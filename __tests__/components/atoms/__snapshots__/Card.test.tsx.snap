@@ -1,0 +1,17 @@
+// Jest Snapshot v1, https://goo.gl/fbAQLP
+
+exports[`Card Component multiple children should render multiple children 1`] = `null`;
+
+exports[`Card Component rendering should render card with children 1`] = `null`;
+
+exports[`Card Component rendering should render empty card 1`] = `null`;
+
+exports[`Card Component spacing should render with different spacing 1`] = `null`;
+
+exports[`Card Component spacing should render with different spacing 2`] = `null`;
+
+exports[`Card Component spacing should render with different spacing 3`] = `null`;
+
+exports[`Card Component spacing should render with different spacing 4`] = `null`;
+
+exports[`Card Component styling should apply custom style 1`] = `null`;

@@ -1,0 +1,23 @@
+// Jest Snapshot v1, https://goo.gl/fbAQLP
+
+exports[`Button Component disabled state should render disabled button 1`] = `null`;
+
+exports[`Button Component rendering should render button with different sizes 1`] = `null`;
+
+exports[`Button Component rendering should render button with different sizes 2`] = `null`;
+
+exports[`Button Component rendering should render button with different sizes 3`] = `null`;
+
+exports[`Button Component rendering should render button with different variants 1`] = `null`;
+
+exports[`Button Component rendering should render button with different variants 2`] = `null`;
+
+exports[`Button Component rendering should render button with different variants 3`] = `null`;
+
+exports[`Button Component rendering should render button with different variants 4`] = `null`;
+
+exports[`Button Component rendering should render button with loading state 1`] = `null`;
+
+exports[`Button Component rendering should render primary button 1`] = `null`;
+
+exports[`Button Component text rendering should render children as text 1`] = `null`;

@@ -1,0 +1,27 @@
+// Jest Snapshot v1, https://goo.gl/fbAQLP
+
+exports[`Badge Component rendering should render badge with icon 1`] = `null`;
+
+exports[`Badge Component rendering should render badge with label 1`] = `null`;
+
+exports[`Badge Component rendering should render badge with numeric label 1`] = `null`;
+
+exports[`Badge Component sizes should render all sizes 1`] = `null`;
+
+exports[`Badge Component sizes should render all sizes 2`] = `null`;
+
+exports[`Badge Component sizes should render all sizes 3`] = `null`;
+
+exports[`Badge Component styling should apply custom style 1`] = `null`;
+
+exports[`Badge Component variants should render all variants 1`] = `null`;
+
+exports[`Badge Component variants should render all variants 2`] = `null`;
+
+exports[`Badge Component variants should render all variants 3`] = `null`;
+
+exports[`Badge Component variants should render all variants 4`] = `null`;
+
+exports[`Badge Component variants should render all variants 5`] = `null`;
+
+exports[`Badge Component variants should render all variants 6`] = `null`;

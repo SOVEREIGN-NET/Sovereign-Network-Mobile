@@ -1,0 +1,27 @@
+// Jest Snapshot v1, https://goo.gl/fbAQLP
+
+exports[`ProgressBar Component percentage clamping should clamp percentage to 0 minimum 1`] = `null`;
+
+exports[`ProgressBar Component percentage clamping should clamp percentage to 100 maximum 1`] = `null`;
+
+exports[`ProgressBar Component percentage clamping should handle valid percentages 1`] = `null`;
+
+exports[`ProgressBar Component percentage clamping should handle valid percentages 2`] = `null`;
+
+exports[`ProgressBar Component percentage clamping should handle valid percentages 3`] = `null`;
+
+exports[`ProgressBar Component percentage clamping should handle valid percentages 4`] = `null`;
+
+exports[`ProgressBar Component percentage clamping should handle valid percentages 5`] = `null`;
+
+exports[`ProgressBar Component rendering should render progress bar 1`] = `null`;
+
+exports[`ProgressBar Component rendering should render with label 1`] = `null`;
+
+exports[`ProgressBar Component rendering should render with percentage display 1`] = `null`;
+
+exports[`ProgressBar Component styling should accept custom color 1`] = `null`;
+
+exports[`ProgressBar Component styling should accept custom height 1`] = `null`;
+
+exports[`ProgressBar Component styling should apply custom style 1`] = `null`;
