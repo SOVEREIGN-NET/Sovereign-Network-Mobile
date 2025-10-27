@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
 
 export interface UseAsyncDataState<T> {
   data: T | null;
@@ -43,27 +43,45 @@ export function useAsyncData<T>(
 
   const [retryCount, setRetryCount] = useState(0);
 
-  const fetchData = useCallback(async () => {
-    setState(prev => ({ ...prev, loading: true, error: null }));
-    try {
-      const result = await asyncFunction();
-      setState({
-        data: result,
-        loading: false,
-        error: null,
-      });
-    } catch (error) {
-      setState({
-        data: null,
-        loading: false,
-        error: error instanceof Error ? error : new Error('Unknown error occurred'),
-      });
-    }
+  // Store the async function in a ref to avoid causing the effect to re-run
+  // when the function is redefined on each render
+  const asyncFunctionRef = useRef(asyncFunction);
+
+  useEffect(() => {
+    asyncFunctionRef.current = asyncFunction;
   }, [asyncFunction]);
 
   useEffect(() => {
+    let mounted = true;
+
+    const fetchData = async () => {
+      setState(prev => ({ ...prev, loading: true, error: null }));
+      try {
+        const result = await asyncFunctionRef.current();
+        if (mounted) {
+          setState({
+            data: result,
+            loading: false,
+            error: null,
+          });
+        }
+      } catch (error) {
+        if (mounted) {
+          setState({
+            data: null,
+            loading: false,
+            error: error instanceof Error ? error : new Error('Unknown error occurred'),
+          });
+        }
+      }
+    };
+
     fetchData();
-  }, [...dependencies, retryCount, fetchData]);
+
+    return () => {
+      mounted = false;
+    };
+  }, [...dependencies, retryCount]);
 
   const retry = useCallback(() => {
     setRetryCount(prev => prev + 1);
