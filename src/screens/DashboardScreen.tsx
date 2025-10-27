@@ -137,8 +137,6 @@ const styles = StyleSheet.create({
     borderRadius: 12,
     padding: 16,
     marginBottom: 16,
-    borderLeftWidth: 4,
-    borderLeftColor: '#00d4ff',
   },
   cardTitle: {
     fontSize: 18,
@@ -205,8 +203,6 @@ const styles = StyleSheet.create({
     paddingHorizontal: 16,
     borderRadius: 8,
     marginBottom: 8,
-    borderLeftWidth: 3,
-    borderLeftColor: '#00d4ff',
   },
   actionButtonText: {
     color: '#ffffff',

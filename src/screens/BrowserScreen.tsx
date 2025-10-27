@@ -298,8 +298,6 @@ const styles = StyleSheet.create({
     borderRadius: 12,
     padding: 16,
     marginBottom: 16,
-    borderLeftWidth: 4,
-    borderLeftColor: '#00d4ff',
   },
   cardTitle: { fontSize: 18, fontWeight: 'bold', color: '#00d4ff', marginBottom: 12 },
   navigationBar: {
@@ -313,12 +311,9 @@ const styles = StyleSheet.create({
     paddingVertical: 10,
     borderRadius: 6,
     alignItems: 'center',
-    borderLeftWidth: 2,
-    borderLeftColor: '#00d4ff',
   },
   navButtonDisabled: {
     opacity: 0.5,
-    borderLeftColor: '#666666',
   },
   navButtonText: { color: '#ffffff', fontWeight: '600', fontSize: 12 },
   addressBarContainer: {
@@ -333,8 +328,6 @@ const styles = StyleSheet.create({
     paddingHorizontal: 12,
     paddingVertical: 10,
     borderRadius: 6,
-    borderLeftWidth: 2,
-    borderLeftColor: '#00d4ff',
     fontSize: 14,
   },
   goButton: {
