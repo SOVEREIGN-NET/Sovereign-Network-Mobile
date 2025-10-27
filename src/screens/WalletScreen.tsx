@@ -17,7 +17,7 @@ import {
   getTransactionColor,
 } from '../utils/colors';
 
-const WalletScreen = () => {
+const WalletScreen = ({ navigation }: any) => {
   const [selectedWalletId, setSelectedWalletId] = useState<string>('wallet-1');
 
   const { data, loading } = useAsyncData(
@@ -105,10 +105,10 @@ const WalletScreen = () => {
       <Card>
         <Text variant="h3">⚡ Actions</Text>
         <Column gap="sm">
-          <Button onPress={() => {}}>📤 Send ZHTP</Button>
-          <Button onPress={() => {}}>📥 Receive ZHTP</Button>
-          <Button onPress={() => {}}>💰 Claim UBI</Button>
-          <Button onPress={() => {}}>🔗 Stake ZHTP</Button>
+          <Button onPress={() => navigation.navigate('SendTokens')}>📤 Send ZHTP</Button>
+          <Button onPress={() => navigation.navigate('ReceiveTokens')}>📥 Receive ZHTP</Button>
+          <Button onPress={() => navigation.navigate('Dashboard', { screen: 'ClaimUBI' })}>💰 Claim UBI</Button>
+          <Button onPress={() => navigation.navigate('StakeTokens')}>🔗 Stake ZHTP</Button>
         </Column>
       </Card>
 

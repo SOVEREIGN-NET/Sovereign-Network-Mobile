@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React from 'react';
 import { ScrollView } from 'react-native';
 import {
   Card,
@@ -14,9 +14,7 @@ import MockDataService from '../services/MockDataService';
 import { colors, spacing } from '../theme';
 import { getProposalStatusColor, getCategoryIcon } from '../utils/colors';
 
-const DAOScreen = () => {
-  const [expandedProposalId, setExpandedProposalId] = useState<string | null>(null);
-
+const DAOScreen = ({ navigation }: any) => {
   const { data, loading } = useAsyncData(
     async () => {
       await new Promise(resolve => setTimeout(resolve, 600));
@@ -34,10 +32,6 @@ const DAOScreen = () => {
 
   const proposals = data?.proposals || [];
   const daoStats = data?.daoStats;
-
-  const handleVote = (proposalId: string, vote: 'yes' | 'no' | 'abstain') => {
-    MockDataService.voteOnProposal(proposalId, vote);
-  };
 
   return (
     <ScrollView
@@ -68,40 +62,21 @@ const DAOScreen = () => {
             <Card key={proposal.id} style={{ backgroundColor: colors.bg_darker }}>
               <Text variant="h3">{getCategoryIcon(proposal.category)} {proposal.title}</Text>
               <Badge variant="info" label={proposal.status} style={{ marginVertical: spacing.sm }} />
-              <Text variant="body" style={{ marginBottom: spacing.sm }}>
+              <Text variant="body" style={{ marginBottom: spacing.md }}>
                 {proposal.description}
               </Text>
 
-              {expandedProposalId === proposal.id && (
-                <Column gap="sm" style={{ marginTop: spacing.md }}>
-                  <Text variant="caption" style={{ color: colors.text_secondary }}>
-                    For: {proposal.votesFor} • Against: {proposal.votesAgainst} • Abstain:{' '}
-                    {proposal.votesAbstain}
-                  </Text>
-                  <Column gap="xs">
-                    <Button onPress={() => handleVote(proposal.id, 'yes')} variant="primary">
-                      Vote For
-                    </Button>
-                    <Button onPress={() => handleVote(proposal.id, 'no')} variant="danger">
-                      Vote Against
-                    </Button>
-                    <Button onPress={() => handleVote(proposal.id, 'abstain')} variant="outline">
-                      Abstain
-                    </Button>
-                  </Column>
-                </Column>
-              )}
+              <Text variant="caption" style={{ color: colors.text_secondary, marginBottom: spacing.md }}>
+                For: {proposal.votesFor} • Against: {proposal.votesAgainst} • Abstain: {proposal.votesAbstain}
+              </Text>
 
               <Button
                 onPress={() =>
-                  setExpandedProposalId(
-                    expandedProposalId === proposal.id ? null : proposal.id,
-                  )
+                  navigation.navigate('ProposalDetail', { proposalId: proposal.id })
                 }
-                variant="outline"
-                style={{ marginTop: spacing.sm }}
+                variant="primary"
               >
-                {expandedProposalId === proposal.id ? 'Hide' : 'Vote'}
+                Vote on Proposal
               </Button>
             </Card>
           ))}

@@ -3,48 +3,99 @@
  * Runs before all tests
  */
 
-// Mock React Native modules
-jest.mock('react-native', () => ({
-  ActivityIndicator: 'ActivityIndicator',
-  View: 'View',
-  Text: 'Text',
-  TouchableOpacity: 'TouchableOpacity',
-  ScrollView: 'ScrollView',
-  Modal: 'Modal',
-  FlatList: 'FlatList',
-  SafeAreaView: 'SafeAreaView',
-  Switch: 'Switch',
-  StyleSheet: {
-    create: (styles: any) => styles,
-  },
-  AsyncStorage: {
-    getItem: jest.fn(),
-    setItem: jest.fn(),
-    removeItem: jest.fn(),
-    clear: jest.fn(),
-  },
-  Animated: {
-    View: 'Animated.View',
-    timing: jest.fn(() => ({
-      start: jest.fn(),
-    })),
-    spring: jest.fn(() => ({
-      start: jest.fn(),
-    })),
-    Value: jest.fn(),
-  },
-}));
+// Mock React Native modules BEFORE any imports
+jest.mock('react-native', () => {
+  const React = require('react');
+  return {
+    ActivityIndicator: 'ActivityIndicator',
+    View: ({ children }: any) => React.createElement('View', {}, children),
+    Text: ({ children }: any) => React.createElement('Text', {}, children),
+    TouchableOpacity: ({ children, onPress }: any) =>
+      React.createElement('TouchableOpacity', { onPress }, children),
+    ScrollView: ({ children }: any) => React.createElement('ScrollView', {}, children),
+    Modal: ({ children }: any) => React.createElement('Modal', {}, children),
+    FlatList: ({ data, renderItem }: any) =>
+      React.createElement('FlatList', {}, data?.map((item: any, i: any) =>
+        React.createElement('View', { key: i }, renderItem?.({ item }))
+      )),
+    SafeAreaView: ({ children }: any) => React.createElement('SafeAreaView', {}, children),
+    Switch: 'Switch',
+    StatusBar: 'StatusBar',
+    Share: {
+      share: jest.fn().mockResolvedValue({ action: 'sharedAction' }),
+    },
+    StyleSheet: {
+      create: (styles: any) => styles,
+    },
+    AsyncStorage: {
+      getItem: jest.fn(),
+      setItem: jest.fn(),
+      removeItem: jest.fn(),
+      clear: jest.fn(),
+    },
+    Animated: {
+      View: ({ children }: any) => React.createElement('Animated.View', {}, children),
+      timing: jest.fn(() => ({
+        start: jest.fn(),
+      })),
+      spring: jest.fn(() => ({
+        start: jest.fn(),
+      })),
+      Value: jest.fn(),
+      createValue: jest.fn(),
+    },
+    useColorScheme: jest.fn(() => 'dark'),
+    Platform: {
+      OS: 'ios',
+      select: (obj: any) => obj.ios,
+    },
+  };
+}, { virtual: true });
 
 // Mock react-native-safe-area-context
-jest.mock('react-native-safe-area-context', () => ({
-  useSafeAreaInsets: () => ({
-    top: 0,
-    right: 0,
-    bottom: 0,
-    left: 0,
-  }),
-  SafeAreaProvider: ({ children }: any) => children,
-}));
+jest.mock('react-native-safe-area-context', () => {
+  const React = require('react');
+  return {
+    useSafeAreaInsets: () => ({
+      top: 0,
+      right: 0,
+      bottom: 0,
+      left: 0,
+    }),
+    SafeAreaProvider: ({ children }: any) => React.createElement('SafeAreaProvider', {}, children),
+  };
+}, { virtual: true });
+
+// Mock React Navigation modules
+jest.mock('@react-navigation/native', () => {
+  const React = require('react');
+  return {
+    NavigationContainer: ({ children }: any) => React.createElement('NavigationContainer', {}, children),
+    DefaultTheme: {},
+    DarkTheme: {},
+    useColorScheme: jest.fn(() => 'dark'),
+  };
+}, { virtual: true });
+
+jest.mock('@react-navigation/bottom-tabs', () => {
+  const React = require('react');
+  return {
+    createBottomTabNavigator: () => ({
+      Navigator: ({ children }: any) => React.createElement('BottomTabNavigator', {}, children),
+      Screen: ({ children }: any) => React.createElement('BottomTabScreen', {}, children),
+    }),
+  };
+}, { virtual: true });
+
+jest.mock('@react-navigation/native-stack', () => {
+  const React = require('react');
+  return {
+    createNativeStackNavigator: () => ({
+      Navigator: ({ children }: any) => React.createElement('StackNavigator', {}, children),
+      Screen: ({ children }: any) => React.createElement('StackScreen', {}, children),
+    }),
+  };
+}, { virtual: true });
 
 // Suppress console errors in tests
 global.console = {

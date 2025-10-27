@@ -12,9 +12,11 @@ export const colors = {
   // Backgrounds
   bg_darkest: '#0f0f1e',      // Main app background
   bg_dark: '#1a1a2e',         // Cards, modals
+  bg_darker: '#16213e',       // Darker cards, nested elements
   bg_medium: '#16213e',       // Buttons, active states
   bg_light: '#2a2a3e',        // Borders, dividers, disabled states
   bg_lighter: '#3a3a4e',      // Hover states
+  surface: '#1a1a2e',         // Surface/card backgrounds
 
   // Text Colors
   text_primary: '#ffffff',    // Primary text

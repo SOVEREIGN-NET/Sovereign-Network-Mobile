@@ -14,6 +14,11 @@ import IdentityScreen from '../screens/IdentityScreen';
 import WalletScreen from '../screens/WalletScreen';
 import DAOScreen from '../screens/DAOScreen';
 import BrowserScreen from '../screens/BrowserScreen';
+import SendTokensScreen from '../screens/SendTokensScreen';
+import ReceiveTokensScreen from '../screens/ReceiveTokensScreen';
+import ProposalDetailScreen from '../screens/ProposalDetailScreen';
+import ClaimUBIScreen from '../screens/ClaimUBIScreen';
+import StakeTokensScreen from '../screens/StakeTokensScreen';
 
 const Stack = createNativeStackNavigator();
 const Tab = createBottomTabNavigator();
@@ -38,6 +43,11 @@ const DashboardStack = () => {
         name="DashboardMain"
         component={DashboardScreen}
         options={{ title: 'ZHTP Dashboard' }}
+      />
+      <Stack.Screen
+        name="ClaimUBI"
+        component={ClaimUBIScreen}
+        options={{ title: 'Claim UBI', headerBackTitle: 'Back' }}
       />
     </Stack.Navigator>
   );
@@ -89,6 +99,21 @@ const WalletStack = () => {
         component={WalletScreen}
         options={{ title: 'Quantum Wallet' }}
       />
+      <Stack.Screen
+        name="SendTokens"
+        component={SendTokensScreen}
+        options={{ title: 'Send ZHTP', headerBackTitle: 'Back' }}
+      />
+      <Stack.Screen
+        name="ReceiveTokens"
+        component={ReceiveTokensScreen}
+        options={{ title: 'Receive ZHTP', headerBackTitle: 'Back' }}
+      />
+      <Stack.Screen
+        name="StakeTokens"
+        component={StakeTokensScreen}
+        options={{ title: 'Stake ZHTP', headerBackTitle: 'Back' }}
+      />
     </Stack.Navigator>
   );
 };
@@ -113,6 +138,11 @@ const DAOStack = () => {
         name="DAOMain"
         component={DAOScreen}
         options={{ title: 'DAO Governance' }}
+      />
+      <Stack.Screen
+        name="ProposalDetail"
+        component={ProposalDetailScreen}
+        options={{ title: 'Proposal Details', headerBackTitle: 'Back' }}
       />
     </Stack.Navigator>
   );

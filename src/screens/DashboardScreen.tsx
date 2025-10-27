@@ -15,7 +15,7 @@ import { useAsyncData } from '../hooks';
 import MockDataService from '../services/MockDataService';
 import { colors, spacing } from '../theme';
 
-const DashboardScreen = () => {
+const DashboardScreen = ({ navigation }: any) => {
   const { data, loading } = useAsyncData(
     async () => {
       await new Promise(resolve => setTimeout(resolve, 800));
@@ -82,13 +82,22 @@ const DashboardScreen = () => {
       {/* Quick Actions */}
       <Card>
         <Text variant="h3">⚡ Quick Actions</Text>
-        <Button onPress={() => {}} style={{ marginBottom: spacing.sm }}>
+        <Button
+          onPress={() => navigation.navigate('Wallet', { screen: 'SendTokens' })}
+          style={{ marginBottom: spacing.sm }}
+        >
           Send ZHTP
         </Button>
-        <Button onPress={() => {}} style={{ marginBottom: spacing.sm }}>
+        <Button
+          onPress={() => navigation.navigate('Dashboard', { screen: 'ClaimUBI' })}
+          style={{ marginBottom: spacing.sm }}
+        >
           Claim UBI
         </Button>
-        <Button onPress={() => {}} style={{ marginBottom: spacing.sm }}>
+        <Button
+          onPress={() => navigation.navigate('DAO')}
+          style={{ marginBottom: spacing.sm }}
+        >
           Vote on Proposal
         </Button>
         <Button onPress={() => {}}>Create Proposal</Button>
