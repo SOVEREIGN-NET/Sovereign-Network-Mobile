@@ -8,13 +8,14 @@ import {
   LoadingView,
   Column,
 } from '../components';
-import { useAsyncData } from '../hooks';
+import { useAsyncData, useAuth } from '../hooks';
 import { useTranslation } from '../i18n';
 import MockDataService from '../services/MockDataService';
-import { colors, spacing } from '../theme';
+import { colors, spacing, typography, borderRadius } from '../theme';
 
 const IdentityScreen = () => {
   const { t } = useTranslation();
+  const { signOut, isLoading: authLoading } = useAuth();
 
   const { data: identity, loading } = useAsyncData(
     async () => {
@@ -23,6 +24,14 @@ const IdentityScreen = () => {
     },
     [],
   );
+
+  const handleLogout = async () => {
+    try {
+      await signOut();
+    } catch (error) {
+      console.error('Logout failed:', error);
+    }
+  };
 
   if (loading) {
     return <LoadingView />;
@@ -43,10 +52,10 @@ const IdentityScreen = () => {
             alignItems: 'center',
             paddingVertical: spacing.lg,
             backgroundColor: colors.bg_darker,
-            borderRadius: 8,
+            borderRadius: borderRadius.base,
           }}
         >
-          <Text style={{ fontSize: 48, marginBottom: spacing.sm }}>
+          <Text style={{ fontSize: typography.size['5xl'], marginBottom: spacing.sm }}>
             {identity?.avatar}
           </Text>
           <Text variant="h2" style={{ marginBottom: spacing.xs }}>
@@ -73,15 +82,40 @@ const IdentityScreen = () => {
 
       <Card>
         <Column gap="sm">
-          <Button onPress={() => {}}>
+          <Button onPress={() => {}} variant="secondary">
             {t.identity.actions.createIdentity}
           </Button>
-          <Button onPress={() => {}}>
+          <Button onPress={() => {}} variant="secondary">
             {t.identity.actions.backupIdentity}
           </Button>
-          <Button onPress={() => {}}>
+          <Button onPress={() => {}} variant="secondary">
             {t.identity.actions.verifyBiometric}
           </Button>
+        </Column>
+      </Card>
+
+      <Card>
+        <Column gap="sm">
+          <Button
+            onPress={handleLogout}
+            disabled={authLoading}
+            variant="outline"
+            style={{
+              borderColor: colors.error,
+            }}
+          >
+            {authLoading ? t.identity.logout.buttonLoading : t.identity.logout.button}
+          </Button>
+          <Text
+            style={{
+              fontSize: typography.size.xs,
+              color: colors.text_tertiary,
+              textAlign: 'center',
+              marginTop: spacing.xs,
+            }}
+          >
+            {t.identity.logout.hint}
+          </Text>
         </Column>
       </Card>
     </ScrollView>
