@@ -51,7 +51,7 @@ const ReceiveTokensScreen = ({ navigation }: any) => {
             </Text>
           </Card>
 
-          <Button onPress={handleCopyAddress}>Copy Address</Button>
+          <Button onPress={handleCopyAddress}> COPY ADDRESS </Button>
           <Button onPress={handleShareAddress} variant="outline">
             Share Address
           </Button>

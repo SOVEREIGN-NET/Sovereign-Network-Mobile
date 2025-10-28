@@ -70,9 +70,9 @@ const IdentityScreen = () => {
 
       <Card>
         <Column gap="sm">
-          <Button onPress={() => {}}>Create Identity</Button>
-          <Button onPress={() => {}}>Backup Identity</Button>
-          <Button onPress={() => {}}>Verify Biometric</Button>
+          <Button onPress={() => {}}> CREATE IDENTITY </Button>
+          <Button onPress={() => {}}> BACKUP IDENTITY </Button>
+          <Button onPress={() => {}}> VERIFY BIOMETRIC </Button>
         </Column>
       </Card>
     </ScrollView>

@@ -43,7 +43,7 @@ const DAOScreen = ({ navigation }: any) => {
     >
       {/* DAO Statistics */}
       {daoStats && (
-        <Card>
+        <Card spacing="xl">
           <Text variant="h3">📊 DAO Statistics</Text>
           <Column gap="lg" style={{ marginTop: spacing.lg }}>
             {/* Row 1 */}
@@ -91,26 +91,43 @@ const DAOScreen = ({ navigation }: any) => {
       {/* Proposals List */}
       <Card>
         <Text variant="h3">🗳️ Active Proposals</Text>
-        <Column gap="md">
+        <Column gap="lg" style={{ marginTop: spacing.lg }}>
           {proposals.map(proposal => (
-            <Card key={proposal.id} style={{ backgroundColor: colors.bg_darker }}>
-              <Text variant="h3">{getCategoryIcon(proposal.category)} {proposal.title}</Text>
-              <Badge variant="info" label={proposal.status} style={{ marginVertical: spacing.sm }} />
-              <Text variant="body" style={{ marginBottom: spacing.md }}>
+            <Card
+              key={proposal.id}
+              style={{
+                backgroundColor: colors.bg_darker,
+                padding: spacing.lg,
+              }}
+              spacing="sm"
+            >
+              <Text variant="h3" style={{ marginBottom: spacing.lg }}>
+                {getCategoryIcon(proposal.category)} {proposal.title}
+              </Text>
+              <Badge
+                variant="info"
+                label={proposal.status}
+                style={{ marginBottom: spacing.lg, alignSelf: 'flex-start' }}
+              />
+              <Text variant="body" style={{ marginBottom: spacing.lg }}>
                 {proposal.description}
               </Text>
 
-              <Text variant="caption" style={{ color: colors.text_secondary, marginBottom: spacing.md }}>
-                For: {proposal.votesFor} • Against: {proposal.votesAgainst} • Abstain: {proposal.votesAbstain}
+              <Text
+                variant="caption"
+                style={{ color: colors.text_secondary, marginBottom: spacing.lg }}
+              >
+                For: {proposal.votesFor} • Against: {proposal.votesAgainst} • Abstain:{' '}
+                {proposal.votesAbstain}
               </Text>
 
               <Button
                 onPress={() =>
                   navigation.navigate('ProposalDetail', { proposalId: proposal.id })
                 }
-                variant="primary"
+                variant="secondary"
               >
-                Vote on Proposal
+                VIEW PROPOSAL
               </Button>
             </Card>
           ))}

@@ -18,7 +18,7 @@ const SendTokensScreen = ({ navigation }: any) => {
             onChangeText={setRecipient}
           />
           <Input placeholder="Amount" value={amount} onChangeText={setAmount} keyboardType="decimal-pad" />
-          <Button onPress={() => navigation.goBack()}>Send</Button>
+          <Button onPress={() => navigation.goBack()}> SEND </Button>
           <Button onPress={() => navigation.goBack()} variant="outline">
             Cancel
           </Button>

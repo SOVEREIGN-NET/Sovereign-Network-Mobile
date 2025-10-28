@@ -74,20 +74,20 @@ const DashboardScreen = ({ navigation }: any) => {
             onPress={() => navigation.navigate('Identity')}
             style={{ marginBottom: spacing.xs }}
           >
-            👤 Manage Identity
+            👤 MANAGE IDENTITY
           </Button>
           <Button
             variant="secondary"
             onPress={() => navigation.navigate('Wallet')}
             style={{ marginBottom: spacing.xs }}
           >
-            💼 View Wallet
+            💼 VIEW WALLET
           </Button>
           <Button
             variant="secondary"
             onPress={() => navigation.navigate('Browser')}
           >
-            🌐 Web4 Browser
+            🌐 WEB4 BROWSER
           </Button>
         </Column>
       </Card>
@@ -99,21 +99,21 @@ const DashboardScreen = ({ navigation }: any) => {
           onPress={() => navigation.navigate('Wallet', { screen: 'SendTokens' })}
           style={{ marginBottom: spacing.sm }}
         >
-          Send ZHTP
+          SEND ZHTP
         </Button>
         <Button
           onPress={() => navigation.navigate('Dashboard', { screen: 'ClaimUBI' })}
           style={{ marginBottom: spacing.sm }}
         >
-          Claim UBI
+          CLAIM UBI
         </Button>
         <Button
           onPress={() => navigation.navigate('DAO')}
           style={{ marginBottom: spacing.sm }}
         >
-          Vote on Proposal
+          VOTE ON PROPOSAL
         </Button>
-        <Button onPress={() => {}}>Create Proposal</Button>
+        <Button onPress={() => {}}>CREATE PROPOSAL</Button>
       </Card>
 
       {/* About Section */}

@@ -84,7 +84,7 @@ const BrowserScreen = () => {
             onChangeText={setUrlInput}
             onSubmitEditing={handleNavigate}
           />
-          <Button onPress={handleNavigate}>Navigate</Button>
+          <Button onPress={handleNavigate}> NAVIGATE </Button>
           <Text variant="caption" style={{ color: colors.success, textAlign: 'center' }}>
             🟢 Connected to ZHTP Network
           </Text>
