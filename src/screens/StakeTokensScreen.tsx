@@ -29,7 +29,7 @@ const StakeTokensScreen = ({ navigation }: any) => {
   };
 
   return (
-    <ScrollView style={{ flex: 1, backgroundColor: colors.bg_dark, padding: spacing.md }}>
+    <ScrollView style={{ flex: 1, backgroundColor: colors.bg_dark, padding: spacing.lg }}>
       <Card>
         <Text variant="h2" style={{ marginBottom: spacing.md }}>
           🔗 Stake ZHTP
@@ -83,7 +83,7 @@ const StakeTokensScreen = ({ navigation }: any) => {
             </Text>
           </Column>
 
-          <Column gap="sm" style={{ marginTop: spacing.md, padding: spacing.md, backgroundColor: colors.bg_darker, borderRadius: 8 }}>
+          <Column gap="sm" style={{ marginTop: spacing.md, padding: spacing.lg, backgroundColor: colors.bg_darker, borderRadius: 8 }}>
             <Text variant="h3">ℹ️ Staking Benefits</Text>
             <Text variant="body" style={{ color: colors.text_secondary }}>
               • Earn passive rewards by securing the network

@@ -23,7 +23,7 @@ const ReceiveTokensScreen = ({ navigation }: any) => {
   };
 
   return (
-    <ScrollView style={{ flex: 1, backgroundColor: colors.bg_dark, padding: spacing.md }}>
+    <ScrollView style={{ flex: 1, backgroundColor: colors.bg_dark, padding: spacing.lg }}>
       <Card>
         <Text variant="h2">Receive ZHTP</Text>
         <Column gap="md" style={{ marginTop: spacing.md }}>

@@ -44,17 +44,17 @@ export const colors = {
   white: '#ffffff',
   transparent: 'transparent',
 
-  // Borders
-  border: '#2a2a3e',
-  border_light: '#3a3a4e',
+  // Borders - Very subtle, almost invisible
+  border: 'rgba(0, 212, 255, 0.08)',      // Ultra subtle primary border
+  border_light: 'rgba(255, 255, 255, 0.06)', // Very subtle light border
 } as const;
 
 export const spacing = {
-  // Spacing scale
-  xs: 4,      // Minimal spacing
-  sm: 8,      // Small gaps
-  md: 12,     // Medium gaps (default padding)
-  lg: 16,     // Large gaps (default padding for cards)
+  // Spacing scale - More generous for better aesthetics
+  xs: 6,      // Minimal spacing
+  sm: 10,     // Small gaps
+  md: 14,     // Medium gaps (default padding)
+  lg: 18,     // Large gaps (default padding for cards)
   xl: 24,     // Extra large spacing
   '2xl': 32,  // Large sections
   '3xl': 48,  // Major sections
@@ -92,17 +92,18 @@ export const typography = {
 } as const;
 
 export const borderRadius = {
-  // Border radius scale
-  sm: 3,      // Health bars, small elements
-  base: 4,    // Buttons, small inputs
-  md: 6,      // Input fields
-  lg: 8,      // Cards, containers
-  xl: 12,     // Large cards (main pattern)
+  // Border radius scale - Generous rounded corners for modern look
+  sm: 6,      // Health bars, small elements
+  base: 10,   // Buttons, small inputs
+  md: 12,     // Input fields
+  lg: 14,     // Cards, containers
+  xl: 16,     // Large cards (main pattern, matches Browser design)
+  '2xl': 20,  // Extra large cards
   full: 9999, // Circular elements
 } as const;
 
 export const shadows = {
-  // Elevation shadows (currently not used, but reserved)
+  // Subtle elevation shadows matching Browser design
   none: {
     shadowColor: 'transparent',
     shadowOffset: { width: 0, height: 0 },
@@ -111,25 +112,25 @@ export const shadows = {
     elevation: 0,
   },
   sm: {
-    shadowColor: 'rgba(0, 0, 0, 0.1)',
-    shadowOffset: { width: 0, height: 1 },
-    shadowOpacity: 0.2,
-    shadowRadius: 1.41,
+    shadowColor: 'rgba(0, 0, 0, 0.08)',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.15,
+    shadowRadius: 3,
     elevation: 2,
   },
   md: {
-    shadowColor: 'rgba(0, 0, 0, 0.15)',
+    shadowColor: 'rgba(0, 0, 0, 0.12)',
     shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.3,
-    shadowRadius: 4.65,
-    elevation: 8,
+    shadowOpacity: 0.2,
+    shadowRadius: 5,
+    elevation: 4,
   },
   lg: {
-    shadowColor: 'rgba(0, 0, 0, 0.25)',
+    shadowColor: 'rgba(0, 0, 0, 0.15)',
     shadowOffset: { width: 0, height: 8 },
-    shadowOpacity: 0.4,
-    shadowRadius: 10,
-    elevation: 15,
+    shadowOpacity: 0.25,
+    shadowRadius: 8,
+    elevation: 8,
   },
 } as const;
 

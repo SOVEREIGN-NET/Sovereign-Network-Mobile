@@ -14,7 +14,7 @@ const ProposalDetailScreen = ({ route, navigation }: any) => {
   const againstPercentage = totalVotes > 0 ? (proposal.votesAgainst / totalVotes) * 100 : 0;
 
   return (
-    <ScrollView style={{ flex: 1, backgroundColor: colors.bg_dark, padding: spacing.md }}>
+    <ScrollView style={{ flex: 1, backgroundColor: colors.bg_dark, padding: spacing.lg }}>
       <Card>
         <Text variant="h2" style={{ marginBottom: spacing.md }}>
           {proposal.title}

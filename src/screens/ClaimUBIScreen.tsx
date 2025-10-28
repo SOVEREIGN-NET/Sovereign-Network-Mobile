@@ -20,7 +20,7 @@ const ClaimUBIScreen = ({ navigation }: any) => {
   };
 
   return (
-    <ScrollView style={{ flex: 1, backgroundColor: colors.bg_dark, padding: spacing.md }}>
+    <ScrollView style={{ flex: 1, backgroundColor: colors.bg_dark, padding: spacing.lg }}>
       <Card>
         <Text variant="h2" style={{ marginBottom: spacing.md }}>
           💰 Universal Basic Income
@@ -56,7 +56,7 @@ const ClaimUBIScreen = ({ navigation }: any) => {
             <Text variant="body">{nextClaimDate}</Text>
           </Column>
 
-          <Column gap="sm" style={{ marginTop: spacing.lg, padding: spacing.md, backgroundColor: colors.bg_darker, borderRadius: 8 }}>
+          <Column gap="sm" style={{ marginTop: spacing.lg, padding: spacing.lg, backgroundColor: colors.bg_darker, borderRadius: 8 }}>
             <Text variant="h3">ℹ️ About UBI</Text>
             <Text variant="body" style={{ color: colors.text_secondary }}>
               Universal Basic Income is automatically distributed to all ZHTP network participants who meet identity verification requirements.

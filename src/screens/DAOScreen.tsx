@@ -38,18 +38,52 @@ const DAOScreen = ({ navigation }: any) => {
       style={{
         flex: 1,
         backgroundColor: colors.bg_dark,
-        padding: spacing.md,
+        padding: spacing.lg,
       }}
     >
       {/* DAO Statistics */}
       {daoStats && (
         <Card>
           <Text variant="h3">📊 DAO Statistics</Text>
-          <Column gap="md" style={{ flexDirection: 'row', flexWrap: 'wrap', justifyContent: 'space-around' }}>
-            <StatBox label="Members" value={daoStats.totalMembers?.toString() || '0'} />
-            <StatBox label="Active" value={daoStats.activeProposals?.toString() || '0'} />
-            <StatBox label="Total" value={daoStats.totalProposals?.toString() || '0'} />
-            <StatBox label="Treasury" value={(daoStats.treasuryBalance || 0).toLocaleString()} />
+          <Column gap="lg" style={{ marginTop: spacing.lg }}>
+            {/* Row 1 */}
+            <Column
+              gap="lg"
+              style={{
+                flexDirection: 'row',
+                justifyContent: 'space-between',
+              }}
+            >
+              <StatBox
+                label="Members"
+                value={daoStats.totalMembers?.toString() || '0'}
+                style={{ flex: 1 }}
+              />
+              <StatBox
+                label="Active"
+                value={daoStats.activeProposals?.toString() || '0'}
+                style={{ flex: 1 }}
+              />
+            </Column>
+            {/* Row 2 */}
+            <Column
+              gap="lg"
+              style={{
+                flexDirection: 'row',
+                justifyContent: 'space-between',
+              }}
+            >
+              <StatBox
+                label="Total"
+                value={daoStats.totalProposals?.toString() || '0'}
+                style={{ flex: 1 }}
+              />
+              <StatBox
+                label="Treasury"
+                value={(daoStats.treasuryBalance || 0).toLocaleString()}
+                style={{ flex: 1 }}
+              />
+            </Column>
           </Column>
         </Card>
       )}

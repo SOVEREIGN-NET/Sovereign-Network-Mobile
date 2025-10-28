@@ -8,7 +8,7 @@ const SendTokensScreen = ({ navigation }: any) => {
   const [amount, setAmount] = React.useState('');
 
   return (
-    <ScrollView style={{ flex: 1, backgroundColor: colors.bg_dark, padding: spacing.md }}>
+    <ScrollView style={{ flex: 1, backgroundColor: colors.bg_dark, padding: spacing.lg }}>
       <Card>
         <Text variant="h2">Send ZHTP</Text>
         <Column gap="md" style={{ marginTop: spacing.md }}>

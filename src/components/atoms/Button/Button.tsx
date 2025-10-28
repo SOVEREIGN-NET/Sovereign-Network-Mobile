@@ -27,7 +27,7 @@ const styles = StyleSheet.create({
   button: {
     alignItems: 'center',
     justifyContent: 'center',
-    borderRadius: borderRadius.md,
+    borderRadius: borderRadius.base,
     flexDirection: 'row',
     gap: spacing.sm,
   },
@@ -45,12 +45,15 @@ const styles = StyleSheet.create({
   primaryTextDisabled: {
     color: colors.text_tertiary,
   },
-  // Variant: Secondary
+  // Variant: Secondary (Transparent with border, like Browser app)
   secondaryButton: {
-    backgroundColor: colors.bg_medium,
+    backgroundColor: 'rgba(255, 255, 255, 0.08)',
+    borderWidth: 1,
+    borderColor: 'rgba(255, 255, 255, 0.15)',
   },
   secondaryButtonDisabled: {
-    backgroundColor: colors.bg_light,
+    backgroundColor: 'rgba(255, 255, 255, 0.04)',
+    borderColor: 'rgba(255, 255, 255, 0.08)',
   },
   secondaryText: {
     color: colors.text_primary,

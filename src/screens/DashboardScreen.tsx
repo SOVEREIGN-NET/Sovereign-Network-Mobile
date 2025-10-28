@@ -39,7 +39,7 @@ const DashboardScreen = ({ navigation }: any) => {
       style={{
         flex: 1,
         backgroundColor: colors.bg_dark,
-        padding: spacing.md,
+        padding: spacing.lg,
       }}
     >
       {/* Status Card */}
@@ -65,18 +65,31 @@ const DashboardScreen = ({ navigation }: any) => {
         </Column>
       </Card>
 
-      {/* DAO Stats Card */}
+      {/* Explore More Card */}
       <Card>
-        <Text variant="h3">🏛️ DAO Statistics</Text>
-        <View style={{ flexDirection: 'row', flexWrap: 'wrap', justifyContent: 'space-around' }}>
-          <StatBox label="Members" value={daoStats?.totalMembers?.toString() || '0'} />
-          <StatBox label="Active" value={daoStats?.activeProposals?.toString() || '0'} />
-          <StatBox label="Total" value={daoStats?.totalProposals?.toString() || '0'} />
-          <StatBox
-            label="Treasury"
-            value={(daoStats?.treasuryBalance || 0).toLocaleString()}
-          />
-        </View>
+        <Text variant="h3">🔍 Explore</Text>
+        <Column gap="md" style={{ marginTop: spacing.md }}>
+          <Button
+            variant="secondary"
+            onPress={() => navigation.navigate('Identity')}
+            style={{ marginBottom: spacing.xs }}
+          >
+            👤 Manage Identity
+          </Button>
+          <Button
+            variant="secondary"
+            onPress={() => navigation.navigate('Wallet')}
+            style={{ marginBottom: spacing.xs }}
+          >
+            💼 View Wallet
+          </Button>
+          <Button
+            variant="secondary"
+            onPress={() => navigation.navigate('Browser')}
+          >
+            🌐 Web4 Browser
+          </Button>
+        </Column>
       </Card>
 
       {/* Quick Actions */}

@@ -30,7 +30,7 @@ const IdentityScreen = () => {
       style={{
         flex: 1,
         backgroundColor: colors.bg_dark,
-        padding: spacing.md,
+        padding: spacing.lg,
       }}
     >
       <Card>

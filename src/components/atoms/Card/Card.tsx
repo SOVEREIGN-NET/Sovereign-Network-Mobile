@@ -1,6 +1,6 @@
 import React from 'react';
 import { View, StyleSheet, ViewStyle } from 'react-native';
-import { colors, spacing, borderRadius } from '../../../theme';
+import { colors, spacing, borderRadius, shadows } from '../../../theme';
 
 export interface CardProps {
   children: React.ReactNode;
@@ -16,6 +16,7 @@ const styles = StyleSheet.create({
     marginBottom: spacing.lg,
     borderWidth: 1,
     borderColor: colors.border,
+    ...shadows.md,
   },
   cardSmallSpacing: {
     marginBottom: spacing.sm,
