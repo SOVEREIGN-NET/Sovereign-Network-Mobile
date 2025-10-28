@@ -7,6 +7,7 @@ import {
 import { createNativeStackNavigator } from '@react-navigation/native-stack';
 import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
 import { useColorScheme } from 'react-native';
+import { colors } from '../theme/tokens';
 
 // Screens
 import DashboardScreen from '../screens/DashboardScreen';
@@ -29,15 +30,14 @@ const DashboardStack = () => {
       screenOptions={{
         headerShown: true,
         headerStyle: {
-          backgroundColor: '#1a1a2e',
+          backgroundColor: colors.bg_dark,
         },
-        headerTintColor: '#00d4ff',
+        headerTintColor: colors.primary,
         headerTitleStyle: {
           fontWeight: 'bold',
-          color: '#ffffff',
+          color: colors.text_primary,
         },
-        cardStyle: { backgroundColor: '#0f0f1e' },
-      }}
+      } as any}
     >
       <Stack.Screen
         name="DashboardMain"
@@ -59,14 +59,13 @@ const IdentityStack = () => {
       screenOptions={{
         headerShown: true,
         headerStyle: {
-          backgroundColor: '#1a1a2e',
+          backgroundColor: colors.bg_dark,
         },
-        headerTintColor: '#00d4ff',
+        headerTintColor: colors.primary,
         headerTitleStyle: {
           fontWeight: 'bold',
-          color: '#ffffff',
+          color: colors.text_primary,
         },
-        cardStyle: { backgroundColor: '#0f0f1e' },
       }}
     >
       <Stack.Screen
@@ -84,14 +83,13 @@ const WalletStack = () => {
       screenOptions={{
         headerShown: true,
         headerStyle: {
-          backgroundColor: '#1a1a2e',
+          backgroundColor: colors.bg_dark,
         },
-        headerTintColor: '#00d4ff',
+        headerTintColor: colors.primary,
         headerTitleStyle: {
           fontWeight: 'bold',
-          color: '#ffffff',
+          color: colors.text_primary,
         },
-        cardStyle: { backgroundColor: '#0f0f1e' },
       }}
     >
       <Stack.Screen
@@ -124,14 +122,13 @@ const DAOStack = () => {
       screenOptions={{
         headerShown: true,
         headerStyle: {
-          backgroundColor: '#1a1a2e',
+          backgroundColor: colors.bg_dark,
         },
-        headerTintColor: '#00d4ff',
+        headerTintColor: colors.primary,
         headerTitleStyle: {
           fontWeight: 'bold',
-          color: '#ffffff',
+          color: colors.text_primary,
         },
-        cardStyle: { backgroundColor: '#0f0f1e' },
       }}
     >
       <Stack.Screen
@@ -154,14 +151,13 @@ const BrowserStack = () => {
       screenOptions={{
         headerShown: true,
         headerStyle: {
-          backgroundColor: '#1a1a2e',
+          backgroundColor: colors.bg_dark,
         },
-        headerTintColor: '#00d4ff',
+        headerTintColor: colors.primary,
         headerTitleStyle: {
           fontWeight: 'bold',
-          color: '#ffffff',
+          color: colors.text_primary,
         },
-        cardStyle: { backgroundColor: '#0f0f1e' },
       }}
     >
       <Stack.Screen
@@ -183,12 +179,12 @@ const RootNavigator = () => {
         screenOptions={{
           headerShown: false,
           tabBarStyle: {
-            backgroundColor: '#1a1a2e',
-            borderTopColor: '#00d4ff',
+            backgroundColor: colors.bg_dark,
+            borderTopColor: colors.primary,
             borderTopWidth: 1,
           },
-          tabBarActiveTintColor: '#00d4ff',
-          tabBarInactiveTintColor: '#888888',
+          tabBarActiveTintColor: colors.primary,
+          tabBarInactiveTintColor: colors.text_tertiary,
         }}
       >
         <Tab.Screen

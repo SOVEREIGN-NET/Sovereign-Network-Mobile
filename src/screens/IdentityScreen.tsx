@@ -15,7 +15,7 @@ import { colors, spacing } from '../theme';
 const IdentityScreen = () => {
   const { data: identity, loading } = useAsyncData(
     async () => {
-      await new Promise(resolve => setTimeout(resolve, 500));
+      await new Promise<void>(resolve => setTimeout(() => resolve(), 500));
       return MockDataService.getIdentity();
     },
     [],

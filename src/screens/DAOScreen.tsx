@@ -17,7 +17,7 @@ import { getProposalStatusColor, getCategoryIcon } from '../utils/colors';
 const DAOScreen = ({ navigation }: any) => {
   const { data, loading } = useAsyncData(
     async () => {
-      await new Promise(resolve => setTimeout(resolve, 600));
+      await new Promise<void>(resolve => setTimeout(() => resolve(), 600));
       return {
         proposals: MockDataService.getProposals(),
         daoStats: MockDataService.getDAOStats(),

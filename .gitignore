@@ -100,3 +100,11 @@ Thumbs.db
 
 # Watchman
 .watchman-cookie_
+docs/SCREENS_DIRECTORY_STRUCTURE.md
+.gitignore
+docs/REFACTORING_SUMMARY.md
+docs/NATIVE_MIGRATION_PLAN.md
+docs/EXPLORATION_SUMMARY.txt
+docs/ARCHITECTURE_ANALYSIS.md
+docs/SCREENS_ANALYSIS_INDEX.md
+.gitignore

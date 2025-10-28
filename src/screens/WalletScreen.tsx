@@ -22,7 +22,7 @@ const WalletScreen = ({ navigation }: any) => {
 
   const { data, loading } = useAsyncData(
     async () => {
-      await new Promise(resolve => setTimeout(resolve, 500));
+      await new Promise<void>(resolve => setTimeout(() => resolve(), 500));
       return {
         wallets: MockDataService.getWallets(),
         transactions: MockDataService.getTransactions(),
