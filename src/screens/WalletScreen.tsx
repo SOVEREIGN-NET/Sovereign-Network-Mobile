@@ -105,10 +105,18 @@ const WalletScreen = ({ navigation }: any) => {
       <Card>
         <Text variant="h3">⚡ Actions</Text>
         <Column gap="sm">
-          <Button onPress={() => navigation.navigate('SendTokens')}>📤 Send ZHTP</Button>
-          <Button onPress={() => navigation.navigate('ReceiveTokens')}>📥 Receive ZHTP</Button>
-          <Button onPress={() => navigation.navigate('Dashboard', { screen: 'ClaimUBI' })}>💰 Claim UBI</Button>
-          <Button onPress={() => navigation.navigate('StakeTokens')}>🔗 Stake ZHTP</Button>
+          <Button onPress={() => navigation.navigate('SendTokens')}>
+            <Text>📤 Send ZHTP</Text>
+          </Button>
+          <Button onPress={() => navigation.navigate('ReceiveTokens')}>
+            <Text>📥 Receive ZHTP</Text>
+          </Button>
+          <Button onPress={() => navigation.navigate('Dashboard', { screen: 'ClaimUBI' })}>
+            <Text>💰 Claim UBI</Text>
+          </Button>
+          <Button onPress={() => navigation.navigate('StakeTokens')}>
+            <Text>🔗 Stake ZHTP</Text>
+          </Button>
         </Column>
       </Card>
 

@@ -117,7 +117,7 @@ const BrowserScreen = () => {
               }}
               variant="outline"
             >
-              {site.emoji} {site.title}
+              <Text>{site.emoji} {site.title}</Text>
             </Button>
           ))}
         </Column>

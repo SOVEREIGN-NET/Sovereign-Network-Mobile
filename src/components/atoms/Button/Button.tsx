@@ -212,7 +212,9 @@ export const Button = React.memo(
         testID={testID}
       >
         {loading && <ActivityIndicator size="small" color={colors.primary} />}
-        {typeof children === 'string' ? (
+        {typeof children === 'string' || typeof children === 'number' ? (
+          <Text style={getTextStyle()}>{children}</Text>
+        ) : Array.isArray(children) ? (
           <Text style={getTextStyle()}>{children}</Text>
         ) : (
           children
