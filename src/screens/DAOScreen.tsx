@@ -36,6 +36,7 @@ const DAOScreen = ({ navigation }: any) => {
 
   return (
     <ScrollView
+      testID="dao-screen"
       style={{
         flex: 1,
         backgroundColor: colors.bg_dark,

@@ -36,6 +36,7 @@ const DashboardScreen = ({ navigation }: any) => {
 
   return (
     <ScrollView
+      testID="dashboard-screen"
       style={{
         flex: 1,
         backgroundColor: colors.bg_dark,

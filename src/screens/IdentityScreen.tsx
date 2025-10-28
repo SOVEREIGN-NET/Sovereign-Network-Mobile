@@ -39,6 +39,7 @@ const IdentityScreen = () => {
 
   return (
     <ScrollView
+      testID="identity-screen"
       style={{
         flex: 1,
         backgroundColor: colors.bg_dark,

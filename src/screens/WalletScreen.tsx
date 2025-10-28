@@ -48,6 +48,7 @@ const WalletScreen = ({ navigation }: any) => {
 
   return (
     <ScrollView
+      testID="wallet-screen"
       style={{
         flex: 1,
         backgroundColor: colors.bg_dark,

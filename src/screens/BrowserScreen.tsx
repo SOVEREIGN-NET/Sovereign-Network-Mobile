@@ -70,6 +70,7 @@ const BrowserScreen = () => {
 
   return (
     <ScrollView
+      testID="browser-screen"
       style={{
         flex: 1,
         backgroundColor: colors.bg_dark,

@@ -193,7 +193,6 @@ const RootNavigator = () => {
           options={{
             title: 'Home',
             tabBarLabel: 'Home',
-            tabBarTestID: 'tab-dashboard',
           }}
         />
         <Tab.Screen
@@ -202,7 +201,6 @@ const RootNavigator = () => {
           options={{
             title: 'Identity',
             tabBarLabel: 'Identity',
-            tabBarTestID: 'tab-identity',
           }}
         />
         <Tab.Screen
@@ -211,7 +209,6 @@ const RootNavigator = () => {
           options={{
             title: 'Wallet',
             tabBarLabel: 'Wallet',
-            tabBarTestID: 'tab-wallet',
           }}
         />
         <Tab.Screen
@@ -220,7 +217,6 @@ const RootNavigator = () => {
           options={{
             title: 'DAO',
             tabBarLabel: 'DAO',
-            tabBarTestID: 'tab-dao',
           }}
         />
         <Tab.Screen
@@ -229,7 +225,6 @@ const RootNavigator = () => {
           options={{
             title: 'Web4',
             tabBarLabel: 'Web4',
-            tabBarTestID: 'tab-browser',
           }}
         />
       </Tab.Navigator>
