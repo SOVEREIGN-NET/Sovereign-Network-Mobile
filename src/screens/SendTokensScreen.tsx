@@ -2,7 +2,7 @@ import React from 'react';
 import { ScrollView, View } from 'react-native';
 import { Card, Text, Button, Column, Input } from '../components';
 import { useTranslation } from '../i18n';
-import { colors, spacing, typography } from '../theme';
+import { colors, spacing } from '../theme';
 
 interface ValidationErrors {
   recipient?: string;
