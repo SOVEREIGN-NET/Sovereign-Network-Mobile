@@ -4,6 +4,13 @@
  */
 
 export const en = {
+  // App
+  app: {
+    title: 'ZHTP Web4',
+    loading: 'Loading...',
+    error: 'Error: Auth context not available',
+  },
+
   // Dashboard Screen
   dashboard: {
     loadingMessage: 'Loading ZHTP Dashboard...',
@@ -34,6 +41,19 @@ export const en = {
       description: 'ZHTP Web4 Mobile - Zero-Knowledge Hypertext Transfer Protocol',
       version: 'Version 1.0.0 (Demo Mode)',
       disclaimer: 'This is a frontend demonstration. No blockchain operations are executed.',
+    },
+  },
+
+  // Auth Screens
+  auth: {
+    signIn: {
+      title: 'Sign In',
+    },
+    createIdentity: {
+      title: 'Create Identity',
+    },
+    recoverIdentity: {
+      title: 'Recover Identity',
     },
   },
 
