@@ -54,6 +54,25 @@ export const en = {
       verifyBiometric: 'VERIFY BIOMETRIC',
     },
   },
+
+  // Wallet Screen
+  wallet: {
+    title: 'Quantum Wallet',
+    balance: {
+      title: 'Balance',
+    },
+    actions: {
+      title: 'Actions',
+      sendZhtp: 'SEND ZHTP',
+      receiveZhtp: 'RECEIVE ZHTP',
+      claimUbi: 'CLAIM UBI',
+      stakeZhtp: 'STAKE ZHTP',
+    },
+    transactions: {
+      title: 'Recent Transactions',
+      noTransactions: 'No transactions yet',
+    },
+  },
 } as const;
 
 export type Translation = typeof en;

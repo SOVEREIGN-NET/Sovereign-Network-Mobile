@@ -1,16 +1,16 @@
 import React, { useState } from 'react';
-import { ScrollView, View, FlatList } from 'react-native';
+import { ScrollView, View } from 'react-native';
 import {
   Card,
   Text,
   Button,
   LoadingView,
   Column,
-  Row,
   ListItem,
 } from '../components';
 import { useAsyncData } from '../hooks';
-import MockDataService, { Wallet, Transaction } from '../services/MockDataService';
+import { useTranslation } from '../i18n';
+import MockDataService from '../services/MockDataService';
 import { colors, spacing } from '../theme';
 import {
   getTransactionIcon,
@@ -18,6 +18,7 @@ import {
 } from '../utils/colors';
 
 const WalletScreen = ({ navigation }: any) => {
+  const { t } = useTranslation();
   const [selectedWalletId, setSelectedWalletId] = useState<string>('wallet-1');
 
   const { data, loading } = useAsyncData(
@@ -39,6 +40,12 @@ const WalletScreen = ({ navigation }: any) => {
   const transactions = data?.transactions || [];
   const selectedWallet = wallets.find(w => w.id === selectedWalletId);
 
+  const getStatusColor = (status: string): string => {
+    if (status === 'confirmed') return colors.success;
+    if (status === 'pending') return colors.warning;
+    return colors.error;
+  };
+
   return (
     <ScrollView
       style={{
@@ -49,7 +56,7 @@ const WalletScreen = ({ navigation }: any) => {
     >
       {/* Wallet Selection */}
       <Card>
-        <Text variant="h3">💼 Quantum Wallet</Text>
+        <Text variant="h3">{t.wallet.title}</Text>
         <Column gap="sm">
           {wallets.map(wallet => (
             <ListItem
@@ -79,7 +86,7 @@ const WalletScreen = ({ navigation }: any) => {
       {/* Balance Display */}
       {selectedWallet && (
         <Card>
-          <Text variant="h3">💵 Balance</Text>
+          <Text variant="h3">{t.wallet.balance.title}</Text>
           <View style={{ alignItems: 'center', paddingVertical: spacing.lg, marginBottom: spacing.md }}>
             <Text variant="h1" style={{ color: colors.primary, marginBottom: spacing.xs }}>
               {selectedWallet.balance.toLocaleString()}
@@ -103,36 +110,36 @@ const WalletScreen = ({ navigation }: any) => {
 
       {/* Quick Actions */}
       <Card>
-        <Text variant="h3">⚡ Actions</Text>
+        <Text variant="h3">{t.wallet.actions.title}</Text>
         <Column gap="sm">
           <Button onPress={() => navigation.navigate('SendTokens')}>
-            <Text>📤 SEND ZHTP</Text>
+            <Text>{t.wallet.actions.sendZhtp}</Text>
           </Button>
           <Button onPress={() => navigation.navigate('ReceiveTokens')}>
-            <Text>📥 RECEIVE ZHTP</Text>
+            <Text>{t.wallet.actions.receiveZhtp}</Text>
           </Button>
           <Button onPress={() => navigation.navigate('Dashboard', { screen: 'ClaimUBI' })}>
-            <Text>💰 CLAIM UBI</Text>
+            <Text>{t.wallet.actions.claimUbi}</Text>
           </Button>
           <Button onPress={() => navigation.navigate('StakeTokens')}>
-            <Text>🔗 STAKE ZHTP</Text>
+            <Text>{t.wallet.actions.stakeZhtp}</Text>
           </Button>
         </Column>
       </Card>
 
       {/* Recent Transactions */}
       <Card>
-        <Text variant="h3">📜 Recent Transactions</Text>
+        <Text variant="h3">{t.wallet.transactions.title}</Text>
         {transactions.length === 0 ? (
           <Text variant="body" style={{ textAlign: 'center', paddingVertical: spacing.md, color: colors.text_secondary }}>
-            No transactions yet
+            {t.wallet.transactions.noTransactions}
           </Text>
         ) : (
           <Column gap="sm">
             {transactions.map(transaction => (
               <ListItem
                 key={transaction.id}
-                leftIcon={getTransactionIcon(transaction.type)}
+                icon={getTransactionIcon(transaction.type)}
                 title={transaction.type.charAt(0).toUpperCase() + transaction.type.slice(1)}
                 subtitle={new Date(transaction.timestamp).toLocaleDateString()}
                 rightContent={
@@ -151,12 +158,7 @@ const WalletScreen = ({ navigation }: any) => {
                       variant="caption"
                       style={{
                         textAlign: 'right',
-                        color:
-                          transaction.status === 'confirmed'
-                            ? colors.success
-                            : transaction.status === 'pending'
-                            ? colors.warning
-                            : colors.error,
+                        color: getStatusColor(transaction.status),
                       }}
                     >
                       {transaction.status.charAt(0).toUpperCase() +
