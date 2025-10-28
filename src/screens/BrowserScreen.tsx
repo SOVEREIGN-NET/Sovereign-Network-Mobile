@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { ScrollView } from 'react-native';
 import { Card, Text, Button, Column, Input } from '../components';
+import { useTranslation } from '../i18n';
 import { colors, spacing } from '../theme';
 
 const mockWebsites: { [key: string]: { title: string; description: string; content: string } } = {
@@ -45,6 +46,7 @@ const suggestedSites = [
 ];
 
 const BrowserScreen = () => {
+  const { t } = useTranslation();
   const [currentUrl, setCurrentUrl] = useState('zhtp://network.sovereign');
   const [urlInput, setUrlInput] = useState('zhtp://network.sovereign');
   const [loading, setLoading] = useState(false);
@@ -57,9 +59,9 @@ const BrowserScreen = () => {
       setCurrentUrl(normalizedUrl);
       setBrowserContent(
         mockWebsites[normalizedUrl] || {
-          title: 'Site Not Found',
-          description: '404 - Domain Not Resolved',
-          content: `The domain "${normalizedUrl}" could not be resolved on the ZHTP network.`,
+          title: t.browser.errors.notFound,
+          description: t.browser.errors.notResolved,
+          content: t.browser.errors.couldNotResolve.replace('{domain}', normalizedUrl),
         },
       );
       setLoading(false);
@@ -76,17 +78,17 @@ const BrowserScreen = () => {
     >
       {/* Browser Controls */}
       <Card>
-        <Text variant="h3">Web4 Browser</Text>
+        <Text variant="h3">{t.browser.title}</Text>
         <Column gap="md" style={{ marginTop: spacing.md }}>
           <Input
-            placeholder="Enter ZHTP domain..."
+            placeholder={t.browser.urlPlaceholder}
             value={urlInput}
             onChangeText={setUrlInput}
             onSubmitEditing={handleNavigate}
           />
-          <Button onPress={handleNavigate}> NAVIGATE </Button>
+          <Button onPress={handleNavigate}>{t.browser.navigateButton}</Button>
           <Text variant="caption" style={{ color: colors.success, textAlign: 'center' }}>
-            🟢 Connected to ZHTP Network
+            {t.browser.connectionStatus}
           </Text>
         </Column>
       </Card>
@@ -106,7 +108,7 @@ const BrowserScreen = () => {
 
       {/* Suggested Sites */}
       <Card>
-        <Text variant="h3">Suggested Sites</Text>
+        <Text variant="h3">{t.browser.suggestedSites}</Text>
         <Column gap="sm" style={{ marginTop: spacing.md }}>
           {suggestedSites.map(site => (
             <Button
@@ -125,12 +127,12 @@ const BrowserScreen = () => {
 
       {/* Browser Features */}
       <Card>
-        <Text variant="caption">Web4 Browser Features</Text>
+        <Text variant="caption">{t.browser.features.title}</Text>
         <Column gap="md" style={{ marginTop: spacing.xs }}>
-          <Text variant="small">End-to-End Encryption - All connections are encrypted by default</Text>
-          <Text variant="small">Mesh Routing - Decentralized routing through edge nodes</Text>
-          <Text variant="small">Zero Censorship - No intermediaries or single point of failure</Text>
-          <Text variant="small">Zero-Knowledge Proofs - Verify without revealing information</Text>
+          <Text variant="small">{t.browser.features.encryption}</Text>
+          <Text variant="small">{t.browser.features.meshRouting}</Text>
+          <Text variant="small">{t.browser.features.zeroCensorship}</Text>
+          <Text variant="small">{t.browser.features.zeroKnowledge}</Text>
         </Column>
       </Card>
     </ScrollView>

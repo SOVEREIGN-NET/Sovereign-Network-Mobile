@@ -89,6 +89,27 @@ export const en = {
       viewProposal: 'VIEW PROPOSAL',
     },
   },
+
+  // Browser Screen
+  browser: {
+    title: 'Web4 Browser',
+    urlPlaceholder: 'Enter ZHTP domain...',
+    navigateButton: 'NAVIGATE',
+    connectionStatus: '🟢 Connected to ZHTP Network',
+    suggestedSites: 'Suggested Sites',
+    features: {
+      title: 'Web4 Browser Features',
+      encryption: 'End-to-End Encryption - All connections are encrypted by default',
+      meshRouting: 'Mesh Routing - Decentralized routing through edge nodes',
+      zeroCensorship: 'Zero Censorship - No intermediaries or single point of failure',
+      zeroKnowledge: 'Zero-Knowledge Proofs - Verify without revealing information',
+    },
+    errors: {
+      notFound: 'Site Not Found',
+      notResolved: '404 - Domain Not Resolved',
+      couldNotResolve: 'The domain "{domain}" could not be resolved on the ZHTP network.',
+    },
+  },
 } as const;
 
 export type Translation = typeof en;
