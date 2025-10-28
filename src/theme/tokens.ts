@@ -51,6 +51,7 @@ export const colors = {
 
 export const spacing = {
   // Spacing scale - More generous for better aesthetics
+  xxs: 2,      // Very minimal spacing
   xs: 6,      // Minimal spacing
   sm: 10,     // Small gaps
   md: 14,     // Medium gaps (default padding)

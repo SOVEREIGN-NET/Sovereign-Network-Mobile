@@ -10,10 +10,13 @@ import {
   Row
 } from '../components';
 import { useAsyncData } from '../hooks';
+import { useTranslation } from '../i18n';
 import MockDataService from '../services/MockDataService';
 import { colors, spacing } from '../theme';
 
 const DashboardScreen = ({ navigation }: any) => {
+  const { t } = useTranslation();
+
   const { data, loading } = useAsyncData(
     async () => {
       await new Promise<void>(resolve => setTimeout(() => resolve(), 800));
@@ -26,7 +29,7 @@ const DashboardScreen = ({ navigation }: any) => {
   );
 
   if (loading) {
-    return <LoadingView message="Loading ZHTP Dashboard..." />;
+    return <LoadingView message={t.dashboard.loadingMessage} />;
   }
 
   const networkStatus = data?.networkStatus;
@@ -41,17 +44,17 @@ const DashboardScreen = ({ navigation }: any) => {
     >
       {/* Status Card */}
       <Card>
-        <Text variant="h3">Network Status</Text>
+        <Text variant="h3">{t.dashboard.networkStatus.title}</Text>
         <DetailRow
-          label="Status:"
-          value={networkStatus?.connected ? '🟢 Connected' : '🔴 Offline'}
+          label={t.dashboard.networkStatus.label}
+          value={networkStatus?.connected ? t.dashboard.networkStatus.connected : t.dashboard.networkStatus.offline}
         />
-        <DetailRow label="Protocol:" value={networkStatus?.protocol || ''} />
-        <DetailRow label="Nodes:" value={networkStatus?.nodeCount?.toString() || ''} />
+        <DetailRow label={t.dashboard.networkStatus.protocol} value={networkStatus?.protocol || ''} />
+        <DetailRow label={t.dashboard.networkStatus.nodes} value={networkStatus?.nodeCount?.toString() || ''} />
         <Column gap="md" style={{ marginVertical: spacing.md }}>
           <Row gap="md">
             <Text variant="body" style={{ flex: 1 }}>
-              Mesh Health:
+              {t.dashboard.networkStatus.meshHealth}
             </Text>
             <ProgressBar
               percentage={networkStatus?.meshHealth || 0}
@@ -64,68 +67,70 @@ const DashboardScreen = ({ navigation }: any) => {
 
       {/* Explore More Card */}
       <Card>
-        <Text variant="h3">Explore</Text>
+        <Text variant="h3">{t.dashboard.explore.title}</Text>
         <Column gap="md" style={{ marginTop: spacing.md }}>
           <Button
             variant="secondary"
             onPress={() => navigation.navigate('Identity')}
             style={{ marginBottom: spacing.xs }}
           >
-            MANAGE IDENTITY
+            {t.dashboard.explore.manageIdentity}
           </Button>
           <Button
             variant="secondary"
             onPress={() => navigation.navigate('Wallet')}
             style={{ marginBottom: spacing.xs }}
           >
-            VIEW WALLET
+            {t.dashboard.explore.viewWallet}
           </Button>
           <Button
             variant="secondary"
             onPress={() => navigation.navigate('Browser')}
           >
-            WEB4 BROWSER
+           {t.dashboard.explore.web4Browser}
           </Button>
         </Column>
       </Card>
 
       {/* Quick Actions */}
       <Card>
-        <Text variant="h3" style={{ marginBottom: spacing.md }}>Quick Actions</Text>
+        <Text variant="h3" style={{ marginBottom: spacing.md }}>{t.dashboard.quickActions.title}</Text>
         <Button
           onPress={() => navigation.navigate('Wallet', { screen: 'SendTokens' })}
           style={{ marginBottom: spacing.sm }}
         >
-          SEND ZHTP
+          {t.dashboard.quickActions.sendZhtp}
         </Button>
         <Button
           onPress={() => navigation.navigate('Dashboard', { screen: 'ClaimUBI' })}
           style={{ marginBottom: spacing.sm }}
         >
-          CLAIM UBI
+          {t.dashboard.quickActions.claimUbi}
         </Button>
         <Button
           onPress={() => navigation.navigate('DAO')}
           style={{ marginBottom: spacing.sm }}
         >
-          VOTE ON PROPOSAL
+          {t.dashboard.quickActions.voteOnProposal}
         </Button>
-        <Button onPress={() => {}}>CREATE PROPOSAL</Button>
+        <Button onPress={() => {}}>
+          {t.dashboard.quickActions.createProposal}
+        </Button>
       </Card>
 
       {/* About Section */}
       <Card>
-        <Text variant="h3" style={{ marginBottom: spacing.md }}> 
-        About 
+        <Text variant="caption" style={{ marginBottom: spacing.xs }}>
+          {t.dashboard.about.title}
         </Text>
-        <Text variant="small" style={{ marginBottom: spacing.sm }}>
-          ZHTP Web4 Mobile - Zero-Knowledge Hypertext Transfer Protocol
+        <Text variant="small" style={{ marginBottom: spacing.xxs }}>
+          {t.dashboard.about.description}
         </Text>
-        <Text variant="small" style={{ marginBottom: spacing.sm }}>
-          Version 1.0.0 (Demo Mode)
+        <Text variant="small" style={{ marginBottom: spacing.xxs }}>
+          {t.dashboard.about.version}
         </Text>
         <Text variant="small">
-          This is a frontend demonstration. No blockchain operations are executed.
+          {t.dashboard.about.disclaimer}
         </Text>
       </Card>
     </ScrollView>

@@ -9,10 +9,13 @@ import {
   Column,
 } from '../components';
 import { useAsyncData } from '../hooks';
-import MockDataService, { Identity } from '../services/MockDataService';
+import { useTranslation } from '../i18n';
+import MockDataService from '../services/MockDataService';
 import { colors, spacing } from '../theme';
 
 const IdentityScreen = () => {
+  const { t } = useTranslation();
+
   const { data: identity, loading } = useAsyncData(
     async () => {
       await new Promise<void>(resolve => setTimeout(() => resolve(), 500));
@@ -34,7 +37,7 @@ const IdentityScreen = () => {
       }}
     >
       <Card>
-        <Text variant="h3">👤 ZK-DID Identity</Text>
+        <Text variant="h3" style={{ marginBottom: spacing.md }}>{t.identity.title}</Text>
         <View
           style={{
             alignItems: 'center',
@@ -56,23 +59,29 @@ const IdentityScreen = () => {
       </Card>
 
       <Card>
-        <Text variant="h3">Details</Text>
-        <DetailRow label="Identity Type:" value={identity?.identityType || ''} />
+        <Text variant="h3">{t.identity.details.title}</Text>
+        <DetailRow label={t.identity.details.identityType} value={identity?.identityType || ''} />
         <DetailRow
-          label="Citizenship:"
-          value={identity?.citizenship ? '✓ Verified' : '✗ Not Verified'}
+          label={t.identity.details.citizenship}
+          value={identity?.citizenship ? t.identity.details.verified : t.identity.details.notVerified}
         />
         <DetailRow
-          label="Created:"
+          label={t.identity.details.created}
           value={new Date(identity?.createdAt || '').toLocaleDateString()}
         />
       </Card>
 
       <Card>
         <Column gap="sm">
-          <Button onPress={() => {}}> CREATE IDENTITY </Button>
-          <Button onPress={() => {}}> BACKUP IDENTITY </Button>
-          <Button onPress={() => {}}> VERIFY BIOMETRIC </Button>
+          <Button onPress={() => {}}>
+            {t.identity.actions.createIdentity}
+          </Button>
+          <Button onPress={() => {}}>
+            {t.identity.actions.backupIdentity}
+          </Button>
+          <Button onPress={() => {}}>
+            {t.identity.actions.verifyBiometric}
+          </Button>
         </Column>
       </Card>
     </ScrollView>
