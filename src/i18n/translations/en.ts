@@ -73,6 +73,22 @@ export const en = {
       noTransactions: 'No transactions yet',
     },
   },
+
+  // DAO Screen
+  dao: {
+    statistics: {
+      title: 'DAO Statistics',
+      members: 'Members',
+      active: 'Active',
+      total: 'Total',
+      treasury: 'Treasury',
+    },
+    proposals: {
+      title: 'Active Proposals',
+      votes: 'For: {votesFor} • Against: {votesAgainst} • Abstain: {votesAbstain}',
+      viewProposal: 'VIEW PROPOSAL',
+    },
+  },
 } as const;
 
 export type Translation = typeof en;

@@ -10,11 +10,12 @@ import {
   Badge,
 } from '../components';
 import { useAsyncData } from '../hooks';
+import { useTranslation } from '../i18n';
 import MockDataService from '../services/MockDataService';
 import { colors, spacing } from '../theme';
-import { getProposalStatusColor, getCategoryIcon } from '../utils/colors';
 
 const DAOScreen = ({ navigation }: any) => {
+  const { t } = useTranslation();
   const { data, loading } = useAsyncData(
     async () => {
       await new Promise<void>(resolve => setTimeout(() => resolve(), 600));
@@ -44,7 +45,7 @@ const DAOScreen = ({ navigation }: any) => {
       {/* DAO Statistics */}
       {daoStats && (
         <Card spacing="xl">
-          <Text variant="h3">📊 DAO Statistics</Text>
+          <Text variant="h3">{t.dao.statistics.title}</Text>
           <Column gap="lg" style={{ marginTop: spacing.lg }}>
             {/* Row 1 */}
             <Column
@@ -55,12 +56,12 @@ const DAOScreen = ({ navigation }: any) => {
               }}
             >
               <StatBox
-                label="Members"
+                label={t.dao.statistics.members}
                 value={daoStats.totalMembers?.toString() || '0'}
                 style={{ flex: 1 }}
               />
               <StatBox
-                label="Active"
+                label={t.dao.statistics.active}
                 value={daoStats.activeProposals?.toString() || '0'}
                 style={{ flex: 1 }}
               />
@@ -74,12 +75,12 @@ const DAOScreen = ({ navigation }: any) => {
               }}
             >
               <StatBox
-                label="Total"
+                label={t.dao.statistics.total}
                 value={daoStats.totalProposals?.toString() || '0'}
                 style={{ flex: 1 }}
               />
               <StatBox
-                label="Treasury"
+                label={t.dao.statistics.treasury}
                 value={(daoStats.treasuryBalance || 0).toLocaleString()}
                 style={{ flex: 1 }}
               />
@@ -90,7 +91,7 @@ const DAOScreen = ({ navigation }: any) => {
 
       {/* Proposals List */}
       <Card>
-        <Text variant="h3">🗳️ Active Proposals</Text>
+        <Text variant="h3">{t.dao.proposals.title}</Text>
         <Column gap="lg" style={{ marginTop: spacing.lg }}>
           {proposals.map(proposal => (
             <Card
@@ -102,7 +103,7 @@ const DAOScreen = ({ navigation }: any) => {
               spacing="sm"
             >
               <Text variant="h3" style={{ marginBottom: spacing.lg }}>
-                {getCategoryIcon(proposal.category)} {proposal.title}
+                 {proposal.title}
               </Text>
               <Badge
                 variant="info"
@@ -117,8 +118,10 @@ const DAOScreen = ({ navigation }: any) => {
                 variant="caption"
                 style={{ color: colors.text_secondary, marginBottom: spacing.lg }}
               >
-                For: {proposal.votesFor} • Against: {proposal.votesAgainst} • Abstain:{' '}
-                {proposal.votesAbstain}
+                {t.dao.proposals.votes
+                  .replace('{votesFor}', proposal.votesFor.toString())
+                  .replace('{votesAgainst}', proposal.votesAgainst.toString())
+                  .replace('{votesAbstain}', proposal.votesAbstain.toString())}
               </Text>
 
               <Button
@@ -127,7 +130,7 @@ const DAOScreen = ({ navigation }: any) => {
                 }
                 variant="secondary"
               >
-                VIEW PROPOSAL
+                {t.dao.proposals.viewProposal}
               </Button>
             </Card>
           ))}

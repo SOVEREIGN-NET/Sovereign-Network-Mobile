@@ -76,7 +76,7 @@ const BrowserScreen = () => {
     >
       {/* Browser Controls */}
       <Card>
-        <Text variant="h3">🌐 Web4 Browser</Text>
+        <Text variant="h3">Web4 Browser</Text>
         <Column gap="md" style={{ marginTop: spacing.md }}>
           <Input
             placeholder="Enter ZHTP domain..."
@@ -106,7 +106,7 @@ const BrowserScreen = () => {
 
       {/* Suggested Sites */}
       <Card>
-        <Text variant="h3">⭐ Suggested Sites</Text>
+        <Text variant="h3">Suggested Sites</Text>
         <Column gap="sm" style={{ marginTop: spacing.md }}>
           {suggestedSites.map(site => (
             <Button
@@ -117,7 +117,7 @@ const BrowserScreen = () => {
               }}
               variant="outline"
             >
-              <Text>{site.emoji} {site.title}</Text>
+              <Text>{site.title}</Text>
             </Button>
           ))}
         </Column>
@@ -125,12 +125,12 @@ const BrowserScreen = () => {
 
       {/* Browser Features */}
       <Card>
-        <Text variant="h3">ℹ️ Web4 Browser Features</Text>
-        <Column gap="md" style={{ marginTop: spacing.md }}>
-          <Text variant="body">🔒 End-to-End Encryption - All connections are encrypted by default</Text>
-          <Text variant="body">⚡ Mesh Routing - Decentralized routing through edge nodes</Text>
-          <Text variant="body">🌍 Zero Censorship - No intermediaries or single point of failure</Text>
-          <Text variant="body">🎯 Zero-Knowledge Proofs - Verify without revealing information</Text>
+        <Text variant="caption">Web4 Browser Features</Text>
+        <Column gap="md" style={{ marginTop: spacing.xs }}>
+          <Text variant="small">End-to-End Encryption - All connections are encrypted by default</Text>
+          <Text variant="small">Mesh Routing - Decentralized routing through edge nodes</Text>
+          <Text variant="small">Zero Censorship - No intermediaries or single point of failure</Text>
+          <Text variant="small">Zero-Knowledge Proofs - Verify without revealing information</Text>
         </Column>
       </Card>
     </ScrollView>
