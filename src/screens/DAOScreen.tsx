@@ -90,6 +90,27 @@ const DAOScreen = ({ navigation }: any) => {
         </Card>
       )}
 
+      {/* Quick Actions */}
+      <Card>
+        <Text variant="h3" style={{ marginBottom: spacing.lg }}>
+          {t.dao.actions.title}
+        </Text>
+        <Column gap="sm">
+          <Button
+            onPress={() => navigation?.navigate('CreateProposal')}
+            style={{ backgroundColor: colors.primary }}
+          >
+            ✨ {t.dao.actions.createProposal}
+          </Button>
+          <Button
+            variant="secondary"
+            onPress={() => navigation?.navigate('TreasuryStatus')}
+          >
+            💰 {t.dao.actions.treasuryStatus}
+          </Button>
+        </Column>
+      </Card>
+
       {/* Proposals List */}
       <Card>
         <Text variant="h3">{t.dao.proposals.title}</Text>
