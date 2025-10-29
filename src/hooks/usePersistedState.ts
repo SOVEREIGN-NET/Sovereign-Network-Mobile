@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback } from 'react';
-import { AsyncStorage } from 'react-native';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 
 /**
  * Custom hook for persisting state to AsyncStorage
@@ -29,7 +29,7 @@ export function usePersistedState<T>(
         if (storedValue !== null) {
           try {
             setState(JSON.parse(storedValue));
-          } catch (error) {
+          } catch {
             // If JSON parse fails, treat as string
             setState(storedValue as unknown as T);
           }

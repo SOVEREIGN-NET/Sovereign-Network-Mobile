@@ -2,7 +2,6 @@ import React from 'react';
 import {
   FlatList,
   FlatListProps,
-  View,
   StyleSheet,
 } from 'react-native';
 import { colors } from '../../../theme';

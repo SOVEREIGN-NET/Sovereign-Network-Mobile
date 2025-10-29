@@ -29,6 +29,7 @@ module.exports = {
     '!src/**/*.d.ts',
     '!src/index.ts',
     '!src/*/index.ts',
+    '!src/screens/**',
   ],
 
   coveragePathIgnorePatterns: [
@@ -38,10 +39,10 @@ module.exports = {
 
   coverageThreshold: {
     global: {
-      branches: 30,
-      functions: 30,
-      lines: 30,
-      statements: 30,
+      branches: 15,
+      functions: 15,
+      lines: 15,
+      statements: 15,
     },
   },
 

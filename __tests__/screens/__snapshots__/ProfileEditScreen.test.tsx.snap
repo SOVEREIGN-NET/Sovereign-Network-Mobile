@@ -1,0 +1,5 @@
+// Jest Snapshot v1, https://goo.gl/fbAQLP
+
+exports[`ProfileEditScreen allows avatar selection and display name editing 1`] = `null`;
+
+exports[`ProfileEditScreen renders profile edit screen with current identity 1`] = `null`;

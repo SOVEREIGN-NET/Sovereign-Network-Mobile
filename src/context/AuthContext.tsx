@@ -17,6 +17,9 @@ export interface AuthContextType {
   recoverIdentity: (method: string, data: string) => Promise<void>;
   signOut: () => Promise<void>;
   clearError: () => void;
+  updateProfile: (displayName: string, avatar?: string) => Promise<void>;
+  updatePassphrase: (newPassphrase: string) => Promise<void>;
+  updateBiometric: (enabled: boolean) => Promise<void>;
 }
 
 export const AuthContext = createContext<AuthContextType | undefined>(undefined);
@@ -138,6 +141,97 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
   }, []);
 
   /**
+   * Update user profile (display name, avatar)
+   */
+  const updateProfile = useCallback(async (displayName: string, avatar?: string) => {
+    if (!currentIdentity) {
+      setError('No identity to update');
+      return;
+    }
+
+    setError(null);
+    setIsLoading(true);
+
+    try {
+      const updatedIdentity = {
+        ...currentIdentity,
+        displayName,
+        avatar: avatar || currentIdentity.avatar,
+      };
+
+      // Save to AsyncStorage
+      await AsyncStorage.setItem('zhtp_identity', JSON.stringify(updatedIdentity));
+      setCurrentIdentity(updatedIdentity);
+    } catch (err: any) {
+      const message = err.message || 'Failed to update profile';
+      setError(message);
+      throw err;
+    } finally {
+      setIsLoading(false);
+    }
+  }, [currentIdentity]);
+
+  /**
+   * Update passphrase
+   */
+  const updatePassphrase = useCallback(async (newPassphrase: string) => {
+    if (!currentIdentity) {
+      setError('No identity to update');
+      return;
+    }
+
+    setError(null);
+    setIsLoading(true);
+
+    try {
+      // In real app, this would hash and save to backend
+      // For mock, we just update locally
+      const updatedIdentity = {
+        ...currentIdentity,
+        // Mark that passphrase was updated (don't actually store it)
+      };
+
+      await AsyncStorage.setItem('zhtp_identity', JSON.stringify(updatedIdentity));
+      setCurrentIdentity(updatedIdentity);
+    } catch (err: any) {
+      const message = err.message || 'Failed to update passphrase';
+      setError(message);
+      throw err;
+    } finally {
+      setIsLoading(false);
+    }
+  }, [currentIdentity]);
+
+  /**
+   * Update biometric setting
+   */
+  const updateBiometric = useCallback(async (enabled: boolean) => {
+    if (!currentIdentity) {
+      setError('No identity to update');
+      return;
+    }
+
+    setError(null);
+    setIsLoading(true);
+
+    try {
+      const updatedIdentity = {
+        ...currentIdentity,
+        biometricHash: enabled ? 'mock_biometric_hash' : undefined,
+      };
+
+      await AsyncStorage.setItem('zhtp_identity', JSON.stringify(updatedIdentity));
+      setCurrentIdentity(updatedIdentity);
+    } catch (err: any) {
+      const message = err.message || 'Failed to update biometric setting';
+      setError(message);
+      throw err;
+    } finally {
+      setIsLoading(false);
+    }
+  }, [currentIdentity]);
+
+  /**
    * Sign out (clear identity)
    */
   const signOut = useCallback(async () => {
@@ -173,7 +267,10 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
     recoverIdentity,
     signOut,
     clearError,
-  }), [currentIdentity, isLoading, error, signIn, createIdentity, recoverIdentity, signOut, clearError]);
+    updateProfile,
+    updatePassphrase,
+    updateBiometric,
+  }), [currentIdentity, isLoading, error, signIn, createIdentity, recoverIdentity, signOut, clearError, updateProfile, updatePassphrase, updateBiometric]);
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
 };

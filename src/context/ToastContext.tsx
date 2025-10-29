@@ -1,4 +1,4 @@
-import React, { createContext, useContext, useState, useCallback } from 'react';
+import React, { createContext, useContext, useState, useCallback, useMemo } from 'react';
 import { View } from 'react-native';
 import { Toast, ToastType } from '../components/molecules/Toast';
 
@@ -38,6 +38,10 @@ export const ToastProvider = ({ children }: ToastProviderProps) => {
 
   const generateId = () => `toast-${Date.now()}-${Math.random()}`;
 
+  const dismissToast = useCallback((id: string) => {
+    setToasts(prev => prev.filter(toast => toast.id !== id));
+  }, []);
+
   const showToast = useCallback(
     (message: string, type: ToastType = 'info', duration?: number) => {
       const id = generateId();
@@ -51,7 +55,7 @@ export const ToastProvider = ({ children }: ToastProviderProps) => {
         dismissToast(id);
       }, autoRemoveTime);
     },
-    [],
+    [dismissToast],
   );
 
   const showSuccess = useCallback(
@@ -82,18 +86,17 @@ export const ToastProvider = ({ children }: ToastProviderProps) => {
     [showToast],
   );
 
-  const dismissToast = useCallback((id: string) => {
-    setToasts(prev => prev.filter(toast => toast.id !== id));
-  }, []);
-
-  const value: ToastContextType = {
-    showToast,
-    showSuccess,
-    showError,
-    showWarning,
-    showInfo,
-    dismissToast,
-  };
+  const value = useMemo(
+    () => ({
+      showToast,
+      showSuccess,
+      showError,
+      showWarning,
+      showInfo,
+      dismissToast,
+    }),
+    [showToast, showSuccess, showError, showWarning, showInfo, dismissToast],
+  );
 
   return (
     <ToastContext.Provider value={value}>

@@ -1,0 +1,11 @@
+// Jest Snapshot v1, https://goo.gl/fbAQLP
+
+exports[`IdentityScreen disables all buttons when loading 1`] = `null`;
+
+exports[`IdentityScreen displays identity with default avatar when none provided 1`] = `null`;
+
+exports[`IdentityScreen displays stats and action buttons 1`] = `null`;
+
+exports[`IdentityScreen renders identity information correctly 1`] = `null`;
+
+exports[`IdentityScreen renders loading view when no currentIdentity 1`] = `null`;

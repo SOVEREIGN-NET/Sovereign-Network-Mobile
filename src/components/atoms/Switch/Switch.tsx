@@ -2,11 +2,10 @@ import React from 'react';
 import {
   TouchableOpacity,
   Animated,
-  View,
   StyleSheet,
   ViewStyle,
 } from 'react-native';
-import { colors, spacing } from '../../../theme';
+import { colors } from '../../../theme';
 
 export interface SwitchProps {
   value: boolean;

@@ -10,7 +10,6 @@ import {
 describe('Date Utilities', () => {
   const testDate = '2025-10-27T10:30:00Z';
   const pastDate = '2025-10-20T10:30:00Z';
-  const futureDate = '2025-11-03T10:30:00Z';
 
   describe('formatDate', () => {
     it('should format date correctly', () => {

@@ -81,6 +81,7 @@ export function useAsyncData<T>(
     return () => {
       mounted = false;
     };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [...dependencies, retryCount]);
 
   const retry = useCallback(() => {
