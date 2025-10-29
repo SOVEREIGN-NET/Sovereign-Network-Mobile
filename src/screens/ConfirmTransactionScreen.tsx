@@ -1,0 +1,297 @@
+import React, { useState } from 'react';
+import { ScrollView, View, Alert } from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
+import { Card, Text, Button, DetailRow, Column, LoadingView } from '../components';
+import { useTranslation } from '../i18n';
+import { colors, spacing, typography, borderRadius } from '../theme';
+
+const ConfirmTransactionScreen = ({ navigation, route }: any) => {
+  const { t } = useTranslation();
+  const [isLoading, setIsLoading] = useState(false);
+  const [transactionResult, setTransactionResult] = useState<'success' | 'error' | null>(null);
+  const [transactionId, setTransactionId] = useState('');
+
+  const { recipient, amount, currency, fee, total, memo } = route.params || {};
+
+  const handleConfirm = async () => {
+    setIsLoading(true);
+
+    // Simulate transaction processing
+    setTimeout(() => {
+      // Simulate 90% success rate
+      if (Math.random() > 0.1) {
+        setTransactionId(`0x${Math.random().toString(16).substr(2, 40)}`);
+        setTransactionResult('success');
+      } else {
+        setTransactionResult('error');
+      }
+      setIsLoading(false);
+    }, 1500);
+  };
+
+  const handleBack = () => {
+    if (transactionResult === 'success') {
+      navigation.navigate('WalletMain');
+    } else {
+      navigation.goBack();
+    }
+  };
+
+  if (!recipient || amount === undefined) {
+    return (
+      <SafeAreaView
+        style={{
+          flex: 1,
+          backgroundColor: colors.bg_darkest,
+        }}
+        edges={['bottom']}
+      >
+        <LoadingView />
+      </SafeAreaView>
+    );
+  }
+
+  if (transactionResult === 'success') {
+    return (
+      <SafeAreaView
+        style={{
+          flex: 1,
+          backgroundColor: colors.bg_darkest,
+          justifyContent: 'center',
+          alignItems: 'center',
+        }}
+        edges={['bottom']}
+      >
+        <ScrollView
+          style={{
+            flex: 1,
+            backgroundColor: colors.bg_darkest,
+          }}
+          contentContainerStyle={{
+            paddingHorizontal: spacing.lg,
+            paddingVertical: spacing.lg,
+            justifyContent: 'center',
+          }}
+          scrollIndicatorInsets={{ right: 1 }}
+          showsVerticalScrollIndicator={false}
+        >
+          <Card style={{ alignItems: 'center', paddingVertical: spacing.xl }}>
+            <Text style={{ fontSize: typography.size['5xl'], marginBottom: spacing.md }}>
+              ✅
+            </Text>
+            <Text variant="h2" style={{ marginBottom: spacing.md, textAlign: 'center' }}>
+              {t.confirmTransaction.success.title}
+            </Text>
+            <Text
+              variant="body"
+              style={{
+                color: colors.text_secondary,
+                marginBottom: spacing.lg,
+                textAlign: 'center',
+              }}
+            >
+              {t.confirmTransaction.success.message}
+            </Text>
+
+            <Card
+              style={{
+                backgroundColor: colors.bg_darker,
+                marginVertical: spacing.md,
+                width: '100%',
+              }}
+            >
+              <Column gap="sm">
+                <DetailRow
+                  label={t.confirmTransaction.success.transactionId}
+                  value={transactionId.substring(0, 12) + '...' + transactionId.substring(-8)}
+                  copyable
+                />
+                <DetailRow label={t.confirmTransaction.currency} value={currency} />
+                <DetailRow label={t.confirmTransaction.amount} value={`${amount} ${currency}`} />
+                <DetailRow label={t.confirmTransaction.fee} value={`${fee.toFixed(8)} ${currency}`} />
+                <DetailRow
+                  label={t.confirmTransaction.total}
+                  value={`${total.toFixed(8)} ${currency}`}
+                />
+              </Column>
+            </Card>
+
+            <Button onPress={handleBack} style={{ marginTop: spacing.lg, width: '100%' }}>
+              {t.confirmTransaction.success.button}
+            </Button>
+          </Card>
+        </ScrollView>
+      </SafeAreaView>
+    );
+  }
+
+  if (transactionResult === 'error') {
+    return (
+      <SafeAreaView
+        style={{
+          flex: 1,
+          backgroundColor: colors.bg_darkest,
+          justifyContent: 'center',
+          alignItems: 'center',
+        }}
+        edges={['bottom']}
+      >
+        <ScrollView
+          style={{
+            flex: 1,
+            backgroundColor: colors.bg_darkest,
+          }}
+          contentContainerStyle={{
+            paddingHorizontal: spacing.lg,
+            paddingVertical: spacing.lg,
+            justifyContent: 'center',
+          }}
+          scrollIndicatorInsets={{ right: 1 }}
+          showsVerticalScrollIndicator={false}
+        >
+          <Card style={{ alignItems: 'center', paddingVertical: spacing.xl }}>
+            <Text style={{ fontSize: typography.size['5xl'], marginBottom: spacing.md }}>
+              ❌
+            </Text>
+            <Text variant="h2" style={{ marginBottom: spacing.md, textAlign: 'center', color: colors.error }}>
+              {t.confirmTransaction.error.title}
+            </Text>
+            <Text
+              variant="body"
+              style={{
+                color: colors.text_secondary,
+                marginBottom: spacing.lg,
+                textAlign: 'center',
+              }}
+            >
+              {t.confirmTransaction.error.message}
+            </Text>
+
+            <Button
+              onPress={handleBack}
+              variant="outline"
+              style={{
+                marginTop: spacing.lg,
+                width: '100%',
+                borderColor: colors.error,
+              }}
+            >
+              {t.confirmTransaction.error.button}
+            </Button>
+          </Card>
+        </ScrollView>
+      </SafeAreaView>
+    );
+  }
+
+  return (
+    <SafeAreaView
+      style={{
+        flex: 1,
+        backgroundColor: colors.bg_darkest,
+      }}
+      edges={['bottom']}
+    >
+      <ScrollView
+        style={{
+          flex: 1,
+          backgroundColor: colors.bg_darkest,
+        }}
+        contentContainerStyle={{
+          paddingHorizontal: spacing.lg,
+          paddingTop: 20,
+          paddingBottom: spacing.lg,
+        }}
+        scrollIndicatorInsets={{ right: 1 }}
+        showsVerticalScrollIndicator={false}
+      >
+        <Column gap="lg">
+          <Text variant="h1">{t.confirmTransaction.title}</Text>
+
+          {/* Transaction Details */}
+          <Card>
+            <Column gap="sm">
+              <DetailRow label={t.confirmTransaction.currency} value={currency} />
+              <DetailRow label={t.confirmTransaction.amount} value={`${amount} ${currency}`} />
+              <DetailRow label={t.confirmTransaction.recipient} value={recipient.substring(0, 20) + '...'} />
+              {memo && <DetailRow label={t.confirmTransaction.memo} value={memo} />}
+              <DetailRow label={t.confirmTransaction.fee} value={`${fee.toFixed(8)} ${currency}`} />
+            </Column>
+          </Card>
+
+          {/* Total Summary */}
+          <Card
+            style={{
+              backgroundColor: colors.bg_darker,
+            }}
+          >
+            <View
+              style={{
+                flexDirection: 'row',
+                justifyContent: 'space-between',
+                alignItems: 'center',
+              }}
+            >
+              <Text
+                style={{
+                  fontSize: typography.size.lg,
+                  fontWeight: typography.weight.semibold,
+                  color: colors.text_primary,
+                }}
+              >
+                {t.confirmTransaction.total}
+              </Text>
+              <Text
+                style={{
+                  fontSize: typography.size.lg,
+                  fontWeight: typography.weight.semibold,
+                  color: colors.primary,
+                }}
+              >
+                {total.toFixed(8)} {currency}
+              </Text>
+            </View>
+          </Card>
+
+          {/* Warning */}
+          <Card
+            style={{
+              backgroundColor: colors.warning,
+              borderLeftWidth: 4,
+              borderLeftColor: colors.error,
+            }}
+          >
+            <Text
+              variant="body"
+              style={{
+                color: colors.bg_darkest,
+              }}
+            >
+              ⚠️ Please review all details carefully. Transactions cannot be reversed once confirmed.
+            </Text>
+          </Card>
+
+          {/* Action Buttons */}
+          <View style={{ gap: spacing.sm }}>
+            <Button
+              onPress={handleConfirm}
+              disabled={isLoading}
+              style={{
+                opacity: isLoading ? 0.5 : 1,
+              }}
+            >
+              {isLoading ? t.confirmTransaction.confirmingButton : t.confirmTransaction.confirmButton}
+            </Button>
+            <Button onPress={() => navigation.goBack()} variant="outline" disabled={isLoading}>
+              {t.confirmTransaction.cancelButton}
+            </Button>
+          </View>
+
+          <View style={{ height: spacing.xl }} />
+        </Column>
+      </ScrollView>
+    </SafeAreaView>
+  );
+};
+
+export default ConfirmTransactionScreen;

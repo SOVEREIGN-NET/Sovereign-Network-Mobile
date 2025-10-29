@@ -317,6 +317,84 @@ export const en = {
     },
   },
 
+  // Confirm Transaction Screen
+  confirmTransaction: {
+    title: 'Review Transaction',
+    recipient: 'Recipient Address',
+    amount: 'Amount',
+    fee: 'Network Fee',
+    total: 'Total',
+    memo: 'Memo',
+    currency: 'Currency',
+    confirmButton: 'Confirm & Send',
+    confirmingButton: 'Confirming...',
+    cancelButton: 'Cancel',
+    success: {
+      title: 'Transaction Sent',
+      message: 'Your transaction has been sent successfully.',
+      transactionId: 'Transaction ID',
+      button: 'Back to Wallet',
+    },
+    error: {
+      title: 'Transaction Failed',
+      message: 'Failed to send transaction. Please try again.',
+      button: 'Back',
+    },
+  },
+
+  // Receive Tokens Screen
+  receiveTokens: {
+    title: 'Receive {currency}',
+    address: 'Your Address',
+    copyButton: 'Copy Address',
+    copied: 'Copied to clipboard',
+    qrCode: 'QR Code',
+    showQR: 'Show QR Code',
+    hideQR: 'Hide QR Code',
+    shareButton: 'Share',
+    recentlyReceived: 'Recently Received',
+    noTransactions: 'No transactions yet',
+    info: {
+      title: 'How to Receive',
+      description: 'Share your address with others so they can send you tokens.',
+    },
+  },
+
+  // Stake Tokens Screen
+  stakeTokens: {
+    title: 'Stake {currency}',
+    currentStake: 'Current Stake',
+    availableBalance: 'Available Balance',
+    stakingRewards: 'Staking Rewards',
+    apyRate: 'APY Rate',
+    stakeAmount: 'Stake Amount',
+    stakePlaceholder: 'Amount to stake',
+    unstakeAmount: 'Unstake Amount',
+    unstakePlaceholder: 'Amount to unstake',
+    duration: 'Lock Duration',
+    durations: {
+      threeMonths: '3 Months',
+      sixMonths: '6 Months',
+      oneYear: '1 Year',
+      twoYears: '2 Years',
+    },
+    stakeButton: 'Stake Tokens',
+    stakingButton: 'Staking...',
+    unstakeButton: 'Unstake',
+    unstakingButton: 'Unstaking...',
+    cancelButton: 'Cancel',
+    validation: {
+      amountRequired: 'Stake amount is required',
+      amountInvalid: 'Please enter a valid amount',
+      insufficientBalance: 'Insufficient balance for staking',
+    },
+    success: {
+      title: 'Staking Successful',
+      message: 'Your tokens have been staked. You will earn rewards.',
+      button: 'Back to Wallet',
+    },
+  },
+
   // Wallet Screen
   wallet: {
     title: 'Quantum Wallet',

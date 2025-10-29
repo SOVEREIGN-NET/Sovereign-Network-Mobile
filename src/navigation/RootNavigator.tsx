@@ -19,6 +19,7 @@ import DAOScreen from '../screens/DAOScreen';
 import BrowserScreen from '../screens/BrowserScreen';
 import SendTokensScreen from '../screens/SendTokensScreen';
 import ReceiveTokensScreen from '../screens/ReceiveTokensScreen';
+import ConfirmTransactionScreen from '../screens/ConfirmTransactionScreen';
 import ProposalDetailScreen from '../screens/ProposalDetailScreen';
 import CreateProposalScreen from '../screens/CreateProposalScreen';
 import TreasuryStatusScreen from '../screens/TreasuryStatusScreen';
@@ -136,6 +137,11 @@ const WalletStack = () => {
         name="StakeTokens"
         component={StakeTokensScreen}
         options={{ title: 'Stake ZHTP', headerBackTitle: 'Back' }}
+      />
+      <Stack.Screen
+        name="ConfirmTransaction"
+        component={ConfirmTransactionScreen}
+        options={{ title: 'Confirm Transaction', headerBackTitle: 'Back' }}
       />
     </Stack.Navigator>
   );
