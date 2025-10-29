@@ -12,6 +12,8 @@ import { colors } from '../theme/tokens';
 // Screens
 import DashboardScreen from '../screens/DashboardScreen';
 import IdentityScreen from '../screens/IdentityScreen';
+import ProfileEditScreen from '../screens/ProfileEditScreen';
+import IdentitySettingsScreen from '../screens/IdentitySettingsScreen';
 import WalletScreen from '../screens/WalletScreen';
 import DAOScreen from '../screens/DAOScreen';
 import BrowserScreen from '../screens/BrowserScreen';
@@ -72,6 +74,21 @@ const IdentityStack = () => {
         name="IdentityMain"
         component={IdentityScreen}
         options={{ title: 'ZK-DID Identity' }}
+      />
+      <Stack.Screen
+        name="ProfileEdit"
+        component={ProfileEditScreen}
+        options={{ title: 'Edit Profile', headerBackTitle: 'Back' }}
+      />
+      <Stack.Screen
+        name="IdentitySettings"
+        component={IdentitySettingsScreen}
+        options={{ title: 'Settings', headerBackTitle: 'Back' }}
+      />
+      <Stack.Screen
+        name="Wallet"
+        component={WalletScreen}
+        options={{ title: 'Wallets', headerBackTitle: 'Back' }}
       />
     </Stack.Navigator>
   );

@@ -1,178 +1,300 @@
 import React, { useState } from 'react';
 import { ScrollView, View } from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
 import {
   Card,
   Text,
   Button,
   LoadingView,
   Column,
-  ListItem,
+  DetailRow,
 } from '../components';
-import { useAsyncData } from '../hooks';
+import { useAuth } from '../hooks';
 import { useTranslation } from '../i18n';
-import MockDataService from '../services/MockDataService';
-import { colors, spacing } from '../theme';
-import {
-  getTransactionIcon,
-  getTransactionColor,
-} from '../utils/colors';
+import { colors, spacing, typography, borderRadius } from '../theme';
 
 const WalletScreen = ({ navigation }: any) => {
   const { t } = useTranslation();
-  const [selectedWalletId, setSelectedWalletId] = useState<string>('wallet-1');
+  const { currentIdentity, isLoading } = useAuth();
+  const [selectedWalletId] = useState<string | null>(null);
 
-  const { data, loading } = useAsyncData(
-    async () => {
-      await new Promise<void>(resolve => setTimeout(() => resolve(), 500));
-      return {
-        wallets: MockDataService.getWallets(),
-        transactions: MockDataService.getTransactions(),
-      };
-    },
-    [],
-  );
-
-  if (loading) {
+  if (!currentIdentity || isLoading) {
     return <LoadingView />;
   }
 
-  const wallets = data?.wallets || [];
-  const transactions = data?.transactions || [];
-  const selectedWallet = wallets.find(w => w.id === selectedWalletId);
-
-  const getStatusColor = (status: string): string => {
-    if (status === 'confirmed') return colors.success;
-    if (status === 'pending') return colors.warning;
-    return colors.error;
-  };
+  const wallets = currentIdentity.wallets || [];
+  const selectedWallet = wallets.find(w => w.id === selectedWalletId) || wallets[0];
+  const totalBalance = wallets.reduce((sum, w) => sum + (w.balance || 0), 0);
 
   return (
-    <ScrollView
-      testID="wallet-screen"
+    <SafeAreaView
       style={{
         flex: 1,
-        backgroundColor: colors.bg_dark,
-        padding: spacing.lg,
+        backgroundColor: colors.bg_darkest,
       }}
+      edges={['bottom']}
     >
-      {/* Wallet Selection */}
-      <Card>
-        <Text variant="h3">{t.wallet.title}</Text>
-        <Column gap="sm">
-          {wallets.map(wallet => (
-            <ListItem
-              key={wallet.id}
-              title={wallet.name}
-              subtitle={wallet.address.slice(0, 20) + '...'}
-              rightContent={
-                <Column>
-                  <Text variant="body" style={{ fontWeight: '600', color: colors.primary }}>
-                    {wallet.balance.toLocaleString()}
-                  </Text>
-                  <Text variant="caption" style={{ color: colors.text_secondary }}>
-                    {wallet.currency}
-                  </Text>
-                </Column>
-              }
-              onPress={() => setSelectedWalletId(wallet.id)}
+      <ScrollView
+        testID="wallet-screen"
+        style={{
+          flex: 1,
+          backgroundColor: colors.bg_darkest,
+        }}
+        contentContainerStyle={{
+          paddingHorizontal: spacing.lg,
+          paddingTop: 20,
+          paddingBottom: spacing.lg,
+        }}
+        scrollIndicatorInsets={{ right: 1 }}
+        showsVerticalScrollIndicator={false}
+      >
+        <Column gap="xl">
+          {/* Total Balance Card */}
+          <Card>
+            <View
               style={{
-                backgroundColor:
-                  selectedWalletId === wallet.id ? colors.surface : colors.bg_darker,
+                alignItems: 'center',
+                paddingVertical: spacing.lg,
+                backgroundColor: colors.bg_darker,
+                borderRadius: borderRadius.base,
               }}
-            />
-          ))}
-        </Column>
-      </Card>
+            >
+              <Text
+                style={{
+                  fontSize: typography.size.xs,
+                  color: colors.text_secondary,
+                  marginBottom: spacing.sm,
+                }}
+              >
+                {t.wallet.totalBalance}
+              </Text>
+              <Text
+                style={{
+                  fontSize: typography.size['5xl'],
+                  fontWeight: typography.weight.bold,
+                  color: colors.primary,
+                  marginBottom: spacing.xs,
+                }}
+              >
+                {totalBalance.toLocaleString()}
+              </Text>
+              <Text
+                style={{
+                  fontSize: typography.size.sm,
+                  color: colors.text_secondary,
+                }}
+              >
+                {t.wallet.currency}
+              </Text>
+            </View>
+          </Card>
 
-      {/* Balance Display */}
-      {selectedWallet && (
-        <Card>
-          <Text variant="h3">{t.wallet.balance.title}</Text>
-          <View style={{ alignItems: 'center', paddingVertical: spacing.lg, marginBottom: spacing.md }}>
-            <Text variant="h1" style={{ color: colors.primary, marginBottom: spacing.xs }}>
-              {selectedWallet.balance.toLocaleString()}
-            </Text>
-            <Text variant="body" style={{ color: colors.text_secondary }}>
-              {selectedWallet.currency}
-            </Text>
-          </View>
-          <Text
-            variant="caption"
-            style={{
-              textAlign: 'center',
-              color: colors.text_secondary,
-              fontFamily: 'monospace',
-            }}
-          >
-            {selectedWallet.address}
-          </Text>
-        </Card>
-      )}
+          {/* Wallets List */}
+          {wallets.length > 0 ? (
+            <Card>
+              <Text
+                style={{
+                  fontSize: typography.size.sm,
+                  fontWeight: typography.weight.semibold,
+                  color: colors.text_primary,
+                  marginBottom: spacing.md,
+                }}
+              >
+                {t.wallet.wallets.title} ({wallets.length})
+              </Text>
 
-      {/* Quick Actions */}
-      <Card>
-        <Text variant="h3">{t.wallet.actions.title}</Text>
-        <Column gap="sm">
-          <Button onPress={() => navigation.navigate('SendTokens')}>
-            <Text>{t.wallet.actions.sendZhtp}</Text>
-          </Button>
-          <Button onPress={() => navigation.navigate('ReceiveTokens')}>
-            <Text>{t.wallet.actions.receiveZhtp}</Text>
-          </Button>
-          <Button onPress={() => navigation.navigate('Dashboard', { screen: 'ClaimUBI' })}>
-            <Text>{t.wallet.actions.claimUbi}</Text>
-          </Button>
-          <Button onPress={() => navigation.navigate('StakeTokens')}>
-            <Text>{t.wallet.actions.stakeZhtp}</Text>
-          </Button>
-        </Column>
-      </Card>
-
-      {/* Recent Transactions */}
-      <Card>
-        <Text variant="h3">{t.wallet.transactions.title}</Text>
-        {transactions.length === 0 ? (
-          <Text variant="body" style={{ textAlign: 'center', paddingVertical: spacing.md, color: colors.text_secondary }}>
-            {t.wallet.transactions.noTransactions}
-          </Text>
-        ) : (
-          <Column gap="sm">
-            {transactions.map(transaction => (
-              <ListItem
-                key={transaction.id}
-                icon={getTransactionIcon(transaction.type)}
-                title={transaction.type.charAt(0).toUpperCase() + transaction.type.slice(1)}
-                subtitle={new Date(transaction.timestamp).toLocaleDateString()}
-                rightContent={
-                  <Column>
-                    <Text
-                      variant="body"
+              <Column gap="sm">
+                {wallets.map((wallet) => (
+                  <View
+                    key={wallet.id}
+                    style={{
+                      backgroundColor:
+                        selectedWalletId === wallet.id
+                          ? colors.primary
+                          : colors.bg_darker,
+                      padding: spacing.md,
+                      borderRadius: borderRadius.base,
+                      borderWidth: 2,
+                      borderColor:
+                        selectedWalletId === wallet.id
+                          ? colors.primary
+                          : colors.border,
+                    }}
+                  >
+                    <View
                       style={{
-                        fontWeight: '600',
-                        color: getTransactionColor(transaction.type),
+                        justifyContent: 'space-between',
+                        alignItems: 'center',
+                        flexDirection: 'row',
+                        marginBottom: spacing.sm,
                       }}
                     >
-                      {transaction.type === 'send' ? '-' : '+'}
-                      {transaction.amount.toLocaleString()}
-                    </Text>
-                    <Text
-                      variant="caption"
-                      style={{
-                        textAlign: 'right',
-                        color: getStatusColor(transaction.status),
-                      }}
-                    >
-                      {transaction.status.charAt(0).toUpperCase() +
-                        transaction.status.slice(1)}
-                    </Text>
-                  </Column>
-                }
-              />
-            ))}
-          </Column>
-        )}
-      </Card>
-    </ScrollView>
+                      <Column style={{ flex: 1 }}>
+                        <Text
+                          style={{
+                            fontSize: typography.size.sm,
+                            fontWeight: typography.weight.semibold,
+                            color:
+                              selectedWalletId === wallet.id
+                                ? colors.white
+                                : colors.text_primary,
+                          }}
+                        >
+                          {wallet.name}
+                        </Text>
+                        <Text
+                          style={{
+                            fontSize: typography.size.xs,
+                            color:
+                              selectedWalletId === wallet.id
+                                ? colors.white
+                                : colors.text_secondary,
+                            marginTop: spacing.xs,
+                          }}
+                        >
+                          {wallet.address}
+                        </Text>
+                      </Column>
+                      <Text
+                        style={{
+                          fontSize: typography.size.sm,
+                          fontWeight: typography.weight.bold,
+                          color:
+                            selectedWalletId === wallet.id
+                              ? colors.white
+                              : colors.primary,
+                        }}
+                      >
+                        {wallet.balance.toLocaleString()}
+                      </Text>
+                    </View>
+
+                    {selectedWalletId === wallet.id && (
+                      <View
+                        style={{
+                          marginTop: spacing.md,
+                          paddingTop: spacing.md,
+                          borderTopWidth: 1,
+                          borderTopColor: 'rgba(255,255,255,0.2)',
+                        }}
+                      >
+                        <Column gap="sm">
+                          <Button
+                            variant="secondary"
+                            onPress={() => navigation?.navigate('SendTokens')}
+                            disabled={isLoading}
+                          >
+                            {t.wallet.actions.send}
+                          </Button>
+                          <Button
+                            variant="secondary"
+                            onPress={() => navigation?.navigate('ReceiveTokens')}
+                            disabled={isLoading}
+                          >
+                            {t.wallet.actions.receive}
+                          </Button>
+                        </Column>
+                      </View>
+                    )}
+                  </View>
+                ))}
+              </Column>
+            </Card>
+          ) : (
+            <Card>
+              <View
+                style={{
+                  alignItems: 'center',
+                  paddingVertical: spacing.lg,
+                }}
+              >
+                <Text style={{ color: colors.text_secondary }}>
+                  {t.wallet.wallets.noWallets}
+                </Text>
+                <Button
+                  variant="secondary"
+                  onPress={() => {}}
+                  style={{ marginTop: spacing.md }}
+                >
+                  {t.wallet.wallets.createWallet}
+                </Button>
+              </View>
+            </Card>
+          )}
+
+          {/* Wallet Details */}
+          {selectedWallet && (
+            <Card>
+              <Text
+                style={{
+                  fontSize: typography.size.sm,
+                  fontWeight: typography.weight.semibold,
+                  color: colors.text_primary,
+                  marginBottom: spacing.md,
+                }}
+              >
+                {t.wallet.details.title}
+              </Text>
+              <Column gap="sm">
+                <DetailRow label={t.wallet.details.name} value={selectedWallet.name} />
+                <DetailRow label={t.wallet.details.address} value={selectedWallet.address} />
+                <DetailRow
+                  label={t.wallet.details.balance}
+                  value={`${selectedWallet.balance.toLocaleString()} ZHTP`}
+                />
+              </Column>
+            </Card>
+          )}
+
+          {/* Quick Actions */}
+          <Card>
+            <Text
+              style={{
+                fontSize: typography.size.sm,
+                fontWeight: typography.weight.semibold,
+                color: colors.text_primary,
+                marginBottom: spacing.md,
+              }}
+            >
+              {t.wallet.quickActions.title}
+            </Text>
+            <Column gap="sm">
+              <Button
+                variant="secondary"
+                onPress={() => navigation?.navigate('SendTokens')}
+                disabled={isLoading}
+              >
+                {t.wallet.quickActions.sendTokens}
+              </Button>
+              <Button
+                variant="secondary"
+                onPress={() => navigation?.navigate('ReceiveTokens')}
+                disabled={isLoading}
+              >
+                {t.wallet.quickActions.receiveTokens}
+              </Button>
+              <Button
+                variant="secondary"
+                onPress={() => navigation?.navigate('StakeTokens')}
+                disabled={isLoading}
+              >
+                {t.wallet.quickActions.stakeTokens}
+              </Button>
+              <Button
+                variant="secondary"
+                onPress={() => {}}
+                disabled={isLoading}
+              >
+                {t.wallet.quickActions.viewHistory}
+              </Button>
+            </Column>
+          </Card>
+
+          {/* Footer spacing */}
+          <View style={{ height: spacing.xl }} />
+        </Column>
+      </ScrollView>
+    </SafeAreaView>
   );
 };
 

@@ -46,9 +46,14 @@ export function usePersistedState<T>(
 
   // Save to storage on state change
   const setPersistedState = useCallback(
-    (value: T | ((prev: T) => T)) => {
+    (valueOrUpdater: T | ((prev: T) => T)) => {
       try {
-        const newValue = value instanceof Function ? value(state) : value;
+        let newValue: T;
+        if (typeof valueOrUpdater === 'function') {
+          newValue = (valueOrUpdater as (prev: T) => T)(state);
+        } else {
+          newValue = valueOrUpdater;
+        }
         setState(newValue);
 
         // Async save to storage (fire and forget)

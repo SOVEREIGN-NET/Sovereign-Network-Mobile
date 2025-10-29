@@ -4,59 +4,27 @@ import { Card, Text, Button, Column, Input } from '../components';
 import { useTranslation } from '../i18n';
 import { colors, spacing } from '../theme';
 
-const mockWebsites: { [key: string]: { title: string; description: string; content: string } } = {
-  'zhtp://network.sovereign': {
-    title: 'Sovereign Network Hub',
-    description: 'Welcome to the ZHTP Web4 Network',
-    content:
-      'The Sovereign Network is a decentralized internet built on Zero-Knowledge technology. Browse, transact, and govern without intermediaries.',
-  },
-  'dao://governance': {
-    title: 'DAO Governance Portal',
-    description: 'Decentralized Autonomous Organization',
-    content:
-      'Participate in network governance. Vote on proposals, allocate treasury funds, and shape the future of Web4.',
-  },
-  'mesh://nodes.local': {
-    title: 'Local Mesh Network',
-    description: 'Your Edge Node Dashboard',
-    content:
-      'Connected to 42 nodes in your mesh network. Bandwidth: 45 Mbps. Latency: 8ms. Help strengthen the network.',
-  },
-  'zk://identity.sovereign': {
-    title: 'ZK-DID Identity Manager',
-    description: 'Zero-Knowledge Digital Identity',
-    content:
-      'Manage your Zero-Knowledge Decentralized Identity. Prove citizenship without revealing personal information.',
-  },
-  'web4://chat.sovereign': {
-    title: 'Decentralized Chat',
-    description: 'Private Messaging Protocol',
-    content:
-      'Send encrypted messages across the ZHTP network. End-to-end encrypted with zero-knowledge proofs.',
-  },
-};
-
-const suggestedSites = [
-  { url: 'zhtp://network.sovereign', title: 'Network Hub', emoji: '🌐' },
-  { url: 'dao://governance', title: 'DAO Portal', emoji: '🏛️' },
-  { url: 'mesh://nodes.local', title: 'Mesh Network', emoji: '🔗' },
-  { url: 'zk://identity.sovereign', title: 'ZK Identity', emoji: '👤' },
-  { url: 'web4://chat.sovereign', title: 'Chat', emoji: '💬' },
-];
-
 const BrowserScreen = () => {
   const { t } = useTranslation();
-  const [currentUrl, setCurrentUrl] = useState('zhtp://network.sovereign');
   const [urlInput, setUrlInput] = useState('zhtp://network.sovereign');
   const [loading, setLoading] = useState(false);
+
+  const mockWebsites = t.browser.websites as Record<string, { title: string; description: string; content: string }>;
+
+  const suggestedSites = [
+    { url: 'zhtp://network.sovereign', ...t.browser.suggestedSitesList.networkHub },
+    { url: 'dao://governance', ...t.browser.suggestedSitesList.daoPortal },
+    { url: 'mesh://nodes.local', ...t.browser.suggestedSitesList.meshNetwork },
+    { url: 'zk://identity.sovereign', ...t.browser.suggestedSitesList.zkIdentity },
+    { url: 'web4://chat.sovereign', ...t.browser.suggestedSitesList.chat },
+  ];
+
   const [browserContent, setBrowserContent] = useState(mockWebsites['zhtp://network.sovereign']);
 
   const handleNavigate = () => {
     setLoading(true);
     setTimeout(() => {
       const normalizedUrl = urlInput.toLowerCase().trim();
-      setCurrentUrl(normalizedUrl);
       setBrowserContent(
         mockWebsites[normalizedUrl] || {
           title: t.browser.errors.notFound,

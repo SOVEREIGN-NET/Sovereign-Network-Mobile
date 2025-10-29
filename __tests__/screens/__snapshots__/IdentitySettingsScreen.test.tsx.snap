@@ -1,7 +1,0 @@
-// Jest Snapshot v1, https://goo.gl/fbAQLP
-
-exports[`IdentitySettingsScreen renders passphrase and biometric sections 1`] = `null`;
-
-exports[`IdentitySettingsScreen renders settings screen with current identity 1`] = `null`;
-
-exports[`IdentitySettingsScreen shows security reminder and backup sections 1`] = `null`;

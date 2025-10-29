@@ -265,6 +265,11 @@ class MockAuthService {
       console.log(`✅ Identity recovered from backup file`);
       return identity;
     } catch (error: any) {
+      // Rethrow validation errors as-is
+      if (error.message === 'Invalid backup file format' || error.message === 'Identity not found') {
+        throw error;
+      }
+      // Catch JSON parsing errors
       throw new Error('Failed to decrypt backup file');
     }
   }

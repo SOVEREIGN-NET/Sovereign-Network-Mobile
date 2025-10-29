@@ -192,13 +192,98 @@ export const en = {
     },
     actions: {
       createIdentity: 'Create Identity',
-      backupIdentity: 'Backup Identity',
+      backupIdentity: '💾 Backup',
       verifyBiometric: 'Verify Biometric',
+      editProfile: '✎ Edit Profile',
+      settings: '⚙️ Settings',
+      viewWallets: '💰 View Wallets',
+    },
+    stats: {
+      title: 'Stats',
+      votingPower: 'Voting Power',
+      ubiEarned: 'UBI Earned',
+      wallets: 'Wallets',
     },
     logout: {
       button: 'Sign Out',
       buttonLoading: 'Signing out...',
       hint: 'Signing out will clear your local identity',
+      confirmTitle: 'Sign Out?',
+      confirmMessage: 'Your local identity data will be cleared.',
+      cancel: 'Cancel',
+      confirm: 'Sign Out',
+    },
+    settings: {
+      title: 'Settings',
+      changePassphrase: 'Change Passphrase',
+      currentPassphrase: 'Current Passphrase',
+      currentPassphrasePlaceholder: 'Enter current passphrase',
+      newPassphrase: 'New Passphrase',
+      newPassphrasePlaceholder: 'Enter new passphrase (min 8 chars)',
+      confirmPassphrase: 'Confirm Passphrase',
+      confirmPassphrasePlaceholder: 'Confirm new passphrase',
+      showHide: {
+        show: '🙈 Show',
+        hide: '👁️ Hide',
+      },
+      updateButton: '🔐 Update Passphrase',
+      updatingButton: '⏳ Updating...',
+      biometric: {
+        title: 'Biometric Authentication',
+        enabled: 'Enabled',
+        disabled: 'Disabled',
+        enableButton: 'Enable',
+        enabledButton: '✓ Enabled',
+      },
+      security: {
+        title: '🔐 Security Reminder',
+        message: 'Keep your passphrase secure and never share it with anyone. We cannot recover your identity if you lose access.',
+      },
+      backup: {
+        title: 'Identity Backup',
+        createButton: '💾 Create Backup',
+        viewButton: '📂 View Backups',
+      },
+      validation: {
+        currentPassphraseRequired: 'Current passphrase is required',
+        newPassphraseRequired: 'New passphrase is required',
+        newPassphraseTooShort: 'New passphrase must be at least 8 characters',
+        passphraseNoMatch: 'Passphrases do not match',
+      },
+      errors: {
+        passphraseUpdateFailed: 'Failed to update passphrase',
+        biometricUpdateFailed: 'Failed to update biometric setting',
+      },
+      success: {
+        passphraseUpdated: 'Passphrase updated successfully',
+        biometricEnabled: 'Biometric authentication enabled',
+        biometricDisabled: 'Biometric authentication disabled',
+      },
+    },
+    profile: {
+      title: 'Edit Profile',
+      selectAvatar: 'Select Avatar',
+      displayName: 'Display Name',
+      displayNamePlaceholder: 'Enter your display name',
+      characterCounter: '{current}/50 characters',
+      info: {
+        title: 'ℹ️ Profile Info',
+        description: 'Your display name and avatar help other users identify you on the network.',
+      },
+      saveButton: '💾 Save Changes',
+      savingButton: '💾 Saving...',
+      cancelButton: 'Cancel',
+      validation: {
+        displayNameRequired: 'Display name is required',
+        displayNameTooShort: 'Display name must be at least 2 characters',
+        displayNameTooLong: 'Display name must be less than 50 characters',
+      },
+      success: {
+        profileUpdated: 'Profile updated successfully',
+      },
+      errors: {
+        profileUpdateFailed: 'Failed to update profile',
+      },
     },
   },
 
@@ -232,15 +317,37 @@ export const en = {
   // Wallet Screen
   wallet: {
     title: 'Quantum Wallet',
+    totalBalance: 'Total Balance',
+    currency: 'ZHTP Tokens',
     balance: {
       title: 'Balance',
     },
     actions: {
       title: 'Actions',
+      send: 'Send',
+      receive: 'Receive',
       sendZhtp: 'SEND ZHTP',
       receiveZhtp: 'RECEIVE ZHTP',
       claimUbi: 'CLAIM UBI',
       stakeZhtp: 'STAKE ZHTP',
+    },
+    wallets: {
+      title: 'Your Wallets',
+      noWallets: 'No wallets found',
+      createWallet: 'Create Wallet',
+    },
+    details: {
+      title: 'Wallet Details',
+      name: 'Name',
+      address: 'Address',
+      balance: 'Balance',
+    },
+    quickActions: {
+      title: 'Quick Actions',
+      sendTokens: 'Send Tokens',
+      receiveTokens: 'Receive Tokens',
+      stakeTokens: 'Stake Tokens',
+      viewHistory: 'View History',
     },
     transactions: {
       title: 'Recent Transactions',
@@ -282,6 +389,40 @@ export const en = {
       notFound: 'Site Not Found',
       notResolved: '404 - Domain Not Resolved',
       couldNotResolve: 'The domain "{domain}" could not be resolved on the ZHTP network.',
+    },
+    websites: {
+      'zhtp://network.sovereign': {
+        title: 'Sovereign Network Hub',
+        description: 'Welcome to the ZHTP Web4 Network',
+        content: 'The Sovereign Network is a decentralized internet built on Zero-Knowledge technology. Browse, transact, and govern without intermediaries.',
+      },
+      'dao://governance': {
+        title: 'DAO Governance Portal',
+        description: 'Decentralized Autonomous Organization',
+        content: 'Participate in network governance. Vote on proposals, allocate treasury funds, and shape the future of Web4.',
+      },
+      'mesh://nodes.local': {
+        title: 'Local Mesh Network',
+        description: 'Your Edge Node Dashboard',
+        content: 'Connected to 42 nodes in your mesh network. Bandwidth: 45 Mbps. Latency: 8ms. Help strengthen the network.',
+      },
+      'zk://identity.sovereign': {
+        title: 'ZK-DID Identity Manager',
+        description: 'Zero-Knowledge Digital Identity',
+        content: 'Manage your Zero-Knowledge Decentralized Identity. Prove citizenship without revealing personal information.',
+      },
+      'web4://chat.sovereign': {
+        title: 'Decentralized Chat',
+        description: 'Private Messaging Protocol',
+        content: 'Send encrypted messages across the ZHTP network. End-to-end encrypted with zero-knowledge proofs.',
+      },
+    },
+    suggestedSitesList: {
+      networkHub: { title: 'Network Hub', emoji: '🌐' },
+      daoPortal: { title: 'DAO Portal', emoji: '🏛️' },
+      meshNetwork: { title: 'Mesh Network', emoji: '🔗' },
+      zkIdentity: { title: 'ZK Identity', emoji: '👤' },
+      chat: { title: 'Chat', emoji: '💬' },
     },
   },
 } as const;
