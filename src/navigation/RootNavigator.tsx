@@ -20,6 +20,9 @@ import BrowserScreen from '../screens/BrowserScreen';
 import SendTokensScreen from '../screens/SendTokensScreen';
 import ReceiveTokensScreen from '../screens/ReceiveTokensScreen';
 import ProposalDetailScreen from '../screens/ProposalDetailScreen';
+import CreateProposalScreen from '../screens/CreateProposalScreen';
+import TreasuryStatusScreen from '../screens/TreasuryStatusScreen';
+import SettingsScreen from '../screens/SettingsScreen';
 import ClaimUBIScreen from '../screens/ClaimUBIScreen';
 import StakeTokensScreen from '../screens/StakeTokensScreen';
 
@@ -83,7 +86,12 @@ const IdentityStack = () => {
       <Stack.Screen
         name="IdentitySettings"
         component={IdentitySettingsScreen}
-        options={{ title: 'Settings', headerBackTitle: 'Back' }}
+        options={{ title: 'Identity Settings', headerBackTitle: 'Back' }}
+      />
+      <Stack.Screen
+        name="AppSettings"
+        component={SettingsScreen}
+        options={{ title: 'App Settings', headerBackTitle: 'Back' }}
       />
       <Stack.Screen
         name="Wallet"
@@ -157,6 +165,16 @@ const DAOStack = () => {
         name="ProposalDetail"
         component={ProposalDetailScreen}
         options={{ title: 'Proposal Details', headerBackTitle: 'Back' }}
+      />
+      <Stack.Screen
+        name="CreateProposal"
+        component={CreateProposalScreen}
+        options={{ title: 'Create Proposal', headerBackTitle: 'Back' }}
+      />
+      <Stack.Screen
+        name="TreasuryStatus"
+        component={TreasuryStatusScreen}
+        options={{ title: 'Treasury Status', headerBackTitle: 'Back' }}
       />
     </Stack.Navigator>
   );

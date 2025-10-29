@@ -195,7 +195,8 @@ export const en = {
       backupIdentity: '💾 Backup',
       verifyBiometric: 'Verify Biometric',
       editProfile: '✎ Edit Profile',
-      settings: '⚙️ Settings',
+      settings: '🔐 Identity Settings',
+      appSettings: '⚙️ App Settings',
       viewWallets: '💰 View Wallets',
     },
     stats: {
