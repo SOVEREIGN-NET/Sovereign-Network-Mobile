@@ -192,12 +192,12 @@ export const en = {
     },
     actions: {
       createIdentity: 'Create Identity',
-      backupIdentity: '💾 Backup',
+      backupIdentity: 'Backup',
       verifyBiometric: 'Verify Biometric',
-      editProfile: '✎ Edit Profile',
-      settings: '🔐 Identity Settings',
-      appSettings: '⚙️ App Settings',
-      viewWallets: '💰 View Wallets',
+      editProfile: 'Edit Profile',
+      settings: 'Identity Settings',
+      appSettings: 'App Settings',
+      viewWallets: 'View Wallets',
     },
     stats: {
       title: 'Stats',
@@ -454,6 +454,83 @@ export const en = {
         description: 'The DAO treasury holds funds that can be allocated through proposals. All transactions are publicly visible and governed by the community.',
       },
       backButton: 'Back to DAO',
+    },
+  },
+
+  // Settings Screen
+  settings: {
+    display: {
+      title: 'Display Settings',
+      theme: 'Theme',
+      fontSize: 'Font Size',
+      themes: {
+        light: '☀️ Light',
+        dark: '🌙 Dark',
+        system: '⚙️ System Default',
+      },
+      fontSizes: {
+        small: 'Small',
+        normal: 'Normal',
+        large: 'Large',
+      },
+    },
+    languages: {
+      en: '🇺🇸 English',
+      es: '🇪🇸 Español',
+      fr: '🇫🇷 Français',
+      de: '🇩🇪 Deutsch',
+    },
+    language: {
+      title: 'Language',
+    },
+    privacy: {
+      title: 'Privacy & Notifications',
+      notifications: 'Push Notifications',
+      notificationsDescription: 'Receive updates about proposals and voting',
+      analytics: 'Analytics',
+      analyticsDescription: 'Help us improve by sharing anonymous usage data',
+    },
+    about: {
+      title: 'About',
+      appName: 'App Name',
+      version: 'Version',
+      buildDate: 'Build Date',
+      termsButton: 'Terms of Service',
+      termsTitle: 'Terms of Service',
+      termsText: 'By using ZHTP Web4, you agree to our terms and conditions. These terms govern your use of our services.',
+      privacyButton: 'Privacy Policy',
+      privacyTitle: 'Privacy Policy',
+      privacyText: 'We respect your privacy. Your data is encrypted and never shared with third parties without consent.',
+    },
+    data: {
+      title: 'Data & Cache',
+      clearCache: 'Clear Cache',
+    },
+    danger: {
+      title: 'Danger Zone',
+      resetSettings: 'Reset Settings to Default',
+      logout: 'Logout',
+      loggingOut: 'Logging out...',
+    },
+    logout: {
+      confirmTitle: 'Logout?',
+      confirmMessage: 'You will be logged out of all sessions. Are you sure?',
+      cancel: 'Cancel',
+      confirm: 'Logout',
+      errorTitle: 'Logout Error',
+      errorMessage: 'Failed to logout. Please try again.',
+    },
+    reset: {
+      confirmTitle: 'Reset Settings?',
+      confirmMessage: 'This will reset all app settings to their default values.',
+      cancel: 'Cancel',
+      confirm: 'Reset',
+      successTitle: 'Success',
+      success: 'All settings have been reset to default.',
+    },
+    cache: {
+      clearTitle: 'Cache Cleared',
+      clearMessage: 'Application cache has been cleared successfully.',
     },
   },
 

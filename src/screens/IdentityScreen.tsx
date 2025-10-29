@@ -165,6 +165,13 @@ const IdentityScreen = ({ navigation }: any) => {
               </Button>
               <Button
                 variant="secondary"
+                onPress={() => navigation?.navigate('AppSettings')}
+                disabled={isLoading}
+              >
+                {t.identity.actions.appSettings}
+              </Button>
+              <Button
+                variant="secondary"
                 onPress={() => navigation?.navigate('Wallet')}
                 disabled={isLoading}
               >
