@@ -11,7 +11,7 @@ export const formatDate = (dateString: string): string => {
       month: 'short',
       day: 'numeric',
     });
-  } catch (error) {
+  } catch {
     return dateString;
   }
 };
@@ -26,7 +26,7 @@ export const formatDateTime = (dateString: string): string => {
       hour: '2-digit',
       minute: '2-digit',
     });
-  } catch (error) {
+  } catch {
     return dateString;
   }
 };
@@ -39,7 +39,7 @@ export const formatTime = (dateString: string): string => {
       minute: '2-digit',
       hour12: true,
     });
-  } catch (error) {
+  } catch {
     return dateString;
   }
 };
@@ -64,7 +64,7 @@ export const formatRelativeTime = (dateString: string): string => {
     } else {
       return formatDate(dateString);
     }
-  } catch (error) {
+  } catch {
     return dateString;
   }
 };
@@ -89,7 +89,7 @@ export const getRemainingTime = (endDateString: string): string => {
       const days = Math.ceil(diffInSeconds / 86400);
       return `${days}d remaining`;
     }
-  } catch (error) {
+  } catch {
     return 'Invalid date';
   }
 };

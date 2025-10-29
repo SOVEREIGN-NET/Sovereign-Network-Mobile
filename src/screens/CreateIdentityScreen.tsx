@@ -24,7 +24,7 @@ import { AuthStackParamList } from '../navigation/AuthNavigator';
 
 type CreateIdentityScreenProps = NativeStackScreenProps<AuthStackParamList, 'CreateIdentity'>;
 
-const CreateIdentityScreen = ({ navigation }: CreateIdentityScreenProps) => {
+const CreateIdentityScreen = (_: CreateIdentityScreenProps) => {
   const { t } = useTranslation();
   const { createIdentity, isLoading, error } = useAuth();
 

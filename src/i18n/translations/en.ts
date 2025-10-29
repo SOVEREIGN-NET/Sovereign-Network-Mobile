@@ -212,6 +212,8 @@ export const en = {
       confirmMessage: 'Your local identity data will be cleared.',
       cancel: 'Cancel',
       confirm: 'Sign Out',
+      errorTitle: 'Error',
+      errorMessage: 'Failed to sign out. Please try again.',
     },
     settings: {
       title: 'Settings',
