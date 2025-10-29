@@ -474,32 +474,6 @@ const RecoverIdentityScreen = ({ navigation }: RecoverIdentityScreenProps) => {
           </Button>
         </Column>
 
-        {/* Alternative Actions */}
-        <View
-          style={{
-            borderTopWidth: 1,
-            borderTopColor: colors.border,
-            paddingTop: spacing.lg,
-          }}
-        >
-          <Column gap="sm">
-            <Button
-              variant="secondary"
-              onPress={() => navigation.navigate('SignIn')}
-              disabled={isLoading}
-            >
-              {t.auth.recoverIdentity.signInInstead}
-            </Button>
-            <Button
-              variant="outline"
-              onPress={() => navigation.navigate('CreateIdentity')}
-              disabled={isLoading}
-            >
-              {t.auth.recoverIdentity.createNew}
-            </Button>
-          </Column>
-        </View>
-
         {/* Footer spacing */}
         <View style={{ height: spacing.xl }} />
       </Column>
