@@ -241,7 +241,7 @@ const RecoverIdentityScreen = ({ navigation }: RecoverIdentityScreenProps) => {
                 multiline
                 numberOfLines={4}
                 editable={!isLoading}
-                style={{ textAlignVertical: 'top' }}
+                textInputStyle={{ textAlignVertical: 'top' }}
               />
 
               <Text
@@ -307,7 +307,7 @@ const RecoverIdentityScreen = ({ navigation }: RecoverIdentityScreenProps) => {
                 multiline
                 numberOfLines={4}
                 editable={!isLoading}
-                style={{ textAlignVertical: 'top' }}
+                textInputStyle={{ textAlignVertical: 'top' }}
               />
 
               <Text

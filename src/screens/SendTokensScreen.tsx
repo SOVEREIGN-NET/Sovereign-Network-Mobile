@@ -34,11 +34,11 @@ const SendTokensScreen = ({ navigation }: any) => {
     }
 
     // Validate amount (must be non-empty, valid number, > 0)
-    if (!amount.trim()) {
+    if (amount.trim() === '') {
       newErrors.amount = t.sendTokens.validation.amountRequired;
     } else {
-      const numAmount = parseFloat(amount);
-      if (isNaN(numAmount)) {
+      const numAmount = Number.parseFloat(amount);
+      if (Number.isNaN(numAmount)) {
         newErrors.amount = t.sendTokens.validation.amountInvalid;
       } else if (numAmount <= 0) {
         newErrors.amount = t.sendTokens.validation.amountZero;
@@ -54,7 +54,7 @@ const SendTokensScreen = ({ navigation }: any) => {
   };
 
   // Calculate estimated fee (2% for now)
-  const amountNum = parseFloat(amount) || 0;
+  const amountNum = Number.parseFloat(amount) || 0;
   const estimatedFee = amountNum * 0.02;
   const total = amountNum + estimatedFee;
 
@@ -180,7 +180,7 @@ const SendTokensScreen = ({ navigation }: any) => {
             editable={!isLoading}
             multiline
             numberOfLines={3}
-            style={{ textAlignVertical: 'top', minHeight: 80 }}
+            textInputStyle={{ textAlignVertical: 'top', minHeight: 80 }}
           />
 
           {/* Fee Preview */}

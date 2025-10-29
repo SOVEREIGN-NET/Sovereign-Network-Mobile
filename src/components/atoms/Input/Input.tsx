@@ -5,6 +5,7 @@ import {
   Text,
   StyleSheet,
   ViewStyle,
+  TextStyle,
   TextInputProps as RNTextInputProps,
 } from 'react-native';
 import { colors, spacing, typography, borderRadius } from '../../../theme';
@@ -16,7 +17,8 @@ export interface InputProps extends Omit<RNTextInputProps, 'style'> {
   leftIcon?: string;
   rightIcon?: string;
   containerStyle?: ViewStyle;
-  style?: ViewStyle;
+  style?: ViewStyle | TextStyle;
+  textInputStyle?: TextStyle;
 }
 
 const styles = StyleSheet.create({
@@ -91,6 +93,7 @@ export const Input = React.memo(
         rightIcon,
         containerStyle,
         style,
+        textInputStyle,
         onFocus,
         onBlur,
         ...props
@@ -122,14 +125,14 @@ export const Input = React.memo(
               styles.inputWrapper,
               isFocused && styles.inputWrapperFocused,
               error && styles.inputWrapperError,
-              style,
+              style as ViewStyle,
             ]}
           >
             {leftIcon && <Text style={styles.icon}>{leftIcon}</Text>}
 
             <RNTextInput
               ref={ref}
-              style={styles.input}
+              style={[styles.input, textInputStyle]}
               placeholderTextColor={styles.inputPlaceholder}
               onFocus={handleFocus}
               onBlur={handleBlur}
