@@ -1,5 +1,4 @@
 import React from 'react';
-import { ScrollView } from 'react-native';
 import {
   Card,
   Text,
@@ -8,6 +7,7 @@ import {
   Column,
   StatBox,
   Badge,
+  ScreenLayout,
 } from '../components';
 import { useAsyncData } from '../hooks';
 import { useTranslation } from '../i18n';
@@ -35,14 +35,7 @@ const DAOScreen = ({ navigation }: any) => {
   const daoStats = data?.daoStats;
 
   return (
-    <ScrollView
-      testID="dao-screen"
-      style={{
-        flex: 1,
-        backgroundColor: colors.bg_dark,
-        padding: spacing.lg,
-      }}
-    >
+    <ScreenLayout testID="dao-screen">
       {/* DAO Statistics */}
       {daoStats && (
         <Card spacing="xl">
@@ -158,7 +151,7 @@ const DAOScreen = ({ navigation }: any) => {
           ))}
         </Column>
       </Card>
-    </ScrollView>
+    </ScreenLayout>
   );
 };
 

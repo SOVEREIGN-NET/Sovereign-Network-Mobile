@@ -1,13 +1,14 @@
 import React, { useState, useEffect } from 'react';
-import { ScrollView, View, Alert } from 'react-native';
-import { SafeAreaView } from 'react-native-safe-area-context';
+import { View, Alert } from 'react-native';
 import {
   Card,
   Text,
   Button,
-  Input,
   Column,
   LoadingView,
+  ScreenLayout,
+  ErrorAlert,
+  FormField,
 } from '../components';
 import { useAuth } from '../hooks';
 import { useTranslation } from '../i18n';
@@ -67,41 +68,10 @@ const ProfileEditScreen = ({ navigation }: any) => {
   }
 
   return (
-    <SafeAreaView
-      style={{
-        flex: 1,
-        backgroundColor: colors.bg_darkest,
-      }}
-      edges={['bottom']}
-    >
-      <ScrollView
-        style={{
-          flex: 1,
-          backgroundColor: colors.bg_darkest,
-        }}
-        contentContainerStyle={{
-          paddingHorizontal: spacing.lg,
-          paddingTop: 20,
-          paddingBottom: spacing.lg,
-        }}
-        scrollIndicatorInsets={{ right: 1 }}
-        showsVerticalScrollIndicator={false}
-      >
-        <Column gap="xl">
-          {/* Error Message */}
-          {error && (
-            <View
-              style={{
-                backgroundColor: colors.error,
-                padding: spacing.md,
-                borderRadius: borderRadius.base,
-                borderLeftWidth: 4,
-                borderLeftColor: colors.error_dark,
-              }}
-            >
-              <Text style={{ color: colors.white }}>❌ {error}</Text>
-            </View>
-          )}
+    <ScreenLayout paddingTop={20}>
+      <Column gap="xl">
+        {/* Error Message */}
+        {error && <ErrorAlert message={error} icon="❌" />}
 
           {/* Avatar Selection */}
           <Card>
@@ -168,37 +138,19 @@ const ProfileEditScreen = ({ navigation }: any) => {
             </View>
           </Card>
 
-          {/* Display Name Input */}
-          <Card>
-            <Column gap="sm">
-              <Text
-                style={{
-                  fontSize: typography.size.sm,
-                  fontWeight: typography.weight.semibold,
-                  color: colors.text_primary,
-                  marginBottom: spacing.sm,
-                }}
-              >
-                {t.identity.profile.displayName}
-              </Text>
-              <Input
-                placeholder={t.identity.profile.displayNamePlaceholder}
-                value={displayName}
-                onChangeText={setDisplayName}
-                editable={!isLoading && !isSaving}
-                maxLength={50}
-              />
-              <Text
-                style={{
-                  fontSize: typography.size.xs,
-                  color: colors.text_tertiary,
-                  marginTop: spacing.xs,
-                }}
-              >
-                {t.identity.profile.characterCounter.replace('{current}', displayName.length.toString())}
-              </Text>
-            </Column>
-          </Card>
+        {/* Display Name Input */}
+        <Card>
+          <FormField
+            label={t.identity.profile.displayName}
+            placeholder={t.identity.profile.displayNamePlaceholder}
+            value={displayName}
+            onChangeText={setDisplayName}
+            editable={!isLoading && !isSaving}
+            maxLength={50}
+            helperText={t.identity.profile.characterCounter.replace('{current}', displayName.length.toString())}
+            containerStyle={{ marginBottom: 0 }}
+          />
+        </Card>
 
           {/* Info Card */}
           <Card>
@@ -233,31 +185,25 @@ const ProfileEditScreen = ({ navigation }: any) => {
             </View>
           </Card>
 
-          {/* Action Buttons */}
-          <Column gap="sm">
-            <Button
-              onPress={handleSave}
-              disabled={isLoading || isSaving}
-              style={{
-                opacity: isLoading || isSaving ? 0.6 : 1,
-              }}
-            >
-              {isSaving ? t.identity.profile.savingButton : t.identity.profile.saveButton}
-            </Button>
-            <Button
-              variant="outline"
-              onPress={() => navigation?.goBack()}
-              disabled={isLoading || isSaving}
-            >
-              {t.identity.profile.cancelButton}
-            </Button>
-          </Column>
-
-          {/* Footer spacing */}
-          <View style={{ height: spacing.xl }} />
-        </Column>
-      </ScrollView>
-    </SafeAreaView>
+        {/* Action Buttons - use ActionFooter import */}
+        <Button
+          onPress={handleSave}
+          disabled={isLoading || isSaving}
+          style={{
+            opacity: isLoading || isSaving ? 0.6 : 1,
+          }}
+        >
+          {isSaving ? t.identity.profile.savingButton : t.identity.profile.saveButton}
+        </Button>
+        <Button
+          variant="outline"
+          onPress={() => navigation?.goBack()}
+          disabled={isLoading || isSaving}
+        >
+          {t.identity.profile.cancelButton}
+        </Button>
+      </Column>
+    </ScreenLayout>
   );
 };
 

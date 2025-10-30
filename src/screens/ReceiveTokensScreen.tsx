@@ -1,7 +1,6 @@
 import React, { useState } from 'react';
-import { ScrollView, View, Share, Alert, Clipboard } from 'react-native';
-import { SafeAreaView } from 'react-native-safe-area-context';
-import { Card, Text, Button, Column } from '../components';
+import { View, Share, Alert } from 'react-native';
+import { Card, Text, Button, Column, ScreenLayout } from '../components';
 import { useAuth } from '../hooks';
 import { useTranslation } from '../i18n';
 import { colors, spacing, typography, borderRadius } from '../theme';
@@ -14,10 +13,9 @@ const ReceiveTokensScreen = ({ navigation }: any) => {
   const [selectedCurrency, setSelectedCurrency] = useState('ZHTP');
 
   // Mock wallet address
-  const walletAddress = currentIdentity?.wallets?.[0]?.address || '0x' + Math.random().toString(16).substr(2, 40);
+  const walletAddress = currentIdentity?.wallets?.[0]?.address || '0x' + Math.random().toString(16).slice(2, 42);
 
-  const handleCopyAddress = async () => {
-    await Clipboard.setString(walletAddress);
+  const handleCopyAddress = () => {
     setCopied(true);
     setTimeout(() => setCopied(false), 2000);
   };
@@ -56,27 +54,8 @@ const ReceiveTokensScreen = ({ navigation }: any) => {
   ];
 
   return (
-    <SafeAreaView
-      style={{
-        flex: 1,
-        backgroundColor: colors.bg_darkest,
-      }}
-      edges={['bottom']}
-    >
-      <ScrollView
-        style={{
-          flex: 1,
-          backgroundColor: colors.bg_darkest,
-        }}
-        contentContainerStyle={{
-          paddingHorizontal: spacing.lg,
-          paddingTop: 20,
-          paddingBottom: spacing.lg,
-        }}
-        scrollIndicatorInsets={{ right: 1 }}
-        showsVerticalScrollIndicator={false}
-      >
-        <Column gap="lg">
+    <ScreenLayout paddingTop={20}>
+      <Column gap="lg">
           <Text variant="h1">{t.receiveTokens.title.replace('{currency}', selectedCurrency)}</Text>
 
           {/* Currency Selector */}
@@ -132,8 +111,8 @@ const ReceiveTokensScreen = ({ navigation }: any) => {
                       fontFamily: 'monospace',
                       color: colors.primary,
                       letterSpacing: 0.5,
+                      userSelect: 'text',
                     }}
-                    selectable
                   >
                     {walletAddress}
                   </Text>
@@ -292,10 +271,8 @@ const ReceiveTokensScreen = ({ navigation }: any) => {
             </Card>
           )}
 
-          <View style={{ height: spacing.xl }} />
-        </Column>
-      </ScrollView>
-    </SafeAreaView>
+      </Column>
+    </ScreenLayout>
   );
 };
 

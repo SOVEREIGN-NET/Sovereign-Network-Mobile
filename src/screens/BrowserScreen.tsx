@@ -1,6 +1,5 @@
 import React, { useState } from 'react';
-import { ScrollView } from 'react-native';
-import { Card, Text, Button, Column, Input } from '../components';
+import { Card, Text, Button, Column, ScreenLayout, FormField } from '../components';
 import { useTranslation } from '../i18n';
 import { colors, spacing } from '../theme';
 
@@ -37,23 +36,18 @@ const BrowserScreen = () => {
   };
 
   return (
-    <ScrollView
-      testID="browser-screen"
-      style={{
-        flex: 1,
-        backgroundColor: colors.bg_dark,
-        padding: spacing.lg,
-      }}
-    >
+    <ScreenLayout testID="browser-screen">
       {/* Browser Controls */}
       <Card>
         <Text variant="h3">{t.browser.title}</Text>
         <Column gap="md" style={{ marginTop: spacing.md }}>
-          <Input
+          <FormField
+            label=""
             placeholder={t.browser.urlPlaceholder}
             value={urlInput}
             onChangeText={setUrlInput}
             onSubmitEditing={handleNavigate}
+            containerStyle={{ marginBottom: 0 }}
           />
           <Button onPress={handleNavigate}>{t.browser.navigateButton}</Button>
           <Text variant="caption" style={{ color: colors.success, textAlign: 'center' }}>
@@ -104,7 +98,7 @@ const BrowserScreen = () => {
           <Text variant="small">{t.browser.features.zeroKnowledge}</Text>
         </Column>
       </Card>
-    </ScrollView>
+    </ScreenLayout>
   );
 };
 

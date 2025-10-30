@@ -1,14 +1,11 @@
 import React, { useState } from 'react';
-import { ScrollView, View, Alert } from 'react-native';
-import { SafeAreaView } from 'react-native-safe-area-context';
-import { Card, Text, Button, Column, Input, DetailRow } from '../components';
-import { useAuth } from '../hooks';
+import { View, Alert } from 'react-native';
+import { Card, Text, Button, Column, DetailRow, ScreenLayout, FormField, TabSelector, ActionFooter } from '../components';
 import { useTranslation } from '../i18n';
-import { colors, spacing, typography, borderRadius } from '../theme';
+import { colors, spacing, typography } from '../theme';
 
 const StakeTokensScreen = ({ navigation }: any) => {
   const { t } = useTranslation();
-  const { currentIdentity } = useAuth();
   const [stakeAmount, setStakeAmount] = useState('');
   const [unstakeAmount, setUnstakeAmount] = useState('');
   const [selectedDuration, setSelectedDuration] = useState('oneYear');
@@ -22,7 +19,7 @@ const StakeTokensScreen = ({ navigation }: any) => {
   const stakingRewards = 55;
   const apyRates: Record<string, number> = {
     threeMonths: 4.5,
-    sixMonths: 5.0,
+    sixMonths: 5,
     oneYear: 5.5,
     twoYears: 6.5,
   };
@@ -37,9 +34,7 @@ const StakeTokensScreen = ({ navigation }: any) => {
   const validateStakeForm = (): boolean => {
     const newErrors: typeof errors = {};
 
-    if (!stakeAmount.trim()) {
-      newErrors.stake = t.stakeTokens.validation.amountRequired;
-    } else {
+    if (stakeAmount.trim()) {
       const amount = Number.parseFloat(stakeAmount);
       if (Number.isNaN(amount)) {
         newErrors.stake = t.stakeTokens.validation.amountInvalid;
@@ -48,6 +43,8 @@ const StakeTokensScreen = ({ navigation }: any) => {
       } else if (amount > availableBalance) {
         newErrors.stake = t.stakeTokens.validation.insufficientBalance;
       }
+    } else {
+      newErrors.stake = t.stakeTokens.validation.amountRequired;
     }
 
     setErrors(newErrors);
@@ -57,9 +54,7 @@ const StakeTokensScreen = ({ navigation }: any) => {
   const validateUnstakeForm = (): boolean => {
     const newErrors: typeof errors = {};
 
-    if (!unstakeAmount.trim()) {
-      newErrors.unstake = t.stakeTokens.validation.amountRequired;
-    } else {
+    if (unstakeAmount.trim()) {
       const amount = Number.parseFloat(unstakeAmount);
       if (Number.isNaN(amount)) {
         newErrors.unstake = t.stakeTokens.validation.amountInvalid;
@@ -68,6 +63,8 @@ const StakeTokensScreen = ({ navigation }: any) => {
       } else if (amount > currentStake) {
         newErrors.unstake = t.stakeTokens.validation.insufficientBalance;
       }
+    } else {
+      newErrors.unstake = t.stakeTokens.validation.amountRequired;
     }
 
     setErrors(newErrors);
@@ -125,30 +122,11 @@ const StakeTokensScreen = ({ navigation }: any) => {
     }, 500);
   };
 
-  const currentAPY = apyRates[selectedDuration as keyof typeof apyRates] || 5.5;
+  const currentAPY = apyRates[selectedDuration] || 5.5;
 
   return (
-    <SafeAreaView
-      style={{
-        flex: 1,
-        backgroundColor: colors.bg_darkest,
-      }}
-      edges={['bottom']}
-    >
-      <ScrollView
-        style={{
-          flex: 1,
-          backgroundColor: colors.bg_darkest,
-        }}
-        contentContainerStyle={{
-          paddingHorizontal: spacing.lg,
-          paddingTop: 20,
-          paddingBottom: spacing.lg,
-        }}
-        scrollIndicatorInsets={{ right: 1 }}
-        showsVerticalScrollIndicator={false}
-      >
-        <Column gap="lg">
+    <ScreenLayout>
+      <Column gap="lg">
           <Text variant="h1">{t.stakeTokens.title.replace('{currency}', 'ZHTP')}</Text>
 
           {/* Current Staking Status */}
@@ -162,22 +140,14 @@ const StakeTokensScreen = ({ navigation }: any) => {
           </Card>
 
           {/* Tab Selector */}
-          <View style={{ flexDirection: 'row', gap: spacing.sm }}>
-            <Button
-              variant={activeTab === 'stake' ? 'primary' : 'outline'}
-              onPress={() => setActiveTab('stake')}
-              style={{ flex: 1 }}
-            >
-              {t.stakeTokens.stakeButton}
-            </Button>
-            <Button
-              variant={activeTab === 'unstake' ? 'primary' : 'outline'}
-              onPress={() => setActiveTab('unstake')}
-              style={{ flex: 1 }}
-            >
-              {t.stakeTokens.unstakeButton}
-            </Button>
-          </View>
+          <TabSelector
+            tabs={[
+              { id: 'stake', label: t.stakeTokens.stakeButton },
+              { id: 'unstake', label: t.stakeTokens.unstakeButton },
+            ]}
+            activeTab={activeTab}
+            onTabChange={(tab) => setActiveTab(tab as 'stake' | 'unstake')}
+          />
 
           {/* Stake Tab */}
           {activeTab === 'stake' && (
@@ -217,31 +187,21 @@ const StakeTokensScreen = ({ navigation }: any) => {
                   </Text>
                 </View>
 
-                <View>
-                  <Input
-                    placeholder={t.stakeTokens.stakePlaceholder}
-                    value={stakeAmount}
-                    onChangeText={(text) => {
-                      setStakeAmount(text);
-                      if (errors.stake) {
-                        setErrors((prev) => ({ ...prev, stake: undefined }));
-                      }
-                    }}
-                    keyboardType="decimal-pad"
-                    editable={!isStaking}
-                    style={{
-                      borderColor: errors.stake ? colors.error : colors.border,
-                    }}
-                  />
-                  {errors.stake && (
-                    <Text
-                      variant="caption"
-                      style={{ color: colors.error, marginTop: spacing.xs }}
-                    >
-                      {errors.stake}
-                    </Text>
-                  )}
-                </View>
+                <FormField
+                  label=""
+                  placeholder={t.stakeTokens.stakePlaceholder}
+                  value={stakeAmount}
+                  onChangeText={(text) => {
+                    setStakeAmount(text);
+                    if (errors.stake) {
+                      setErrors((prev) => ({ ...prev, stake: undefined }));
+                    }
+                  }}
+                  keyboardType="decimal-pad"
+                  error={errors.stake}
+                  editable={!isStaking}
+                  containerStyle={{ marginBottom: 0 }}
+                />
 
                 <Card style={{ backgroundColor: colors.bg_darker }}>
                   <Column gap="sm">
@@ -280,31 +240,21 @@ const StakeTokensScreen = ({ navigation }: any) => {
           {activeTab === 'unstake' && (
             <Card>
               <Column gap="md">
-                <View>
-                  <Input
-                    placeholder={t.stakeTokens.unstakePlaceholder}
-                    value={unstakeAmount}
-                    onChangeText={(text) => {
-                      setUnstakeAmount(text);
-                      if (errors.unstake) {
-                        setErrors((prev) => ({ ...prev, unstake: undefined }));
-                      }
-                    }}
-                    keyboardType="decimal-pad"
-                    editable={!isStaking}
-                    style={{
-                      borderColor: errors.unstake ? colors.error : colors.border,
-                    }}
-                  />
-                  {errors.unstake && (
-                    <Text
-                      variant="caption"
-                      style={{ color: colors.error, marginTop: spacing.xs }}
-                    >
-                      {errors.unstake}
-                    </Text>
-                  )}
-                </View>
+                <FormField
+                  label=""
+                  placeholder={t.stakeTokens.unstakePlaceholder}
+                  value={unstakeAmount}
+                  onChangeText={(text) => {
+                    setUnstakeAmount(text);
+                    if (errors.unstake) {
+                      setErrors((prev) => ({ ...prev, unstake: undefined }));
+                    }
+                  }}
+                  keyboardType="decimal-pad"
+                  error={errors.unstake}
+                  editable={!isStaking}
+                  containerStyle={{ marginBottom: 0 }}
+                />
 
                 <Card
                   style={{
@@ -355,19 +305,19 @@ const StakeTokensScreen = ({ navigation }: any) => {
             </Column>
           </Card>
 
-          <Button
-            onPress={() => navigation.goBack()}
-            variant="outline"
-            disabled={isStaking}
-          >
-            {t.stakeTokens.cancelButton}
-          </Button>
-
-          <View style={{ height: spacing.xl }} />
+          <ActionFooter
+            actions={[
+              {
+                label: t.stakeTokens.cancelButton,
+                onPress: () => navigation.goBack(),
+                variant: 'secondary',
+                disabled: isStaking,
+              },
+            ]}
+          />
         </Column>
-      </ScrollView>
-    </SafeAreaView>
-  );
+      </ScreenLayout>
+    );
 };
 
 export default StakeTokensScreen;

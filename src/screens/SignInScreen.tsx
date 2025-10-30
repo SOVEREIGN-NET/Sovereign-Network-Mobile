@@ -4,21 +4,22 @@
  */
 
 import React, { useState, useEffect } from 'react';
-import { ScrollView, View, Pressable } from 'react-native';
-import { SafeAreaView } from 'react-native-safe-area-context';
+import { View, Pressable } from 'react-native';
 import { NativeStackScreenProps } from '@react-navigation/native-stack';
 import {
   Card,
-  Text,
-  Button,
-  Input,
-  Column,
+  Text, Column,
   Row,
   LoadingView,
+  ScreenLayout,
+  FormField,
+  ErrorAlert,
+  InfoCard,
+  ActionFooter
 } from '../components';
 import { useAuth } from '../hooks';
 import { useTranslation } from '../i18n';
-import { colors, spacing, typography, borderRadius } from '../theme';
+import { colors, spacing, typography } from '../theme';
 import { AuthStackParamList } from '../navigation/AuthNavigator';
 import MockAuthService from '../services/MockAuthService';
 
@@ -72,75 +73,23 @@ const SignInScreen = ({ navigation }: SignInScreenProps) => {
   }
 
   return (
-    <SafeAreaView
-      style={{
-        flex: 1,
-        backgroundColor: colors.bg_darkest,
-      }}
-      edges={['bottom']}
-    >
-      <ScrollView
-        style={{
-          flex: 1,
-          backgroundColor: colors.bg_darkest,
-        }}
-        contentContainerStyle={{
-          paddingHorizontal: spacing.lg,
-          paddingTop: 20,
-          paddingBottom: spacing.lg,
-        }}
-        scrollIndicatorInsets={{ right: 1 }}
-        showsVerticalScrollIndicator={false}
-      >
+    <ScreenLayout>
       <Column gap="xl">
         {/* Error Message */}
-        {displayError && (
-          <View
-            style={{
-              backgroundColor: colors.error,
-              padding: spacing.md,
-              borderRadius: borderRadius.base,
-              borderLeftWidth: 4,
-              borderLeftColor: colors.error_dark,
-            }}
-          >
-            <Text variant="body" style={{ color: colors.white }}>
-              {displayError}
-            </Text>
-          </View>
-        )}
+        {displayError && <ErrorAlert message={displayError} icon="❌" />}
 
         {/* Form Card */}
         <Card>
           <Column gap="md">
             {/* DID Input */}
-            <View>
-              <Text
-                style={{
-                  fontSize: typography.size.sm,
-                  fontWeight: typography.weight.semibold,
-                  color: colors.text_primary,
-                  marginBottom: spacing.sm,
-                }}
-              >
-                {t.auth.signIn.didLabel}
-              </Text>
-              <Input
-                placeholder={t.auth.signIn.didPlaceholder}
-                value={did}
-                onChangeText={setDid}
-                editable={!isLoading}
-              />
-              <Text
-                style={{
-                  fontSize: typography.size.xs,
-                  color: colors.text_tertiary,
-                  marginTop: spacing.xs,
-                }}
-              >
-                {t.auth.signIn.didExample}
-              </Text>
-            </View>
+            <FormField
+              label={t.auth.signIn.didLabel}
+              placeholder={t.auth.signIn.didPlaceholder}
+              value={did}
+              onChangeText={setDid}
+              editable={!isLoading}
+              helperText={t.auth.signIn.didExample}
+            />
 
             {/* Passphrase Input */}
             <View>
@@ -171,93 +120,53 @@ const SignInScreen = ({ navigation }: SignInScreenProps) => {
                   </Text>
                 </Pressable>
               </Row>
-              <Input
+              <FormField
+                label=""
                 placeholder={t.auth.signIn.passphrasePlaceholder}
                 value={passphrase}
                 onChangeText={setPassphrase}
                 secureTextEntry={!showPassword}
                 editable={!isLoading}
+                helperText={t.auth.signIn.passphraseHint}
+                containerStyle={{ marginBottom: 0 }}
               />
-              <Text
-                style={{
-                  fontSize: typography.size.xs,
-                  color: colors.text_tertiary,
-                  marginTop: spacing.xs,
-                }}
-              >
-                {t.auth.signIn.passphraseHint}
-              </Text>
             </View>
 
             {/* Test Credentials Info */}
-            <View
-              style={{
-                backgroundColor: colors.bg_darker,
-                padding: spacing.md,
-                borderRadius: borderRadius.base
-              }}
-            >
-              <Text
-                style={{
-                  fontSize: typography.size.xs,
-                  fontWeight: typography.weight.semibold,
-                  color: colors.info,
-                  marginBottom: spacing.sm,
-                }}
-              >
-                {t.auth.signIn.demoLabel}
-              </Text>
-              <Text style={{ fontSize: typography.size.xs, color: colors.text_secondary }}>
-                {t.auth.signIn.demoInfo}
-              </Text>
-            </View>
+            <InfoCard
+              title={t.auth.signIn.demoLabel}
+              description={t.auth.signIn.demoInfo}
+              type="info"
+              icon="ℹ️"
+            />
           </Column>
         </Card>
 
         {/* Action Buttons */}
-        <Column gap="sm">
-          <Button
-            onPress={handleSignIn}
-            disabled={isLoading}
-            style={{
-              opacity: isLoading ? 0.6 : 1,
-            }}
-          >
-            {isLoading ? t.auth.signIn.buttonLoading : t.auth.signIn.button}
-          </Button>
-        </Column>
-
-        {/* Alternative Actions */}
-        <View
-          style={{
-            borderTopWidth: 1,
-            borderTopColor: colors.border,
-            paddingTop: spacing.lg,
-          }}
-        >
-          <Column gap="sm">
-            <Button
-              variant="secondary"
-              onPress={() => navigation.navigate('CreateIdentity')}
-              disabled={isLoading}
-            >
-              {t.auth.signIn.createNew}
-            </Button>
-            <Button
-              variant="outline"
-              onPress={() => navigation.navigate('RecoverIdentity')}
-              disabled={isLoading}
-            >
-              {t.auth.signIn.recover}
-            </Button>
-          </Column>
-        </View>
-
-        {/* Footer spacing */}
-        <View style={{ height: spacing.xl }} />
+        <ActionFooter
+          actions={[
+            {
+              label: isLoading ? t.auth.signIn.buttonLoading : t.auth.signIn.button,
+              onPress: handleSignIn,
+              disabled: isLoading,
+              loading: isLoading,
+            },
+            {
+              label: t.auth.signIn.createNew,
+              onPress: () => navigation.navigate('CreateIdentity'),
+              variant: 'secondary',
+              disabled: isLoading,
+            },
+            {
+              label: t.auth.signIn.recover,
+              onPress: () => navigation.navigate('RecoverIdentity'),
+              variant: 'secondary',
+              disabled: isLoading,
+            },
+          ]}
+        />
       </Column>
-      </ScrollView>
-    </SafeAreaView>
+    </ScreenLayout>
   );
 };
 

@@ -1,6 +1,5 @@
 import React, { useState } from 'react';
-import { ScrollView, View } from 'react-native';
-import { SafeAreaView } from 'react-native-safe-area-context';
+import { View } from 'react-native';
 import {
   Card,
   Text,
@@ -8,6 +7,7 @@ import {
   LoadingView,
   Column,
   DetailRow,
+  ScreenLayout,
 } from '../components';
 import { useAuth } from '../hooks';
 import { useTranslation } from '../i18n';
@@ -27,28 +27,8 @@ const WalletScreen = ({ navigation }: any) => {
   const totalBalance = wallets.reduce((sum, w) => sum + (w.balance || 0), 0);
 
   return (
-    <SafeAreaView
-      style={{
-        flex: 1,
-        backgroundColor: colors.bg_darkest,
-      }}
-      edges={['bottom']}
-    >
-      <ScrollView
-        testID="wallet-screen"
-        style={{
-          flex: 1,
-          backgroundColor: colors.bg_darkest,
-        }}
-        contentContainerStyle={{
-          paddingHorizontal: spacing.lg,
-          paddingTop: 20,
-          paddingBottom: spacing.lg,
-        }}
-        scrollIndicatorInsets={{ right: 1 }}
-        showsVerticalScrollIndicator={false}
-      >
-        <Column gap="xl">
+    <ScreenLayout paddingTop={20}>
+      <Column gap="xl">
           {/* Total Balance Card */}
           <Card>
             <View
@@ -290,11 +270,8 @@ const WalletScreen = ({ navigation }: any) => {
             </Column>
           </Card>
 
-          {/* Footer spacing */}
-          <View style={{ height: spacing.xl }} />
-        </Column>
-      </ScrollView>
-    </SafeAreaView>
+      </Column>
+    </ScreenLayout>
   );
 };
 

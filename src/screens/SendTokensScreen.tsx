@@ -1,6 +1,6 @@
 import React from 'react';
-import { ScrollView, View } from 'react-native';
-import { Card, Text, Button, Column, Input } from '../components';
+import { View } from 'react-native';
+import { Card, Text, Button, Column, ScreenLayout, FormField, ActionFooter } from '../components';
 import { useTranslation } from '../i18n';
 import { colors, spacing } from '../theme';
 
@@ -84,10 +84,7 @@ const SendTokensScreen = ({ navigation }: any) => {
   const currencies = ['ZHTP', 'USDT', 'ETH', 'BTC'];
 
   return (
-    <ScrollView
-      style={{ flex: 1, backgroundColor: colors.bg_dark, padding: spacing.lg }}
-      showsVerticalScrollIndicator={false}
-    >
+    <ScreenLayout>
       <Card>
         <Text variant="h2" style={{ marginBottom: spacing.md }}>
           {t.sendTokens.title.replace('{currency}', selectedCurrency)}
@@ -120,67 +117,48 @@ const SendTokensScreen = ({ navigation }: any) => {
 
         <Column gap="md">
           {/* Recipient Address Input */}
-          <View>
-            <Input
-              placeholder={t.sendTokens.recipientPlaceholder}
-              value={recipient}
-              onChangeText={(text) => {
-                setRecipient(text);
-                if (errors.recipient) {
-                  setErrors((prev) => ({ ...prev, recipient: undefined }));
-                }
-              }}
-              editable={!isLoading}
-              style={{
-                borderColor: errors.recipient ? colors.error : colors.border,
-              }}
-            />
-            {errors.recipient && (
-              <Text
-                variant="caption"
-                style={{ color: colors.error, marginTop: spacing.xs }}
-              >
-                {errors.recipient}
-              </Text>
-            )}
-          </View>
+          <FormField
+            label=""
+            placeholder={t.sendTokens.recipientPlaceholder}
+            value={recipient}
+            onChangeText={(text) => {
+              setRecipient(text);
+              if (errors.recipient) {
+                setErrors((prev) => ({ ...prev, recipient: undefined }));
+              }
+            }}
+            error={errors.recipient}
+            editable={!isLoading}
+            containerStyle={{ marginBottom: 0 }}
+          />
 
           {/* Amount Input */}
-          <View>
-            <Input
-              placeholder={t.sendTokens.amountPlaceholder}
-              value={amount}
-              onChangeText={(text) => {
-                setAmount(text);
-                if (errors.amount) {
-                  setErrors((prev) => ({ ...prev, amount: undefined }));
-                }
-              }}
-              keyboardType="decimal-pad"
-              editable={!isLoading}
-              style={{
-                borderColor: errors.amount ? colors.error : colors.border,
-              }}
-            />
-            {errors.amount && (
-              <Text
-                variant="caption"
-                style={{ color: colors.error, marginTop: spacing.xs }}
-              >
-                {errors.amount}
-              </Text>
-            )}
-          </View>
+          <FormField
+            label=""
+            placeholder={t.sendTokens.amountPlaceholder}
+            value={amount}
+            onChangeText={(text) => {
+              setAmount(text);
+              if (errors.amount) {
+                setErrors((prev) => ({ ...prev, amount: undefined }));
+              }
+            }}
+            keyboardType="decimal-pad"
+            error={errors.amount}
+            editable={!isLoading}
+            containerStyle={{ marginBottom: 0 }}
+          />
 
           {/* Memo Input */}
-          <Input
+          <FormField
+            label=""
             placeholder={t.sendTokens.memoPlaceholder}
             value={memo}
             onChangeText={setMemo}
             editable={!isLoading}
             multiline
             numberOfLines={3}
-            textInputStyle={{ textAlignVertical: 'top', minHeight: 80 }}
+            containerStyle={{ marginBottom: 0 }}
           />
 
           {/* Fee Preview */}
@@ -243,27 +221,25 @@ const SendTokensScreen = ({ navigation }: any) => {
           )}
 
           {/* Action Buttons */}
-          <View style={{ gap: spacing.sm, marginTop: spacing.md }}>
-            <Button
-              onPress={handleSend}
-              disabled={!recipient || !amount || isLoading || Object.keys(errors).length > 0}
-              style={{
-                opacity: !recipient || !amount || Object.keys(errors).length > 0 ? 0.5 : 1,
-              }}
-            >
-              {isLoading ? t.sendTokens.buttonLoading : t.sendTokens.button}
-            </Button>
-            <Button
-              onPress={() => navigation.goBack()}
-              variant="outline"
-              disabled={isLoading}
-            >
-              {t.sendTokens.cancel}
-            </Button>
-          </View>
+          <ActionFooter
+            actions={[
+              {
+                label: isLoading ? t.sendTokens.buttonLoading : t.sendTokens.button,
+                onPress: handleSend,
+                disabled: !recipient || !amount || isLoading || Object.keys(errors).length > 0,
+                loading: isLoading,
+              },
+              {
+                label: t.sendTokens.cancel,
+                onPress: () => navigation.goBack(),
+                variant: 'secondary',
+                disabled: isLoading,
+              },
+            ]}
+          />
         </Column>
       </Card>
-    </ScrollView>
+    </ScreenLayout>
   );
 };
 

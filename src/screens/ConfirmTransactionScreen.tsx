@@ -1,9 +1,8 @@
 import React, { useState } from 'react';
-import { ScrollView, View, Alert } from 'react-native';
-import { SafeAreaView } from 'react-native-safe-area-context';
-import { Card, Text, Button, DetailRow, Column, LoadingView } from '../components';
+import { View } from 'react-native';
+import { Card, Text, Button, DetailRow, Column, LoadingView, ScreenLayout } from '../components';
 import { useTranslation } from '../i18n';
-import { colors, spacing, typography, borderRadius } from '../theme';
+import { colors, spacing, typography } from '../theme';
 
 const ConfirmTransactionScreen = ({ navigation, route }: any) => {
   const { t } = useTranslation();
@@ -20,7 +19,7 @@ const ConfirmTransactionScreen = ({ navigation, route }: any) => {
     setTimeout(() => {
       // Simulate 90% success rate
       if (Math.random() > 0.1) {
-        setTransactionId(`0x${Math.random().toString(16).substr(2, 40)}`);
+        setTransactionId(`0x${Math.random().toString(16).slice(2, 42)}`);
         setTransactionResult('success');
       } else {
         setTransactionResult('error');
@@ -38,43 +37,13 @@ const ConfirmTransactionScreen = ({ navigation, route }: any) => {
   };
 
   if (!recipient || amount === undefined) {
-    return (
-      <SafeAreaView
-        style={{
-          flex: 1,
-          backgroundColor: colors.bg_darkest,
-        }}
-        edges={['bottom']}
-      >
-        <LoadingView />
-      </SafeAreaView>
-    );
+    return <LoadingView />;
   }
 
   if (transactionResult === 'success') {
     return (
-      <SafeAreaView
-        style={{
-          flex: 1,
-          backgroundColor: colors.bg_darkest,
-          justifyContent: 'center',
-          alignItems: 'center',
-        }}
-        edges={['bottom']}
-      >
-        <ScrollView
-          style={{
-            flex: 1,
-            backgroundColor: colors.bg_darkest,
-          }}
-          contentContainerStyle={{
-            paddingHorizontal: spacing.lg,
-            paddingVertical: spacing.lg,
-            justifyContent: 'center',
-          }}
-          scrollIndicatorInsets={{ right: 1 }}
-          showsVerticalScrollIndicator={false}
-        >
+      <ScreenLayout>
+        <Column gap="lg" style={{ justifyContent: 'center', flex: 1 }}>
           <Card style={{ alignItems: 'center', paddingVertical: spacing.xl }}>
             <Text style={{ fontSize: typography.size['5xl'], marginBottom: spacing.md }}>
               ✅
@@ -104,7 +73,6 @@ const ConfirmTransactionScreen = ({ navigation, route }: any) => {
                 <DetailRow
                   label={t.confirmTransaction.success.transactionId}
                   value={transactionId.substring(0, 12) + '...' + transactionId.substring(-8)}
-                  copyable
                 />
                 <DetailRow label={t.confirmTransaction.currency} value={currency} />
                 <DetailRow label={t.confirmTransaction.amount} value={`${amount} ${currency}`} />
@@ -120,35 +88,15 @@ const ConfirmTransactionScreen = ({ navigation, route }: any) => {
               {t.confirmTransaction.success.button}
             </Button>
           </Card>
-        </ScrollView>
-      </SafeAreaView>
+        </Column>
+      </ScreenLayout>
     );
   }
 
   if (transactionResult === 'error') {
     return (
-      <SafeAreaView
-        style={{
-          flex: 1,
-          backgroundColor: colors.bg_darkest,
-          justifyContent: 'center',
-          alignItems: 'center',
-        }}
-        edges={['bottom']}
-      >
-        <ScrollView
-          style={{
-            flex: 1,
-            backgroundColor: colors.bg_darkest,
-          }}
-          contentContainerStyle={{
-            paddingHorizontal: spacing.lg,
-            paddingVertical: spacing.lg,
-            justifyContent: 'center',
-          }}
-          scrollIndicatorInsets={{ right: 1 }}
-          showsVerticalScrollIndicator={false}
-        >
+      <ScreenLayout>
+        <Column gap="lg" style={{ justifyContent: 'center', flex: 1 }}>
           <Card style={{ alignItems: 'center', paddingVertical: spacing.xl }}>
             <Text style={{ fontSize: typography.size['5xl'], marginBottom: spacing.md }}>
               ❌
@@ -179,33 +127,14 @@ const ConfirmTransactionScreen = ({ navigation, route }: any) => {
               {t.confirmTransaction.error.button}
             </Button>
           </Card>
-        </ScrollView>
-      </SafeAreaView>
+        </Column>
+      </ScreenLayout>
     );
   }
 
   return (
-    <SafeAreaView
-      style={{
-        flex: 1,
-        backgroundColor: colors.bg_darkest,
-      }}
-      edges={['bottom']}
-    >
-      <ScrollView
-        style={{
-          flex: 1,
-          backgroundColor: colors.bg_darkest,
-        }}
-        contentContainerStyle={{
-          paddingHorizontal: spacing.lg,
-          paddingTop: 20,
-          paddingBottom: spacing.lg,
-        }}
-        scrollIndicatorInsets={{ right: 1 }}
-        showsVerticalScrollIndicator={false}
-      >
-        <Column gap="lg">
+    <ScreenLayout paddingTop={20}>
+      <Column gap="lg">
           <Text variant="h1">{t.confirmTransaction.title}</Text>
 
           {/* Transaction Details */}
@@ -286,11 +215,8 @@ const ConfirmTransactionScreen = ({ navigation, route }: any) => {
               {t.confirmTransaction.cancelButton}
             </Button>
           </View>
-
-          <View style={{ height: spacing.xl }} />
-        </Column>
-      </ScrollView>
-    </SafeAreaView>
+      </Column>
+    </ScreenLayout>
   );
 };
 

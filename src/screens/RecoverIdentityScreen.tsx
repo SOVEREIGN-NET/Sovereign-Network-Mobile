@@ -4,17 +4,19 @@
  */
 
 import React, { useState } from 'react';
-import { ScrollView, View, Pressable } from 'react-native';
-import { SafeAreaView } from 'react-native-safe-area-context';
+import { View, Pressable } from 'react-native';
 import { NativeStackScreenProps } from '@react-navigation/native-stack';
 import {
   Card,
   Text,
-  Button,
-  Input,
   Column,
   Row,
   LoadingView,
+  ScreenLayout,
+  ErrorAlert,
+  SelectableOptionCard,
+  FormField,
+  ActionFooter,
 } from '../components';
 import { useAuth } from '../hooks';
 import { useTranslation } from '../i18n';
@@ -120,43 +122,10 @@ const RecoverIdentityScreen = ({ navigation }: RecoverIdentityScreenProps) => {
   ];
 
   return (
-    <SafeAreaView
-      style={{
-        flex: 1,
-        backgroundColor: colors.bg_darkest,
-      }}
-      edges={['bottom']}
-    >
-      <ScrollView
-        style={{
-          flex: 1,
-          backgroundColor: colors.bg_darkest,
-        }}
-        contentContainerStyle={{
-          paddingHorizontal: spacing.lg,
-          paddingTop: spacing.xl,
-          paddingBottom: spacing.lg,
-        }}
-        scrollIndicatorInsets={{ right: 1 }}
-        showsVerticalScrollIndicator={false}
-      >
+    <ScreenLayout>
       <Column gap="xl">
         {/* Error Message */}
-        {displayError && (
-          <View
-            style={{
-              backgroundColor: colors.error,
-              padding: spacing.md,
-              borderRadius: borderRadius.base,
-              borderLeftWidth: 4,
-              borderLeftColor: colors.error_dark,
-            }}
-          >
-            <Text variant="body" style={{ color: colors.white }}>
-              {displayError}
-            </Text>
-          </View>
-        )}
+        {displayError && <ErrorAlert message={displayError} icon="❌" />}
 
         {/* Recovery Method Selection */}
         <Card>
@@ -173,48 +142,14 @@ const RecoverIdentityScreen = ({ navigation }: RecoverIdentityScreenProps) => {
 
             <Column gap="xs">
               {recoveryOptions.map((option) => (
-                <Pressable
+                <SelectableOptionCard
                   key={option.value}
-                  onPress={() => setRecoveryMethod(option.value)}
-                  style={{
-                    backgroundColor:
-                      recoveryMethod === option.value
-                        ? colors.primary
-                        : colors.bg_darker,
-                    padding: spacing.md,
-                    borderRadius: borderRadius.base,
-                    borderWidth: 2,
-                    borderColor:
-                      recoveryMethod === option.value
-                        ? colors.primary
-                        : colors.border,
-                  }}
-                >
-                  <Text
-                    style={{
-                      fontSize: typography.size.md,
-                      fontWeight: typography.weight.semibold,
-                      color:
-                        recoveryMethod === option.value
-                          ? colors.bg_darkest
-                          : colors.text_primary,
-                      marginBottom: spacing.xs,
-                    }}
-                  >
-                    {option.label}
-                  </Text>
-                  <Text
-                    style={{
-                      fontSize: typography.size.xs,
-                      color:
-                        recoveryMethod === option.value
-                          ? colors.bg_darkest
-                          : colors.text_secondary,
-                    }}
-                  >
-                    {option.description}
-                  </Text>
-                </Pressable>
+                  id={option.value}
+                  title={option.label}
+                  description={option.description}
+                  isSelected={recoveryMethod === option.value}
+                  onSelect={(id) => setRecoveryMethod(id as typeof recoveryMethod)}
+                />
               ))}
             </Column>
           </Column>
@@ -224,34 +159,17 @@ const RecoverIdentityScreen = ({ navigation }: RecoverIdentityScreenProps) => {
         {recoveryMethod === 'seed' && (
           <Card>
             <Column gap="sm">
-              <Text
-                style={{
-                  fontSize: typography.size.sm,
-                  fontWeight: typography.weight.semibold,
-                  color: colors.text_primary,
-                }}
-              >
-                {t.auth.recoverIdentity.seed.title}
-              </Text>
-
-              <Input
+              <FormField
+                label={t.auth.recoverIdentity.seed.title}
                 placeholder={t.auth.recoverIdentity.seed.placeholder}
                 value={seedPhrase}
                 onChangeText={setSeedPhrase}
                 multiline
                 numberOfLines={4}
                 editable={!isLoading}
-                textInputStyle={{ textAlignVertical: 'top' }}
+                helperText={t.auth.recoverIdentity.seed.hint}
+                containerStyle={{ marginBottom: 0 }}
               />
-
-              <Text
-                style={{
-                  fontSize: typography.size.xs,
-                  color: colors.text_tertiary,
-                }}
-              >
-                {t.auth.recoverIdentity.seed.hint}
-              </Text>
 
               <View
                 style={{
@@ -290,35 +208,16 @@ const RecoverIdentityScreen = ({ navigation }: RecoverIdentityScreenProps) => {
         {recoveryMethod === 'backup' && (
           <Card>
             <Column gap="sm">
-              <Text
-                style={{
-                  fontSize: typography.size.sm,
-                  fontWeight: typography.weight.semibold,
-                  color: colors.text_primary,
-                }}
-              >
-                {t.auth.recoverIdentity.backup.title}
-              </Text>
-
-              <Input
+              <FormField
+                label={t.auth.recoverIdentity.backup.title}
                 placeholder={t.auth.recoverIdentity.backup.placeholder}
                 value={backupJson}
                 onChangeText={setBackupJson}
                 multiline
                 numberOfLines={4}
                 editable={!isLoading}
-                textInputStyle={{ textAlignVertical: 'top' }}
+                containerStyle={{ marginBottom: spacing.md }}
               />
-
-              <Text
-                style={{
-                  fontSize: typography.size.xs,
-                  color: colors.text_tertiary,
-                  marginTop: spacing.md,
-                }}
-              >
-                {t.auth.recoverIdentity.backup.passwordLabel}
-              </Text>
 
               <Row
                 style={{
@@ -327,6 +226,15 @@ const RecoverIdentityScreen = ({ navigation }: RecoverIdentityScreenProps) => {
                   marginBottom: spacing.sm,
                 }}
               >
+                <Text
+                  style={{
+                    fontSize: typography.size.sm,
+                    fontWeight: typography.weight.semibold,
+                    color: colors.text_primary,
+                  }}
+                >
+                  {t.auth.recoverIdentity.backup.passwordLabel}
+                </Text>
                 <Pressable onPress={() => setShowPassword(!showPassword)}>
                   <Text
                     style={{
@@ -339,23 +247,16 @@ const RecoverIdentityScreen = ({ navigation }: RecoverIdentityScreenProps) => {
                 </Pressable>
               </Row>
 
-              <Input
+              <FormField
+                label=""
                 placeholder={t.auth.recoverIdentity.backup.passwordPlaceholder}
                 value={backupPassword}
                 onChangeText={setBackupPassword}
                 secureTextEntry={!showPassword}
                 editable={!isLoading}
+                helperText={t.auth.recoverIdentity.backup.hint}
+                containerStyle={{ marginBottom: 0 }}
               />
-
-              <Text
-                style={{
-                  fontSize: typography.size.xs,
-                  color: colors.text_tertiary,
-                  marginTop: spacing.md,
-                }}
-              >
-                {t.auth.recoverIdentity.backup.hint}
-              </Text>
             </Column>
           </Card>
         )}
@@ -364,28 +265,19 @@ const RecoverIdentityScreen = ({ navigation }: RecoverIdentityScreenProps) => {
         {recoveryMethod === 'social' && (
           <Card>
             <Column gap="sm">
-              <Text
-                style={{
-                  fontSize: typography.size.sm,
-                  fontWeight: typography.weight.semibold,
-                  color: colors.text_primary,
-                }}
-              >
-                {t.auth.recoverIdentity.social.title}
-              </Text>
-
-              <Input
+              <FormField
+                label={t.auth.recoverIdentity.social.title}
                 placeholder={t.auth.recoverIdentity.social.placeholder}
                 value={guardianCode}
                 onChangeText={setGuardianCode}
                 editable={!isLoading}
+                containerStyle={{ marginBottom: spacing.md }}
               />
 
               <Text
                 style={{
                   fontSize: typography.size.xs,
                   color: colors.text_tertiary,
-                  marginTop: spacing.md,
                 }}
               >
                 {t.auth.recoverIdentity.social.processTitle}
@@ -462,23 +354,18 @@ const RecoverIdentityScreen = ({ navigation }: RecoverIdentityScreenProps) => {
         )}
 
         {/* Action Buttons */}
-        <Column gap="sm">
-          <Button
-            onPress={handleRecover}
-            disabled={isLoading}
-            style={{
-              opacity: isLoading ? 0.6 : 1,
-            }}
-          >
-            {isLoading ? t.auth.recoverIdentity.buttonLoading : t.auth.recoverIdentity.button}
-          </Button>
-        </Column>
-
-        {/* Footer spacing */}
-        <View style={{ height: spacing.xl }} />
+        <ActionFooter
+          actions={[
+            {
+              label: isLoading ? t.auth.recoverIdentity.buttonLoading : t.auth.recoverIdentity.button,
+              onPress: () => { handleRecover().catch(() => {}); },
+              disabled: isLoading,
+              loading: isLoading,
+            },
+          ]}
+        />
       </Column>
-      </ScrollView>
-    </SafeAreaView>
+    </ScreenLayout>
   );
 };
 

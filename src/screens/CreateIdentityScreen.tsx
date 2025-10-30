@@ -4,17 +4,19 @@
  */
 
 import React, { useState, useCallback } from 'react';
-import { ScrollView, View, Pressable } from 'react-native';
-import { SafeAreaView } from 'react-native-safe-area-context';
+import { View, Pressable } from 'react-native';
 import { NativeStackScreenProps } from '@react-navigation/native-stack';
 import {
   Card,
   Text,
-  Button,
-  Input,
   Column,
   Row,
   LoadingView,
+  ScreenLayout,
+  FormField,
+  ErrorAlert,
+  SelectableOptionCard,
+  ActionFooter,
 } from '../components';
 import { useAuth, useDebounce } from '../hooks';
 import { useTranslation } from '../i18n';
@@ -161,162 +163,12 @@ const CreateIdentityScreen = (_: CreateIdentityScreenProps) => {
   ];
 
   return (
-    <SafeAreaView
-      style={{
-        flex: 1,
-        backgroundColor: colors.bg_darkest,
-      }}
-      edges={['bottom']}
-    >
-      <ScrollView
-        style={{
-          flex: 1,
-          backgroundColor: colors.bg_darkest,
-        }}
-        contentContainerStyle={{
-          paddingHorizontal: spacing.lg,
-          paddingTop: spacing.xl,
-          paddingBottom: spacing.lg,
-        }}
-        scrollIndicatorInsets={{ right: 1 }}
-        showsVerticalScrollIndicator={false}
-      >
+    <ScreenLayout paddingTop={spacing.xl}>
       <Column gap="xl">
         {/* Error Message */}
-        {displayError && (
-          <View
-            style={{
-              backgroundColor: colors.error,
-              padding: spacing.md,
-              borderRadius: borderRadius.base,
-              borderLeftWidth: 4,
-              borderLeftColor: colors.error_dark,
-            }}
-          >
-            <Text variant="body" style={{ color: colors.white }}>
-              {displayError}
-            </Text>
-          </View>
-        )}
+        {displayError && <ErrorAlert message={displayError} icon="❌" />}
 
         {/* Identity Type Selection */}
-        <Card>
-          <Column gap="sm">
-            <Text
-              style={{
-                fontSize: typography.size.sm,
-                fontWeight: typography.weight.semibold,
-                color: colors.text_primary,
-              }}
-            >
-              {t.auth.createIdentity.identityType}
-            </Text>
-
-            <Column gap="xs">
-              {identityTypes.map((type) => (
-                <Pressable
-                  key={type.value}
-                  onPress={() => setIdentityType(type.value)}
-                  style={{
-                    backgroundColor:
-                      identityType === type.value
-                        ? colors.primary
-                        : colors.bg_darker,
-                    padding: spacing.md,
-                    borderRadius: borderRadius.base,
-                    borderWidth: 2,
-                    borderColor:
-                      identityType === type.value
-                        ? colors.primary
-                        : colors.border,
-                  }}
-                >
-                  <Text
-                    style={{
-                      fontSize: typography.size.md,
-                      fontWeight: typography.weight.semibold,
-                      color:
-                        identityType === type.value
-                          ? colors.bg_darkest
-                          : colors.text_primary,
-                      marginBottom: spacing.xs,
-                    }}
-                  >
-                    {type.label}
-                  </Text>
-                  <Text
-                    style={{
-                      fontSize: typography.size.xs,
-                      color:
-                        identityType === type.value
-                          ? colors.bg_darkest
-                          : colors.text_secondary,
-                    }}
-                  >
-                    {type.description}
-                  </Text>
-                </Pressable>
-              ))}
-            </Column>
-          </Column>
-        </Card>
-
-        {/* Username Input */}
-        <Card>
-          <Column gap="sm">
-            <View>
-              <Row
-                style={{
-                  justifyContent: 'space-between',
-                  alignItems: 'center',
-                  marginBottom: spacing.sm,
-                }}
-              >
-                <Text
-                  style={{
-                    fontSize: typography.size.sm,
-                    fontWeight: typography.weight.semibold,
-                    color: colors.text_primary,
-                  }}
-                >
-                  {t.auth.createIdentity.username}
-                </Text>
-                {checkingUsername && (
-                  <Text style={{ color: colors.primary, fontSize: typography.size.xs }}>
-                    {t.auth.createIdentity.usernameChecking}
-                  </Text>
-                )}
-                {!checkingUsername && usernameAvailable === true && (
-                  <Text style={{ color: colors.success, fontSize: typography.size.xs }}>
-                    {t.auth.createIdentity.usernameAvailable}
-                  </Text>
-                )}
-                {!checkingUsername && usernameAvailable === false && (
-                  <Text style={{ color: colors.error, fontSize: typography.size.xs }}>
-                    {t.auth.createIdentity.usernameTaken}
-                  </Text>
-                )}
-              </Row>
-              <Input
-                placeholder="yourname"
-                value={username}
-                onChangeText={handleUsernameChange}
-                editable={!isLoading}
-              />
-              <Text
-                style={{
-                  fontSize: typography.size.xs,
-                  color: colors.text_tertiary,
-                  marginTop: spacing.xs,
-                }}
-              >
-                {t.auth.createIdentity.usernameWillBe.replace('{username}', username || 'yourname')}
-              </Text>
-            </View>
-          </Column>
-        </Card>
-
-        {/* Display Name Input */}
         <Card>
           <Column gap="sm">
             <Text
@@ -327,24 +179,82 @@ const CreateIdentityScreen = (_: CreateIdentityScreenProps) => {
                 marginBottom: spacing.sm,
               }}
             >
-              {t.auth.createIdentity.displayName}
+              {t.auth.createIdentity.identityType}
             </Text>
-            <Input
-              placeholder={t.auth.createIdentity.displayNamePlaceholder}
-              value={displayName}
-              onChangeText={setDisplayName}
-              editable={!isLoading}
-            />
-            <Text
+
+            <Column gap="xs">
+              {identityTypes.map((type) => (
+                <SelectableOptionCard
+                  key={type.value}
+                  id={type.value}
+                  title={type.label}
+                  description={type.description}
+                  isSelected={identityType === type.value}
+                  onSelect={(id) => setIdentityType(id as typeof identityType)}
+                />
+              ))}
+            </Column>
+          </Column>
+        </Card>
+
+        {/* Username Input */}
+        <Card>
+          <Column gap="sm">
+            <Row
               style={{
-                fontSize: typography.size.xs,
-                color: colors.text_tertiary,
-                marginTop: spacing.xs,
+                justifyContent: 'space-between',
+                alignItems: 'center',
+                marginBottom: spacing.sm,
               }}
             >
-              {t.auth.createIdentity.displayNameHint}
-            </Text>
+              <Text
+                style={{
+                  fontSize: typography.size.sm,
+                  fontWeight: typography.weight.semibold,
+                  color: colors.text_primary,
+                }}
+              >
+                {t.auth.createIdentity.username}
+              </Text>
+              {checkingUsername && (
+                <Text style={{ color: colors.primary, fontSize: typography.size.xs }}>
+                  {t.auth.createIdentity.usernameChecking}
+                </Text>
+              )}
+              {!checkingUsername && usernameAvailable === true && (
+                <Text style={{ color: colors.success, fontSize: typography.size.xs }}>
+                  {t.auth.createIdentity.usernameAvailable}
+                </Text>
+              )}
+              {!checkingUsername && usernameAvailable === false && (
+                <Text style={{ color: colors.error, fontSize: typography.size.xs }}>
+                  {t.auth.createIdentity.usernameTaken}
+                </Text>
+              )}
+            </Row>
+            <FormField
+              label=""
+              placeholder="yourname"
+              value={username}
+              onChangeText={handleUsernameChange}
+              editable={!isLoading}
+              helperText={t.auth.createIdentity.usernameWillBe.replace('{username}', username || 'yourname')}
+              containerStyle={{ marginBottom: 0 }}
+            />
           </Column>
+        </Card>
+
+        {/* Display Name Input */}
+        <Card>
+          <FormField
+            label={t.auth.createIdentity.displayName}
+            placeholder={t.auth.createIdentity.displayNamePlaceholder}
+            value={displayName}
+            onChangeText={setDisplayName}
+            editable={!isLoading}
+            helperText={t.auth.createIdentity.displayNameHint}
+            containerStyle={{ marginBottom: 0 }}
+          />
         </Card>
 
         {/* Passphrase Input */}
@@ -377,26 +287,29 @@ const CreateIdentityScreen = (_: CreateIdentityScreenProps) => {
                 </Text>
               </Pressable>
             </Row>
-            <Input
+            <FormField
+              label=""
               placeholder={t.auth.createIdentity.passphraseMinHint}
               value={passphrase}
               onChangeText={setPassphrase}
               secureTextEntry={!showPassphrase}
               editable={!isLoading}
+              containerStyle={{ marginBottom: spacing.sm }}
             />
-            <Input
+            <FormField
+              label=""
               placeholder={t.auth.createIdentity.passphraseConfirm}
               value={confirmPassphrase}
               onChangeText={setConfirmPassphrase}
               secureTextEntry={!showPassphrase}
               editable={!isLoading}
-              style={{ marginTop: spacing.sm }}
+              containerStyle={{ marginBottom: 0 }}
             />
             <Text
               style={{
                 fontSize: typography.size.xs,
                 color: colors.text_tertiary,
-                marginTop: spacing.xs,
+                marginTop: spacing.md,
               }}
             >
               {t.auth.createIdentity.passphraseBlankHint}
@@ -495,23 +408,18 @@ const CreateIdentityScreen = (_: CreateIdentityScreenProps) => {
         </Card>
 
         {/* Action Buttons */}
-        <Column gap="sm">
-          <Button
-            onPress={handleCreateIdentity}
-            disabled={isLoading}
-            style={{
-              opacity: isLoading ? 0.6 : 1,
-            }}
-          >
-            {isLoading ? t.auth.createIdentity.buttonLoading : t.auth.createIdentity.button}
-          </Button>
-        </Column>
-
-        {/* Footer spacing */}
-        <View style={{ height: spacing.xl }} />
+        <ActionFooter
+          actions={[
+            {
+              label: isLoading ? t.auth.createIdentity.buttonLoading : t.auth.createIdentity.button,
+              onPress: handleCreateIdentity,
+              disabled: isLoading,
+              loading: isLoading,
+            },
+          ]}
+        />
       </Column>
-      </ScrollView>
-    </SafeAreaView>
+    </ScreenLayout>
   );
 };
 

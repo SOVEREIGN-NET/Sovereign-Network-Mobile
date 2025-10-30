@@ -1,6 +1,5 @@
 import React, { useState } from 'react';
-import { ScrollView, View, Alert } from 'react-native';
-import { SafeAreaView } from 'react-native-safe-area-context';
+import { View, Alert } from 'react-native';
 import {
   Card,
   Text,
@@ -8,6 +7,7 @@ import {
   DetailRow,
   LoadingView,
   Column,
+  ScreenLayout,
 } from '../components';
 import { useAuth } from '../hooks';
 import { useTranslation } from '../i18n';
@@ -58,27 +58,8 @@ const IdentityScreen = ({ navigation }: any) => {
   const walletCount = currentIdentity.wallets?.length || 0;
 
   return (
-    <SafeAreaView
-      style={{
-        flex: 1,
-        backgroundColor: colors.bg_darkest,
-      }}
-      edges={['bottom']}
-    >
-      <ScrollView
-        style={{
-          flex: 1,
-          backgroundColor: colors.bg_darkest,
-        }}
-        contentContainerStyle={{
-          paddingHorizontal: spacing.lg,
-          paddingTop: 20,
-          paddingBottom: spacing.lg,
-        }}
-        scrollIndicatorInsets={{ right: 1 }}
-        showsVerticalScrollIndicator={false}
-      >
-        <Column gap="xl">
+    <ScreenLayout paddingTop={20}>
+      <Column gap="xl">
           {/* Identity Card */}
           <Card>
             <View
@@ -213,11 +194,8 @@ const IdentityScreen = ({ navigation }: any) => {
             </Column>
           </Card>
 
-          {/* Footer spacing */}
-          <View style={{ height: spacing.xl }} />
-        </Column>
-      </ScrollView>
-    </SafeAreaView>
+      </Column>
+    </ScreenLayout>
   );
 };
 

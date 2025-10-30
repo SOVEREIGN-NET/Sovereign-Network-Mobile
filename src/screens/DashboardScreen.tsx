@@ -1,5 +1,4 @@
 import React from 'react';
-import { ScrollView } from 'react-native';
 import {
   Card,
   Text,
@@ -7,12 +6,13 @@ import {
   ProgressBar, DetailRow,
   LoadingView,
   Column,
-  Row
+  Row,
+  ScreenLayout
 } from '../components';
 import { useAsyncData } from '../hooks';
 import { useTranslation } from '../i18n';
 import MockDataService from '../services/MockDataService';
-import { colors, spacing } from '../theme';
+import { spacing } from '../theme';
 
 const DashboardScreen = ({ navigation }: any) => {
   const { t } = useTranslation();
@@ -35,14 +35,7 @@ const DashboardScreen = ({ navigation }: any) => {
   const networkStatus = data?.networkStatus;
 
   return (
-    <ScrollView
-      testID="dashboard-screen"
-      style={{
-        flex: 1,
-        backgroundColor: colors.bg_dark,
-        padding: spacing.lg,
-      }}
-    >
+    <ScreenLayout testID="dashboard-screen">
       {/* Status Card */}
       <Card>
         <Text variant="h3">{t.dashboard.networkStatus.title}</Text>
@@ -108,7 +101,7 @@ const DashboardScreen = ({ navigation }: any) => {
           {t.dashboard.about.disclaimer}
         </Text>
       </Card>
-    </ScrollView>
+    </ScreenLayout>
   );
 };
 
