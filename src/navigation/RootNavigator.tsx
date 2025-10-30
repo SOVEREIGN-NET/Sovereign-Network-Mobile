@@ -26,6 +26,8 @@ import TreasuryStatusScreen from '../screens/TreasuryStatusScreen';
 import SettingsScreen from '../screens/SettingsScreen';
 import ClaimUBIScreen from '../screens/ClaimUBIScreen';
 import StakeTokensScreen from '../screens/StakeTokensScreen';
+import BackupIdentityScreen from '../screens/BackupIdentityScreen';
+import BiometricVerificationScreen from '../screens/BiometricVerificationScreen';
 
 const Stack = createNativeStackNavigator();
 const Tab = createBottomTabNavigator();
@@ -98,6 +100,16 @@ const IdentityStack = () => {
         name="Wallet"
         component={WalletScreen}
         options={{ title: 'Wallets', headerBackTitle: 'Back' }}
+      />
+      <Stack.Screen
+        name="BackupIdentity"
+        component={BackupIdentityScreen as any}
+        options={{ title: 'Backup Identity', headerBackTitle: 'Back' }}
+      />
+      <Stack.Screen
+        name="BiometricVerification"
+        component={BiometricVerificationScreen as any}
+        options={{ title: 'Biometric Authentication', headerBackTitle: 'Back' }}
       />
     </Stack.Navigator>
   );
@@ -211,62 +223,61 @@ const BrowserStack = () => {
 };
 
 const RootNavigator = () => {
-  const colorScheme = useColorScheme();
-  const theme = colorScheme === 'dark' ? DarkTheme : DefaultTheme;
+  const scheme = useColorScheme();
+  const navTheme = scheme === 'dark' ? DarkTheme : DefaultTheme;
 
   return (
-    <NavigationContainer theme={theme}>
+    <NavigationContainer theme={navTheme}>
       <Tab.Navigator
         screenOptions={{
           headerShown: false,
           tabBarStyle: {
             backgroundColor: colors.bg_dark,
-            borderTopColor: colors.primary,
-            borderTopWidth: 1,
+            borderTopColor: colors.border,
           },
           tabBarActiveTintColor: colors.primary,
-          tabBarInactiveTintColor: colors.text_tertiary,
-        }}
+          tabBarInactiveTintColor: colors.text_secondary,
+        } as any}
       >
         <Tab.Screen
-          name="Dashboard"
+          name="DashboardTab"
           component={DashboardStack}
           options={{
-            title: 'Home',
-            tabBarLabel: 'Home',
-          }}
+            title: '📊 Dashboard',
+            tabBarLabel: 'Dashboard',
+          } as any}
         />
         <Tab.Screen
-          name="Identity"
+          name="IdentityTab"
           component={IdentityStack}
           options={{
-            title: 'Identity',
+            title: '🔐 Identity',
             tabBarLabel: 'Identity',
-          }}
+          } as any}
         />
         <Tab.Screen
-          name="Wallet"
+          name="WalletTab"
           component={WalletStack}
           options={{
-            title: 'Wallet',
+            title: '💰 Wallet',
             tabBarLabel: 'Wallet',
-          }}
+          } as any}
         />
         <Tab.Screen
-          name="DAO"
+          name="DAOTab"
           component={DAOStack}
           options={{
-            title: 'DAO',
+            title: '🏛️ DAO',
             tabBarLabel: 'DAO',
-          }}
+          } as any}
         />
         <Tab.Screen
-          name="Browser"
+          name="BrowserTab"
           component={BrowserStack}
           options={{
-            title: 'Web4',
-            tabBarLabel: 'Web4',
-          }}
+            title: '🌐 Browser',
+            tabBarLabel: 'Browser',
+          } as any}
         />
       </Tab.Navigator>
     </NavigationContainer>

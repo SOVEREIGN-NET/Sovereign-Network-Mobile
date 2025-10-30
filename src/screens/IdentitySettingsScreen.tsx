@@ -14,7 +14,7 @@ import { useAuth } from '../hooks';
 import { useTranslation } from '../i18n';
 import { colors, spacing, typography, borderRadius } from '../theme';
 
-const IdentitySettingsScreen = (_: any) => {
+const IdentitySettingsScreen = ({ navigation }: any) => {
   const { t } = useTranslation();
   const { currentIdentity, updatePassphrase, updateBiometric, isLoading } = useAuth();
 
@@ -257,7 +257,7 @@ const IdentitySettingsScreen = (_: any) => {
                 </Text>
               </Column>
               <Button
-                onPress={() => handleBiometricToggle(!biometricEnabled)}
+                onPress={() => navigation.navigate('BiometricVerification')}
                 disabled={isLoading || isSaving}
                 style={{
                   backgroundColor: biometricEnabled ? colors.success : colors.bg_light,
@@ -319,14 +319,14 @@ const IdentitySettingsScreen = (_: any) => {
               </Text>
               <Button
                 variant="secondary"
-                onPress={() => {}}
+                onPress={() => navigation.navigate('BackupIdentity')}
                 disabled={isLoading}
               >
                 {t.identity.settings.backup.createButton}
               </Button>
               <Button
                 variant="secondary"
-                onPress={() => {}}
+                onPress={() => navigation.navigate('BackupIdentity')}
                 disabled={isLoading}
               >
                 {t.identity.settings.backup.viewButton}

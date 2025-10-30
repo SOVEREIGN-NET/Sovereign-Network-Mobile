@@ -17,35 +17,41 @@ export type TabParamList = {
 
 // Define individual stack param lists
 export type DashboardStackParamList = {
-  Dashboard: undefined;
-  // Add other dashboard-related screens as needed
+  DashboardMain: undefined;
+  ClaimUBI: undefined;
 };
 
 export type IdentityStackParamList = {
-  Identity: undefined;
-  // Add other identity-related screens as needed
+  IdentityMain: undefined;
+  ProfileEdit: undefined;
+  IdentitySettings: undefined;
+  AppSettings: undefined;
+  Wallet: undefined;
+  BackupIdentity: undefined;
+  BiometricVerification: undefined;
 };
 
 export type WalletStackParamList = {
-  Wallet: undefined;
-  // Add other wallet-related screens as needed
+  WalletMain: undefined;
+  SendTokens: undefined;
+  ReceiveTokens: undefined;
+  StakeTokens: undefined;
+  ConfirmTransaction: undefined;
 };
 
 export type DAOStackParamList = {
-  DAO: undefined;
-  // Add other DAO-related screens as needed
+  DAOMain: undefined;
+  ProposalDetail: undefined;
+  CreateProposal: undefined;
+  TreasuryStatus: undefined;
 };
 
 export type BrowserStackParamList = {
-  Browser: undefined;
-  // Add other browser-related screens as needed
+  BrowserMain: undefined;
 };
 
 // Root stack param list (if needed for modals, auth, etc.)
-export type RootStackParamList = {
-  Root: undefined;
-  // Add modal screens here as needed
-};
+export type RootStackParamList = IdentityStackParamList;
 
 // Tab screen props
 export type TabScreenProps<T extends keyof TabParamList> = BottomTabScreenProps<

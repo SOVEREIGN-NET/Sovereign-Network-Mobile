@@ -16,11 +16,11 @@ import {
 } from '../components';
 import { useAuth } from '../hooks';
 import { useTranslation } from '../i18n';
-import { colors, spacing, typography, borderRadius } from '../theme';
-import type { RootStackParamList } from '../types/navigation';
+import { colors, spacing, borderRadius } from '../theme';
+import type { IdentityStackParamList } from '../types/navigation';
 
 type BackupIdentityScreenProps = NativeStackScreenProps<
-  RootStackParamList,
+  IdentityStackParamList,
   'BackupIdentity'
 >;
 
@@ -250,27 +250,7 @@ const BackupIdentityScreen = ({ navigation }: BackupIdentityScreenProps) => {
                   {t.auth.backup.seed.title}
                 </Text>
 
-                {!showSeed ? (
-                  <Pressable
-                    onPress={() => setShowSeed(true)}
-                    style={{
-                      backgroundColor: colors.bg_dark,
-                      padding: spacing.lg,
-                      borderRadius: borderRadius.md,
-                      alignItems: 'center',
-                      justifyContent: 'center',
-                      minHeight: 120,
-                    }}
-                  >
-                    <Text
-                      variant="body"
-                      color={colors.text_secondary}
-                      style={{ textAlign: 'center' }}
-                    >
-                      👁️ Tap to reveal
-                    </Text>
-                  </Pressable>
-                ) : (
+                {showSeed ? (
                   <>
                     <Text
                       variant="body"
@@ -297,6 +277,26 @@ const BackupIdentityScreen = ({ navigation }: BackupIdentityScreenProps) => {
                       </Text>
                     </Button>
                   </>
+                ) : (
+                  <Pressable
+                    onPress={() => setShowSeed(true)}
+                    style={{
+                      backgroundColor: colors.bg_dark,
+                      padding: spacing.lg,
+                      borderRadius: borderRadius.md,
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      minHeight: 120,
+                    }}
+                  >
+                    <Text
+                      variant="body"
+                      color={colors.text_secondary}
+                      style={{ textAlign: 'center' }}
+                    >
+                      👁️ Tap to reveal
+                    </Text>
+                  </Pressable>
                 )}
               </View>
             </Card>
