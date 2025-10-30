@@ -4,8 +4,13 @@
  */
 
 import React, { createContext, useState, useCallback, useEffect, useMemo } from 'react';
+import { Platform } from 'react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import { NativeStorage } from '../services/NativeStorage';
 import MockAuthService, { Identity } from '../services/MockAuthService';
+
+// Use native storage on Android, AsyncStorage on iOS
+const storage = Platform.OS === 'android' ? NativeStorage : AsyncStorage;
 
 export interface AuthContextType {
   currentIdentity: Identity | null;
@@ -43,7 +48,7 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
   useEffect(() => {
     const restoreIdentity = async () => {
       try {
-        const saved = await AsyncStorage.getItem('zhtp_identity');
+        const saved = await storage.getItem('zhtp_identity');
         if (saved) {
           const identity = JSON.parse(saved);
           setCurrentIdentity(identity);
@@ -69,8 +74,8 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
     try {
       const identity = await MockAuthService.signIn({ did, passphrase });
 
-      // Save to AsyncStorage
-      await AsyncStorage.setItem('zhtp_identity', JSON.stringify(identity));
+      // Save to storage
+      await storage.setItem('zhtp_identity', JSON.stringify(identity));
 
       setCurrentIdentity(identity);
     } catch (err: any) {
@@ -92,8 +97,8 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
     try {
       const identity = await MockAuthService.createIdentity(data);
 
-      // Save to AsyncStorage
-      await AsyncStorage.setItem('zhtp_identity', JSON.stringify(identity));
+      // Save to storage
+      await storage.setItem('zhtp_identity', JSON.stringify(identity));
 
       setCurrentIdentity(identity);
     } catch (err: any) {
@@ -127,8 +132,8 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
         throw new Error('Unknown recovery method');
       }
 
-      // Save to AsyncStorage
-      await AsyncStorage.setItem('zhtp_identity', JSON.stringify(identity));
+      // Save to storage
+      await storage.setItem('zhtp_identity', JSON.stringify(identity));
 
       setCurrentIdentity(identity);
     } catch (err: any) {
@@ -159,8 +164,8 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
         avatar: avatar || currentIdentity.avatar,
       };
 
-      // Save to AsyncStorage
-      await AsyncStorage.setItem('zhtp_identity', JSON.stringify(updatedIdentity));
+      // Save to storage
+      await storage.setItem('zhtp_identity', JSON.stringify(updatedIdentity));
       setCurrentIdentity(updatedIdentity);
     } catch (err: any) {
       const message = err.message || 'Failed to update profile';
@@ -191,7 +196,7 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
         // Mark that passphrase was updated (don't actually store it)
       };
 
-      await AsyncStorage.setItem('zhtp_identity', JSON.stringify(updatedIdentity));
+      await storage.setItem('zhtp_identity', JSON.stringify(updatedIdentity));
       setCurrentIdentity(updatedIdentity);
     } catch (err: any) {
       const message = err.message || 'Failed to update passphrase';
@@ -220,7 +225,7 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
         biometricHash: enabled ? 'mock_biometric_hash' : undefined,
       };
 
-      await AsyncStorage.setItem('zhtp_identity', JSON.stringify(updatedIdentity));
+      await storage.setItem('zhtp_identity', JSON.stringify(updatedIdentity));
       setCurrentIdentity(updatedIdentity);
     } catch (err: any) {
       const message = err.message || 'Failed to update biometric setting';
@@ -239,7 +244,7 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
     setIsLoading(true);
 
     try {
-      await AsyncStorage.removeItem('zhtp_identity');
+      await storage.removeItem('zhtp_identity');
       setCurrentIdentity(null);
     } catch (err: any) {
       const message = err.message || 'Sign out failed';
