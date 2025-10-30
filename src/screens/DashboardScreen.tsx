@@ -93,32 +93,6 @@ const DashboardScreen = ({ navigation }: any) => {
         </Column>
       </Card>
 
-      {/* Quick Actions */}
-      <Card>
-        <Text variant="h3" style={{ marginBottom: spacing.md }}>{t.dashboard.quickActions.title}</Text>
-        <Button
-          onPress={() => navigation.navigate('Wallet', { screen: 'SendTokens' })}
-          style={{ marginBottom: spacing.sm }}
-        >
-          {t.dashboard.quickActions.sendZhtp}
-        </Button>
-        <Button
-          onPress={() => navigation.navigate('Dashboard', { screen: 'ClaimUBI' })}
-          style={{ marginBottom: spacing.sm }}
-        >
-          {t.dashboard.quickActions.claimUbi}
-        </Button>
-        <Button
-          onPress={() => navigation.navigate('DAO')}
-          style={{ marginBottom: spacing.sm }}
-        >
-          {t.dashboard.quickActions.voteOnProposal}
-        </Button>
-        <Button onPress={() => {}}>
-          {t.dashboard.quickActions.createProposal}
-        </Button>
-      </Card>
-
       {/* About Section */}
       <Card>
         <Text variant="caption" style={{ marginBottom: spacing.xs }}>
