@@ -13,6 +13,10 @@ import {
   Button,
   Switch,
   LoadingView,
+  ScreenHeader,
+  ActionButtons,
+  InfoCard,
+  OptionCardGroup,
 } from '../components';
 import { useAuth } from '../hooks';
 import { useTranslation } from '../i18n';
@@ -85,43 +89,20 @@ const BackupIdentityScreen = ({ navigation }: BackupIdentityScreenProps) => {
         style={{ flex: 1 }}
       >
         {/* Header */}
-        <View style={{ padding: spacing.lg }}>
-          <Text variant="h2" color={colors.primary} style={{ marginBottom: spacing.sm }}>
-            {t.auth.backup.title}
-          </Text>
-          <Text
-            variant="body"
-            color={colors.text_secondary}
-            style={{ marginBottom: spacing.lg }}
-          >
-            {t.auth.backup.description}
-          </Text>
-        </View>
+        <ScreenHeader
+          title={t.auth.backup.title}
+          subtitle={t.auth.backup.description}
+        />
 
         {/* Security Warning */}
-        <Card
-          style={{
-            marginHorizontal: spacing.lg,
-            marginBottom: spacing.lg,
-            backgroundColor: `${colors.error}15`,
-            borderColor: colors.error,
-            borderWidth: 1,
-          }}
-        >
-          <View style={{ padding: spacing.md }}>
-            <Text
-              variant="body"
-              weight="semibold"
-              color={colors.error}
-              style={{ marginBottom: spacing.sm }}
-            >
-              ⚠️ {t.auth.backup.securityTitle}
-            </Text>
-            <Text variant="caption" color={colors.text_secondary}>
-              {t.auth.backup.securityWarning}
-            </Text>
-          </View>
-        </Card>
+        <View style={{ paddingHorizontal: spacing.lg, marginBottom: spacing.lg }}>
+          <InfoCard
+            title={t.auth.backup.securityTitle}
+            description={t.auth.backup.securityWarning}
+            type="error"
+            icon="⚠️"
+          />
+        </View>
 
         {/* Backup Method Selection */}
         <View style={{ paddingHorizontal: spacing.lg, marginBottom: spacing.lg }}>
@@ -134,98 +115,23 @@ const BackupIdentityScreen = ({ navigation }: BackupIdentityScreenProps) => {
             {t.auth.backup.method}
           </Text>
 
-          {/* Seed Phrase Option */}
-          <Pressable
-            onPress={() => setBackupMethod('seed')}
-            style={{ marginBottom: spacing.md }}
-          >
-            <Card
-              style={{
-                padding: spacing.md,
-                backgroundColor:
-                  backupMethod === 'seed' ? `${colors.primary}20` : colors.bg_dark,
-                borderColor:
-                  backupMethod === 'seed' ? colors.primary : colors.border,
-                borderWidth: 1,
-              }}
-            >
-              <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}>
-                <View style={{ flex: 1 }}>
-                  <Text
-                    variant="body"
-                    weight="semibold"
-                    color={colors.text_primary}
-                  >
-                    {t.auth.backup.seed.label}
-                  </Text>
-                  <Text
-                    variant="caption"
-                    color={colors.text_secondary}
-                    style={{ marginTop: spacing.xs }}
-                  >
-                    {t.auth.backup.seed.description}
-                  </Text>
-                </View>
-                <View
-                  style={{
-                    width: 20,
-                    height: 20,
-                    borderRadius: 10,
-                    borderWidth: 2,
-                    borderColor:
-                      backupMethod === 'seed' ? colors.primary : colors.border,
-                    backgroundColor:
-                      backupMethod === 'seed' ? colors.primary : 'transparent',
-                  }}
-                />
-              </View>
-            </Card>
-          </Pressable>
-
-          {/* Encrypted File Option */}
-          <Pressable onPress={() => setBackupMethod('file')}>
-            <Card
-              style={{
-                padding: spacing.md,
-                backgroundColor:
-                  backupMethod === 'file' ? `${colors.primary}20` : colors.bg_dark,
-                borderColor:
-                  backupMethod === 'file' ? colors.primary : colors.border,
-                borderWidth: 1,
-              }}
-            >
-              <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}>
-                <View style={{ flex: 1 }}>
-                  <Text
-                    variant="body"
-                    weight="semibold"
-                    color={colors.text_primary}
-                  >
-                    {t.auth.backup.file.label}
-                  </Text>
-                  <Text
-                    variant="caption"
-                    color={colors.text_secondary}
-                    style={{ marginTop: spacing.xs }}
-                  >
-                    {t.auth.backup.file.description}
-                  </Text>
-                </View>
-                <View
-                  style={{
-                    width: 20,
-                    height: 20,
-                    borderRadius: 10,
-                    borderWidth: 2,
-                    borderColor:
-                      backupMethod === 'file' ? colors.primary : colors.border,
-                    backgroundColor:
-                      backupMethod === 'file' ? colors.primary : 'transparent',
-                  }}
-                />
-              </View>
-            </Card>
-          </Pressable>
+          <OptionCardGroup
+            options={[
+              {
+                id: 'seed',
+                title: t.auth.backup.seed.label,
+                description: t.auth.backup.seed.description,
+              },
+              {
+                id: 'file',
+                title: t.auth.backup.file.label,
+                description: t.auth.backup.file.description,
+              },
+            ]}
+            selected={backupMethod}
+            onSelect={(method) => setBackupMethod(method as 'seed' | 'file')}
+            gap="md"
+          />
         </View>
 
         {/* Content based on selected method */}
@@ -330,16 +236,17 @@ const BackupIdentityScreen = ({ navigation }: BackupIdentityScreenProps) => {
               </Pressable>
             </Card>
 
-            <Button
-              variant="primary"
-              disabled={!understood}
-              onPress={() => navigation.goBack()}
-              style={{ marginBottom: spacing.lg }}
-            >
-              <Text color={colors.white} weight="semibold">
-                ✓ I've saved my seed phrase
-              </Text>
-            </Button>
+            <ActionButtons
+              buttons={[
+                {
+                  label: "✓ I've saved my seed phrase",
+                  onPress: () => navigation.goBack(),
+                  variant: 'primary',
+                  disabled: !understood,
+                },
+              ]}
+              paddingHorizontal={0}
+            />
           </View>
         )}
 
@@ -372,59 +279,38 @@ const BackupIdentityScreen = ({ navigation }: BackupIdentityScreenProps) => {
                   Create an encrypted backup file with a secure password.
                 </Text>
 
-                {!backupCreated ? (
+                {backupCreated ? (
+                  <>
+                    <InfoCard
+                      title="Backup file created successfully"
+                      description="Stored securely on your device"
+                      type="success"
+                      icon="✓"
+                    />
+
+                    <ActionButtons
+                      buttons={[
+                        {
+                          label: '⬇️ Download Backup',
+                          onPress: handleDownloadBackup,
+                          variant: 'secondary',
+                        },
+                        {
+                          label: 'Done',
+                          onPress: () => navigation.goBack(),
+                          variant: 'primary',
+                        },
+                      ]}
+                      gap="md"
+                      paddingVertical={spacing.md}
+                    />
+                  </>
+                ) : (
                   <Button variant="primary" onPress={handleCreateBackupFile}>
                     <Text color={colors.white} weight="semibold">
                       Create Backup File
                     </Text>
                   </Button>
-                ) : (
-                  <>
-                    <Card
-                      style={{
-                        backgroundColor: `${colors.success}15`,
-                        borderColor: colors.success,
-                        borderWidth: 1,
-                        marginBottom: spacing.md,
-                      }}
-                    >
-                      <View style={{ padding: spacing.md }}>
-                        <Text
-                          variant="caption"
-                          color={colors.success}
-                          weight="semibold"
-                        >
-                          ✓ Backup file created successfully
-                        </Text>
-                        <Text
-                          variant="caption"
-                          color={colors.text_secondary}
-                          style={{ marginTop: spacing.xs }}
-                        >
-                          Stored securely on your device
-                        </Text>
-                      </View>
-                    </Card>
-
-                    <Button
-                      variant="secondary"
-                      onPress={handleDownloadBackup}
-                      style={{ marginBottom: spacing.md }}
-                    >
-                      <Text color={colors.text_primary} weight="semibold">
-                        ⬇️ Download Backup
-                      </Text>
-                    </Button>
-
-                    <Button
-                      variant="primary"
-                      onPress={() => navigation.goBack()}
-                    >
-                      <Text color={colors.white} weight="semibold">
-                        Done
-                      </Text>
-                    </Button>
-                  </>
                 )}
               </View>
             </Card>

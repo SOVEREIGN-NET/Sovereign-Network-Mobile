@@ -9,10 +9,12 @@ import {
   Column,
   Row,
   LoadingView,
+  ErrorAlert,
+  InfoCard,
 } from '../components';
 import { useAuth } from '../hooks';
 import { useTranslation } from '../i18n';
-import { colors, spacing, typography, borderRadius } from '../theme';
+import { colors, spacing, typography } from '../theme';
 
 const IdentitySettingsScreen = ({ navigation }: any) => {
   const { t } = useTranslation();
@@ -108,19 +110,7 @@ const IdentitySettingsScreen = ({ navigation }: any) => {
       >
         <Column gap="xl">
           {/* Error Message */}
-          {error && (
-            <View
-              style={{
-                backgroundColor: colors.error,
-                padding: spacing.md,
-                borderRadius: borderRadius.base,
-                borderLeftWidth: 4,
-                borderLeftColor: colors.error_dark,
-              }}
-            >
-              <Text style={{ color: colors.white }}>❌ {error}</Text>
-            </View>
-          )}
+          {error && <ErrorAlert message={error} icon="❌" />}
 
           {/* Passphrase Section */}
           <Card>
@@ -272,37 +262,14 @@ const IdentitySettingsScreen = ({ navigation }: any) => {
           </Card>
 
           {/* Security Info Card */}
-          <Card>
-            <View
-              style={{
-                backgroundColor: colors.bg_darker,
-                padding: spacing.md,
-                borderRadius: borderRadius.base,
-                borderLeftWidth: 4,
-                borderLeftColor: colors.warning,
-              }}
-            >
-              <Text
-                style={{
-                  fontSize: typography.size.xs,
-                  fontWeight: typography.weight.semibold,
-                  color: colors.warning_dark,
-                  marginBottom: spacing.sm,
-                }}
-              >
-                {t.identity.settings.security.title}
-              </Text>
-              <Text
-                style={{
-                  fontSize: typography.size.xs,
-                  color: colors.text_secondary,
-                  lineHeight: typography.size.sm * 1.5,
-                }}
-              >
-                {t.identity.settings.security.message}
-              </Text>
-            </View>
-          </Card>
+          <View style={{ paddingHorizontal: spacing.lg }}>
+            <InfoCard
+              title={t.identity.settings.security.title}
+              description={t.identity.settings.security.message}
+              type="warning"
+              icon="🔒"
+            />
+          </View>
 
           {/* Backup Section */}
           <Card>

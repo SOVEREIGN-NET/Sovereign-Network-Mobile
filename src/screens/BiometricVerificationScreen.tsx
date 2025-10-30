@@ -10,13 +10,16 @@ import { NativeStackScreenProps } from '@react-navigation/native-stack';
 import {
   Card,
   Text,
-  Button,
   Switch,
   LoadingView,
+  ScreenHeader,
+  InfoCard,
+  InfoCardList,
+  ActionButtons,
 } from '../components';
 import { useAuth } from '../hooks';
 import { useTranslation } from '../i18n';
-import { colors, spacing, typography, borderRadius } from '../theme';
+import { colors, spacing } from '../theme';
 import type { IdentityStackParamList } from '../types/navigation';
 
 type BiometricVerificationScreenProps = NativeStackScreenProps<
@@ -95,18 +98,20 @@ const BiometricVerificationScreen = ({
             },
             {
               text: t.settings.biometric.disableConfirm,
-              onPress: async () => {
-                try {
-                  await updateBiometric(false);
-                  setBiometricEnabled(false);
-                  Alert.alert(
-                    t.settings.biometric.disableSuccess,
-                    t.settings.biometric.disableSuccessDescription
-                  );
-                } catch (error) {
-                  console.error('Failed to disable biometric:', error);
-                  Alert.alert(t.app.error, t.settings.biometric.disableFailed);
-                }
+              onPress: () => {
+                (async () => {
+                  try {
+                    await updateBiometric(false);
+                    setBiometricEnabled(false);
+                    Alert.alert(
+                      t.settings.biometric.disableSuccess,
+                      t.settings.biometric.disableSuccessDescription
+                    );
+                  } catch (error) {
+                    console.error('Failed to disable biometric:', error);
+                    Alert.alert(t.app.error, t.settings.biometric.disableFailed);
+                  }
+                })();
               },
               style: 'destructive',
             },
@@ -128,77 +133,31 @@ const BiometricVerificationScreen = ({
         style={{ flex: 1 }}
       >
         {/* Header */}
-        <View style={{ padding: spacing.lg }}>
-          <Text variant="h2" color={colors.primary} style={{ marginBottom: spacing.sm }}>
-            {t.settings.biometric.title}
-          </Text>
-          <Text
-            variant="body"
-            color={colors.text_secondary}
-            style={{ marginBottom: spacing.lg }}
-          >
-            {t.settings.biometric.description}
-          </Text>
-        </View>
+        <ScreenHeader
+          title={t.settings.biometric.title}
+          subtitle={t.settings.biometric.description}
+        />
 
         {/* Biometric Status */}
-        {!biometricAvailable ? (
-          <Card
-            style={{
-              marginHorizontal: spacing.lg,
-              marginBottom: spacing.lg,
-              backgroundColor: `${colors.warning}15`,
-              borderColor: colors.warning,
-              borderWidth: 1,
-            }}
-          >
-            <View style={{ padding: spacing.md }}>
-              <Text
-                variant="body"
-                weight="semibold"
-                color={colors.warning}
-                style={{ marginBottom: spacing.sm }}
-              >
-                ⚠️ {t.settings.biometric.notAvailable}
-              </Text>
-              <Text variant="caption" color={colors.text_secondary}>
-                {t.settings.biometric.notAvailableMessage}
-              </Text>
-            </View>
-          </Card>
-        ) : (
+        {biometricAvailable ? (
           <>
             {/* Biometric Type Info */}
-            <Card
-              style={{
-                marginHorizontal: spacing.lg,
-                marginBottom: spacing.lg,
-                backgroundColor: `${colors.info}15`,
-                borderColor: colors.info,
-                borderWidth: 1,
-              }}
-            >
-              <View style={{ padding: spacing.md }}>
-                <View style={{ flexDirection: 'row', alignItems: 'center', marginBottom: spacing.sm }}>
-                  <Text
-                    variant="body"
-                    weight="semibold"
-                    color={colors.info}
-                    style={{ flex: 1 }}
-                  >
-                    {biometricType === 'fingerprint' ? '👆' : '👤'}{' '}
-                    {biometricType === 'fingerprint'
-                      ? t.settings.biometric.fingerprint
-                      : t.settings.biometric.faceRecognition}
-                  </Text>
-                </View>
-                <Text variant="caption" color={colors.text_secondary}>
-                  {biometricType === 'fingerprint'
+            <View style={{ paddingHorizontal: spacing.lg, marginBottom: spacing.lg }}>
+              <InfoCard
+                title={
+                  biometricType === 'fingerprint'
+                    ? t.settings.biometric.fingerprint
+                    : t.settings.biometric.faceRecognition
+                }
+                description={
+                  biometricType === 'fingerprint'
                     ? t.settings.biometric.fingerprintDescription
-                    : t.settings.biometric.faceRecognitionDescription}
-                </Text>
-              </View>
-            </Card>
+                    : t.settings.biometric.faceRecognitionDescription
+                }
+                type="info"
+                icon={biometricType === 'fingerprint' ? '👆' : '👤'}
+              />
+            </View>
 
             {/* Toggle Switch */}
             <Card
@@ -325,83 +284,58 @@ const BiometricVerificationScreen = ({
                 {t.settings.biometric.securityInfo}
               </Text>
 
-              {[
-                {
-                  id: 'secure',
-                  title: t.settings.biometric.secure,
-                  description: t.settings.biometric.secureDescription,
-                },
-                {
-                  id: 'fast',
-                  title: t.settings.biometric.fast,
-                  description: t.settings.biometric.fastDescription,
-                },
-                {
-                  id: 'convenient',
-                  title: t.settings.biometric.convenient,
-                  description: t.settings.biometric.convenientDescription,
-                },
-              ].map((item) => (
-                <Card
-                  key={item.id}
-                  style={{
-                    backgroundColor: colors.bg_dark,
-                    borderColor: colors.border,
-                    borderWidth: 1,
-                    marginBottom: spacing.md,
-                  }}
-                >
-                  <View style={{ padding: spacing.md }}>
-                    <Text
-                      variant="body"
-                      weight="semibold"
-                      color={colors.text_primary}
-                      style={{ marginBottom: spacing.xs }}
-                    >
-                      {item.title}
-                    </Text>
-                    <Text variant="caption" color={colors.text_secondary}>
-                      {item.description}
-                    </Text>
-                  </View>
-                </Card>
-              ))}
+              <InfoCardList
+                items={[
+                  {
+                    id: 'secure',
+                    title: t.settings.biometric.secure,
+                    description: t.settings.biometric.secureDescription,
+                  },
+                  {
+                    id: 'fast',
+                    title: t.settings.biometric.fast,
+                    description: t.settings.biometric.fastDescription,
+                  },
+                  {
+                    id: 'convenient',
+                    title: t.settings.biometric.convenient,
+                    description: t.settings.biometric.convenientDescription,
+                  },
+                ]}
+                gap="md"
+              />
             </View>
 
             {/* Passphrase Backup Warning */}
-            <Card
-              style={{
-                marginHorizontal: spacing.lg,
-                marginBottom: spacing.lg,
-                backgroundColor: `${colors.warning}15`,
-                borderColor: colors.warning,
-                borderWidth: 1,
-              }}
-            >
-              <View style={{ padding: spacing.md }}>
-                <Text
-                  variant="body"
-                  weight="semibold"
-                  color={colors.warning}
-                  style={{ marginBottom: spacing.sm }}
-                >
-                  💡 {t.settings.biometric.backupPassphrase}
-                </Text>
-                <Text variant="caption" color={colors.text_secondary}>
-                  {t.settings.biometric.backupPassphraseMessage}
-                </Text>
-              </View>
-            </Card>
+            <View style={{ paddingHorizontal: spacing.lg, marginBottom: spacing.lg }}>
+              <InfoCard
+                title={t.settings.biometric.backupPassphrase}
+                description={t.settings.biometric.backupPassphraseMessage}
+                type="warning"
+                icon="💡"
+              />
+            </View>
 
             {/* Action Buttons */}
-            <View style={{ paddingHorizontal: spacing.lg }}>
-              <Button variant="secondary" onPress={() => navigation.goBack()}>
-                <Text color={colors.text_primary} weight="semibold">
-                  {t.identity.actions.settings}
-                </Text>
-              </Button>
-            </View>
+            <ActionButtons
+              buttons={[
+                {
+                  label: t.identity.actions.settings,
+                  onPress: () => navigation.goBack(),
+                  variant: 'secondary',
+                },
+              ]}
+            />
           </>
+        ) : (
+          <View style={{ paddingHorizontal: spacing.lg, marginBottom: spacing.lg }}>
+            <InfoCard
+              title={t.settings.biometric.notAvailable}
+              description={t.settings.biometric.notAvailableMessage}
+              type="warning"
+              icon="⚠️"
+            />
+          </View>
         )}
       </ScrollView>
     </SafeAreaView>
