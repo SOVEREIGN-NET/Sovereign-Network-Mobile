@@ -26,8 +26,9 @@ const ReceiveTokensScreen = ({ navigation }: any) => {
         message: `${t.receiveTokens.address}: ${walletAddress}`,
         title: `Receive ${selectedCurrency}`,
       });
-    } catch (error) {
-      Alert.alert('Share Error', 'Failed to share address');
+    } catch (error: any) {
+      console.error('Share failed:', error);
+      Alert.alert('Share Error', error.message || 'Failed to share address');
     }
   };
 

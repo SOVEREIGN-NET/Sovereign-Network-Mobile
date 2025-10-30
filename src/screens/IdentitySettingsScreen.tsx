@@ -1,14 +1,14 @@
 import React, { useState } from 'react';
-import { ScrollView, View, Alert, Pressable } from 'react-native';
-import { SafeAreaView } from 'react-native-safe-area-context';
+import { View, Alert, Pressable } from 'react-native';
 import {
   Card,
   Text,
   Button,
-  Input,
+  FormField,
   Column,
   Row,
   LoadingView,
+  ScreenLayout,
   ErrorAlert,
   InfoCard,
 } from '../components';
@@ -18,13 +18,13 @@ import { colors, spacing, typography } from '../theme';
 
 const IdentitySettingsScreen = ({ navigation }: any) => {
   const { t } = useTranslation();
-  const { currentIdentity, updatePassphrase, updateBiometric, isLoading } = useAuth();
+  const { currentIdentity, updatePassphrase, isLoading } = useAuth();
 
   const [currentPassphrase, setCurrentPassphrase] = useState('');
   const [newPassphrase, setNewPassphrase] = useState('');
   const [confirmPassphrase, setConfirmPassphrase] = useState('');
   const [showPassphrase, setShowPassphrase] = useState(false);
-  const [biometricEnabled, setBiometricEnabled] = useState(!!currentIdentity?.biometricHash);
+  const [biometricEnabled] = useState(!!currentIdentity?.biometricHash);
   const [error, setError] = useState<string | null>(null);
   const [isSaving, setIsSaving] = useState(false);
 
@@ -70,45 +70,9 @@ const IdentitySettingsScreen = ({ navigation }: any) => {
     }
   };
 
-  const handleBiometricToggle = async (enabled: boolean) => {
-    setError(null);
-    setIsSaving(true);
-    try {
-      await updateBiometric(enabled);
-      setBiometricEnabled(enabled);
-      Alert.alert(
-        'Success',
-        enabled ? t.identity.settings.success.biometricEnabled : t.identity.settings.success.biometricDisabled
-      );
-    } catch (err: any) {
-      setError(err.message || t.identity.settings.errors.biometricUpdateFailed);
-    } finally {
-      setIsSaving(false);
-    }
-  };
-
   return (
-    <SafeAreaView
-      style={{
-        flex: 1,
-        backgroundColor: colors.bg_darkest,
-      }}
-      edges={['bottom']}
-    >
-      <ScrollView
-        style={{
-          flex: 1,
-          backgroundColor: colors.bg_darkest,
-        }}
-        contentContainerStyle={{
-          paddingHorizontal: spacing.lg,
-          paddingTop: 20,
-          paddingBottom: spacing.lg,
-        }}
-        scrollIndicatorInsets={{ right: 1 }}
-        showsVerticalScrollIndicator={false}
-      >
-        <Column gap="xl">
+    <ScreenLayout>
+      <Column gap="xl">
           {/* Error Message */}
           {error && <ErrorAlert message={error} icon="❌" />}
 
@@ -126,51 +90,25 @@ const IdentitySettingsScreen = ({ navigation }: any) => {
             </Text>
 
             <Column gap="sm">
-              <View>
-                <Text
-                  style={{
-                    fontSize: typography.size.xs,
-                    fontWeight: typography.weight.semibold,
-                    color: colors.text_primary,
-                    marginBottom: spacing.sm,
-                  }}
-                >
-                  {t.identity.settings.currentPassphrase}
-                </Text>
-                <Input
-                  placeholder={t.identity.settings.currentPassphrasePlaceholder}
-                  value={currentPassphrase}
-                  onChangeText={setCurrentPassphrase}
-                  secureTextEntry={!showPassphrase}
-                  editable={!isLoading && !isSaving}
-                />
-              </View>
+              <FormField
+                label={t.identity.settings.currentPassphrase}
+                placeholder={t.identity.settings.currentPassphrasePlaceholder}
+                value={currentPassphrase}
+                onChangeText={setCurrentPassphrase}
+                secureTextEntry={!showPassphrase}
+                editable={!isLoading && !isSaving}
+                containerStyle={{ marginBottom: 0 }}
+              />
 
-              <View>
-                <Row
-                  style={{
-                    justifyContent: 'space-between',
-                    marginBottom: spacing.sm,
-                  }}
-                >
-                  <Text
-                    style={{
-                      fontSize: typography.size.xs,
-                      fontWeight: typography.weight.semibold,
-                      color: colors.text_primary,
-                    }}
-                  >
-                    {t.identity.settings.newPassphrase}
-                  </Text>
-                </Row>
-                <Input
-                  placeholder={t.identity.settings.newPassphrasePlaceholder}
-                  value={newPassphrase}
-                  onChangeText={setNewPassphrase}
-                  secureTextEntry={!showPassphrase}
-                  editable={!isLoading && !isSaving}
-                />
-              </View>
+              <FormField
+                label={t.identity.settings.newPassphrase}
+                placeholder={t.identity.settings.newPassphrasePlaceholder}
+                value={newPassphrase}
+                onChangeText={setNewPassphrase}
+                secureTextEntry={!showPassphrase}
+                editable={!isLoading && !isSaving}
+                containerStyle={{ marginBottom: 0 }}
+              />
 
               <View>
                 <Row
@@ -199,12 +137,14 @@ const IdentitySettingsScreen = ({ navigation }: any) => {
                     </Text>
                   </Pressable>
                 </Row>
-                <Input
+                <FormField
+                  label=""
                   placeholder={t.identity.settings.confirmPassphrasePlaceholder}
                   value={confirmPassphrase}
                   onChangeText={setConfirmPassphrase}
                   secureTextEntry={!showPassphrase}
                   editable={!isLoading && !isSaving}
+                  containerStyle={{ marginBottom: 0 }}
                 />
               </View>
 
@@ -301,11 +241,10 @@ const IdentitySettingsScreen = ({ navigation }: any) => {
             </Column>
           </Card>
 
-          {/* Footer spacing */}
-          <View style={{ height: spacing.xl }} />
-        </Column>
-      </ScrollView>
-    </SafeAreaView>
+        {/* Footer spacing */}
+        <View style={{ height: spacing.xl }} />
+      </Column>
+    </ScreenLayout>
   );
 };
 

@@ -1,12 +1,12 @@
 import React, { useState } from 'react';
-import { ScrollView, View, Alert, Pressable, useColorScheme } from 'react-native';
-import { SafeAreaView } from 'react-native-safe-area-context';
+import { View, Alert, Pressable, useColorScheme } from 'react-native';
 import {
   Card,
   Text,
   Button,
   Column,
   Row,
+  ScreenLayout,
 } from '../components';
 import { useAuth } from '../hooks';
 import { useTranslation } from '../i18n';
@@ -15,7 +15,7 @@ import { colors, spacing, typography, borderRadius } from '../theme';
 type Theme = 'light' | 'dark' | 'system';
 type Language = 'en' | 'es' | 'fr' | 'de';
 
-const SettingsScreen = ({ navigation }: any) => {
+const SettingsScreen = ({ _navigation }: any) => {
   const { t } = useTranslation();
   const { signOut, isLoading } = useAuth();
   const deviceColorScheme = useColorScheme();
@@ -93,7 +93,8 @@ const SettingsScreen = ({ navigation }: any) => {
         ? t.settings.display.themes.dark
         : t.settings.display.themes.light;
     }
-    return theme === 'dark' ? t.settings.display.themes.dark : t.settings.display.themes.light;
+    const isDark = theme === 'dark';
+    return isDark ? t.settings.display.themes.dark : t.settings.display.themes.light;
   };
 
   const currentTheme = getThemeLabel();
@@ -102,28 +103,15 @@ const SettingsScreen = ({ navigation }: any) => {
 
   const languageLabel = t.settings.languages[language];
 
+  const getFontSizePixels = (size: 'small' | 'normal' | 'large'): number => {
+    if (size === 'small') return 12;
+    if (size === 'normal') return 14;
+    return 16;
+  };
+
   return (
-    <SafeAreaView
-      style={{
-        flex: 1,
-        backgroundColor: colors.bg_darkest,
-      }}
-      edges={['bottom']}
-    >
-      <ScrollView
-        style={{
-          flex: 1,
-          backgroundColor: colors.bg_darkest,
-        }}
-        contentContainerStyle={{
-          paddingHorizontal: spacing.lg,
-          paddingTop: 20,
-          paddingBottom: spacing.lg,
-        }}
-        scrollIndicatorInsets={{ right: 1 }}
-        showsVerticalScrollIndicator={false}
-      >
-        <Column gap="xl">
+    <ScreenLayout>
+      <Column gap="xl">
           {/* Display Settings */}
           <Card>
             <Text
@@ -258,12 +246,7 @@ const SettingsScreen = ({ navigation }: any) => {
                         <Text
                           style={{
                             color: fontSize === size ? colors.white : colors.text_primary,
-                            fontSize:
-                              size === 'small'
-                                ? 12
-                                : size === 'normal'
-                                ? 14
-                                : 16,
+                            fontSize: getFontSizePixels(size),
                           }}
                         >
                           {t.settings.display.fontSizes[size]}
@@ -632,11 +615,10 @@ const SettingsScreen = ({ navigation }: any) => {
             </Column>
           </Card>
 
-          {/* Footer spacing */}
-          <View style={{ height: spacing.xl }} />
-        </Column>
-      </ScrollView>
-    </SafeAreaView>
+        {/* Footer spacing */}
+        <View style={{ height: spacing.xl }} />
+      </Column>
+    </ScreenLayout>
   );
 };
 

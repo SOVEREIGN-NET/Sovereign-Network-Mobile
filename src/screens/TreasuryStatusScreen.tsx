@@ -1,6 +1,5 @@
 import React from 'react';
-import { ScrollView, View } from 'react-native';
-import { SafeAreaView } from 'react-native-safe-area-context';
+import { View } from 'react-native';
 import {
   Card,
   Text,
@@ -9,6 +8,7 @@ import {
   LoadingView,
   StatBox,
   ProgressBar,
+  ScreenLayout,
 } from '../components';
 import { useAsyncData } from '../hooks';
 import { useTranslation } from '../i18n';
@@ -91,27 +91,8 @@ const TreasuryStatusScreen = ({ navigation }: any) => {
   };
 
   return (
-    <SafeAreaView
-      style={{
-        flex: 1,
-        backgroundColor: colors.bg_darkest,
-      }}
-      edges={['bottom']}
-    >
-      <ScrollView
-        style={{
-          flex: 1,
-          backgroundColor: colors.bg_darkest,
-        }}
-        contentContainerStyle={{
-          paddingHorizontal: spacing.lg,
-          paddingTop: 20,
-          paddingBottom: spacing.lg,
-        }}
-        scrollIndicatorInsets={{ right: 1 }}
-        showsVerticalScrollIndicator={false}
-      >
-        <Column gap="xl">
+    <ScreenLayout>
+      <Column gap="xl">
           {/* Treasury Overview */}
           <Card>
             <Text
@@ -386,11 +367,10 @@ const TreasuryStatusScreen = ({ navigation }: any) => {
             {t.dao.treasury.backButton}
           </Button>
 
-          {/* Footer spacing */}
-          <View style={{ height: spacing.xl }} />
-        </Column>
-      </ScrollView>
-    </SafeAreaView>
+        {/* Footer spacing */}
+        <View style={{ height: spacing.xl }} />
+      </Column>
+    </ScreenLayout>
   );
 };
 

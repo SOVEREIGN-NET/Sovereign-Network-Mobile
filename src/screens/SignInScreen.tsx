@@ -147,7 +147,9 @@ const SignInScreen = ({ navigation }: SignInScreenProps) => {
           actions={[
             {
               label: isLoading ? t.auth.signIn.buttonLoading : t.auth.signIn.button,
-              onPress: handleSignIn,
+              onPress: () => {
+                handleSignIn().catch(() => {});
+              },
               disabled: isLoading,
               loading: isLoading,
             },

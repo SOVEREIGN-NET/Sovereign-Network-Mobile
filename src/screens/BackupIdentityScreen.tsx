@@ -4,8 +4,7 @@
  */
 
 import React, { useState, useCallback } from 'react';
-import { ScrollView, View, Pressable, Share, Alert } from 'react-native';
-import { SafeAreaView } from 'react-native-safe-area-context';
+import { View, Pressable, Share, Alert } from 'react-native';
 import { NativeStackScreenProps } from '@react-navigation/native-stack';
 import {
   Card,
@@ -14,6 +13,7 @@ import {
   Switch,
   LoadingView,
   ScreenHeader,
+  ScreenLayout,
   ActionButtons,
   InfoCard,
   OptionCardGroup,
@@ -83,16 +83,12 @@ const BackupIdentityScreen = ({ navigation }: BackupIdentityScreenProps) => {
   }
 
   return (
-    <SafeAreaView style={{ flex: 1, backgroundColor: colors.bg_darkest }}>
-      <ScrollView
-        contentContainerStyle={{ paddingBottom: spacing['3xl'] }}
-        style={{ flex: 1 }}
-      >
-        {/* Header */}
-        <ScreenHeader
-          title={t.auth.backup.title}
-          subtitle={t.auth.backup.description}
-        />
+    <ScreenLayout>
+      {/* Header */}
+      <ScreenHeader
+        title={t.auth.backup.title}
+        subtitle={t.auth.backup.description}
+      />
 
         {/* Security Warning */}
         <View style={{ paddingHorizontal: spacing.lg, marginBottom: spacing.lg }}>
@@ -292,7 +288,9 @@ const BackupIdentityScreen = ({ navigation }: BackupIdentityScreenProps) => {
                       buttons={[
                         {
                           label: '⬇️ Download Backup',
-                          onPress: handleDownloadBackup,
+                          onPress: () => {
+                            handleDownloadBackup().catch(() => {});
+                          },
                           variant: 'secondary',
                         },
                         {
@@ -315,9 +313,8 @@ const BackupIdentityScreen = ({ navigation }: BackupIdentityScreenProps) => {
               </View>
             </Card>
           </View>
-        )}
-      </ScrollView>
-    </SafeAreaView>
+      )}
+    </ScreenLayout>
   );
 };
 

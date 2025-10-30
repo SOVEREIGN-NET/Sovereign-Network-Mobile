@@ -4,8 +4,7 @@
  */
 
 import React, { useState, useCallback, useEffect } from 'react';
-import { ScrollView, View, Pressable, Alert } from 'react-native';
-import { SafeAreaView } from 'react-native-safe-area-context';
+import { View, Pressable, Alert } from 'react-native';
 import { NativeStackScreenProps } from '@react-navigation/native-stack';
 import {
   Card,
@@ -13,6 +12,7 @@ import {
   Switch,
   LoadingView,
   ScreenHeader,
+  ScreenLayout,
   InfoCard,
   InfoCardList,
   ActionButtons,
@@ -127,16 +127,12 @@ const BiometricVerificationScreen = ({
   }
 
   return (
-    <SafeAreaView style={{ flex: 1, backgroundColor: colors.bg_darkest }}>
-      <ScrollView
-        contentContainerStyle={{ paddingBottom: spacing['3xl'] }}
-        style={{ flex: 1 }}
-      >
-        {/* Header */}
-        <ScreenHeader
-          title={t.settings.biometric.title}
-          subtitle={t.settings.biometric.description}
-        />
+    <ScreenLayout>
+      {/* Header */}
+      <ScreenHeader
+        title={t.settings.biometric.title}
+        subtitle={t.settings.biometric.description}
+      />
 
         {/* Biometric Status */}
         {biometricAvailable ? (
@@ -336,9 +332,8 @@ const BiometricVerificationScreen = ({
               icon="⚠️"
             />
           </View>
-        )}
-      </ScrollView>
-    </SafeAreaView>
+      )}
+    </ScreenLayout>
   );
 };
 

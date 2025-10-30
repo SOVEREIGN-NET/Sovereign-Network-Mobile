@@ -1,18 +1,17 @@
 import React, { useState } from 'react';
-import { ScrollView, View, Alert, Pressable } from 'react-native';
-import { SafeAreaView } from 'react-native-safe-area-context';
+import { View, Alert, Pressable } from 'react-native';
 import {
   Card,
   Text,
   Button,
-  Input,
+  FormField,
   Column,
   LoadingView,
+  ScreenLayout,
 } from '../components';
 import { useAuth } from '../hooks';
 import { useTranslation } from '../i18n';
 import { colors, spacing, typography, borderRadius } from '../theme';
-import MockDataService from '../services/MockDataService';
 
 type ProposalType = 'technical' | 'funding' | 'governance' | 'parameter';
 
@@ -44,7 +43,7 @@ const CreateProposalScreen = ({ navigation }: any) => {
   const [title, setTitle] = useState('');
   const [description, setDescription] = useState('');
   const [fundingAmount, setFundingAmount] = useState('');
-  const [budgetCategory, setBudgetCategory] = useState(BUDGET_CATEGORIES[0] || 'Infrastructure');
+  const [budgetCategory] = useState(BUDGET_CATEGORIES[0] || 'Infrastructure');
   const [parameterName, setParameterName] = useState('');
   const [currentValue, setCurrentValue] = useState('');
   const [proposedValue, setProposedValue] = useState('');
@@ -80,7 +79,7 @@ const CreateProposalScreen = ({ navigation }: any) => {
     }
 
     if (proposalType === 'funding') {
-      if (!fundingAmount || parseFloat(fundingAmount) <= 0) {
+      if (!fundingAmount || Number.parseFloat(fundingAmount) <= 0) {
         setError(t.dao.createProposal.validation.fundingAmountRequired);
         return false;
       }
@@ -117,7 +116,7 @@ const CreateProposalScreen = ({ navigation }: any) => {
       };
 
       if (proposalType === 'funding') {
-        proposalData.fundingAmount = parseFloat(fundingAmount);
+        proposalData.fundingAmount = Number.parseFloat(fundingAmount);
         proposalData.budgetCategory = budgetCategory;
       }
 
@@ -150,27 +149,8 @@ const CreateProposalScreen = ({ navigation }: any) => {
   const selectedTypeInfo = PROPOSAL_TYPES.find(t => t.value === proposalType);
 
   return (
-    <SafeAreaView
-      style={{
-        flex: 1,
-        backgroundColor: colors.bg_darkest,
-      }}
-      edges={['bottom']}
-    >
-      <ScrollView
-        style={{
-          flex: 1,
-          backgroundColor: colors.bg_darkest,
-        }}
-        contentContainerStyle={{
-          paddingHorizontal: spacing.lg,
-          paddingTop: 20,
-          paddingBottom: spacing.lg,
-        }}
-        scrollIndicatorInsets={{ right: 1 }}
-        showsVerticalScrollIndicator={false}
-      >
-        <Column gap="xl">
+    <ScreenLayout>
+      <Column gap="xl">
           {/* Error Message */}
           {error && (
             <View
@@ -260,66 +240,28 @@ const CreateProposalScreen = ({ navigation }: any) => {
           </Card>
 
           {/* Title Input */}
-          <Card>
-            <Text
-              style={{
-                fontSize: typography.size.sm,
-                fontWeight: typography.weight.semibold,
-                color: colors.text_primary,
-                marginBottom: spacing.md,
-              }}
-            >
-              {t.dao.createProposal.title}
-            </Text>
-            <Input
-              placeholder={t.dao.createProposal.titlePlaceholder}
-              value={title}
-              onChangeText={setTitle}
-              maxLength={100}
-              editable={!isSubmitting}
-            />
-            <Text
-              style={{
-                fontSize: typography.size.xs,
-                color: colors.text_tertiary,
-                marginTop: spacing.xs,
-              }}
-            >
-              {t.dao.createProposal.titleCounter.replace('{current}', title.length.toString())}
-            </Text>
-          </Card>
+          <FormField
+            label={t.dao.createProposal.title}
+            placeholder={t.dao.createProposal.titlePlaceholder}
+            value={title}
+            onChangeText={setTitle}
+            maxLength={100}
+            editable={!isSubmitting}
+            helperText={t.dao.createProposal.titleCounter.replace('{current}', title.length.toString())}
+          />
 
           {/* Description Input */}
-          <Card>
-            <Text
-              style={{
-                fontSize: typography.size.sm,
-                fontWeight: typography.weight.semibold,
-                color: colors.text_primary,
-                marginBottom: spacing.md,
-              }}
-            >
-              {t.dao.createProposal.description}
-            </Text>
-            <Input
-              placeholder={t.dao.createProposal.descriptionPlaceholder}
-              value={description}
-              onChangeText={setDescription}
-              multiline
-              numberOfLines={5}
-              maxLength={500}
-              editable={!isSubmitting}
-            />
-            <Text
-              style={{
-                fontSize: typography.size.xs,
-                color: colors.text_tertiary,
-                marginTop: spacing.xs,
-              }}
-            >
-              {t.dao.createProposal.descriptionCounter.replace('{current}', description.length.toString())}
-            </Text>
-          </Card>
+          <FormField
+            label={t.dao.createProposal.description}
+            placeholder={t.dao.createProposal.descriptionPlaceholder}
+            value={description}
+            onChangeText={setDescription}
+            multiline
+            numberOfLines={5}
+            maxLength={500}
+            editable={!isSubmitting}
+            helperText={t.dao.createProposal.descriptionCounter.replace('{current}', description.length.toString())}
+          />
 
           {/* Funding Type Fields */}
           {proposalType === 'funding' && (
@@ -351,98 +293,48 @@ const CreateProposalScreen = ({ navigation }: any) => {
                 </Pressable>
               </Card>
 
-              <Card>
-                <Text
-                  style={{
-                    fontSize: typography.size.sm,
-                    fontWeight: typography.weight.semibold,
-                    color: colors.text_primary,
-                    marginBottom: spacing.md,
-                  }}
-                >
-                  {t.dao.createProposal.fundingAmount}
-                </Text>
-                <Input
-                  placeholder="0.00"
-                  value={fundingAmount}
-                  onChangeText={setFundingAmount}
-                  keyboardType="decimal-pad"
-                  editable={!isSubmitting}
-                />
-                <Text
-                  style={{
-                    fontSize: typography.size.xs,
-                    color: colors.text_secondary,
-                    marginTop: spacing.xs,
-                  }}
-                >
-                  {t.dao.createProposal.fundingUnit}
-                </Text>
-              </Card>
+              <FormField
+                label={t.dao.createProposal.fundingAmount}
+                placeholder="0.00"
+                value={fundingAmount}
+                onChangeText={setFundingAmount}
+                keyboardType="decimal-pad"
+                editable={!isSubmitting}
+                helperText={t.dao.createProposal.fundingUnit}
+              />
             </>
           )}
 
           {/* Parameter Type Fields */}
           {proposalType === 'parameter' && (
             <>
-              <Card>
-                <Text
-                  style={{
-                    fontSize: typography.size.sm,
-                    fontWeight: typography.weight.semibold,
-                    color: colors.text_primary,
-                    marginBottom: spacing.md,
-                  }}
-                >
-                  {t.dao.createProposal.parameterName}
-                </Text>
-                <Input
-                  placeholder={t.dao.createProposal.parameterNamePlaceholder}
-                  value={parameterName}
-                  onChangeText={setParameterName}
-                  editable={!isSubmitting}
-                />
-              </Card>
+              <FormField
+                label={t.dao.createProposal.parameterName}
+                placeholder={t.dao.createProposal.parameterNamePlaceholder}
+                value={parameterName}
+                onChangeText={setParameterName}
+                editable={!isSubmitting}
+              />
 
               <Card>
                 <Column gap="md">
-                  <View>
-                    <Text
-                      style={{
-                        fontSize: typography.size.sm,
-                        fontWeight: typography.weight.semibold,
-                        color: colors.text_primary,
-                        marginBottom: spacing.sm,
-                      }}
-                    >
-                      {t.dao.createProposal.currentValue}
-                    </Text>
-                    <Input
-                      placeholder={t.dao.createProposal.currentValuePlaceholder}
-                      value={currentValue}
-                      onChangeText={setCurrentValue}
-                      editable={!isSubmitting}
-                    />
-                  </View>
+                  <FormField
+                    label={t.dao.createProposal.currentValue}
+                    placeholder={t.dao.createProposal.currentValuePlaceholder}
+                    value={currentValue}
+                    onChangeText={setCurrentValue}
+                    editable={!isSubmitting}
+                    containerStyle={{ marginBottom: 0 }}
+                  />
 
-                  <View>
-                    <Text
-                      style={{
-                        fontSize: typography.size.sm,
-                        fontWeight: typography.weight.semibold,
-                        color: colors.text_primary,
-                        marginBottom: spacing.sm,
-                      }}
-                    >
-                      {t.dao.createProposal.proposedValue}
-                    </Text>
-                    <Input
-                      placeholder={t.dao.createProposal.proposedValuePlaceholder}
-                      value={proposedValue}
-                      onChangeText={setProposedValue}
-                      editable={!isSubmitting}
-                    />
-                  </View>
+                  <FormField
+                    label={t.dao.createProposal.proposedValue}
+                    placeholder={t.dao.createProposal.proposedValuePlaceholder}
+                    value={proposedValue}
+                    onChangeText={setProposedValue}
+                    editable={!isSubmitting}
+                    containerStyle={{ marginBottom: 0 }}
+                  />
                 </Column>
               </Card>
             </>
@@ -501,11 +393,10 @@ const CreateProposalScreen = ({ navigation }: any) => {
             </Button>
           </Column>
 
-          {/* Footer spacing */}
-          <View style={{ height: spacing.xl }} />
-        </Column>
-      </ScrollView>
-    </SafeAreaView>
+        {/* Footer spacing */}
+        <View style={{ height: spacing.xl }} />
+      </Column>
+    </ScreenLayout>
   );
 };
 
