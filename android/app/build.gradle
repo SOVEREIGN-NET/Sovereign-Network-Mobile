@@ -96,6 +96,9 @@ android {
     buildTypes {
         debug {
             signingConfig signingConfigs.debug
+            ndk {
+                debugSymbolLevel 'none'
+            }
         }
         release {
             // Caution! In production, you need to generate your own keystore file.

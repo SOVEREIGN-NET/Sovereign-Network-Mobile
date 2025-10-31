@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "635183338127",
+    "project_id": "sovereign-network-mobile-906a1",
+    "storage_bucket": "sovereign-network-mobile-906a1.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:635183338127:android:f2b5d4f9444a1b73d216fa",
+        "android_client_info": {
+          "package_name": "com.sovereignnetworkmobile"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyDm_fgNFFmToMjXhm30p_18Bs0QMljkPno"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}
