@@ -4,7 +4,9 @@
  */
 
 import React, { useState, useEffect } from 'react';
-import { View, Pressable } from 'react-native';
+import { View, Pressable, Text as RNText } from 'react-native';
+import LinearGradient from 'react-native-linear-gradient';
+import MaskedView from '@react-native-masked-view/masked-view';
 import { NativeStackScreenProps } from '@react-navigation/native-stack';
 import {
   Card,
@@ -14,7 +16,6 @@ import {
   ScreenLayout,
   FormField,
   ErrorAlert,
-  InfoCard,
   ActionFooter
 } from '../components';
 import { useAuth } from '../hooks';
@@ -75,12 +76,71 @@ const SignInScreen = ({ navigation }: SignInScreenProps) => {
   return (
     <ScreenLayout>
       <Column gap="xl">
+        {/* Welcome Header */}
+        <View style={{
+          alignItems: 'center',
+          paddingVertical: spacing.xl,
+          marginBottom: spacing.xxs,
+        }}>
+          <Text
+            style={{
+              fontSize: typography.size['2xl'],
+              fontWeight: typography.weight.bold,
+              marginBottom: spacing.xxs,
+              textAlign: 'center',
+              color: colors.text_primary,
+            }}
+          >
+            {t.auth.signIn.welcome.heading}
+          </Text>
+
+          {/* Gradient Text for Sovereign Network */}
+          <MaskedView
+            style={{ marginBottom: spacing.lg, alignSelf: 'center' }}
+            maskElement={
+              <RNText
+                style={{
+                  fontSize: typography.size['3xl'],
+                  fontWeight: typography.weight.bold,
+                  textAlign: 'center',
+                  color: colors.white,
+                }}
+              >
+                {t.auth.signIn.welcome.accent}
+              </RNText>
+            }
+          >
+            <LinearGradient
+              colors={['#ff00d4', '#00d4ff']}
+              start={{ x: 0, y: 0 }}
+              end={{ x: 1, y: 0 }}
+              style={{
+                height: typography.size['3xl'] * 1.5,
+                width: 300,
+              }}
+            />
+          </MaskedView>
+
+          <Text
+            variant="body"
+            style={{
+              color: colors.text_secondary,
+              textAlign: 'center',
+              fontSize: typography.size.base,
+              paddingHorizontal: spacing.lg,
+              opacity: 0.8,
+            }}
+          >
+            {t.auth.signIn.welcome.subtitle}
+          </Text>
+        </View>
+
         {/* Error Message */}
         {displayError && <ErrorAlert message={displayError} icon="❌" />}
 
         {/* Form Card */}
         <Card>
-          <Column gap="md">
+          <Column gap="xs">
             {/* DID Input */}
             <FormField
               label={t.auth.signIn.didLabel}
@@ -88,7 +148,7 @@ const SignInScreen = ({ navigation }: SignInScreenProps) => {
               value={did}
               onChangeText={setDid}
               editable={!isLoading}
-              helperText={t.auth.signIn.didExample}
+              helperText=''
             />
 
             {/* Passphrase Input */}
@@ -97,7 +157,7 @@ const SignInScreen = ({ navigation }: SignInScreenProps) => {
                 style={{
                   justifyContent: 'space-between',
                   alignItems: 'center',
-                  marginBottom: spacing.sm,
+                  marginBottom: spacing.xxs,
                 }}
               >
                 <Text
@@ -127,18 +187,10 @@ const SignInScreen = ({ navigation }: SignInScreenProps) => {
                 onChangeText={setPassphrase}
                 secureTextEntry={!showPassword}
                 editable={!isLoading}
-                helperText={t.auth.signIn.passphraseHint}
+                helperText=''
                 containerStyle={{ marginBottom: 0 }}
               />
             </View>
-
-            {/* Test Credentials Info */}
-            <InfoCard
-              title={t.auth.signIn.demoLabel}
-              description={t.auth.signIn.demoInfo}
-              type="info"
-              icon="ℹ️"
-            />
           </Column>
         </Card>
 

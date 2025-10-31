@@ -1,7 +1,7 @@
 import React from 'react';
 import { View } from 'react-native';
 import { Card, Text } from '../../atoms';
-import { colors, spacing, borderRadius } from '../../../theme';
+import { colors, spacing } from '../../../theme';
 
 export type InfoCardType = 'info' | 'warning' | 'error' | 'success';
 
@@ -53,11 +53,7 @@ export const InfoCard = ({
     >
       <View
         style={{
-          backgroundColor: colors.bg_darker,
-          padding: spacing.md,
-          borderRadius: borderRadius.md,
-          borderLeftWidth: 4,
-          borderLeftColor: style.borderColor,
+          padding: spacing.xxs,
         }}
       >
         <Text

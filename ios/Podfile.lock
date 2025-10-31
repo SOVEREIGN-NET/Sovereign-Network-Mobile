@@ -1,5 +1,7 @@
 PODS:
   - boost (1.84.0)
+  - BVLinearGradient (2.8.3):
+    - React-Core
   - DoubleConversion (1.1.6)
   - fast_float (8.0.0)
   - FBLazyVector (0.82.1)
@@ -2436,6 +2438,8 @@ PODS:
     - ReactCommon/turbomodule/core
     - SocketRocket
     - Yoga
+  - RNCMaskedView (0.1.11):
+    - React
   - RNScreens (4.18.0):
     - boost
     - DoubleConversion
@@ -2500,6 +2504,7 @@ PODS:
 
 DEPENDENCIES:
   - boost (from `../node_modules/react-native/third-party-podspecs/boost.podspec`)
+  - BVLinearGradient (from `../node_modules/react-native-linear-gradient`)
   - DoubleConversion (from `../node_modules/react-native/third-party-podspecs/DoubleConversion.podspec`)
   - fast_float (from `../node_modules/react-native/third-party-podspecs/fast_float.podspec`)
   - FBLazyVector (from `../node_modules/react-native/Libraries/FBLazyVector`)
@@ -2574,6 +2579,7 @@ DEPENDENCIES:
   - ReactCodegen (from `build/generated/ios`)
   - ReactCommon/turbomodule/core (from `../node_modules/react-native/ReactCommon`)
   - "RNCAsyncStorage (from `../node_modules/@react-native-async-storage/async-storage`)"
+  - "RNCMaskedView (from `../node_modules/@react-native-community/masked-view`)"
   - RNScreens (from `../node_modules/react-native-screens`)
   - SocketRocket (~> 0.7.1)
   - Yoga (from `../node_modules/react-native/ReactCommon/yoga`)
@@ -2585,6 +2591,8 @@ SPEC REPOS:
 EXTERNAL SOURCES:
   boost:
     :podspec: "../node_modules/react-native/third-party-podspecs/boost.podspec"
+  BVLinearGradient:
+    :path: "../node_modules/react-native-linear-gradient"
   DoubleConversion:
     :podspec: "../node_modules/react-native/third-party-podspecs/DoubleConversion.podspec"
   fast_float:
@@ -2732,6 +2740,8 @@ EXTERNAL SOURCES:
     :path: "../node_modules/react-native/ReactCommon"
   RNCAsyncStorage:
     :path: "../node_modules/@react-native-async-storage/async-storage"
+  RNCMaskedView:
+    :path: "../node_modules/@react-native-community/masked-view"
   RNScreens:
     :path: "../node_modules/react-native-screens"
   Yoga:
@@ -2739,6 +2749,7 @@ EXTERNAL SOURCES:
 
 SPEC CHECKSUMS:
   boost: 7e761d76ca2ce687f7cc98e698152abd03a18f90
+  BVLinearGradient: cb006ba232a1f3e4f341bb62c42d1098c284da70
   DoubleConversion: cb417026b2400c8f53ae97020b2be961b59470cb
   fast_float: b32c788ed9c6a8c584d114d0047beda9664e7cc6
   FBLazyVector: 0aa6183b9afe3c31fc65b5d1eeef1f3c19b63bfa
@@ -2812,6 +2823,7 @@ SPEC CHECKSUMS:
   ReactCodegen: 878add6c7d8ff8cea87697c44d29c03b79b6f2d9
   ReactCommon: 804dc80944fa90b86800b43c871742ec005ca424
   RNCAsyncStorage: 01e4301688a611936e3644746ffe3325d3181952
+  RNCMaskedView: 4c5ee1c8667d56077246cc6d1977f77393923560
   RNScreens: d821082c6dd1cb397cc0c98b026eeafaa68be479
   SocketRocket: d4aabe649be1e368d1318fdf28a022d714d65748
   Yoga: 689c8e04277f3ad631e60fe2a08e41d411daf8eb

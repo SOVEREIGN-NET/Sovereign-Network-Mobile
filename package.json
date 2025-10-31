@@ -7,15 +7,23 @@
     "ios": "react-native run-ios",
     "lint": "eslint .",
     "start": "react-native start",
-    "test": "jest"
+    "test": "jest",
+    "bundle:android": "react-native bundle --platform android --dev false --entry-file index.js --bundle-output android/app/src/main/assets/index.android.bundle --assets-dest android/app/src/main/res",
+    "bundle:ios": "react-native bundle --platform ios --dev false --entry-file index.js --bundle-output ios/main.jsbundle --assets-dest ios",
+    "build:android": "cd android && ./gradlew assembleRelease && cd ..",
+    "build:android:aab": "cd android && ./gradlew bundleRelease && cd ..",
+    "build:ios": "xcodebuild -workspace ios/SovereignNetworkMobile.xcworkspace -scheme SovereignNetworkMobile -configuration Release"
   },
   "dependencies": {
     "@react-native-async-storage/async-storage": "^1.23.1",
+    "@react-native-community/masked-view": "^0.1.11",
+    "@react-native-masked-view/masked-view": "^0.3.2",
     "@react-navigation/bottom-tabs": "^7.6.0",
     "@react-navigation/native": "^7.1.19",
     "@react-navigation/native-stack": "^7.6.0",
     "react": "19.1.1",
     "react-native": "0.82.1",
+    "react-native-linear-gradient": "^2.8.3",
     "react-native-safe-area-context": "^5.6.1",
     "react-native-screens": "^4.18.0"
   },

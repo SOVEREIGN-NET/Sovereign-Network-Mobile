@@ -160,7 +160,7 @@ const IdentityScreen = ({ navigation }: any) => {
               </Button>
               <Button
                 variant="secondary"
-                onPress={() => {}}
+                onPress={() => navigation?.navigate('BackupIdentity')}
                 disabled={isLoading}
               >
                 {t.identity.actions.backupIdentity}

@@ -33,14 +33,20 @@ const styles = StyleSheet.create({
   },
   // Variant: Primary
   primaryButton: {
-    backgroundColor: colors.primary,
+    backgroundColor: colors.transparent,
+    borderWidth: 1,
+    borderColor: colors.primary,
   },
   primaryButtonDisabled: {
-    backgroundColor: colors.bg_medium,
+    backgroundColor: colors.transparent,
+    borderColor: colors.text_tertiary,
   },
   primaryText: {
-    color: colors.black,
-    fontWeight: '600' as const,
+    color: colors.primary,
+    fontWeight: '700' as const,
+    textShadowColor: 'rgba(0, 0, 0, 0.3)',
+    textShadowOffset: { width: -0.5, height: -0.5 },
+    textShadowRadius: 0.5,
   },
   primaryTextDisabled: {
     color: colors.text_tertiary,
@@ -57,7 +63,10 @@ const styles = StyleSheet.create({
   },
   secondaryText: {
     color: colors.text_primary,
-    fontWeight: '600' as const,
+    fontWeight: '700' as const,
+    textShadowColor: 'rgba(0, 0, 0, 0.3)',
+    textShadowOffset: { width: -0.5, height: -0.5 },
+    textShadowRadius: 0.5,
   },
   secondaryTextDisabled: {
     color: colors.text_tertiary,
@@ -73,7 +82,10 @@ const styles = StyleSheet.create({
   },
   outlineText: {
     color: colors.primary,
-    fontWeight: '600' as const,
+    fontWeight: '700' as const,
+    textShadowColor: 'rgba(0, 0, 0, 0.3)',
+    textShadowOffset: { width: -0.5, height: -0.5 },
+    textShadowRadius: 0.5,
   },
   outlineTextDisabled: {
     color: colors.text_tertiary,
@@ -87,7 +99,10 @@ const styles = StyleSheet.create({
   },
   dangerText: {
     color: colors.white,
-    fontWeight: '600' as const,
+    fontWeight: '700' as const,
+    textShadowColor: 'rgba(0, 0, 0, 0.4)',
+    textShadowOffset: { width: -1, height: -1 },
+    textShadowRadius: 0.5,
   },
   dangerTextDisabled: {
     color: colors.text_tertiary,
@@ -130,8 +145,8 @@ export const Button = React.memo(
   }: ButtonProps) => {
     const isDisabled = disabled || loading;
 
-    const getButtonStyle = (): ViewStyle[] => {
-      const baseStyle = [styles.button];
+    const getButtonStyle = (): (ViewStyle | undefined)[] => {
+      const baseStyle: (ViewStyle | undefined)[] = [styles.button];
 
       // Variant styles
       switch (variant) {
@@ -171,8 +186,8 @@ export const Button = React.memo(
       return baseStyle;
     };
 
-    const getTextStyle = (): TextStyle[] => {
-      const baseStyle = [];
+    const getTextStyle = (): (TextStyle | undefined)[] => {
+      const baseStyle: (TextStyle | undefined)[] = [];
 
       // Text color based on variant
       switch (variant) {
@@ -206,6 +221,16 @@ export const Button = React.memo(
       return baseStyle;
     };
 
+    const renderChildren = () => {
+      const isStringOrNumber = typeof children === 'string' || typeof children === 'number';
+      const isArray = Array.isArray(children);
+
+      if (isStringOrNumber || isArray) {
+        return <Text style={getTextStyle()}>{children}</Text>;
+      }
+      return children;
+    };
+
     return (
       <TouchableOpacity
         style={getButtonStyle()}
@@ -215,13 +240,7 @@ export const Button = React.memo(
         testID={testID}
       >
         {loading && <ActivityIndicator size="small" color={colors.primary} />}
-        {typeof children === 'string' || typeof children === 'number' ? (
-          <Text style={getTextStyle()}>{children}</Text>
-        ) : Array.isArray(children) ? (
-          <Text style={getTextStyle()}>{children}</Text>
-        ) : (
-          children
-        )}
+        {renderChildren()}
       </TouchableOpacity>
     );
   },

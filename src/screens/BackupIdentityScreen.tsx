@@ -11,6 +11,7 @@ import {
   Text,
   Button,
   Switch,
+  FormField,
   LoadingView,
   ScreenHeader,
   ScreenLayout,
@@ -38,6 +39,9 @@ const BackupIdentityScreen = ({ navigation }: BackupIdentityScreenProps) => {
   const [copied, setCopied] = useState(false);
   const [understood, setUnderstood] = useState(false);
   const [backupCreated, setBackupCreated] = useState(false);
+  const [backupPassword, setBackupPassword] = useState('');
+  const [confirmPassword, setConfirmPassword] = useState('');
+  const [showPassword, setShowPassword] = useState(false);
 
   // Mock seed phrase
   const seedPhrase = currentIdentity?.did
@@ -61,11 +65,27 @@ const BackupIdentityScreen = ({ navigation }: BackupIdentityScreenProps) => {
   }, [seedPhrase]);
 
   const handleCreateBackupFile = useCallback(async () => {
+    // Validate passwords
+    if (!backupPassword.trim()) {
+      Alert.alert('Error', 'Please enter a backup password');
+      return;
+    }
+
+    if (backupPassword.length < 8) {
+      Alert.alert('Error', 'Password must be at least 8 characters');
+      return;
+    }
+
+    if (backupPassword !== confirmPassword) {
+      Alert.alert('Error', 'Passwords do not match');
+      return;
+    }
+
     setBackupCreated(true);
     setTimeout(() => {
       Alert.alert('Success', 'Backup file created and saved to device');
     }, 1000);
-  }, []);
+  }, [backupPassword, confirmPassword]);
 
   const handleDownloadBackup = useCallback(async () => {
     try {
@@ -304,11 +324,47 @@ const BackupIdentityScreen = ({ navigation }: BackupIdentityScreenProps) => {
                     />
                   </>
                 ) : (
-                  <Button variant="primary" onPress={handleCreateBackupFile}>
-                    <Text color={colors.white} weight="semibold">
-                      Create Backup File
-                    </Text>
-                  </Button>
+                  <>
+                    {/* Password Input Fields */}
+                    <FormField
+                      label="Backup Password"
+                      placeholder="Enter a strong password"
+                      value={backupPassword}
+                      onChangeText={setBackupPassword}
+                      secureTextEntry={!showPassword}
+                      editable={!backupCreated}
+                      helperText="Minimum 8 characters"
+                      containerStyle={{ marginBottom: spacing.md }}
+                    />
+
+                    <View style={{ marginBottom: spacing.md }}>
+                      <View style={{ flexDirection: 'row', justifyContent: 'space-between', marginBottom: spacing.sm }}>
+                        <Text style={{ fontSize: 12, fontWeight: '600', color: colors.text_primary }}>
+                          Confirm Password
+                        </Text>
+                        <Pressable onPress={() => setShowPassword(!showPassword)}>
+                          <Text style={{ fontSize: 12, color: colors.primary }}>
+                            {showPassword ? 'Hide' : 'Show'}
+                          </Text>
+                        </Pressable>
+                      </View>
+                      <FormField
+                        label=""
+                        placeholder="Confirm your password"
+                        value={confirmPassword}
+                        onChangeText={setConfirmPassword}
+                        secureTextEntry={!showPassword}
+                        editable={!backupCreated}
+                        containerStyle={{ marginBottom: 0 }}
+                      />
+                    </View>
+
+                    <Button variant="primary" onPress={handleCreateBackupFile}>
+                      <Text color={colors.white} weight="semibold">
+                        Create Backup File
+                      </Text>
+                    </Button>
+                  </>
                 )}
               </View>
             </Card>

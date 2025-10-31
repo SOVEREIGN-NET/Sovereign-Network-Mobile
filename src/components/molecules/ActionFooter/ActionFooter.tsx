@@ -6,7 +6,7 @@
 
 import React from 'react';
 import { View } from 'react-native';
-import { Button, Text, Column } from '../../atoms';
+import { Button, Column } from '../../atoms';
 import { spacing } from '../../../theme';
 
 export interface ActionFooterAction {
@@ -15,6 +15,7 @@ export interface ActionFooterAction {
   disabled?: boolean;
   loading?: boolean;
   variant?: 'primary' | 'secondary' | 'danger';
+  id?: string; // Unique identifier for key prop
 }
 
 export interface ActionFooterProps {
@@ -48,17 +49,15 @@ export const ActionFooter = ({
           paddingHorizontal,
         }}
       >
-        {actions.map((action, index) => (
+        {actions.map((action) => (
           <Button
-            key={index}
+            key={action.id || action.label}
             onPress={action.onPress}
             disabled={action.disabled || action.loading}
             variant={action.variant || 'primary'}
             style={{ flex: 1 }}
           >
-            <Text>
-              {action.loading ? '...' : action.label}
-            </Text>
+            {action.loading ? '...' : action.label}
           </Button>
         ))}
       </View>
@@ -67,16 +66,14 @@ export const ActionFooter = ({
 
   return (
     <Column gap={gap} style={{ paddingBottom, paddingHorizontal }}>
-      {actions.map((action, index) => (
+      {actions.map((action) => (
         <Button
-          key={index}
+          key={action.id || action.label}
           onPress={action.onPress}
           disabled={action.disabled || action.loading}
           variant={action.variant || 'primary'}
         >
-          <Text>
-            {action.loading ? '...' : action.label}
-          </Text>
+          {action.loading ? '...' : action.label}
         </Button>
       ))}
       <View style={{ height: spacing.xl }} />

@@ -1,20 +1,26 @@
+/**
+ * DashboardScreen
+ * Main dashboard with network status, identity, wallet, governance, and trending content
+ */
+
 import React from 'react';
+import { View, ScrollView } from 'react-native';
 import {
   Card,
   Text,
   Button,
-  ProgressBar, DetailRow,
   LoadingView,
   Column,
   Row,
-  ScreenLayout
+  ScreenLayout,
+  Badge,
 } from '../components';
 import { useAsyncData } from '../hooks';
 import { useTranslation } from '../i18n';
 import MockDataService from '../services/MockDataService';
-import { spacing } from '../theme';
+import { colors, spacing, typography, borderRadius } from '../theme';
 
-const DashboardScreen = ({ navigation }: any) => {
+const DashboardScreen = ({ _navigation }: any) => {
   const { t } = useTranslation();
 
   const { data, loading } = useAsyncData(
@@ -34,73 +40,237 @@ const DashboardScreen = ({ navigation }: any) => {
 
   const networkStatus = data?.networkStatus;
 
+  // Get sample data from translations
+  const trendingDapps = t.dashboard.trendingDapps.items;
+  const trendingTokens = t.dashboard.trendingTokens.items;
+  const trendingBounties = t.dashboard.bounties.items;
+
   return (
-    <ScreenLayout testID="dashboard-screen">
-      {/* Status Card */}
-      <Card>
-        <Text variant="h3">{t.dashboard.networkStatus.title}</Text>
-        <DetailRow
-          label={t.dashboard.networkStatus.label}
-          value={networkStatus?.connected ? t.dashboard.networkStatus.connected : t.dashboard.networkStatus.offline}
-        />
-        <DetailRow label={t.dashboard.networkStatus.protocol} value={networkStatus?.protocol || ''} />
-        <DetailRow label={t.dashboard.networkStatus.nodes} value={networkStatus?.nodeCount?.toString() || ''} />
-        <Column gap="md" style={{ marginVertical: spacing.md }}>
-          <Row gap="md">
-            <Text variant="body" style={{ flex: 1 }}>
-              {t.dashboard.networkStatus.meshHealth}
-            </Text>
-            <ProgressBar
-              percentage={networkStatus?.meshHealth || 0}
-              showPercentage
-              style={{ flex: 1 }}
+    <ScreenLayout testID="dashboard-screen" paddingTop={10} paddingBottom={0}>
+      <ScrollView showsVerticalScrollIndicator={false} scrollEventThrottle={16}>
+        {/* Compact Network Status */}
+        <View
+          style={{
+            backgroundColor: colors.bg_darker,
+            borderRadius: borderRadius.md,
+            padding: spacing.md,
+            marginBottom: spacing.lg,
+            marginHorizontal: spacing.md,
+            marginTop: spacing.lg,
+          }}
+        >
+          <Row style={{ justifyContent: 'space-between', alignItems: 'center', marginBottom: spacing.sm }}>
+            <Row style={{ alignItems: 'center', gap: spacing.sm }}>
+              <Text style={{ fontSize: typography.size.md }}>⚡</Text>
+              <Text
+                style={{
+                  fontSize: typography.size.sm,
+                  fontWeight: typography.weight.semibold,
+                  color: colors.text_primary,
+                }}
+              >
+                {t.dashboard.networkStatus.title}
+              </Text>
+            </Row>
+            <Badge
+              label={networkStatus?.connected ? t.dashboard.networkStatus.connected : t.dashboard.networkStatus.offline}
+              variant={networkStatus?.connected ? 'success' : 'error'}
+              style={{ backgroundColor: colors.transparent }}
             />
           </Row>
-        </Column>
-      </Card>
+          <Row style={{ justifyContent: 'space-between', flexWrap: 'wrap', gap: spacing.sm }}>
+            <Text style={{ fontSize: typography.size.xs, color: colors.text_secondary }}>
+              {t.dashboard.networkStatus.blockHeight}: {networkStatus?.nodeCount}
+            </Text>
+            <Text style={{ fontSize: typography.size.xs, color: colors.text_secondary }}>
+              {t.dashboard.networkStatus.peers}: --
+            </Text>
+            <Text style={{ fontSize: typography.size.xs, color: colors.text_secondary }}>
+              {t.dashboard.networkStatus.gasPrice}: --
+            </Text>
+            <Text style={{ fontSize: typography.size.xs, color: colors.text_secondary }}>
+              {t.dashboard.networkStatus.tps}: --
+            </Text>
+          </Row>
+        </View>
 
-      {/* Explore More Card */}
-      <Card>
-        <Text variant="h3">{t.dashboard.explore.title}</Text>
-        <Column gap="md" style={{ marginTop: spacing.md }}>
-          <Button
-            variant="secondary"
-            onPress={() => navigation.navigate('Identity')}
-            style={{ marginBottom: spacing.xs }}
-          >
-            {t.dashboard.explore.manageIdentity}
-          </Button>
-          <Button
-            variant="secondary"
-            onPress={() => navigation.navigate('Wallet')}
-            style={{ marginBottom: spacing.xs }}
-          >
-            {t.dashboard.explore.viewWallet}
-          </Button>
-          <Button
-            variant="secondary"
-            onPress={() => navigation.navigate('Browser')}
-          >
-           {t.dashboard.explore.web4Browser}
-          </Button>
-        </Column>
-      </Card>
+        {/* Trending dApps */}
+        <Card style={{ marginHorizontal: spacing.md, marginBottom: spacing.lg }}>
+          <Row style={{ justifyContent: 'space-between', alignItems: 'center', marginBottom: spacing.md }}>
+            <Row style={{ alignItems: 'center', gap: spacing.sm }}>
+              <Text style={{ fontSize: typography.size.lg }}>📱</Text>
+              <Text
+                style={{
+                  fontSize: typography.size.lg,
+                  fontWeight: typography.weight.bold,
+                  color: colors.text_primary,
+                }}
+              >
+                {t.dashboard.trendingDapps.title}
+              </Text>
+            </Row>
+          </Row>
 
-      {/* About Section */}
-      <Card>
-        <Text variant="caption" style={{ marginBottom: spacing.xs }}>
-          {t.dashboard.about.title}
-        </Text>
-        <Text variant="small" style={{ marginBottom: spacing.xxs }}>
-          {t.dashboard.about.description}
-        </Text>
-        <Text variant="small" style={{ marginBottom: spacing.xxs }}>
-          {t.dashboard.about.version}
-        </Text>
-        <Text variant="small">
-          {t.dashboard.about.disclaimer}
-        </Text>
-      </Card>
+          <Column gap="sm" style={{ marginBottom: spacing.md }}>
+            {trendingDapps.map((dapp) => (
+              <View
+                key={dapp.name}
+                style={{
+                  backgroundColor: colors.bg_darker,
+                  padding: spacing.md,
+                  borderRadius: borderRadius.sm,
+                }}
+              >
+                <Row style={{ justifyContent: 'space-between' }}>
+                  <Column gap="xs" style={{ flex: 1 }}>
+                    <Text
+                      style={{
+                        fontSize: typography.size.sm,
+                        fontWeight: typography.weight.semibold,
+                        color: colors.text_primary,
+                      }}
+                    >
+                      {dapp.name}
+                    </Text>
+                    <Text style={{ fontSize: typography.size.xs, color: colors.text_secondary }}>
+                      {dapp.desc}
+                    </Text>
+                  </Column>
+                  <Badge label={`↑ ${dapp.change}`} variant="primary" />
+                </Row>
+              </View>
+            ))}
+          </Column>
+
+          <Button variant="primary" onPress={() => {}}>
+            {t.dashboard.trendingDapps.exploreAll}
+          </Button>
+        </Card>
+
+        {/* Trending Tokens */}
+        <Card style={{ marginHorizontal: spacing.md, marginBottom: spacing.lg }}>
+          <Row style={{ justifyContent: 'space-between', alignItems: 'center', marginBottom: spacing.md }}>
+            <Row style={{ alignItems: 'center', gap: spacing.sm }}>
+              <Text style={{ fontSize: typography.size.lg }}>💎</Text>
+              <Text
+                style={{
+                  fontSize: typography.size.lg,
+                  fontWeight: typography.weight.bold,
+                  color: colors.text_primary,
+                }}
+              >
+                {t.dashboard.trendingTokens.title}
+              </Text>
+            </Row>
+          </Row>
+
+          <Column gap="sm" style={{ marginBottom: spacing.md }}>
+            {trendingTokens.map((token) => (
+              <View
+                key={token.symbol}
+                style={{
+                  backgroundColor: colors.bg_darker,
+                  padding: spacing.md,
+                  borderRadius: borderRadius.sm,
+                }}
+              >
+                <Row style={{ justifyContent: 'space-between', alignItems: 'center' }}>
+                  <Column gap="xs" style={{ flex: 1 }}>
+                    <Text
+                      style={{
+                        fontSize: typography.size.sm,
+                        fontWeight: typography.weight.semibold,
+                        color: colors.text_primary,
+                      }}
+                    >
+                      {token.symbol}
+                    </Text>
+                    <Text style={{ fontSize: typography.size.xs, color: colors.text_secondary }}>
+                      {token.name}
+                    </Text>
+                  </Column>
+                  <Text
+                    style={{
+                      fontSize: typography.size.sm,
+                      fontWeight: typography.weight.bold,
+                      color: colors.primary,
+                    }}
+                  >
+                    {token.price}
+                  </Text>
+                </Row>
+              </View>
+            ))}
+          </Column>
+
+          <Button variant="primary" onPress={() => {}}>
+            {t.dashboard.trendingTokens.viewAll}
+          </Button>
+        </Card>
+
+        {/* Trending Bounties */}
+        <Card style={{ marginHorizontal: spacing.md, marginBottom: spacing.xl }}>
+          <Row style={{ justifyContent: 'space-between', alignItems: 'center', marginBottom: spacing.md }}>
+            <Row style={{ alignItems: 'center', gap: spacing.sm }}>
+              <Text style={{ fontSize: typography.size.lg }}>🎯</Text>
+              <Text
+                style={{
+                  fontSize: typography.size.lg,
+                  fontWeight: typography.weight.bold,
+                  color: colors.text_primary,
+                }}
+              >
+                {t.dashboard.bounties.title}
+              </Text>
+            </Row>
+          </Row>
+
+          <Column gap="sm" style={{ marginBottom: spacing.md }}>
+            {trendingBounties.map((bounty) => (
+              <View
+                key={bounty.title}
+                style={{
+                  backgroundColor: colors.bg_darker,
+                  padding: spacing.md,
+                  borderRadius: borderRadius.sm,
+                }}
+              >
+                <Row style={{ justifyContent: 'space-between', marginBottom: spacing.xs }}>
+                  <Text
+                    style={{
+                      fontSize: typography.size.sm,
+                      fontWeight: typography.weight.semibold,
+                      color: colors.text_primary,
+                      flex: 1,
+                    }}
+                    numberOfLines={2}
+                  >
+                    {bounty.title}
+                  </Text>
+                  <Badge label={bounty.reward} variant="primary" />
+                </Row>
+                <Row style={{ justifyContent: 'space-between', gap: spacing.sm }}>
+                  <Text style={{ fontSize: typography.size.xs, color: colors.text_secondary }}>
+                    ⏰ {bounty.daysLeft}d
+                  </Text>
+                  <Text style={{ fontSize: typography.size.xs, color: colors.text_secondary }}>
+                    👥 {bounty.contributors}
+                  </Text>
+                </Row>
+              </View>
+            ))}
+          </Column>
+
+          <Column gap="sm">
+            <Button variant="secondary" onPress={() => {}}>
+              {t.dashboard.bounties.submitBounty}
+            </Button>
+            <Button variant="primary" onPress={() => {}}>
+              {t.dashboard.bounties.viewAll}
+            </Button>
+          </Column>
+        </Card>
+      </ScrollView>
     </ScreenLayout>
   );
 };
