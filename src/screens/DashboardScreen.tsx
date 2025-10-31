@@ -55,7 +55,7 @@ const DashboardScreen = ({ _navigation }: any) => {
             borderRadius: borderRadius.md,
             padding: spacing.md,
             marginBottom: spacing.lg,
-            marginHorizontal: spacing.md,
+            marginHorizontal: spacing.xxs,
             marginTop: spacing.lg,
           }}
         >
@@ -95,10 +95,9 @@ const DashboardScreen = ({ _navigation }: any) => {
         </View>
 
         {/* Trending dApps */}
-        <Card style={{ marginHorizontal: spacing.md, marginBottom: spacing.lg }}>
+        <Card style={{ marginHorizontal: spacing.xxs, marginBottom: spacing.lg }}>
           <Row style={{ justifyContent: 'space-between', alignItems: 'center', marginBottom: spacing.md }}>
             <Row style={{ alignItems: 'center', gap: spacing.sm }}>
-              <Text style={{ fontSize: typography.size.lg }}>📱</Text>
               <Text
                 style={{
                   fontSize: typography.size.lg,
@@ -148,10 +147,9 @@ const DashboardScreen = ({ _navigation }: any) => {
         </Card>
 
         {/* Trending Tokens */}
-        <Card style={{ marginHorizontal: spacing.md, marginBottom: spacing.lg }}>
+        <Card style={{ marginHorizontal: spacing.xxs, marginBottom: spacing.lg }}>
           <Row style={{ justifyContent: 'space-between', alignItems: 'center', marginBottom: spacing.md }}>
             <Row style={{ alignItems: 'center', gap: spacing.sm }}>
-              <Text style={{ fontSize: typography.size.lg }}>💎</Text>
               <Text
                 style={{
                   fontSize: typography.size.lg,
@@ -209,10 +207,9 @@ const DashboardScreen = ({ _navigation }: any) => {
         </Card>
 
         {/* Trending Bounties */}
-        <Card style={{ marginHorizontal: spacing.md, marginBottom: spacing.xl }}>
+        <Card style={{ marginHorizontal: spacing.xxs, marginBottom: spacing.xl }}>
           <Row style={{ justifyContent: 'space-between', alignItems: 'center', marginBottom: spacing.md }}>
             <Row style={{ alignItems: 'center', gap: spacing.sm }}>
-              <Text style={{ fontSize: typography.size.lg }}>🎯</Text>
               <Text
                 style={{
                   fontSize: typography.size.lg,

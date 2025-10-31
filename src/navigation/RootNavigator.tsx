@@ -6,7 +6,7 @@ import {
 } from '@react-navigation/native';
 import { createNativeStackNavigator } from '@react-navigation/native-stack';
 import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
-import { useColorScheme } from 'react-native';
+import { useColorScheme, View } from 'react-native';
 import { colors } from '../theme/tokens';
 
 // Screens
@@ -222,6 +222,42 @@ const BrowserStack = () => {
   );
 };
 
+// Tab Icon Components - Simple geometric icons using Views
+const HomeIcon = ({ color }: { color: string }) => (
+  <View style={{ width: 24, height: 24, justifyContent: 'center', alignItems: 'center' }}>
+    <View style={{ width: 14, height: 12, borderWidth: 1.5, borderColor: color, borderTopWidth: 0 }} />
+    <View style={{ width: 8, height: 8, borderWidth: 1.5, borderColor: color, marginTop: -6, marginLeft: 3 }} />
+  </View>
+);
+
+const UserIcon = ({ color }: { color: string }) => (
+  <View style={{ width: 24, height: 24, justifyContent: 'center', alignItems: 'center' }}>
+    <View style={{ width: 8, height: 8, borderRadius: 4, borderWidth: 1.5, borderColor: color }} />
+    <View style={{ width: 12, height: 8, borderWidth: 1.5, borderColor: color, borderTopWidth: 0, marginTop: 2 }} />
+  </View>
+);
+
+const BriefcaseIcon = ({ color }: { color: string }) => (
+  <View style={{ width: 24, height: 24, justifyContent: 'center', alignItems: 'center' }}>
+    <View style={{ width: 14, height: 10, borderWidth: 1.5, borderColor: color }} />
+    <View style={{ width: 6, height: 4, borderWidth: 1, borderColor: color, position: 'absolute', top: 0, left: 9 }} />
+  </View>
+);
+
+const VoteIcon = ({ color }: { color: string }) => (
+  <View style={{ width: 24, height: 24, justifyContent: 'center', alignItems: 'center' }}>
+    <View style={{ width: 10, height: 10, borderRadius: 5, borderWidth: 1.5, borderColor: color }} />
+    <View style={{ width: 1.5, height: 6, backgroundColor: color, position: 'absolute', bottom: 2 }} />
+  </View>
+);
+
+const GlobeIcon = ({ color }: { color: string }) => (
+  <View style={{ width: 24, height: 24, justifyContent: 'center', alignItems: 'center' }}>
+    <View style={{ width: 12, height: 12, borderRadius: 6, borderWidth: 1.5, borderColor: color }} />
+    <View style={{ width: 14, height: 1, backgroundColor: color, position: 'absolute' }} />
+  </View>
+);
+
 const RootNavigator = () => {
   const scheme = useColorScheme();
   const navTheme = scheme === 'dark' ? DarkTheme : DefaultTheme;
@@ -243,40 +279,45 @@ const RootNavigator = () => {
           name="DashboardTab"
           component={DashboardStack}
           options={{
-            title: '📊 Dashboard',
+            title: 'Dashboard',
             tabBarLabel: 'Dashboard',
+            tabBarIcon: HomeIcon,
           } as any}
         />
         <Tab.Screen
           name="IdentityTab"
           component={IdentityStack}
           options={{
-            title: '🔐 Identity',
+            title: 'Identity',
             tabBarLabel: 'Identity',
+            tabBarIcon: UserIcon,
           } as any}
         />
         <Tab.Screen
           name="WalletTab"
           component={WalletStack}
           options={{
-            title: '💰 Wallet',
+            title: 'Wallet',
             tabBarLabel: 'Wallet',
+            tabBarIcon: BriefcaseIcon,
           } as any}
         />
         <Tab.Screen
           name="DAOTab"
           component={DAOStack}
           options={{
-            title: '🏛️ DAO',
+            title: 'DAO',
             tabBarLabel: 'DAO',
+            tabBarIcon: VoteIcon,
           } as any}
         />
         <Tab.Screen
           name="BrowserTab"
           component={BrowserStack}
           options={{
-            title: '🌐 Browser',
+            title: 'Browser',
             tabBarLabel: 'Browser',
+            tabBarIcon: GlobeIcon,
           } as any}
         />
       </Tab.Navigator>
