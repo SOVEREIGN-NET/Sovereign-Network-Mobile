@@ -5,7 +5,7 @@ import { useAuth } from '../hooks';
 import { useTranslation } from '../i18n';
 import { colors, spacing, typography, borderRadius } from '../theme';
 
-const ReceiveTokensScreen = ({ navigation }: any) => {
+const ReceiveTokensScreen = () => {
   const { t } = useTranslation();
   const { currentIdentity } = useAuth();
   const [showQR, setShowQR] = useState(false);
@@ -55,140 +55,156 @@ const ReceiveTokensScreen = ({ navigation }: any) => {
   ];
 
   return (
-    <ScreenLayout paddingTop={20}>
+    <ScreenLayout paddingTop={40}>
       <Column gap="lg">
-          <Text variant="h1">{t.receiveTokens.title.replace('{currency}', selectedCurrency)}</Text>
 
-          {/* Currency Selector */}
-          <View>
-            <Text variant="body" style={{ marginBottom: spacing.sm, color: colors.text_secondary }}>
-              {t.sendTokens.currency}
-            </Text>
-            <View
-              style={{
-                flexDirection: 'row',
-                gap: spacing.sm,
-                flexWrap: 'wrap',
-              }}
-            >
-              {currencies.map((currency) => (
-                <Button
-                  key={currency}
-                  variant={selectedCurrency === currency ? 'primary' : 'outline'}
-                  onPress={() => setSelectedCurrency(currency)}
-                  style={{ flex: 0, paddingHorizontal: spacing.md }}
-                >
-                  {currency}
-                </Button>
-              ))}
-            </View>
+        {/* Currency Selector */}
+        <View>
+          <Text variant="body" style={{ marginBottom: spacing.sm, color: colors.text_secondary }}>
+            {t.sendTokens.currency}
+          </Text>
+          <View
+            style={{
+              flexDirection: 'row',
+              gap: spacing.sm,
+              flexWrap: 'wrap',
+            }}
+          >
+            {currencies.map((currency) => (
+              <Button
+                key={currency}
+                variant={selectedCurrency === currency ? 'primary' : 'outline'}
+                onPress={() => setSelectedCurrency(currency)}
+                style={{ flex: 0, paddingHorizontal: spacing.md }}
+              >
+                {currency}
+              </Button>
+            ))}
           </View>
+        </View>
 
-          {/* Address Card */}
-          <Card>
-            <Column gap="md">
-              <View>
+        {/* Address Card */}
+        <Card>
+          <Column gap="md">
+            <View>
+              <Text
+                style={{
+                  fontSize: typography.size.xs,
+                  color: colors.text_secondary,
+                  marginBottom: spacing.sm,
+                }}
+              >
+                {t.receiveTokens.address}
+              </Text>
+              <View
+                style={{
+                  backgroundColor: colors.bg_darker,
+                  padding: spacing.md,
+                  borderRadius: borderRadius.base,
+                  borderWidth: 1,
+                  borderColor: colors.border,
+                }}
+              >
                 <Text
                   style={{
-                    fontSize: typography.size.xs,
-                    color: colors.text_secondary,
-                    marginBottom: spacing.sm,
+                    fontSize: typography.size.sm,
+                    fontFamily: 'monospace',
+                    color: colors.primary,
+                    letterSpacing: 0.5,
+                    userSelect: 'text',
                   }}
                 >
-                  {t.receiveTokens.address}
+                  {walletAddress}
                 </Text>
+              </View>
+            </View>
+
+            {/* Copy and Share Buttons */}
+            <View style={{ gap: spacing.sm, flexDirection: 'row' }}>
+              <Button
+                onPress={handleCopyAddress}
+                variant="secondary"
+                style={{ flex: 1 }}
+              >
+                {copied ? '✓ ' + t.receiveTokens.copied : t.receiveTokens.copyButton}
+              </Button>
+              <Button onPress={handleShare} variant="secondary" style={{ flex: 1 }}>
+                {t.receiveTokens.shareButton}
+              </Button>
+            </View>
+          </Column>
+        </Card>
+
+        {/* QR Code Section */}
+        <Card>
+          <Column gap="md">
+            <Button
+              variant="secondary"
+              onPress={() => setShowQR(!showQR)}
+            >
+              {showQR ? t.receiveTokens.hideQR : t.receiveTokens.showQR}
+            </Button>
+
+            {showQR && (
+              <View
+                style={{
+                  backgroundColor: colors.bg_darker,
+                  padding: spacing.md,
+                  borderRadius: borderRadius.base,
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                }}
+              >
                 <View
                   style={{
-                    backgroundColor: colors.bg_darker,
-                    padding: spacing.md,
-                    borderRadius: borderRadius.base,
-                    borderWidth: 1,
-                    borderColor: colors.border,
+                    width: 200,
+                    height: 200,
+                    backgroundColor: colors.white,
+                    borderRadius: 8,
+                    justifyContent: 'center',
+                    alignItems: 'center',
                   }}
                 >
+                  <Text style={{ color: colors.bg_darkest, fontSize: typography.size.lg }}>
+                    QR Code
+                  </Text>
                   <Text
                     style={{
-                      fontSize: typography.size.sm,
-                      fontFamily: 'monospace',
-                      color: colors.primary,
-                      letterSpacing: 0.5,
-                      userSelect: 'text',
+                      color: colors.text_secondary,
+                      fontSize: typography.size.xs,
+                      marginTop: spacing.xs,
                     }}
                   >
-                    {walletAddress}
+                    {walletAddress.substring(0, 8)}...
                   </Text>
                 </View>
               </View>
+            )}
+          </Column>
+        </Card>
 
-              {/* Copy and Share Buttons */}
-              <View style={{ gap: spacing.sm, flexDirection: 'row' }}>
-                <Button
-                  onPress={handleCopyAddress}
-                  variant="secondary"
-                  style={{ flex: 1 }}
-                >
-                  {copied ? '✓ ' + t.receiveTokens.copied : t.receiveTokens.copyButton}
-                </Button>
-                <Button onPress={handleShare} variant="secondary" style={{ flex: 1 }}>
-                  {t.receiveTokens.shareButton}
-                </Button>
-              </View>
-            </Column>
-          </Card>
+        {/* Info Section */}
+        <Card style={{ backgroundColor: colors.bg_darker }}>
+          <Column gap="sm">
+            <Text
+              style={{
+                fontSize: typography.size.sm,
+                fontWeight: typography.weight.semibold,
+                color: colors.text_primary,
+              }}
+            >
+              {t.receiveTokens.info.title}
+            </Text>
+            <Text variant="body" style={{ color: colors.text_secondary }}>
+              {t.receiveTokens.info.description}
+            </Text>
+          </Column>
+        </Card>
 
-          {/* QR Code Section */}
+        {/* Recent Transactions */}
+        {recentTransactions.length > 0 && (
           <Card>
             <Column gap="md">
-              <Button
-                variant="secondary"
-                onPress={() => setShowQR(!showQR)}
-              >
-                {showQR ? t.receiveTokens.hideQR : t.receiveTokens.showQR}
-              </Button>
-
-              {showQR && (
-                <View
-                  style={{
-                    backgroundColor: colors.bg_darker,
-                    padding: spacing.md,
-                    borderRadius: borderRadius.base,
-                    alignItems: 'center',
-                    aspectRatio: 1,
-                    justifyContent: 'center',
-                  }}
-                >
-                  {/* QR Code Placeholder */}
-                  <View
-                    style={{
-                      width: 200,
-                      height: 200,
-                      backgroundColor: colors.white,
-                      borderRadius: 8,
-                      justifyContent: 'center',
-                      alignItems: 'center',
-                    }}
-                  >
-                    <Text style={{ color: colors.bg_darkest, fontSize: typography.size.lg }}>
-                      QR Code
-                    </Text>
-                    <Text
-                      style={{
-                        color: colors.text_secondary,
-                        fontSize: typography.size.xs,
-                        marginTop: spacing.xs,
-                      }}
-                    >
-                      {walletAddress.substring(0, 8)}...
-                    </Text>
-                  </View>
-                </View>
-              )}
-            </Column>
-          </Card>
-
-          {/* Info Section */}
-          <Card style={{ backgroundColor: colors.bg_darker }}>
-            <Column gap="sm">
               <Text
                 style={{
                   fontSize: typography.size.sm,
@@ -196,82 +212,62 @@ const ReceiveTokensScreen = ({ navigation }: any) => {
                   color: colors.text_primary,
                 }}
               >
-                {t.receiveTokens.info.title}
+                {t.receiveTokens.recentlyReceived}
               </Text>
-              <Text variant="body" style={{ color: colors.text_secondary }}>
-                {t.receiveTokens.info.description}
-              </Text>
-            </Column>
-          </Card>
 
-          {/* Recent Transactions */}
-          {recentTransactions.length > 0 && (
-            <Card>
-              <Column gap="md">
-                <Text
-                  style={{
-                    fontSize: typography.size.sm,
-                    fontWeight: typography.weight.semibold,
-                    color: colors.text_primary,
-                  }}
-                >
-                  {t.receiveTokens.recentlyReceived}
-                </Text>
-
-                <Column gap="sm">
-                  {recentTransactions.map((tx) => (
+              <Column gap="sm">
+                {recentTransactions.map((tx) => (
+                  <View
+                    key={tx.id}
+                    style={{
+                      backgroundColor: colors.bg_darker,
+                      padding: spacing.md,
+                      borderRadius: borderRadius.base,
+                    }}
+                  >
                     <View
-                      key={tx.id}
                       style={{
-                        backgroundColor: colors.bg_darker,
-                        padding: spacing.md,
-                        borderRadius: borderRadius.base,
+                        flexDirection: 'row',
+                        justifyContent: 'space-between',
+                        alignItems: 'center',
+                        marginBottom: spacing.sm,
                       }}
                     >
-                      <View
-                        style={{
-                          flexDirection: 'row',
-                          justifyContent: 'space-between',
-                          alignItems: 'center',
-                          marginBottom: spacing.sm,
-                        }}
-                      >
-                        <Text variant="body" style={{ color: colors.text_secondary }}>
-                          From: {tx.sender}
-                        </Text>
-                        <Text style={{ fontSize: typography.size.sm, color: colors.success }}>
-                          +{tx.amount} {tx.currency}
-                        </Text>
-                      </View>
-                      <View
-                        style={{
-                          flexDirection: 'row',
-                          justifyContent: 'space-between',
-                          alignItems: 'center',
-                        }}
-                      >
-                        <Text
-                          variant="caption"
-                          style={{ color: colors.text_tertiary }}
-                        >
-                          {tx.date}
-                        </Text>
-                        <Text
-                          style={{
-                            fontSize: typography.size.xs,
-                            color: colors.success,
-                          }}
-                        >
-                          {tx.status}
-                        </Text>
-                      </View>
+                      <Text variant="body" style={{ color: colors.text_secondary }}>
+                        From: {tx.sender}
+                      </Text>
+                      <Text style={{ fontSize: typography.size.sm, color: colors.success }}>
+                        +{tx.amount} {tx.currency}
+                      </Text>
                     </View>
-                  ))}
-                </Column>
+                    <View
+                      style={{
+                        flexDirection: 'row',
+                        justifyContent: 'space-between',
+                        alignItems: 'center',
+                      }}
+                    >
+                      <Text
+                        variant="caption"
+                        style={{ color: colors.text_tertiary }}
+                      >
+                        {tx.date}
+                      </Text>
+                      <Text
+                        style={{
+                          fontSize: typography.size.xs,
+                          color: colors.success,
+                        }}
+                      >
+                        {tx.status}
+                      </Text>
+                    </View>
+                  </View>
+                ))}
               </Column>
-            </Card>
-          )}
-
+            </Column>
+          </Card>
+        )}
       </Column>
     </ScreenLayout>
   );
