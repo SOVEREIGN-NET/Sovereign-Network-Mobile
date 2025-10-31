@@ -285,12 +285,12 @@ const RootNavigator = () => {
           } as any}
         />
         <Tab.Screen
-          name="IdentityTab"
-          component={IdentityStack}
+          name="BrowserTab"
+          component={BrowserStack}
           options={{
-            title: 'Identity',
-            tabBarLabel: 'Identity',
-            tabBarIcon: UserIcon,
+            title: 'Browser',
+            tabBarLabel: 'Browser',
+            tabBarIcon: GlobeIcon,
           } as any}
         />
         <Tab.Screen
@@ -312,12 +312,12 @@ const RootNavigator = () => {
           } as any}
         />
         <Tab.Screen
-          name="BrowserTab"
-          component={BrowserStack}
+          name="IdentityTab"
+          component={IdentityStack}
           options={{
-            title: 'Browser',
-            tabBarLabel: 'Browser',
-            tabBarIcon: GlobeIcon,
+            title: 'Identity',
+            tabBarLabel: 'Identity',
+            tabBarIcon: UserIcon,
           } as any}
         />
       </Tab.Navigator>

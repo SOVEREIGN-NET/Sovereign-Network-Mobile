@@ -179,7 +179,7 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
   /**
    * Update passphrase
    */
-  const updatePassphrase = useCallback(async (newPassphrase: string) => {
+  const updatePassphrase = useCallback(async (_newPassphrase: string) => {
     if (!currentIdentity) {
       setError('No identity to update');
       return;

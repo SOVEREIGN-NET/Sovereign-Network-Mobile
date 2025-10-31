@@ -1,14 +1,11 @@
 import React, { useState } from 'react';
-import { View } from 'react-native';
+import { View, TouchableOpacity, ScrollView } from 'react-native';
 import {
   Card,
-  Text,
-  Button,
-  LoadingView,
-  Column,
-  DetailRow,
-  ScreenLayout,
+  Text, LoadingView,
+  Column, ScreenLayout
 } from '../components';
+import SShieldLogo from '../components/atoms/Logo';
 import { useAuth } from '../hooks';
 import { useTranslation } from '../i18n';
 import { colors, spacing, typography, borderRadius } from '../theme';
@@ -16,261 +13,280 @@ import { colors, spacing, typography, borderRadius } from '../theme';
 const WalletScreen = ({ navigation }: any) => {
   const { t } = useTranslation();
   const { currentIdentity, isLoading } = useAuth();
-  const [selectedWalletId] = useState<string | null>(null);
+  const [activeTab, setActiveTab] = useState('Tokens');
 
   if (!currentIdentity || isLoading) {
     return <LoadingView />;
   }
 
   const wallets = currentIdentity.wallets || [];
-  const selectedWallet = wallets.find(w => w.id === selectedWalletId) || wallets[0];
-  const totalBalance = wallets.reduce((sum, w) => sum + (w.balance || 0), 0);
+  const selectedWallet = wallets[0];
 
   return (
-    <ScreenLayout paddingTop={20}>
-      <Column gap="xl">
-          {/* Total Balance Card */}
-          <Card>
-            <View
-              style={{
-                alignItems: 'center',
-                paddingVertical: spacing.lg,
-                backgroundColor: colors.bg_darker,
-                borderRadius: borderRadius.base,
-              }}
-            >
-              <Text
-                style={{
-                  fontSize: typography.size.xs,
-                  color: colors.text_secondary,
-                  marginBottom: spacing.sm,
-                }}
-              >
-                {t.wallet.totalBalance}
-              </Text>
-              <Text
-                style={{
-                  fontSize: typography.size['5xl'],
-                  fontWeight: typography.weight.bold,
-                  color: colors.primary,
-                  marginBottom: spacing.xs,
-                }}
-              >
-                {totalBalance.toLocaleString()}
-              </Text>
-              <Text
-                style={{
-                  fontSize: typography.size.sm,
-                  color: colors.text_secondary,
-                }}
-              >
-                {t.wallet.currency}
-              </Text>
-            </View>
-          </Card>
-
-          {/* Wallets List */}
-          {wallets.length > 0 ? (
-            <Card>
-              <Text
-                style={{
-                  fontSize: typography.size.sm,
-                  fontWeight: typography.weight.semibold,
-                  color: colors.text_primary,
-                  marginBottom: spacing.md,
-                }}
-              >
-                {t.wallet.wallets.title} ({wallets.length})
-              </Text>
-
-              <Column gap="sm">
-                {wallets.map((wallet) => (
-                  <View
-                    key={wallet.id}
-                    style={{
-                      backgroundColor:
-                        selectedWalletId === wallet.id
-                          ? colors.primary
-                          : colors.bg_darker,
-                      padding: spacing.md,
-                      borderRadius: borderRadius.base,
-                      borderWidth: 2,
-                      borderColor:
-                        selectedWalletId === wallet.id
-                          ? colors.primary
-                          : colors.border,
-                    }}
-                  >
-                    <View
-                      style={{
-                        justifyContent: 'space-between',
-                        alignItems: 'center',
-                        flexDirection: 'row',
-                        marginBottom: spacing.sm,
-                      }}
-                    >
-                      <Column style={{ flex: 1 }}>
-                        <Text
-                          style={{
-                            fontSize: typography.size.sm,
-                            fontWeight: typography.weight.semibold,
-                            color:
-                              selectedWalletId === wallet.id
-                                ? colors.white
-                                : colors.text_primary,
-                          }}
-                        >
-                          {wallet.name}
-                        </Text>
-                        <Text
-                          style={{
-                            fontSize: typography.size.xs,
-                            color:
-                              selectedWalletId === wallet.id
-                                ? colors.white
-                                : colors.text_secondary,
-                            marginTop: spacing.xs,
-                          }}
-                        >
-                          {wallet.address}
-                        </Text>
-                      </Column>
-                      <Text
-                        style={{
-                          fontSize: typography.size.sm,
-                          fontWeight: typography.weight.bold,
-                          color:
-                            selectedWalletId === wallet.id
-                              ? colors.white
-                              : colors.primary,
-                        }}
-                      >
-                        {wallet.balance.toLocaleString()}
-                      </Text>
-                    </View>
-
-                    {selectedWalletId === wallet.id && (
-                      <View
-                        style={{
-                          marginTop: spacing.md,
-                          paddingTop: spacing.md,
-                          borderTopWidth: 1,
-                          borderTopColor: 'rgba(255,255,255,0.2)',
-                        }}
-                      >
-                        <Column gap="sm">
-                          <Button
-                            variant="secondary"
-                            onPress={() => navigation?.navigate('SendTokens')}
-                            disabled={isLoading}
-                          >
-                            {t.wallet.actions.send}
-                          </Button>
-                          <Button
-                            variant="secondary"
-                            onPress={() => navigation?.navigate('ReceiveTokens')}
-                            disabled={isLoading}
-                          >
-                            {t.wallet.actions.receive}
-                          </Button>
-                        </Column>
-                      </View>
-                    )}
-                  </View>
-                ))}
-              </Column>
-            </Card>
-          ) : (
-            <Card>
+    <ScreenLayout paddingTop={spacing.md}>
+      <ScrollView showsVerticalScrollIndicator={false}>
+        <Column gap="lg" style={{ paddingBottom: spacing.xl }}>
+          {/* Wallet Header */}
+          <View style={{ paddingHorizontal: spacing.md }}>
+            <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-start' }}>
+              <View>
+                <Text
+                  style={{
+                    fontSize: typography.size.lg,
+                    fontWeight: typography.weight.semibold,
+                    color: colors.text_primary,
+                  }}
+                >
+                  {selectedWallet?.name || 'Wallet'}
+                </Text>
+                <Text
+                  style={{
+                    fontSize: typography.size.xs,
+                    color: colors.text_secondary,
+                    marginTop: spacing.xs,
+                  }}
+                >
+                  {selectedWallet?.id} • Not synced
+                </Text>
+              </View>
               <View
                 style={{
+                  width: 36,
+                  height: 36,
+                  borderRadius: 18,
+                  backgroundColor: colors.bg_darker,
+                  justifyContent: 'center',
                   alignItems: 'center',
-                  paddingVertical: spacing.lg,
+                  borderWidth: 1,
+                  borderColor: colors.border,
                 }}
               >
-                <Text style={{ color: colors.text_secondary }}>
-                  {t.wallet.wallets.noWallets}
-                </Text>
-                <Button
-                  variant="secondary"
-                  onPress={() => {}}
-                  style={{ marginTop: spacing.md }}
-                >
-                  {t.wallet.wallets.createWallet}
-                </Button>
+                <Text style={{ fontSize: 20 }}>⚙️</Text>
               </View>
-            </Card>
+            </View>
+          </View>
+
+          {/* Wallet Address Card */}
+          {selectedWallet && (
+            <View style={{ paddingHorizontal: spacing.md }}>
+              <Card style={{ marginHorizontal: 0, overflow: 'hidden' }}>
+                <View
+                  style={{
+                    borderTopWidth: 2,
+                    borderTopColor: colors.primary,
+                    paddingHorizontal: spacing.lg,
+                    paddingVertical: spacing.lg,
+                  }}
+                >
+                  <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: spacing.md }}>
+                    <Text style={{ fontSize: typography.size.xs, color: colors.text_secondary }}>
+                      {t.wallet.details.address}
+                    </Text>
+                    <TouchableOpacity>
+                      <Text style={{ fontSize: 18 }}>📋</Text>
+                    </TouchableOpacity>
+                  </View>
+                  <Text
+                    style={{
+                      fontSize: typography.size.lg,
+                      fontWeight: typography.weight.semibold,
+                      color: colors.text_primary,
+                      letterSpacing: 0.5,
+                    }}
+                  >
+                    {selectedWallet.address.substring(0, 10)}...{selectedWallet.address.substring(selectedWallet.address.length - 8)}
+                  </Text>
+                </View>
+
+                {/* Balance Section */}
+                <View style={{ paddingHorizontal: spacing.lg, paddingVertical: spacing.xl, alignItems: 'center' }}>
+                  <Text
+                    style={{
+                      fontSize: typography.size['5xl'],
+                      fontWeight: typography.weight.bold,
+                      color: colors.primary,
+                      marginBottom: spacing.sm,
+                    }}
+                  >
+                    {selectedWallet.balance.toLocaleString()}
+                  </Text>
+                  <Text style={{ fontSize: typography.size.sm, color: colors.text_secondary }}>
+                    {t.wallet.currency}
+                  </Text>
+                </View>
+              </Card>
+            </View>
           )}
 
-          {/* Wallet Details */}
-          {selectedWallet && (
-            <Card>
+          {/* Send & Receive Buttons */}
+          <View
+            style={{
+              paddingHorizontal: spacing.md,
+              flexDirection: 'row',
+              gap: spacing.md,
+            }}
+          >
+            <TouchableOpacity
+              style={{
+                flex: 1,
+                paddingVertical: spacing.lg,
+                borderRadius: borderRadius.base,
+                borderWidth: 2,
+                borderColor: colors.border,
+                justifyContent: 'center',
+                alignItems: 'center',
+              }}
+              onPress={() => navigation?.navigate('SendTokens')}
+              disabled={isLoading}
+            >
               <Text
                 style={{
-                  fontSize: typography.size.sm,
+                  fontSize: typography.size.md,
                   fontWeight: typography.weight.semibold,
                   color: colors.text_primary,
-                  marginBottom: spacing.md,
                 }}
               >
-                {t.wallet.details.title}
+                ↑ {t.wallet.actions.send}
               </Text>
-              <Column gap="sm">
-                <DetailRow label={t.wallet.details.name} value={selectedWallet.name} />
-                <DetailRow label={t.wallet.details.address} value={selectedWallet.address} />
-                <DetailRow
-                  label={t.wallet.details.balance}
-                  value={`${selectedWallet.balance.toLocaleString()} ZHTP`}
-                />
+            </TouchableOpacity>
+
+            <TouchableOpacity
+              style={{
+                flex: 1,
+                paddingVertical: spacing.lg,
+                borderRadius: borderRadius.base,
+                borderWidth: 2,
+                borderColor: colors.border,
+                justifyContent: 'center',
+                alignItems: 'center',
+              }}
+              onPress={() => navigation?.navigate('ReceiveTokens')}
+              disabled={isLoading}
+            >
+              <Text
+                style={{
+                  fontSize: typography.size.md,
+                  fontWeight: typography.weight.semibold,
+                  color: colors.text_primary,
+                }}
+              >
+                ↓ {t.wallet.actions.receive}
+              </Text>
+            </TouchableOpacity>
+          </View>
+
+          {/* Assets/Tokens List */}
+          {wallets.length > 0 && (
+            <View style={{ paddingHorizontal: spacing.md }}>
+              <Column gap="md">
+                {wallets.map((wallet) => (
+                  <TouchableOpacity
+                    key={wallet.id}
+                    activeOpacity={0.7}
+                  >
+                    <Card style={{ marginHorizontal: 0 }}>
+                      <View
+                        style={{
+                          flexDirection: 'row',
+                          justifyContent: 'space-between',
+                          alignItems: 'center',
+                          paddingHorizontal: spacing.md,
+                          paddingVertical: spacing.lg,
+                        }}
+                      >
+                        <View
+                          style={{
+                            width: 48,
+                            height: 48,
+                            borderRadius: 24,
+                            backgroundColor: colors.primary,
+                            justifyContent: 'center',
+                            alignItems: 'center',
+                            marginRight: spacing.md,
+                            overflow: 'hidden',
+                          }}
+                        >
+                          <SShieldLogo size={48} />
+                        </View>
+                        <View style={{ flex: 1 }}>
+                          <Text
+                            style={{
+                              fontSize: typography.size.sm,
+                              fontWeight: typography.weight.semibold,
+                              color: colors.text_primary,
+                            }}
+                          >
+                            {wallet.name}
+                          </Text>
+                          <Text
+                            style={{
+                              fontSize: typography.size.xs,
+                              color: colors.text_secondary,
+                              marginTop: 2,
+                            }}
+                          >
+                            {wallet.id}
+                          </Text>
+                        </View>
+                        <Text
+                          style={{
+                            fontSize: typography.size.md,
+                            fontWeight: typography.weight.bold,
+                            color: colors.text_primary,
+                          }}
+                        >
+                          {wallet.balance.toLocaleString()}
+                        </Text>
+                      </View>
+                    </Card>
+                  </TouchableOpacity>
+                ))}
               </Column>
-            </Card>
+            </View>
           )}
 
-          {/* Quick Actions */}
-          <Card>
-            <Text
-              style={{
-                fontSize: typography.size.sm,
-                fontWeight: typography.weight.semibold,
-                color: colors.text_primary,
-                marginBottom: spacing.md,
-              }}
-            >
-              {t.wallet.quickActions.title}
-            </Text>
-            <Column gap="sm">
-              <Button
-                variant="secondary"
-                onPress={() => navigation?.navigate('SendTokens')}
-                disabled={isLoading}
+          {/* Bottom Tab Bar */}
+          <View
+            style={{
+              marginHorizontal: spacing.md,
+              marginTop: spacing.lg,
+              flexDirection: 'row',
+              gap: spacing.md,
+              backgroundColor: colors.bg_darker,
+              borderRadius: borderRadius.lg,
+              paddingVertical: spacing.md,
+              paddingHorizontal: spacing.md,
+            }}
+          >
+            {['Tokens', 'NFTs', 'Activity', 'Settings'].map((tab) => (
+              <TouchableOpacity
+                key={tab}
+                onPress={() => setActiveTab(tab)}
+                style={{
+                  flex: 1,
+                  alignItems: 'center',
+                  paddingVertical: spacing.md,
+                  borderRadius: borderRadius.base,
+                  backgroundColor: activeTab === tab ? 'rgba(0,0,0,0.3)' : 'transparent',
+                }}
               >
-                {t.wallet.quickActions.sendTokens}
-              </Button>
-              <Button
-                variant="secondary"
-                onPress={() => navigation?.navigate('ReceiveTokens')}
-                disabled={isLoading}
-              >
-                {t.wallet.quickActions.receiveTokens}
-              </Button>
-              <Button
-                variant="secondary"
-                onPress={() => navigation?.navigate('StakeTokens')}
-                disabled={isLoading}
-              >
-                {t.wallet.quickActions.stakeTokens}
-              </Button>
-              <Button
-                variant="secondary"
-                onPress={() => {}}
-                disabled={isLoading}
-              >
-                {t.wallet.quickActions.viewHistory}
-              </Button>
-            </Column>
-          </Card>
-
-      </Column>
+                <Text
+                  style={{
+                    fontSize: typography.size.xs,
+                    color: activeTab === tab ? colors.primary : colors.text_secondary,
+                    fontWeight: activeTab === tab ? typography.weight.semibold : typography.weight.normal,
+                  }}
+                >
+                  {tab === 'Tokens' && '💰 Tokens'}
+                  {tab === 'NFTs' && '🖼️ NFTs'}
+                  {tab === 'Activity' && '⏱️ Activity'}
+                  {tab === 'Settings' && '⚙️ Settings'}
+                </Text>
+              </TouchableOpacity>
+            ))}
+          </View>
+        </Column>
+      </ScrollView>
     </ScreenLayout>
   );
 };

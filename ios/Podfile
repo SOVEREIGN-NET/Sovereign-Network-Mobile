@@ -5,6 +5,9 @@ require Pod::Executable.execute_command('node', ['-p',
     {paths: [process.argv[1]]},
   )', __dir__]).strip
 
+# Firebase static frameworks cause modular header conflicts with RN 0.82; keep as dynamic frameworks
+$RNFirebaseAsStaticFramework = false
+
 platform :ios, min_ios_version_supported
 prepare_react_native_project!
 
@@ -16,6 +19,18 @@ end
 
 target 'SovereignNetworkMobile' do
   config = use_native_modules!
+
+  # Firebase Swift pods need modular headers on their C deps when linked statically with RN
+  pod 'FirebaseCore', :modular_headers => true
+  pod 'FirebaseCoreInternal', :modular_headers => true
+  pod 'FirebaseInstallations', :modular_headers => true
+  pod 'FirebaseCrashlytics', :modular_headers => true
+  pod 'FirebaseSessions', :modular_headers => true
+  pod 'FirebaseCoreExtension', :modular_headers => true
+  pod 'FirebaseRemoteConfigInterop', :modular_headers => true
+  pod 'GoogleDataTransport', :modular_headers => true
+  pod 'GoogleUtilities', :modular_headers => true
+  pod 'nanopb', :modular_headers => true
 
   use_react_native!(
     :path => config[:reactNativePath],
@@ -30,5 +45,15 @@ target 'SovereignNetworkMobile' do
       :mac_catalyst_enabled => false,
       # :ccache_enabled => true
     )
+
+    # Firebase build settings
+    installer.pods_project.targets.each do |target|
+      target.build_configurations.each do |config|
+        config.build_settings['GCC_PREPROCESSOR_DEFINITIONS'] ||= [
+          '$(inherited)',
+          'FIREBASE_ANALYTICS_COLLECTION_ENABLED=1',
+        ]
+      end
+    end
   end
 end
