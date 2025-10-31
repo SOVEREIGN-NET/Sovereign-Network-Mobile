@@ -83,7 +83,7 @@ const WalletScreen = ({ navigation }: any) => {
                       {t.wallet.details.address}
                     </Text>
                     <TouchableOpacity>
-                      <Text style={{ fontSize: 18 }}>📋</Text>
+                      <Text style={{ fontSize: typography.size.xs, color: colors.primary }}>Copy</Text>
                     </TouchableOpacity>
                   </View>
                   <Text
@@ -175,8 +175,8 @@ const WalletScreen = ({ navigation }: any) => {
             </TouchableOpacity>
           </View>
 
-          {/* Assets/Tokens List */}
-          {wallets.length > 0 && (
+          {/* Tab Content */}
+          {activeTab === 'Tokens' && wallets.length > 0 && (
             <View style={{ paddingHorizontal: spacing.md }}>
               <Column gap="md">
                 {wallets.map((wallet) => (
@@ -245,6 +245,36 @@ const WalletScreen = ({ navigation }: any) => {
             </View>
           )}
 
+          {activeTab === 'NFTs' && (
+            <View style={{ paddingHorizontal: spacing.md }}>
+              <Card>
+                <Column gap="md" style={{ alignItems: 'center', paddingVertical: spacing.lg }}>
+                  <Text style={{ fontSize: typography.size.lg, fontWeight: typography.weight.semibold, color: colors.text_primary }}>
+                    No NFTs
+                  </Text>
+                  <Text style={{ fontSize: typography.size.sm, color: colors.text_secondary }}>
+                    You don't have any NFTs yet
+                  </Text>
+                </Column>
+              </Card>
+            </View>
+          )}
+
+          {activeTab === 'Activity' && (
+            <View style={{ paddingHorizontal: spacing.md }}>
+              <Card>
+                <Column gap="md" style={{ alignItems: 'center', paddingVertical: spacing.lg }}>
+                  <Text style={{ fontSize: typography.size.lg, fontWeight: typography.weight.semibold, color: colors.text_primary }}>
+                    No Activity
+                  </Text>
+                  <Text style={{ fontSize: typography.size.sm, color: colors.text_secondary }}>
+                    Your transaction history will appear here
+                  </Text>
+                </Column>
+              </Card>
+            </View>
+          )}
+
           {/* Bottom Tab Bar */}
           <View
             style={{
@@ -258,7 +288,7 @@ const WalletScreen = ({ navigation }: any) => {
               paddingHorizontal: spacing.md,
             }}
           >
-            {['Tokens', 'NFTs', 'Activity', 'Settings'].map((tab) => (
+            {['Tokens', 'NFTs', 'Activity'].map((tab) => (
               <TouchableOpacity
                 key={tab}
                 onPress={() => setActiveTab(tab)}
@@ -277,10 +307,7 @@ const WalletScreen = ({ navigation }: any) => {
                     fontWeight: activeTab === tab ? typography.weight.semibold : typography.weight.normal,
                   }}
                 >
-                  {tab === 'Tokens' && '💰 Tokens'}
-                  {tab === 'NFTs' && '🖼️ NFTs'}
-                  {tab === 'Activity' && '⏱️ Activity'}
-                  {tab === 'Settings' && '⚙️ Settings'}
+                  {tab}
                 </Text>
               </TouchableOpacity>
             ))}
