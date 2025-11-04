@@ -9,10 +9,9 @@ import { NativeStackScreenProps } from '@react-navigation/native-stack';
 // Define the tab navigator param list
 export type TabParamList = {
   DashboardTab: undefined;
-  IdentityTab: undefined;
-  WalletTab: undefined;
   DAOTab: undefined;
-  BrowserTab: undefined;
+  SIDTab: undefined;
+  IdentityTab: undefined;
 };
 
 // Define individual stack param lists
@@ -31,8 +30,8 @@ export type IdentityStackParamList = {
   BiometricVerification: undefined;
 };
 
-export type WalletStackParamList = {
-  WalletMain: undefined;
+export type SIDStackParamList = {
+  SIDMain: undefined;
   SendTokens: undefined;
   ReceiveTokens: undefined;
   StakeTokens: undefined;
@@ -46,13 +45,6 @@ export type DAOStackParamList = {
   TreasuryStatus: undefined;
 };
 
-export type BrowserStackParamList = {
-  BrowserMain: undefined;
-};
-
-// Root stack param list (if needed for modals, auth, etc.)
-export type RootStackParamList = IdentityStackParamList;
-
 // Tab screen props
 export type TabScreenProps<T extends keyof TabParamList> = BottomTabScreenProps<
   TabParamList,
@@ -62,25 +54,20 @@ export type TabScreenProps<T extends keyof TabParamList> = BottomTabScreenProps<
 // Stack screen props for each tab
 export type DashboardScreenProps = NativeStackScreenProps<
   DashboardStackParamList,
-  'Dashboard'
+  'DashboardMain'
 >;
 
 export type IdentityScreenProps = NativeStackScreenProps<
   IdentityStackParamList,
-  'Identity'
+  'IdentityMain'
 >;
 
-export type WalletScreenProps = NativeStackScreenProps<
-  WalletStackParamList,
-  'Wallet'
+export type SIDScreenProps = NativeStackScreenProps<
+  SIDStackParamList,
+  'SIDMain'
 >;
 
 export type DAOScreenProps = NativeStackScreenProps<
   DAOStackParamList,
-  'DAO'
->;
-
-export type BrowserScreenProps = NativeStackScreenProps<
-  BrowserStackParamList,
-  'Browser'
+  'DAOMain'
 >;

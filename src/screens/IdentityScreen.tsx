@@ -8,6 +8,9 @@ import {
   LoadingView,
   Column,
   ScreenLayout,
+  HeaderBar,
+  SideDrawer,
+  DrawerItem,
 } from '../components';
 import { useAuth } from '../hooks';
 import { useTranslation } from '../i18n';
@@ -17,6 +20,42 @@ const IdentityScreen = ({ navigation }: any) => {
   const { t } = useTranslation();
   const { currentIdentity, signOut, isLoading: authLoading } = useAuth();
   const [loggingOut, setLoggingOut] = useState(false);
+  const [drawerVisible, setDrawerVisible] = useState(false);
+
+  const drawerItems: DrawerItem[] = [
+    {
+      id: 'history',
+      label: 'History',
+      icon: '',
+      onPress: () => {
+        // TODO: Navigate to history
+      },
+    },
+    {
+      id: 'bookmarks',
+      label: 'Bookmarks',
+      icon: '',
+      onPress: () => {
+        // TODO: Navigate to bookmarks
+      },
+    },
+    {
+      id: 'favorites',
+      label: 'Favorites',
+      icon: '',
+      onPress: () => {
+        // TODO: Navigate to favorites
+      },
+    },
+    {
+      id: 'settings',
+      label: 'Settings',
+      icon: '',
+      onPress: () => {
+        navigation.navigate('AppSettings');
+      },
+    },
+  ];
 
   const handleLogout = () => {
     Alert.alert(
@@ -58,7 +97,22 @@ const IdentityScreen = ({ navigation }: any) => {
   const walletCount = currentIdentity.wallets?.length || 0;
 
   return (
-    <ScreenLayout paddingTop={20}>
+    <View style={{ flex: 1, backgroundColor: colors.bg_darkest }}>
+      <HeaderBar
+        onMenuPress={() => setDrawerVisible(true)}
+        onBLEPress={() => {
+          // TODO: Handle BLE connection
+        }}
+      />
+
+      <SideDrawer
+        visible={drawerVisible}
+        onClose={() => setDrawerVisible(false)}
+        items={drawerItems}
+        title="Menu"
+      />
+
+      <ScreenLayout paddingTop={20}>
       <Column gap="xl">
           {/* Identity Card */}
           <Card>
@@ -195,7 +249,8 @@ const IdentityScreen = ({ navigation }: any) => {
           </Card>
 
       </Column>
-    </ScreenLayout>
+      </ScreenLayout>
+    </View>
   );
 };
 

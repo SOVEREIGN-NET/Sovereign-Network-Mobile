@@ -3,7 +3,15 @@
  * Centralized theme configuration for the entire app
  */
 
-export const colors = {
+// Gradient accent colors used across themes
+export const gradientAccents = {
+  // Pink to Cyan gradient (primary accent)
+  gradient_start: '#ff00d4',    // Hot pink/magenta
+  gradient_end: '#00d4ff',      // Cyan
+} as const;
+
+// Color palette for light/dark theme variants
+const lightThemeColors = {
   // Primary Brand Colors
   primary: '#00d4ff',
   primary_dark: '#00a8cc',
@@ -48,6 +56,67 @@ export const colors = {
   border: 'rgba(0, 212, 255, 0.08)',      // Ultra subtle primary border
   border_light: 'rgba(255, 255, 255, 0.06)', // Very subtle light border
 } as const;
+
+// Dark grey theme with gradient accents
+const charcoalGreyThemeColors = {
+  // Primary Brand Colors - Gradient accents
+  primary: gradientAccents.gradient_end,  // Cyan accent
+  primary_dark: '#0099cc',
+  primary_light: '#33e0ff',
+
+  // Backgrounds - Charcoal grey base
+  bg_darkest: '#1a1a1a',      // Main app background (darker charcoal)
+  bg_dark: '#2a2a2a',         // Cards, modals
+  bg_darker: '#333333',       // Darker cards, nested elements
+  bg_medium: '#2f2f2f',       // Buttons, active states
+  bg_light: '#3d3d3d',        // Borders, dividers, disabled states
+  bg_lighter: '#4a4a4a',      // Hover states
+  surface: '#2a2a2a',         // Surface/card backgrounds
+
+  // Text Colors
+  text_primary: '#ffffff',    // Primary text
+  text_secondary: '#cccccc',  // Secondary text, descriptions
+  text_tertiary: '#888888',   // Disabled text, hints
+  text_placeholder: '#666666',
+
+  // Semantic Colors
+  success: '#51cf66',         // Success states
+  success_dark: '#37b24d',
+  error: '#ff6b6b',           // Error states
+  error_dark: '#fa5252',
+  warning: '#ffd43b',         // Warning states
+  warning_dark: '#f9ca24',
+  info: '#00d4ff',            // Info (same as primary)
+  info_dark: '#0099cc',
+
+  // Bright Semantic (for status indicators)
+  alert_success: '#00ff00',
+  alert_error: '#ff4444',
+  alert_warning: '#ffaa00',
+
+  // Utility
+  black: '#000000',
+  white: '#ffffff',
+  transparent: 'transparent',
+
+  // Borders - Subtle gradient accent borders
+  border: `rgba(255, 0, 212, 0.06)`,        // Subtle pink gradient border
+  border_light: `rgba(0, 212, 255, 0.08)`,  // Subtle cyan border
+} as const;
+
+export type ThemeType = 'light' | 'charcoal';
+
+// Theme color map for runtime switching
+export const themeColorMap: Record<ThemeType, Record<string, string>> = {
+  light: lightThemeColors,
+  charcoal: charcoalGreyThemeColors,
+} as const;
+
+// Helper function to get colors for a specific theme
+export const getThemeColors = (theme: ThemeType) => themeColorMap[theme] as typeof charcoalGreyThemeColors;
+
+// Default to charcoal grey theme
+export const colors = charcoalGreyThemeColors;
 
 export const spacing = {
   // Spacing scale - More generous for better aesthetics

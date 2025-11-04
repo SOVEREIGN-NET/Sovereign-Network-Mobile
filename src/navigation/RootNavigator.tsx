@@ -16,7 +16,6 @@ import ProfileEditScreen from '../screens/ProfileEditScreen';
 import IdentitySettingsScreen from '../screens/IdentitySettingsScreen';
 import WalletScreen from '../screens/WalletScreen';
 import DAOScreen from '../screens/DAOScreen';
-import BrowserScreen from '../screens/BrowserScreen';
 import SendTokensScreen from '../screens/SendTokensScreen';
 import ReceiveTokensScreen from '../screens/ReceiveTokensScreen';
 import ConfirmTransactionScreen from '../screens/ConfirmTransactionScreen';
@@ -36,26 +35,23 @@ const DashboardStack = () => {
   return (
     <Stack.Navigator
       screenOptions={{
-        headerShown: true,
-        headerStyle: {
-          backgroundColor: colors.bg_dark,
-        },
-        headerTintColor: colors.primary,
-        headerTitleStyle: {
-          fontWeight: 'bold',
-          color: colors.text_primary,
-        },
+        headerShown: false,
       } as any}
     >
       <Stack.Screen
         name="DashboardMain"
         component={DashboardScreen}
-        options={{ title: 'ZHTP Dashboard' }}
+        options={{
+          headerShown: false,
+        }}
       />
       <Stack.Screen
         name="ClaimUBI"
         component={ClaimUBIScreen}
-        options={{ title: 'Claim UBI', headerBackTitle: 'Back' }}
+        options={{
+          title: 'Claim UBI',
+          headerBackTitle: 'Back',
+        }}
       />
     </Stack.Navigator>
   );
@@ -65,21 +61,13 @@ const IdentityStack = () => {
   return (
     <Stack.Navigator
       screenOptions={{
-        headerShown: true,
-        headerStyle: {
-          backgroundColor: colors.bg_dark,
-        },
-        headerTintColor: colors.primary,
-        headerTitleStyle: {
-          fontWeight: 'bold',
-          color: colors.text_primary,
-        },
+        headerShown: false,
       }}
     >
       <Stack.Screen
         name="IdentityMain"
         component={IdentityScreen}
-        options={{ title: 'ZK-DID Identity' }}
+        options={{ headerShown: false }}
       />
       <Stack.Screen
         name="ProfileEdit"
@@ -115,25 +103,17 @@ const IdentityStack = () => {
   );
 };
 
-const WalletStack = () => {
+const SIDStack = () => {
   return (
     <Stack.Navigator
       screenOptions={{
-        headerShown: true,
-        headerStyle: {
-          backgroundColor: colors.bg_dark,
-        },
-        headerTintColor: colors.primary,
-        headerTitleStyle: {
-          fontWeight: 'bold',
-          color: colors.text_primary,
-        },
+        headerShown: false,
       }}
     >
       <Stack.Screen
-        name="WalletMain"
+        name="SIDMain"
         component={WalletScreen}
-        options={{ title: 'Quantum Wallet' }}
+        options={{ headerShown: false }}
       />
       <Stack.Screen
         name="SendTokens"
@@ -163,21 +143,13 @@ const DAOStack = () => {
   return (
     <Stack.Navigator
       screenOptions={{
-        headerShown: true,
-        headerStyle: {
-          backgroundColor: colors.bg_dark,
-        },
-        headerTintColor: colors.primary,
-        headerTitleStyle: {
-          fontWeight: 'bold',
-          color: colors.text_primary,
-        },
+        headerShown: false,
       }}
     >
       <Stack.Screen
         name="DAOMain"
         component={DAOScreen}
-        options={{ title: 'DAO Governance' }}
+        options={{ headerShown: false }}
       />
       <Stack.Screen
         name="ProposalDetail"
@@ -198,29 +170,6 @@ const DAOStack = () => {
   );
 };
 
-const BrowserStack = () => {
-  return (
-    <Stack.Navigator
-      screenOptions={{
-        headerShown: true,
-        headerStyle: {
-          backgroundColor: colors.bg_dark,
-        },
-        headerTintColor: colors.primary,
-        headerTitleStyle: {
-          fontWeight: 'bold',
-          color: colors.text_primary,
-        },
-      }}
-    >
-      <Stack.Screen
-        name="BrowserMain"
-        component={BrowserScreen}
-        options={{ title: 'Web4 Browser' }}
-      />
-    </Stack.Navigator>
-  );
-};
 
 // Tab Icon Components - Simple geometric icons using Views
 const HomeIcon = ({ color }: { color: string }) => (
@@ -285,30 +234,21 @@ const RootNavigator = () => {
           } as any}
         />
         <Tab.Screen
-          name="BrowserTab"
-          component={BrowserStack}
-          options={{
-            title: 'Browser',
-            tabBarLabel: 'Browser',
-            tabBarIcon: GlobeIcon,
-          } as any}
-        />
-        <Tab.Screen
-          name="WalletTab"
-          component={WalletStack}
-          options={{
-            title: 'Wallet',
-            tabBarLabel: 'Wallet',
-            tabBarIcon: BriefcaseIcon,
-          } as any}
-        />
-        <Tab.Screen
           name="DAOTab"
           component={DAOStack}
           options={{
             title: 'DAO',
             tabBarLabel: 'DAO',
             tabBarIcon: VoteIcon,
+          } as any}
+        />
+        <Tab.Screen
+          name="SIDTab"
+          component={SIDStack}
+          options={{
+            title: 'SID',
+            tabBarLabel: 'SID',
+            tabBarIcon: BriefcaseIcon,
           } as any}
         />
         <Tab.Screen

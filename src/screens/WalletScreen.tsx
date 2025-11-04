@@ -3,7 +3,10 @@ import { View, TouchableOpacity, ScrollView } from 'react-native';
 import {
   Card,
   Text, LoadingView,
-  Column, ScreenLayout
+  Column, ScreenLayout,
+  HeaderBar,
+  SideDrawer,
+  DrawerItem,
 } from '../components';
 import SShieldLogo from '../components/atoms/Logo';
 import { useAuth } from '../hooks';
@@ -14,6 +17,42 @@ const WalletScreen = ({ navigation }: any) => {
   const { t } = useTranslation();
   const { currentIdentity, isLoading } = useAuth();
   const [activeTab, setActiveTab] = useState('Tokens');
+  const [drawerVisible, setDrawerVisible] = useState(false);
+
+  const drawerItems: DrawerItem[] = [
+    {
+      id: 'history',
+      label: 'History',
+      icon: '',
+      onPress: () => {
+        // TODO: Navigate to history
+      },
+    },
+    {
+      id: 'bookmarks',
+      label: 'Bookmarks',
+      icon: '',
+      onPress: () => {
+        // TODO: Navigate to bookmarks
+      },
+    },
+    {
+      id: 'favorites',
+      label: 'Favorites',
+      icon: '',
+      onPress: () => {
+        // TODO: Navigate to favorites
+      },
+    },
+    {
+      id: 'settings',
+      label: 'Settings',
+      icon: '',
+      onPress: () => {
+        navigation.navigate('AppSettings');
+      },
+    },
+  ];
 
   if (!currentIdentity || isLoading) {
     return <LoadingView />;
@@ -23,7 +62,22 @@ const WalletScreen = ({ navigation }: any) => {
   const selectedWallet = wallets[0];
 
   return (
-    <ScreenLayout paddingTop={spacing.md}>
+    <View style={{ flex: 1, backgroundColor: colors.bg_darkest }}>
+      <HeaderBar
+        onMenuPress={() => setDrawerVisible(true)}
+        onBLEPress={() => {
+          // TODO: Handle BLE connection
+        }}
+      />
+
+      <SideDrawer
+        visible={drawerVisible}
+        onClose={() => setDrawerVisible(false)}
+        items={drawerItems}
+        title="Menu"
+      />
+
+      <ScreenLayout paddingTop={spacing.md}>
       <ScrollView showsVerticalScrollIndicator={false}>
         <Column gap="lg" style={{ paddingBottom: spacing.xl }}>
           {/* Wallet Header */}
@@ -314,7 +368,8 @@ const WalletScreen = ({ navigation }: any) => {
           </View>
         </Column>
       </ScrollView>
-    </ScreenLayout>
+      </ScreenLayout>
+    </View>
   );
 };
 

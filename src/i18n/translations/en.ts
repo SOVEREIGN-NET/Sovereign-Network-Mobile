@@ -528,6 +528,29 @@ export const en = {
       total: 'Total',
       treasury: 'Treasury',
     },
+    governance: {
+      title: 'Governance & dApps',
+      section: 'Governance',
+      activeProposals: 'Active Proposals',
+      proposalsWaiting: '{count} proposals waiting for your vote',
+      noProposals: 'No active proposals',
+      viewProposals: 'View Proposals',
+    },
+    dapps: {
+      title: 'Native dApps',
+      defiHub: 'DeFi Hub',
+      defiHubDesc: 'Decentralized finance platform',
+      defiHubAction: 'Launch DeFi Hub',
+      gameFi: 'GameFi Arena',
+      gamefiDesc: 'Play-to-earn gaming platform',
+      gamefiAction: 'Launch GameFi',
+      nftMarketplace: 'NFT Marketplace',
+      nftDesc: 'Trade digital collectibles',
+      nftAction: 'Launch Marketplace',
+      socialGraph: 'Social Graph',
+      socialDesc: 'Decentralized social network',
+      socialAction: 'Launch Social',
+    },
     proposals: {
       title: 'Active Proposals',
       votes: 'For: {votesFor} • Against: {votesAgainst} • Abstain: {votesAbstain}',
@@ -744,6 +767,13 @@ export const en = {
       clearTitle: 'Cache Cleared',
       clearMessage: 'Application cache has been cleared successfully.',
     },
+  },
+
+  // Header Bar
+  headerbar: {
+    ble: 'Start BLE',
+    connected: 'Connected',
+    offline: 'Offline',
   },
 
   // Browser Screen

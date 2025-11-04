@@ -1,10 +1,15 @@
 /**
  * DashboardScreen
- * Main dashboard with network status, identity, wallet, governance, and trending content
+ * Merged browser and dashboard screen with:
+ * - HeaderBar (hamburger menu, BLE button, connection status)
+ * - Search bar for browsing
+ * - Trending dApps, Tokens, and Bounties
+ * - Network status and dashboard content
  */
 
-import React from 'react';
-import { View, ScrollView } from 'react-native';
+import React, { useState } from 'react';
+import { View } from 'react-native';
+import LinearGradient from 'react-native-linear-gradient';
 import {
   Card,
   Text,
@@ -14,14 +19,21 @@ import {
   Row,
   ScreenLayout,
   Badge,
+  HeaderBar,
+  SideDrawer,
+  FormField,
+  DrawerItem,
 } from '../components';
+import SShieldLogo from '../components/atoms/Logo';
 import { useAsyncData } from '../hooks';
 import { useTranslation } from '../i18n';
 import MockDataService from '../services/MockDataService';
-import { colors, spacing, typography, borderRadius } from '../theme';
+import { colors, spacing, typography, borderRadius, gradientAccents } from '../theme';
 
-const DashboardScreen = ({ _navigation }: any) => {
+const DashboardScreen = ({ navigation }: any) => {
   const { t } = useTranslation();
+  const [drawerVisible, setDrawerVisible] = useState(false);
+  const [urlInput, setUrlInput] = useState('zhtp://network.sovereign');
 
   const { data, loading } = useAsyncData(
     async () => {
@@ -34,65 +46,112 @@ const DashboardScreen = ({ _navigation }: any) => {
     [],
   );
 
-  if (loading) {
+  if (loading && !data) {
     return <LoadingView message={t.dashboard.loadingMessage} />;
   }
 
-  const networkStatus = data?.networkStatus;
 
   // Get sample data from translations
   const trendingDapps = t.dashboard.trendingDapps.items;
   const trendingTokens = t.dashboard.trendingTokens.items;
   const trendingBounties = t.dashboard.bounties.items;
 
+  // Drawer menu items
+  const drawerItems: DrawerItem[] = [
+    {
+      id: 'history',
+      label: 'History',
+      icon: '',
+      onPress: () => {
+        // TODO: Navigate to history
+      },
+    },
+    {
+      id: 'bookmarks',
+      label: 'Bookmarks',
+      icon: '',
+      onPress: () => {
+        // TODO: Navigate to bookmarks
+      },
+    },
+    {
+      id: 'favorites',
+      label: 'Favorites',
+      icon: '',
+      onPress: () => {
+        // TODO: Navigate to favorites
+      },
+    },
+    {
+      id: 'settings',
+      label: 'Settings',
+      icon: '',
+      onPress: () => {
+        navigation.navigate('AppSettings');
+      },
+    },
+  ];
+
   return (
-    <ScreenLayout testID="dashboard-screen" paddingTop={10} paddingBottom={0}>
-      <ScrollView showsVerticalScrollIndicator={false} scrollEventThrottle={16}>
-        {/* Compact Network Status */}
-        <View
-          style={{
-            backgroundColor: colors.bg_darker,
-            borderRadius: borderRadius.md,
-            padding: spacing.md,
-            marginBottom: spacing.lg,
-            marginHorizontal: spacing.xxs,
-            marginTop: spacing.lg,
-          }}
-        >
-          <Row style={{ justifyContent: 'space-between', alignItems: 'center', marginBottom: spacing.sm }}>
-            <Row style={{ alignItems: 'center', gap: spacing.sm }}>
-              <Text style={{ fontSize: typography.size.md }}>⚡</Text>
-              <Text
-                style={{
-                  fontSize: typography.size.sm,
-                  fontWeight: typography.weight.semibold,
-                  color: colors.text_primary,
-                }}
-              >
-                {t.dashboard.networkStatus.title}
-              </Text>
-            </Row>
-            <Badge
-              label={networkStatus?.connected ? t.dashboard.networkStatus.connected : t.dashboard.networkStatus.offline}
-              variant={networkStatus?.connected ? 'success' : 'error'}
-              style={{ backgroundColor: colors.transparent }}
+    <View style={{ flex: 1, backgroundColor: colors.bg_darkest }}>
+      {/* Header Bar */}
+      <HeaderBar
+        onMenuPress={() => setDrawerVisible(true)}
+        onBLEPress={() => {
+          // TODO: Handle BLE connection
+        }}
+      />
+
+      {/* Side Drawer */}
+      <SideDrawer
+        visible={drawerVisible}
+        onClose={() => setDrawerVisible(false)}
+        items={drawerItems}
+        title="Menu"
+      />
+
+      {/* Main Content */}
+      <ScreenLayout
+        testID="dashboard-screen"
+        paddingTop={0}
+        paddingBottom={0}
+        contentContainerStyle={{ paddingBottom: 80 }}
+      >
+          {/* App Logo */}
+          <View
+            style={{
+              alignItems: 'center',
+              paddingTop: spacing.lg + 10,
+              paddingBottom: spacing.xxs,
+              shadowColor: gradientAccents.gradient_end,
+              shadowOffset: { width: 0, height: 6 },
+              shadowOpacity: 0.25,
+              shadowRadius: 10,
+              elevation: 6,
+            }}
+          >
+            <SShieldLogo size={100} />
+            {/* Subtle accent line below logo */}
+            <View style={{ height: 1, width: 120, marginTop: spacing.md, overflow: 'hidden' }}>
+              <LinearGradient
+                colors={[gradientAccents.gradient_start, gradientAccents.gradient_end]}
+                start={{ x: 0, y: 0 }}
+                end={{ x: 1, y: 0 }}
+                style={{ height: 1, opacity: 0.4 }}
+              />
+            </View>
+          </View>
+
+          {/* Search Bar */}
+          <View style={{ paddingHorizontal: spacing.xxs, paddingTop: 0, paddingBottom: spacing.md }}>
+            <FormField
+              label=""
+              placeholder="Search dApps, tokens..."
+              value={urlInput}
+              onChangeText={setUrlInput}
+              containerStyle={{ marginBottom: 0 }}
             />
-          </Row>
-          <Row style={{ justifyContent: 'space-between', flexWrap: 'wrap', gap: spacing.sm }}>
-            <Text style={{ fontSize: typography.size.xs, color: colors.text_secondary }}>
-              {t.dashboard.networkStatus.blockHeight}: {networkStatus?.nodeCount}
-            </Text>
-            <Text style={{ fontSize: typography.size.xs, color: colors.text_secondary }}>
-              {t.dashboard.networkStatus.peers}: --
-            </Text>
-            <Text style={{ fontSize: typography.size.xs, color: colors.text_secondary }}>
-              {t.dashboard.networkStatus.gasPrice}: --
-            </Text>
-            <Text style={{ fontSize: typography.size.xs, color: colors.text_secondary }}>
-              {t.dashboard.networkStatus.tps}: --
-            </Text>
-          </Row>
-        </View>
+          </View>
 
         {/* Trending dApps */}
         <Card style={{ marginHorizontal: spacing.xxs, marginBottom: spacing.lg }}>
@@ -267,8 +326,8 @@ const DashboardScreen = ({ _navigation }: any) => {
             </Button>
           </Column>
         </Card>
-      </ScrollView>
-    </ScreenLayout>
+      </ScreenLayout>
+    </View>
   );
 };
 
