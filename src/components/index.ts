@@ -55,6 +55,8 @@ export {
   ActionFooter,
   SelectableOptionCard,
   TabSelector,
+  HeaderBar,
+  SideDrawer,
 } from './molecules';
 export type {
   DetailRowProps,
@@ -84,6 +86,9 @@ export type {
   SelectableOptionCardProps,
   TabSelectorProps,
   TabOption,
+  HeaderBarProps,
+  SideDrawerProps,
+  DrawerItem,
 } from './molecules';
 
 // Organisms

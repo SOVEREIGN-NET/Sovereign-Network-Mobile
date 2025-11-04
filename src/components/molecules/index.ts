@@ -59,3 +59,9 @@ export type { SelectableOptionCardProps } from './SelectableOptionCard';
 
 export { TabSelector } from './TabSelector';
 export type { TabSelectorProps, TabOption } from './TabSelector';
+
+export { HeaderBar } from './HeaderBar';
+export type { HeaderBarProps } from './HeaderBar';
+
+export { SideDrawer } from './SideDrawer';
+export type { SideDrawerProps, DrawerItem } from './SideDrawer';

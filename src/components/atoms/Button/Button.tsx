@@ -7,7 +7,7 @@ import {
   TextStyle,
   ActivityIndicator,
 } from 'react-native';
-import { colors, spacing, borderRadius, typography } from '../../../theme';
+import { colors, spacing, borderRadius, typography, gradientAccents } from '../../../theme';
 
 export type ButtonVariant = 'primary' | 'secondary' | 'outline' | 'danger';
 export type ButtonSize = 'sm' | 'md' | 'lg';
@@ -35,7 +35,7 @@ const styles = StyleSheet.create({
   primaryButton: {
     backgroundColor: colors.transparent,
     borderWidth: 1,
-    borderColor: colors.primary,
+    borderColor: gradientAccents.gradient_end,
   },
   primaryButtonDisabled: {
     backgroundColor: colors.transparent,
@@ -75,7 +75,7 @@ const styles = StyleSheet.create({
   outlineButton: {
     backgroundColor: colors.transparent,
     borderWidth: 1,
-    borderColor: colors.primary,
+    borderColor: gradientAccents.gradient_start,
   },
   outlineButtonDisabled: {
     borderColor: colors.text_tertiary,
@@ -239,7 +239,7 @@ export const Button = React.memo(
         activeOpacity={0.7}
         testID={testID}
       >
-        {loading && <ActivityIndicator size="small" color={colors.primary} />}
+        {loading && <ActivityIndicator size="small" color={gradientAccents.gradient_end} />}
         {renderChildren()}
       </TouchableOpacity>
     );

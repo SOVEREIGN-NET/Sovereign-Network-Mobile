@@ -6,7 +6,7 @@
 import React from 'react';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
 import { StatusBar, View } from 'react-native';
-import { AuthProvider, AuthContext } from './src/context/AuthContext';
+import { AuthProvider, AuthContext, ThemeProvider, useTheme } from './src/context';
 import RootNavigator from './src/navigation/RootNavigator';
 import AuthNavigator from './src/navigation/AuthNavigator';
 import { colors } from './src/theme';
@@ -64,15 +64,30 @@ function AppContent() {
 }
 
 /**
+ * App content with theme context available
+ */
+function AppWithTheme() {
+  const { colors: themeColors } = useTheme();
+
+  return (
+    <>
+      <StatusBar barStyle="light-content" backgroundColor={themeColors.bg_darkest} />
+      <AuthProvider>
+        <AppContent />
+      </AuthProvider>
+    </>
+  );
+}
+
+/**
  * Root App component with providers
  */
 function App() {
   return (
     <SafeAreaProvider>
-      <StatusBar barStyle="light-content" backgroundColor="#0f0f1e" />
-      <AuthProvider>
-        <AppContent />
-      </AuthProvider>
+      <ThemeProvider>
+        <AppWithTheme />
+      </ThemeProvider>
     </SafeAreaProvider>
   );
 }
