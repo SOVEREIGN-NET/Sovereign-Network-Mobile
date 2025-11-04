@@ -97,6 +97,8 @@ Thumbs.db
 # Build outputs
 *.apk
 *.ipa
+android/app/src/main/assets/index.android.bundle
+ios/Podfile.lock
 
 # Watchman
 .watchman-cookie_

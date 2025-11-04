@@ -6,12 +6,13 @@
 import React from 'react';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
 import { StatusBar, View } from 'react-native';
-import { AuthProvider, AuthContext, ThemeProvider, useTheme } from './src/context';
+import { AuthProvider, AuthContext, ThemeProvider, useTheme, ApiProvider } from './src/context';
 import RootNavigator from './src/navigation/RootNavigator';
 import AuthNavigator from './src/navigation/AuthNavigator';
 import { colors } from './src/theme';
 import { Text } from './src/components'; // NavigationContainer is handled by each navigator
 import { useTranslation } from './src/i18n';
+import { config } from './src/config';
 
 /**
  * AppContent component that uses auth context to determine which navigator to show
@@ -86,7 +87,9 @@ function App() {
   return (
     <SafeAreaProvider>
       <ThemeProvider>
-        <AppWithTheme />
+        <ApiProvider zhtpNodeUrl={config.ZHTP_NODE_URL}>
+          <AppWithTheme />
+        </ApiProvider>
       </ThemeProvider>
     </SafeAreaProvider>
   );
