@@ -12,15 +12,32 @@ import {
   SideDrawer,
   DrawerItem,
 } from '../components';
-import { useAuth } from '../hooks';
+import { useAuth, useApi, useAsyncData } from '../hooks';
 import { useTranslation } from '../i18n';
 import { colors, spacing, typography, borderRadius } from '../theme';
 
 const IdentityScreen = ({ navigation }: any) => {
   const { t } = useTranslation();
   const { currentIdentity, signOut, isLoading: authLoading } = useAuth();
+  const { api, isInitialized } = useApi();
   const [loggingOut, setLoggingOut] = useState(false);
   const [drawerVisible, setDrawerVisible] = useState(false);
+
+  // Fetch identity details from API when identity changes
+  useAsyncData(
+    async () => {
+      try {
+        if (api && isInitialized && currentIdentity) {
+          const identity = await api.getIdentity(currentIdentity.did);
+          return identity;
+        }
+      } catch (error) {
+        console.warn('Failed to fetch identity details from API:', error);
+      }
+      return null;
+    },
+    [api, isInitialized, currentIdentity],
+  );
 
   const drawerItems: DrawerItem[] = [
     {

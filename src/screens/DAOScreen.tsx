@@ -11,13 +11,14 @@ import {
   SideDrawer,
   DrawerItem
 } from '../components';
-import { useAsyncData } from '../hooks';
+import { useAsyncData, useApi } from '../hooks';
 import { useTranslation } from '../i18n';
 import MockDataService from '../services/MockDataService';
 import { colors, spacing, typography } from '../theme';
 
 const DAOScreen = ({ navigation }: any) => {
   const { t } = useTranslation();
+  const { api, isInitialized } = useApi();
   const [drawerVisible, setDrawerVisible] = useState(false);
 
   const drawerItems: DrawerItem[] = [
@@ -57,13 +58,25 @@ const DAOScreen = ({ navigation }: any) => {
 
   const { data, loading } = useAsyncData(
     async () => {
+      try {
+        if (api && isInitialized) {
+          // Fetch real DAO data from API
+          const proposals = await api.getDaoProposals();
+          const daoStats = await api.getDaoStats();
+          return { proposals, daoStats };
+        }
+      } catch (error) {
+        console.warn('Failed to fetch DAO data, using mock:', error);
+      }
+
+      // Fallback to mock data
       await new Promise<void>(resolve => setTimeout(() => resolve(), 600));
       return {
         proposals: MockDataService.getProposals(),
         daoStats: MockDataService.getDAOStats(),
       };
     },
-    [],
+    [api, isInitialized],
   );
 
   if (loading) {
@@ -99,7 +112,7 @@ const DAOScreen = ({ navigation }: any) => {
           <View style={{ flexDirection: 'row', gap: spacing.md, paddingHorizontal: spacing.xxs }}>
             <StatBox
               label={t.dao.statistics.members}
-              value={daoStats.totalMembers?.toString() || '0'}
+              value={daoStats.delegates?.toString() || '0'}
               style={{ flex: 1 }}
             />
             <StatBox
@@ -116,7 +129,7 @@ const DAOScreen = ({ navigation }: any) => {
           <View style={{ paddingHorizontal: spacing.xxs }}>
             <StatBox
               label={t.dao.statistics.treasury}
-              value={`${(daoStats.treasuryBalance || 0).toFixed(0)} ZHTP`}
+              value={`${(daoStats.treasury || 0).toFixed(0)} ZHTP`}
               style={{ width: '100%' }}
             />
           </View>

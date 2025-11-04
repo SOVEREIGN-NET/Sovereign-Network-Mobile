@@ -46,10 +46,11 @@ export interface Proposal {
 }
 
 export interface DAOStats {
-  totalMembers: number;
-  treasuryBalance: number;
-  activeProposals: number;
   totalProposals: number;
+  activeProposals: number;
+  treasury: number;
+  delegates: number;
+  participationRate: number;
 }
 
 export interface NetworkStatus {
@@ -84,7 +85,7 @@ class MockDataService {
         id: 'wallet-1',
         name: 'Primary Wallet',
         address: 'zhtp1acdefghijklmnopqrstuvwxyz',
-        balance: 150250.50,
+        balance: 150250.59,
         currency: 'ZHTP',
         type: 'primary',
       },
@@ -92,7 +93,7 @@ class MockDataService {
         id: 'wallet-2',
         name: 'UBI Wallet',
         address: 'zhtp1bcdefghijklmnopqrstuvwxyz',
-        balance: 1250.00,
+        balance: 1250.01,
         currency: 'ZHTP',
         type: 'ubi',
       },
@@ -100,7 +101,7 @@ class MockDataService {
         id: 'wallet-3',
         name: 'Savings Wallet',
         address: 'zhtp1ccdefghijklmnopqrstuvwxyz',
-        balance: 50000.00,
+        balance: 50000.01,
         currency: 'ZHTP',
         type: 'savings',
       },
@@ -116,7 +117,7 @@ class MockDataService {
         id: 'tx-001',
         from: 'zhtp1acdefghijklmnopqrstuvwxyz',
         to: 'zhtp1dcdefghijklmnopqrstuvwxyz',
-        amount: 100.00,
+        amount: 100.09,
         currency: 'ZHTP',
         timestamp: '2024-10-25T14:30:00Z',
         status: 'confirmed',
@@ -126,7 +127,7 @@ class MockDataService {
         id: 'tx-002',
         from: 'zhtp1ecdefghijklmnopqrstuvwxyz',
         to: 'zhtp1acdefghijklmnopqrstuvwxyz',
-        amount: 250.00,
+        amount: 250.01,
         currency: 'ZHTP',
         timestamp: '2024-10-24T10:15:00Z',
         status: 'confirmed',
@@ -136,7 +137,7 @@ class MockDataService {
         id: 'tx-003',
         from: 'zhtp1acdefghijklmnopqrstuvwxyz',
         to: 'dao.zhtp',
-        amount: 500.00,
+        amount: 500.03,
         currency: 'ZHTP',
         timestamp: '2024-10-23T09:45:00Z',
         status: 'confirmed',
@@ -146,7 +147,7 @@ class MockDataService {
         id: 'tx-004',
         from: 'ubi.zhtp',
         to: 'zhtp1acdefghijklmnopqrstuvwxyz',
-        amount: 50.00,
+        amount: 50.02,
         currency: 'ZHTP',
         timestamp: '2024-10-22T00:00:00Z',
         status: 'confirmed',
@@ -206,10 +207,11 @@ class MockDataService {
    */
   static getDAOStats(): DAOStats {
     return {
-      totalMembers: 5432,
-      treasuryBalance: 2500000,
-      activeProposals: 2,
       totalProposals: 47,
+      activeProposals: 2,
+      treasury: 2500000,
+      delegates: 156,
+      participationRate: 0.73,
     };
   }
 
@@ -259,7 +261,7 @@ class MockDataService {
     return {
       success: true,
       message: 'UBI claimed successfully',
-      amount: 50.00,
+      amount: 50.06,
       nextClaimTime: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString(),
     };
   }

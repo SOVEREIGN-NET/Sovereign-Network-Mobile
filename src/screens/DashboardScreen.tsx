@@ -25,25 +25,41 @@ import {
   DrawerItem,
 } from '../components';
 import SShieldLogo from '../components/atoms/Logo';
-import { useAsyncData } from '../hooks';
+import { useAsyncData, useApi } from '../hooks';
 import { useTranslation } from '../i18n';
 import MockDataService from '../services/MockDataService';
 import { colors, spacing, typography, borderRadius, gradientAccents } from '../theme';
 
 const DashboardScreen = ({ navigation }: any) => {
   const { t } = useTranslation();
+  const { api, isInitialized } = useApi();
   const [drawerVisible, setDrawerVisible] = useState(false);
   const [urlInput, setUrlInput] = useState('zhtp://network.sovereign');
 
   const { data, loading } = useAsyncData(
     async () => {
+      try {
+        if (api && isInitialized) {
+          // Fetch real network info from API
+          const networkInfo = await api.getNetworkInfo();
+          const daoStats = await api.getDaoStats();
+          return {
+            networkStatus: networkInfo,
+            daoStats: daoStats,
+          };
+        }
+      } catch (error) {
+        console.warn('Failed to fetch real data, using mock:', error);
+      }
+
+      // Fallback to mock data
       await new Promise<void>(resolve => setTimeout(() => resolve(), 800));
       return {
         networkStatus: MockDataService.getNetworkStatus(),
         daoStats: MockDataService.getDAOStats(),
       };
     },
-    [],
+    [api, isInitialized],
   );
 
   if (loading && !data) {

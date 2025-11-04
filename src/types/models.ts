@@ -49,12 +49,13 @@ export interface Proposal {
   category: 'governance' | 'funding' | 'technical';
 }
 
-// DAO Statistics
+// DAO Statistics (matches API client DaoStats)
 export interface DAOStats {
-  totalMembers: number;
-  treasuryBalance: number;
-  activeProposals: number;
   totalProposals: number;
+  activeProposals: number;
+  treasury: number;
+  delegates: number;
+  participationRate: number;
 }
 
 // Network Status
