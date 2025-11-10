@@ -8,6 +8,12 @@ import { Platform } from 'react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { NativeStorage } from '../services/NativeStorage';
 import MockAuthService, { Identity } from '../services/MockAuthService';
+import RealAuthService from '../services/RealAuthService';
+
+// Toggle between mock and real auth service
+// Set to false to use real API backend
+const USE_MOCK_SERVICE = __DEV__; // Use mock in development, real in production
+const AuthService = USE_MOCK_SERVICE ? MockAuthService : RealAuthService;
 
 // Use native storage on Android, AsyncStorage on iOS
 const storage = Platform.OS === 'android' ? NativeStorage : AsyncStorage;
@@ -65,14 +71,21 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
   }, []);
 
   /**
-   * Sign in with DID and passphrase
+   * Sign in with DID and passphrase (or identity_id and password for real service)
    */
   const signIn = useCallback(async (did: string, passphrase: string) => {
     setError(null);
     setIsLoading(true);
 
     try {
-      const identity = await MockAuthService.signIn({ did, passphrase });
+      let identity: Identity;
+
+      if (USE_MOCK_SERVICE) {
+        identity = await MockAuthService.signIn({ did, passphrase });
+      } else {
+        // For real service, did is actually identity_id and passphrase is password
+        identity = await RealAuthService.signIn({ identity_id: did, password: passphrase });
+      }
 
       // Save to storage
       await storage.setItem('zhtp_identity', JSON.stringify(identity));
@@ -95,7 +108,20 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
     setIsLoading(true);
 
     try {
-      const identity = await MockAuthService.createIdentity(data);
+      let identity: Identity;
+
+      if (USE_MOCK_SERVICE) {
+        identity = await MockAuthService.createIdentity(data);
+      } else {
+        // Map mock data to real service format
+        const realData = {
+          display_name: data.displayName,
+          password: data.passphrase || '',
+          identity_type: data.identityType,
+          recovery_options: [],
+        };
+        identity = await RealAuthService.createIdentity(realData);
+      }
 
       // Save to storage
       await storage.setItem('zhtp_identity', JSON.stringify(identity));
@@ -119,15 +145,16 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
 
     try {
       let identity: Identity;
+      const service = USE_MOCK_SERVICE ? MockAuthService : RealAuthService;
 
       if (method === 'seed') {
-        identity = await MockAuthService.recoverWithSeed(data);
+        identity = await service.recoverWithSeed(data);
       } else if (method === 'backup') {
         // For backup, data is JSON string + password
         const [fileContent, password] = data.split('|||');
-        identity = await MockAuthService.recoverWithBackup(fileContent, password);
+        identity = await service.recoverWithBackup(fileContent, password);
       } else if (method === 'social') {
-        identity = await MockAuthService.recoverWithSocial(data);
+        identity = await service.recoverWithSocial(data);
       } else {
         throw new Error('Unknown recovery method');
       }

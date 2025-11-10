@@ -4,6 +4,15 @@
  * TODO: Replace with real ZHTP API calls when backend is ready
  */
 
+export interface WalletInfo {
+  id: string;
+  wallet_type: string;
+  name: string;
+  balance: number;
+  staked_balance: number;
+  pending_rewards: number;
+}
+
 export interface Identity {
   did: string;
   displayName: string;
@@ -14,11 +23,25 @@ export interface Identity {
   citizenship?: boolean;
   publicKey?: string;
   biometricHash?: string;
-  wallets?: Wallet[];
+  wallets?: {
+    primary: WalletInfo;
+    ubi: WalletInfo;
+    savings: WalletInfo;
+  };
+  daoMembership?: {
+    votingPower: number;
+    soulboundNftIssued: boolean;
+  };
+  seedPhrases?: {
+    primary: string[];
+    ubi: string[];
+    savings: string[];
+  };
   votingPower?: number;
   ubiEarned?: number;
 }
 
+// Keep old Wallet interface for backwards compatibility
 export interface Wallet {
   id: string;
   name: string;
@@ -57,14 +80,36 @@ const MOCK_IDENTITIES: Record<string, Identity> = {
     avatar: '👤',
     createdAt: '2025-10-15T08:00:00Z',
     citizenship: true,
-    wallets: [
-      {
-        id: 'wallet_001',
+    wallets: {
+      primary: {
+        id: 'wallet_primary_001',
+        wallet_type: 'Primary',
         name: 'Primary Wallet',
         balance: 5000,
-        address: 'zhtp1a2b3c4d5e6f7g8h9i0j',
+        staked_balance: 0,
+        pending_rewards: 0,
       },
-    ],
+      ubi: {
+        id: 'wallet_ubi_001',
+        wallet_type: 'UBI',
+        name: 'UBI Wallet',
+        balance: 150.5,
+        staked_balance: 0,
+        pending_rewards: 0,
+      },
+      savings: {
+        id: 'wallet_savings_001',
+        wallet_type: 'Savings',
+        name: 'Savings Wallet',
+        balance: 0,
+        staked_balance: 0,
+        pending_rewards: 0,
+      },
+    },
+    daoMembership: {
+      votingPower: 1000,
+      soulboundNftIssued: true,
+    },
     votingPower: 1000,
     ubiEarned: 150.5,
   },
@@ -76,14 +121,36 @@ const MOCK_IDENTITIES: Record<string, Identity> = {
     avatar: '🏢',
     createdAt: '2025-10-16T10:30:00Z',
     citizenship: false,
-    wallets: [
-      {
-        id: 'wallet_002',
+    wallets: {
+      primary: {
+        id: 'wallet_primary_002',
+        wallet_type: 'Primary',
         name: 'Treasury',
         balance: 50000,
-        address: 'zhtp1x9y8z7w6v5u4t3s2r1',
+        staked_balance: 0,
+        pending_rewards: 0,
       },
-    ],
+      ubi: {
+        id: 'wallet_ubi_002',
+        wallet_type: 'UBI',
+        name: 'UBI Wallet',
+        balance: 0,
+        staked_balance: 0,
+        pending_rewards: 0,
+      },
+      savings: {
+        id: 'wallet_savings_002',
+        wallet_type: 'Savings',
+        name: 'Savings Wallet',
+        balance: 0,
+        staked_balance: 0,
+        pending_rewards: 0,
+      },
+    },
+    daoMembership: {
+      votingPower: 5000,
+      soulboundNftIssued: false,
+    },
     votingPower: 5000,
   },
 };
@@ -187,14 +254,36 @@ class MockAuthService {
       avatar: this.getAvatarForType(data.identityType),
       createdAt: new Date().toISOString(),
       citizenship: data.identityType === 'citizen',
-      wallets: [
-        {
-          id: 'wallet_' + this.generateMockId(),
+      wallets: {
+        primary: {
+          id: 'wallet_primary_' + this.generateMockId(),
+          wallet_type: 'Primary',
           name: 'Primary Wallet',
-          balance: data.identityType === 'citizen' ? 100 : 0,
-          address: this.generateMockAddress(),
+          balance: data.identityType === 'citizen' ? 5000 : 0, // Welcome bonus
+          staked_balance: 0,
+          pending_rewards: 0,
         },
-      ],
+        ubi: {
+          id: 'wallet_ubi_' + this.generateMockId(),
+          wallet_type: 'UBI',
+          name: 'UBI Wallet',
+          balance: 0,
+          staked_balance: 0,
+          pending_rewards: 0,
+        },
+        savings: {
+          id: 'wallet_savings_' + this.generateMockId(),
+          wallet_type: 'Savings',
+          name: 'Savings Wallet',
+          balance: 0,
+          staked_balance: 0,
+          pending_rewards: 0,
+        },
+      },
+      daoMembership: data.identityType === 'citizen' ? {
+        votingPower: 1,
+        soulboundNftIssued: true,
+      } : undefined,
       votingPower: data.identityType === 'citizen' ? 1 : 0,
       ubiEarned: 0,
     };
