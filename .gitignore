@@ -107,3 +107,6 @@ ios/Podfile.lock
 /docs/
 CLAUDE.md
 android/app/src/main/res/drawable-mdpi/node_modules_reactnavigation_elements_lib_module_assets_backicon.png
+.github/workflows/build-and-distribute-ios.yml
+.github/workflows/build-and-distribute-android.yml
+.github/CI_CD_SETUP.md
