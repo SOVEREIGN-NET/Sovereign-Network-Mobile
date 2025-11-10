@@ -84,7 +84,7 @@ interface ApiProviderProps {
  */
 export const ApiProvider: React.FC<ApiProviderProps> = ({
   children,
-  zhtpNodeUrl = 'http://192.168.1.31:8000',
+  zhtpNodeUrl = 'http://192.168.1.31:9333',
   networkType = 'testnet',
 }) => {
   const [api, setApi] = useState<ZhtpApi | null>(null);
