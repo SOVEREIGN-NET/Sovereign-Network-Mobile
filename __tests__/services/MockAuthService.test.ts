@@ -88,13 +88,19 @@ describe('MockAuthService', () => {
       );
     });
 
-    it('should return identity with wallets', async () => {
+    it('should return identity with three wallets', async () => {
       const credentials = authService.getDemoCredentials();
       const identity = await authService.signIn(credentials);
 
       expect(identity.wallets).toBeDefined();
-      expect(Array.isArray(identity.wallets)).toBe(true);
-      expect(identity.wallets!.length).toBeGreaterThan(0);
+      expect(identity.wallets!.primary).toBeDefined();
+      expect(identity.wallets!.ubi).toBeDefined();
+      expect(identity.wallets!.savings).toBeDefined();
+
+      // Verify wallet structure
+      expect(identity.wallets!.primary.wallet_type).toBe('Primary');
+      expect(identity.wallets!.ubi.wallet_type).toBe('UBI');
+      expect(identity.wallets!.savings.wallet_type).toBe('Savings');
     });
 
     it('should return identity with voting power', async () => {
@@ -216,11 +222,16 @@ describe('MockAuthService', () => {
       expect(identity.username).toBe(data.username);
     });
 
-    it('should return identity with wallet', async () => {
+    it('should return identity with three wallets', async () => {
       const identity = await authService.createIdentity(getValidCreateData());
 
       expect(identity.wallets).toBeDefined();
-      expect(identity.wallets!.length).toBeGreaterThan(0);
+      expect(identity.wallets!.primary).toBeDefined();
+      expect(identity.wallets!.ubi).toBeDefined();
+      expect(identity.wallets!.savings).toBeDefined();
+
+      // Verify 5000 ZHTP welcome bonus for citizens
+      expect(identity.wallets!.primary.balance).toBe(5000);
     });
 
     it('should set citizenship for citizen type', async () => {
@@ -236,6 +247,26 @@ describe('MockAuthService', () => {
       });
 
       expect(identity.votingPower).toBeGreaterThan(0);
+    });
+
+    it('should set DAO membership for citizens', async () => {
+      const identity = await authService.createIdentity({
+        ...getValidCreateData(),
+        identityType: 'citizen',
+      });
+
+      expect(identity.daoMembership).toBeDefined();
+      expect(identity.daoMembership!.votingPower).toBe(1);
+      expect(identity.daoMembership!.soulboundNftIssued).toBe(true);
+    });
+
+    it('should not set DAO membership for non-citizens', async () => {
+      const identity = await authService.createIdentity({
+        ...getValidCreateData(),
+        identityType: 'organization',
+      });
+
+      expect(identity.daoMembership).toBeUndefined();
     });
   });
 
