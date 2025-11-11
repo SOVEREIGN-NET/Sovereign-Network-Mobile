@@ -8,12 +8,17 @@ import { Platform } from 'react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { NativeStorage } from '../services/NativeStorage';
 import MockAuthService, { Identity } from '../services/MockAuthService';
-import RealAuthService from '../services/RealAuthService';
+import type { CreateIdentityData } from '../services/RealAuthService';
 
 // Toggle between mock and real auth service
 // Set to false to use real API backend
 const USE_MOCK_SERVICE = __DEV__; // Use mock in development, real in production
-const AuthService = USE_MOCK_SERVICE ? MockAuthService : RealAuthService;
+
+// Only import RealAuthService in production to avoid initialization errors in dev
+let RealAuthService: any = null;
+if (!USE_MOCK_SERVICE) {
+  RealAuthService = require('../services/RealAuthService').default;
+}
 
 // Use native storage on Android, AsyncStorage on iOS
 const storage = Platform.OS === 'android' ? NativeStorage : AsyncStorage;
@@ -23,8 +28,8 @@ export interface AuthContextType {
   isAuthenticated: boolean;
   isLoading: boolean;
   error: string | null;
-  signIn: (did: string, passphrase: string) => Promise<void>;
-  createIdentity: (data: any) => Promise<void>;
+  signIn: (identity_id: string, password: string) => Promise<void>;
+  createIdentity: (data: CreateIdentityData) => Promise<void>;
   recoverIdentity: (method: string, data: string) => Promise<void>;
   signOut: () => Promise<void>;
   clearError: () => void;
@@ -71,9 +76,9 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
   }, []);
 
   /**
-   * Sign in with DID and passphrase (or identity_id and password for real service)
+   * Sign in with identity_id and password
    */
-  const signIn = useCallback(async (did: string, passphrase: string) => {
+  const signIn = useCallback(async (identity_id: string, password: string) => {
     setError(null);
     setIsLoading(true);
 
@@ -81,10 +86,9 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
       let identity: Identity;
 
       if (USE_MOCK_SERVICE) {
-        identity = await MockAuthService.signIn({ did, passphrase });
+        identity = await MockAuthService.signIn({ did: identity_id, passphrase: password });
       } else {
-        // For real service, did is actually identity_id and passphrase is password
-        identity = await RealAuthService.signIn({ identity_id: did, password: passphrase });
+        identity = await RealAuthService!.signIn({ identity_id, password });
       }
 
       // Save to storage
@@ -103,7 +107,7 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
   /**
    * Create a new identity
    */
-  const createIdentity = useCallback(async (data: any) => {
+  const createIdentity = useCallback(async (data: CreateIdentityData) => {
     setError(null);
     setIsLoading(true);
 
@@ -111,16 +115,18 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
       let identity: Identity;
 
       if (USE_MOCK_SERVICE) {
-        identity = await MockAuthService.createIdentity(data);
+        const identityType: 'citizen' | 'organization' | 'developer' | 'validator' =
+          data.identity_type as 'citizen' | 'organization' | 'developer' | 'validator';
+
+        identity = await MockAuthService.createIdentity({
+          displayName: data.display_name,
+          passphrase: data.password,
+          identityType: identityType || 'citizen',
+          username: data.display_name.toLowerCase().replaceAll(/\s+/g, '_'),
+          acceptedTerms: true,
+        });
       } else {
-        // Map mock data to real service format
-        const realData = {
-          display_name: data.displayName,
-          password: data.passphrase || '',
-          identity_type: data.identityType,
-          recovery_options: [],
-        };
-        identity = await RealAuthService.createIdentity(realData);
+        identity = await RealAuthService.createIdentity(data);
       }
 
       // Save to storage
@@ -145,16 +151,25 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
 
     try {
       let identity: Identity;
-      const service = USE_MOCK_SERVICE ? MockAuthService : RealAuthService;
 
-      if (method === 'seed') {
-        identity = await service.recoverWithSeed(data);
+      if (USE_MOCK_SERVICE) {
+        if (method === 'seed') {
+          identity = await MockAuthService.recoverWithSeed(data);
+        } else if (method === 'backup') {
+          const [fileContent, password] = data.split('|||');
+          identity = await MockAuthService.recoverWithBackup(fileContent, password);
+        } else if (method === 'social') {
+          identity = await MockAuthService.recoverWithSocial(data);
+        } else {
+          throw new Error('Unknown recovery method');
+        }
+      } else if (method === 'seed') {
+        identity = await RealAuthService.recoverWithSeed(data);
       } else if (method === 'backup') {
-        // For backup, data is JSON string + password
         const [fileContent, password] = data.split('|||');
-        identity = await service.recoverWithBackup(fileContent, password);
+        identity = await RealAuthService.recoverWithBackup(fileContent, password);
       } else if (method === 'social') {
-        identity = await service.recoverWithSocial(data);
+        identity = await RealAuthService.recoverWithSocial(data);
       } else {
         throw new Error('Unknown recovery method');
       }

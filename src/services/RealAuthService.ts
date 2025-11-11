@@ -3,7 +3,8 @@
  * Integrates with ZHTP API backend for actual identity operations
  */
 
-import { ZhtpApi, Identity, SignupRequest, LoginRequest } from '@sovereign-net/api-client';
+import { ZhtpApi, ReactNativeConfigProvider, Identity, SignupRequest, LoginRequest } from '@sovereign-net/api-client/react-native';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 
 export interface SignInCredentials {
   identity_id: string;
@@ -21,15 +22,20 @@ export interface CreateIdentityData {
  * Real auth service using ZHTP API
  */
 class RealAuthService {
-  private api: ZhtpApi;
+  private readonly api: ZhtpApi;
+  private readonly configProvider: ReactNativeConfigProvider;
 
   constructor(nodeUrl: string) {
-    this.api = new ZhtpApi({
-      zhtpNodeUrl: nodeUrl,
-      networkType: 'testnet',
-      debugMode: __DEV__,
-      enableBiometrics: false,
-    });
+    this.configProvider = new ReactNativeConfigProvider(
+      {
+        ZHTP_NODE_URL: nodeUrl,
+        NETWORK_TYPE: 'testnet',
+        DEBUG_MODE: __DEV__,
+        ENABLE_BIOMETRICS: true,
+      },
+      AsyncStorage,
+    );
+    this.api = new ZhtpApi(this.configProvider);
   }
 
   /**
@@ -161,16 +167,93 @@ class RealAuthService {
 
   /**
    * Test connection to ZHTP node
-   * @returns True if connection is successful
+   * Tries /api/v1/protocol/health endpoint (no authentication required)
+   * @returns True if node is reachable
    */
   async testConnection(): Promise<boolean> {
     try {
-      const connected = await this.api.testConnection();
-      console.log(connected ? '✅ Connected to ZHTP node' : '❌ Failed to connect to ZHTP node');
+      const baseUrl = this.api.getBaseUrl();
+
+      const timeoutPromise = new Promise((_, reject) =>
+        setTimeout(() => reject(new Error('Timeout')), 5000)
+      );
+
+      const fetchPromise = fetch(`${baseUrl}/api/v1/protocol/health`, {
+        method: 'GET',
+      });
+
+      const response = await Promise.race([fetchPromise, timeoutPromise]) as Response;
+
+      // 401/403 means node is reachable but auth required - that's fine
+      const connected = response.ok || response.status === 401 || response.status === 403;
+      console.log(connected ? '✅ Connected to ZHTP node' : `❌ Failed to connect to ZHTP node (${response.status})`);
+      return connected;
+    } catch (error: any) {
+      console.error('❌ Connection test failed:', error.message);
+      return false;
+    }
+  }
+
+  /**
+   * Get comprehensive protocol and node information
+   * Fetches node status directly from /api/v1/protocol/health endpoint
+   * @returns Protocol info or null if unavailable
+   */
+  async getProtocolInfo() {
+    try {
+      const baseUrl = this.api.getBaseUrl();
+
+      const timeoutPromise = new Promise((_, reject) =>
+        setTimeout(() => reject(new Error('Timeout')), 5000)
+      );
+
+      const fetchPromise = fetch(`${baseUrl}/api/v1/protocol/health`, {
+        method: 'GET',
+      });
+
+      const response = await Promise.race([fetchPromise, timeoutPromise]) as Response;
+
+      if (response.ok || response.status === 401 || response.status === 403) {
+        const data = await response.json();
+        console.log('✅ Protocol info retrieved');
+        return data;
+      } else {
+        throw new Error(`HTTP ${response.status}`);
+      }
+    } catch (error: any) {
+      console.error('❌ Failed to get protocol info:', error.message);
+      return null;
+    }
+  }
+
+  /**
+   * Ensure API is initialized and connected
+   * Reinitializes config if connection was lost
+   * @returns True if connection established
+   */
+  async ensureConnection(): Promise<boolean> {
+    try {
+      const connected = await this.api.ensureConnection();
+      console.log(connected ? '✅ Connection ensured' : '❌ Connection failed');
       return connected;
     } catch (error) {
-      console.error('❌ Connection test failed:', error);
+      console.error('❌ Failed to ensure connection:', error);
       return false;
+    }
+  }
+
+  /**
+   * Update the ZHTP node URL dynamically
+   * Persists to AsyncStorage for app restart
+   * @param nodeUrl - New ZHTP node URL
+   */
+  async updateNodeUrl(nodeUrl: string): Promise<void> {
+    try {
+      await this.configProvider.updateConfig({ zhtpNodeUrl: nodeUrl });
+      console.log('✅ Node URL updated to:', nodeUrl);
+    } catch (error) {
+      console.error('❌ Failed to update node URL:', error);
+      throw error;
     }
   }
 
@@ -181,11 +264,19 @@ class RealAuthService {
   getApi(): ZhtpApi {
     return this.api;
   }
+
+  /**
+   * Get current node URL
+   * @returns Configured ZHTP node URL
+   */
+  getNodeUrl(): string {
+    return this.api.getBaseUrl();
+  }
 }
 
 // Export singleton instance with default node URL
 // TODO: Make node URL configurable from app settings
-const DEFAULT_NODE_URL = 'http://localhost:3000'; // Update this to your ZHTP node URL
+const DEFAULT_NODE_URL = 'http://192.168.1.31:9333'; // Update this to your ZHTP node URL
 export default new RealAuthService(DEFAULT_NODE_URL);
 
 // Also export the class for creating custom instances

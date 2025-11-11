@@ -8,3 +8,6 @@ export { usePersistedState } from './usePersistedState';
 export { useAuth } from './useAuth';
 
 export { useApi } from './useApi';
+
+export { useNodeConnection } from './useNodeConnection';
+export type { ProtocolInfo, UseNodeConnectionState, UseNodeConnectionReturn } from './useNodeConnection';

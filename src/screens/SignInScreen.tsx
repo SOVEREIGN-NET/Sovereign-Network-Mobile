@@ -16,9 +16,10 @@ import {
   ScreenLayout,
   FormField,
   ErrorAlert,
-  ActionFooter
+  ActionFooter,
+  Badge
 } from '../components';
-import { useAuth } from '../hooks';
+import { useAuth, useNodeConnection } from '../hooks';
 import { useTranslation } from '../i18n';
 import { colors, spacing, typography } from '../theme';
 import { AuthStackParamList } from '../navigation/AuthNavigator';
@@ -29,6 +30,7 @@ type SignInScreenProps = NativeStackScreenProps<AuthStackParamList, 'SignIn'>;
 const SignInScreen = ({ navigation }: SignInScreenProps) => {
   const { t } = useTranslation();
   const { signIn, isLoading, error } = useAuth();
+  const { isConnected, isLoading: nodeLoading, nodeUrl, checkConnection } = useNodeConnection(true);
 
   const [did, setDid] = useState('');
   const [passphrase, setPassphrase] = useState('');
@@ -57,6 +59,7 @@ const SignInScreen = ({ navigation }: SignInScreenProps) => {
     }
 
     try {
+      // signIn expects identity_id and password
       await signIn(did, passphrase);
       // Reset form on success
       setDid('');
@@ -66,6 +69,8 @@ const SignInScreen = ({ navigation }: SignInScreenProps) => {
       setLocalError(err.message || t.auth.signIn.errors.signInFailed);
     }
   };
+
+  const isSignInDisabled = isLoading || nodeLoading || !isConnected;
 
   const displayError = localError || error;
 
@@ -135,6 +140,59 @@ const SignInScreen = ({ navigation }: SignInScreenProps) => {
           </Text>
         </View>
 
+        {/* Node Connection Status */}
+        <Card>
+          <Row style={{ justifyContent: 'space-between', alignItems: 'center' }}>
+            <Column gap="xs" style={{ flex: 1 }}>
+              <Text
+                style={{
+                  fontSize: typography.size.xs,
+                  color: colors.text_secondary,
+                  fontWeight: typography.weight.medium,
+                }}
+              >
+                {t.app.nodeStatus}
+              </Text>
+              <Text
+                style={{
+                  fontSize: typography.size.sm,
+                  color: colors.text_primary,
+                  fontWeight: typography.weight.semibold,
+                }}
+              >
+                {nodeUrl}
+              </Text>
+            </Column>
+            <Badge
+              label={isConnected ? t.app.connected : t.app.disconnected}
+              variant={isConnected ? 'success' : 'error'}
+            />
+          </Row>
+          {!isConnected && !nodeLoading && (
+            <Pressable
+              onPress={() => checkConnection()}
+              style={{
+                marginTop: spacing.sm,
+                paddingVertical: spacing.xs,
+                paddingHorizontal: spacing.sm,
+                backgroundColor: colors.bg_light,
+                borderRadius: 6,
+              }}
+            >
+              <Text
+                style={{
+                  fontSize: typography.size.xs,
+                  color: colors.primary,
+                  fontWeight: typography.weight.semibold,
+                  textAlign: 'center',
+                }}
+              >
+                {t.app.retryConnection}
+              </Text>
+            </Pressable>
+          )}
+        </Card>
+
         {/* Error Message */}
         {displayError && <ErrorAlert message={displayError} icon="❌" />}
 
@@ -202,20 +260,20 @@ const SignInScreen = ({ navigation }: SignInScreenProps) => {
               onPress: () => {
                 handleSignIn().catch(() => {});
               },
-              disabled: isLoading,
+              disabled: isSignInDisabled,
               loading: isLoading,
             },
             {
               label: t.auth.signIn.createNew,
               onPress: () => navigation.navigate('CreateIdentity'),
               variant: 'secondary',
-              disabled: isLoading,
+              disabled: isLoading || !isConnected,
             },
             {
               label: t.auth.signIn.recover,
               onPress: () => navigation.navigate('RecoverIdentity'),
               variant: 'secondary',
-              disabled: isLoading,
+              disabled: isLoading || !isConnected,
             },
           ]}
         />
