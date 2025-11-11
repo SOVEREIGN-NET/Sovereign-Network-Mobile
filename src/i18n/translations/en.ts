@@ -9,6 +9,19 @@ export const en = {
     title: 'ZHTP Web4',
     loading: 'Loading...',
     error: 'Error: Auth context not available',
+    nodeStatus: 'Node Status',
+    retryConnection: 'Retry Connection',
+    connected: 'Connected',
+    disconnected: 'Disconnected',
+    back: 'Back',
+    errors: {
+      nodeUnreachable: 'Node is not reachable',
+      connectionCheckFailed: 'Failed to check connection',
+      protocolInfoFailed: 'Failed to get protocol info',
+      failedToEstablishConnection: 'Failed to establish connection',
+      ensureConnectionFailed: 'Failed to ensure connection',
+      updateNodeUrlFailed: 'Failed to update node URL',
+    },
   },
 
   // Dashboard Screen
@@ -172,6 +185,8 @@ export const en = {
       biometricDisabled: 'Disabled (optional)',
       terms: 'I accept the ZHTP Network Terms and',
       termsPrivacy: 'Privacy Policy',
+      termsTitle: 'I accept the Terms & Conditions',
+      termsDescription: 'By creating an identity, you agree to our terms',
       button: 'Generate ZK-DID Identity',
       buttonLoading: 'Creating identity...',
       validation: {
