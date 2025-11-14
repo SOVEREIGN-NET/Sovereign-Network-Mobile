@@ -17,6 +17,7 @@ import { useTranslation } from '../i18n';
 import SignInScreen from '../screens/SignInScreen';
 import CreateIdentityScreen from '../screens/CreateIdentityScreen';
 import RecoverIdentityScreen from '../screens/RecoverIdentityScreen';
+import SeedPhraseScreen from '../screens/SeedPhraseScreen';
 
 const Stack = createNativeStackNavigator();
 
@@ -24,6 +25,7 @@ export type AuthStackParamList = {
   SignIn: undefined;
   CreateIdentity: undefined;
   RecoverIdentity: undefined;
+  SeedPhrase: { seedPhrases: string[]; walletType: string };
 };
 
 /**
@@ -61,6 +63,11 @@ const AuthNavigatorContent: React.FC = () => {
         name="RecoverIdentity"
         component={RecoverIdentityScreen as any}
         options={{ title: t.auth.recoverIdentity.title }}
+      />
+      <Stack.Screen
+        name="SeedPhrase"
+        component={SeedPhraseScreen as any}
+        options={{ title: t.auth.seedPhrase.screenTitle }}
       />
     </Stack.Navigator>
   );

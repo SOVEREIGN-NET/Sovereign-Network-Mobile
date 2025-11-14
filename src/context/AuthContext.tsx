@@ -28,9 +28,9 @@ export interface AuthContextType {
   isAuthenticated: boolean;
   isLoading: boolean;
   error: string | null;
-  signIn: (identity_id: string, password: string) => Promise<void>;
-  createIdentity: (data: CreateIdentityData) => Promise<void>;
-  recoverIdentity: (method: string, data: string) => Promise<void>;
+  signIn: (identity_id: string, password: string) => Promise<Identity>;
+  createIdentity: (data: CreateIdentityData) => Promise<Identity>;
+  recoverIdentity: (method: string, data: string) => Promise<Identity>;
   signOut: () => Promise<void>;
   clearError: () => void;
   updateProfile: (displayName: string, avatar?: string) => Promise<void>;
@@ -78,7 +78,7 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
   /**
    * Sign in with identity_id and password
    */
-  const signIn = useCallback(async (identity_id: string, password: string) => {
+  const signIn = useCallback(async (identity_id: string, password: string): Promise<Identity> => {
     setError(null);
     setIsLoading(true);
 
@@ -95,6 +95,7 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
       await storage.setItem('zhtp_identity', JSON.stringify(identity));
 
       setCurrentIdentity(identity);
+      return identity;
     } catch (err: any) {
       const message = err.message || 'Sign in failed';
       setError(message);
@@ -107,7 +108,7 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
   /**
    * Create a new identity
    */
-  const createIdentity = useCallback(async (data: CreateIdentityData) => {
+  const createIdentity = useCallback(async (data: CreateIdentityData): Promise<Identity> => {
     setError(null);
     setIsLoading(true);
 
@@ -133,6 +134,7 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
       await storage.setItem('zhtp_identity', JSON.stringify(identity));
 
       setCurrentIdentity(identity);
+      return identity;
     } catch (err: any) {
       const message = err.message || 'Identity creation failed';
       setError(message);
@@ -145,7 +147,7 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
   /**
    * Recover identity using various methods
    */
-  const recoverIdentity = useCallback(async (method: string, data: string) => {
+  const recoverIdentity = useCallback(async (method: string, data: string): Promise<Identity> => {
     setError(null);
     setIsLoading(true);
 
@@ -178,6 +180,7 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
       await storage.setItem('zhtp_identity', JSON.stringify(identity));
 
       setCurrentIdentity(identity);
+      return identity;
     } catch (err: any) {
       const message = err.message || 'Identity recovery failed';
       setError(message);

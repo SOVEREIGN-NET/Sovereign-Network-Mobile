@@ -154,6 +154,7 @@ export const en = {
     createIdentity: {
       title: 'Create Identity',
       identityType: 'Identity Type',
+      selectType: 'Select Type',
       types: {
         citizen: 'Citizen (UBI Eligible)',
         citizenDescription: 'Individual citizen with voting rights',
@@ -256,6 +257,25 @@ export const en = {
       },
       errors: {
         recoveryFailed: 'Recovery failed',
+      },
+    },
+    seedPhrase: {
+      screenTitle: 'Save Your Seed Phrase',
+      title: 'Your 20-Word Seed Phrase',
+      wallet: 'Wallet',
+      warning: 'Important: Save Your Seed Phrase',
+      warningDescription: 'This 20-word phrase is the ONLY way to recover your identity and funds. Write it down securely and keep it in a safe place. Never share it with anyone.',
+      show: 'Show',
+      hide: 'Hide',
+      hidden: 'Tap "Show" to display your seed phrase',
+      writeDown: 'Write down these words in order on paper. Do not take a screenshot.',
+      copy: 'Copy to Clipboard',
+      copied: 'Copied!',
+      confirmSaved: 'I have securely saved my seed phrase',
+      confirmSavedDescription: 'Check this box to confirm you have written down and safely stored your seed phrase. You will need it if you need to recover your identity.',
+      continueButton: 'I\'ve Saved My Seed Phrase',
+      errors: {
+        invalidPhrases: 'Invalid seed phrases received from server',
       },
     },
     backup: {

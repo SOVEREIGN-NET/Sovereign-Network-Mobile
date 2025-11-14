@@ -63,7 +63,6 @@ const styles = StyleSheet.create({
     paddingVertical: spacing.md,
     paddingHorizontal: spacing.sm,
   },
-  inputPlaceholder: colors.text_tertiary,
   errorContainer: {
     marginTop: spacing.sm,
   },
@@ -86,6 +85,7 @@ export const Input = React.memo(
   React.forwardRef<RNTextInput, InputProps>(
     (
       {
+        // eslint-disable-next-line @typescript-eslint/no-unused-vars
         label,
         error,
         hint,
@@ -133,9 +133,10 @@ export const Input = React.memo(
             <RNTextInput
               ref={ref}
               style={[styles.input, textInputStyle]}
-              placeholderTextColor={styles.inputPlaceholder}
+              placeholderTextColor={colors.text_tertiary}
               onFocus={handleFocus}
               onBlur={handleBlur}
+              autoCapitalize="none"
               {...props}
             />
 

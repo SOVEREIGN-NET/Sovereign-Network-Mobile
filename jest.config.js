@@ -51,7 +51,7 @@ module.exports = {
 
   // Transform ignore patterns - handle ES modules in node_modules
   transformIgnorePatterns: [
-    'node_modules/(?!(@react-navigation|@react-native|react-native)/)',
+    'node_modules/(?!(@react-navigation|@react-native|react-native|@sovereign-net|react-native-linear-gradient)/)',
   ],
 
   // Globals

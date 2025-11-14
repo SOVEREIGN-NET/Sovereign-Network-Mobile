@@ -230,36 +230,41 @@ describe('MockDataService', () => {
     it('should return stats with required properties', () => {
       const stats = MockDataService.getDAOStats();
 
-      expect(stats).toHaveProperty('totalMembers');
-      expect(stats).toHaveProperty('treasuryBalance');
-      expect(stats).toHaveProperty('activeProposals');
       expect(stats).toHaveProperty('totalProposals');
+      expect(stats).toHaveProperty('activeProposals');
+      expect(stats).toHaveProperty('treasury');
+      expect(stats).toHaveProperty('delegates');
+      expect(stats).toHaveProperty('participationRate');
     });
 
     it('should return stats with numeric values', () => {
       const stats = MockDataService.getDAOStats();
 
-      expect(typeof stats.totalMembers).toBe('number');
-      expect(typeof stats.treasuryBalance).toBe('number');
-      expect(typeof stats.activeProposals).toBe('number');
       expect(typeof stats.totalProposals).toBe('number');
+      expect(typeof stats.activeProposals).toBe('number');
+      expect(typeof stats.treasury).toBe('number');
+      expect(typeof stats.delegates).toBe('number');
+      expect(typeof stats.participationRate).toBe('number');
     });
 
     it('should return reasonable stat values', () => {
       const stats = MockDataService.getDAOStats();
 
-      expect(stats.totalMembers).toBeGreaterThan(0);
-      expect(stats.treasuryBalance).toBeGreaterThan(0);
+      expect(stats.totalProposals).toBeGreaterThan(0);
+      expect(stats.treasury).toBeGreaterThan(0);
       expect(stats.activeProposals).toBeGreaterThanOrEqual(0);
       expect(stats.totalProposals).toBeGreaterThanOrEqual(stats.activeProposals);
+      expect(stats.participationRate).toBeGreaterThanOrEqual(0);
+      expect(stats.participationRate).toBeLessThanOrEqual(1);
     });
 
     it('should return consistent stats across calls', () => {
       const stats1 = MockDataService.getDAOStats();
       const stats2 = MockDataService.getDAOStats();
 
-      expect(stats1.totalMembers).toBe(stats2.totalMembers);
-      expect(stats1.treasuryBalance).toBe(stats2.treasuryBalance);
+      expect(stats1.totalProposals).toBe(stats2.totalProposals);
+      expect(stats1.treasury).toBe(stats2.treasury);
+      expect(stats1.delegates).toBe(stats2.delegates);
     });
   });
 

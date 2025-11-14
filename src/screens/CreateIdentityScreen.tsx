@@ -4,7 +4,6 @@
  */
 
 import React, { useState } from 'react';
-import { Pressable } from 'react-native';
 import { NativeStackScreenProps } from '@react-navigation/native-stack';
 import {
   Card,
@@ -14,21 +13,22 @@ import {
   LoadingView,
   ScreenLayout,
   FormField,
-  ErrorAlert,
-  SelectableOptionCard,
+  PasswordField,
   ActionFooter,
   Badge,
+  Select,
+  Checkbox,
 } from '../components';
 import { useAuth, useNodeConnection } from '../hooks';
 import { useTranslation } from '../i18n';
-import { colors, spacing, typography, borderRadius } from '../theme';
+import { colors, spacing, typography } from '../theme';
 import { AuthStackParamList } from '../navigation/AuthNavigator';
 
 type CreateIdentityScreenProps = NativeStackScreenProps<AuthStackParamList, 'CreateIdentity'>;
 
 const CreateIdentityScreen = ({ navigation }: CreateIdentityScreenProps) => {
   const { t } = useTranslation();
-  const { createIdentity, isLoading, error } = useAuth();
+  const { createIdentity, isLoading } = useAuth();
   const { isConnected, isLoading: nodeLoading } = useNodeConnection(true);
 
   // Form state
@@ -39,71 +39,75 @@ const CreateIdentityScreen = ({ navigation }: CreateIdentityScreenProps) => {
   const [password, setPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
   const [acceptedTerms, setAcceptedTerms] = useState(false);
-  const [showPassword, setShowPassword] = useState(false);
-  const [localError, setLocalError] = useState<string | null>(null);
+  const [fieldErrors, setFieldErrors] = useState<{
+    displayName?: string;
+    password?: string;
+    confirmPassword?: string;
+    terms?: string;
+  }>({});
 
   const identityTypes = [
-    { value: 'citizen' as const, label: t.auth.createIdentity.types.citizen, description: t.auth.createIdentity.types.citizenDescription },
-    { value: 'organization' as const, label: t.auth.createIdentity.types.organization, description: t.auth.createIdentity.types.organizationDescription },
-    { value: 'developer' as const, label: t.auth.createIdentity.types.developer, description: t.auth.createIdentity.types.developerDescription },
-    { value: 'validator' as const, label: t.auth.createIdentity.types.validator, description: t.auth.createIdentity.types.validatorDescription },
+    { id: 'citizen' as const, label: t.auth.createIdentity.types.citizen },
+    { id: 'organization' as const, label: t.auth.createIdentity.types.organization },
+    { id: 'developer' as const, label: t.auth.createIdentity.types.developer },
+    { id: 'validator' as const, label: t.auth.createIdentity.types.validator },
   ];
 
   const handleCreateIdentity = async () => {
-    setLocalError(null);
+    setFieldErrors({});
+    const errors: typeof fieldErrors = {};
 
     // Validation
     if (!displayName.trim()) {
-      setLocalError(t.auth.createIdentity.validation.displayNameRequired);
-      return;
-    }
-
-    if (displayName.trim().length < 2) {
-      setLocalError(t.auth.createIdentity.validation.displayNameTooShort);
-      return;
+      errors.displayName = t.auth.createIdentity.validation.displayNameRequired;
+    } else if (displayName.trim().length < 2) {
+      errors.displayName = t.auth.createIdentity.validation.displayNameTooShort;
     }
 
     if (!password) {
-      setLocalError(t.auth.createIdentity.validation.passphraseTooShort);
-      return;
+      errors.password = t.auth.createIdentity.validation.passphraseRequired;
+    } else if (password.length < 8) {
+      errors.password = t.auth.createIdentity.validation.passphraseTooShort;
     }
 
-    if (password.length < 8) {
-      setLocalError(t.auth.createIdentity.validation.passphraseTooShort);
-      return;
-    }
-
-    if (password !== confirmPassword) {
-      setLocalError(t.auth.createIdentity.validation.passphraseNoMatch);
-      return;
+    if (password && password !== confirmPassword) {
+      errors.confirmPassword = t.auth.createIdentity.validation.passphraseNoMatch;
     }
 
     if (!acceptedTerms) {
-      setLocalError(t.auth.createIdentity.validation.termsRequired);
+      errors.terms = t.auth.createIdentity.validation.termsRequired;
+    }
+
+    if (Object.keys(errors).length > 0) {
+      setFieldErrors(errors);
       return;
     }
 
-    try {
-      await createIdentity({
-        display_name: displayName.trim(),
-        password,
-        identity_type: identityType,
-        recovery_options: [],
-      });
-
-      // Reset form on success
-      setDisplayName('');
-      setPassword('');
-      setConfirmPassword('');
-      setAcceptedTerms(false);
-      // App.tsx will detect authenticated state and switch to RootNavigator
-    } catch (err: any) {
-      setLocalError(err.message || t.auth.createIdentity.errors.creationFailed);
-    }
+    createIdentity({
+      display_name: displayName.trim(),
+      password,
+      identity_type: identityType,
+      recovery_options: [],
+    }).then((identity) => {
+      // Show seed phrases if available
+      if (identity?.seedPhrases) {
+        navigation.navigate('SeedPhrase', {
+          seedPhrases: identity.seedPhrases.primary,
+          walletType: 'primary',
+        });
+      } else {
+        // Fallback: reset form and app will detect authenticated state
+        setDisplayName('');
+        setPassword('');
+        setConfirmPassword('');
+        setAcceptedTerms(false);
+      }
+    }).catch(() => {
+      // Error is handled by auth context and displayed via error state
+    });
   };
 
   const isCreateDisabled = isLoading || nodeLoading || !isConnected;
-  const displayError = localError || error;
 
   if (isLoading) {
     return <LoadingView />;
@@ -127,9 +131,6 @@ const CreateIdentityScreen = ({ navigation }: CreateIdentityScreenProps) => {
           </Row>
         </Card>
 
-        {/* Error Message */}
-        {displayError && <ErrorAlert message={displayError} icon="❌" />}
-
         {/* Identity Type Selection */}
         <Card>
           <Column gap="sm">
@@ -138,24 +139,17 @@ const CreateIdentityScreen = ({ navigation }: CreateIdentityScreenProps) => {
                 fontSize: typography.size.sm,
                 fontWeight: typography.weight.semibold,
                 color: colors.text_primary,
-                marginBottom: spacing.sm,
               }}
             >
-              {t.auth.createIdentity.identityType}
+              {t.auth.createIdentity.selectType}
             </Text>
-
-            <Column gap="xs">
-              {identityTypes.map((type) => (
-                <SelectableOptionCard
-                  key={type.value}
-                  id={type.value}
-                  title={type.label}
-                  description={type.description}
-                  isSelected={identityType === type.value}
-                  onSelect={(id) => setIdentityType(id as typeof identityType)}
-                />
-              ))}
-            </Column>
+            <Select
+              options={identityTypes}
+              selectedId={identityType}
+              onSelect={(id) => setIdentityType(id as typeof identityType)}
+              label={t.auth.createIdentity.identityType}
+              placeholder={t.auth.createIdentity.identityType}
+            />
           </Column>
         </Card>
 
@@ -167,64 +161,44 @@ const CreateIdentityScreen = ({ navigation }: CreateIdentityScreenProps) => {
             value={displayName}
             onChangeText={setDisplayName}
             editable={!isLoading || !isCreateDisabled}
-            helperText={t.auth.createIdentity.displayNameHint}
+            helperText={fieldErrors.displayName || t.auth.createIdentity.displayNameHint}
+            error={fieldErrors.displayName}
             containerStyle={{ marginBottom: 0 }}
+            secureTextEntry={false}
+            autoComplete="off"
           />
         </Card>
 
         {/* Password Input */}
         <Card>
-          <Column gap="sm">
-            <Row
-              style={{
-                justifyContent: 'space-between',
-                alignItems: 'center',
-                marginBottom: spacing.sm,
-              }}
-            >
-              <Text
-                style={{
-                  fontSize: typography.size.sm,
-                  fontWeight: typography.weight.semibold,
-                  color: colors.text_primary,
-                }}
-              >
-                {t.auth.createIdentity.passphrase}
-              </Text>
-              <Pressable onPress={() => setShowPassword(!showPassword)}>
-                <Text
-                  style={{
-                    fontSize: typography.size.xs,
-                    color: colors.primary,
-                  }}
-                >
-                  {showPassword ? t.auth.createIdentity.passphraseShowHide.hide : t.auth.createIdentity.passphraseShowHide.show}
-                </Text>
-              </Pressable>
-            </Row>
-            <FormField
-              label=""
+          <Column gap="md">
+            <PasswordField
+              label={t.auth.createIdentity.passphrase}
               placeholder={t.auth.createIdentity.passphraseMinHint}
               value={password}
               onChangeText={setPassword}
-              secureTextEntry={!showPassword}
               editable={!isCreateDisabled}
-              containerStyle={{ marginBottom: spacing.sm }}
+              containerStyle={{ marginBottom: 0 }}
+              autoComplete="off"
+              textContentType="none"
+              error={fieldErrors.password}
+              helperText={t.auth.createIdentity.passphraseMinHint}
             />
-            <FormField
-              label=""
+            <PasswordField
+              label={t.auth.createIdentity.passphraseConfirm}
               placeholder={t.auth.createIdentity.passphraseConfirm}
               value={confirmPassword}
               onChangeText={setConfirmPassword}
-              secureTextEntry={!showPassword}
               editable={!isCreateDisabled}
               containerStyle={{ marginBottom: 0 }}
+              autoComplete="off"
+              textContentType="none"
+              error={fieldErrors.confirmPassword}
             />
             <Text
               style={{
                 fontSize: typography.size.xs,
                 color: colors.text_tertiary,
-                marginTop: spacing.md,
               }}
             >
               {t.auth.createIdentity.passphraseBlankHint}
@@ -233,14 +207,14 @@ const CreateIdentityScreen = ({ navigation }: CreateIdentityScreenProps) => {
         </Card>
 
         {/* Terms & Conditions */}
-        <Card>
-          <Row
-            style={{
-              justifyContent: 'space-between',
-              alignItems: 'center',
-            }}
-          >
-            <Column gap="xs" style={{ flex: 1, marginRight: spacing.md }}>
+        <Card
+          style={{
+            borderWidth: fieldErrors.terms ? 2 : 1,
+            borderColor: fieldErrors.terms ? colors.error : colors.border,
+          }}
+        >
+          <Column gap="xs">
+            <Row style={{ alignItems: 'center' }}>
               <Text
                 style={{
                   fontSize: typography.size.sm,
@@ -250,33 +224,33 @@ const CreateIdentityScreen = ({ navigation }: CreateIdentityScreenProps) => {
               >
                 {t.auth.createIdentity.termsTitle}
               </Text>
+              <Text style={{ color: colors.error, marginLeft: spacing.xs }}>*</Text>
+            </Row>
+            <Text
+              style={{
+                fontSize: typography.size.xs,
+                color: colors.text_secondary,
+              }}
+            >
+              {t.auth.createIdentity.termsDescription}
+            </Text>
+            <Checkbox
+              checked={acceptedTerms}
+              onChange={setAcceptedTerms}
+              disabled={isCreateDisabled}
+            />
+            {fieldErrors.terms && (
               <Text
                 style={{
                   fontSize: typography.size.xs,
-                  color: colors.text_secondary,
+                  color: colors.error,
+                  marginTop: spacing.xs,
                 }}
               >
-                {t.auth.createIdentity.termsDescription}
+                {fieldErrors.terms}
               </Text>
-            </Column>
-            <Pressable
-              onPress={() => setAcceptedTerms(!acceptedTerms)}
-              style={{
-                width: spacing.lg,
-                height: spacing.lg,
-                borderRadius: borderRadius.sm,
-                backgroundColor: acceptedTerms ? colors.success : colors.bg_light,
-                justifyContent: 'center',
-                alignItems: 'center',
-                borderWidth: acceptedTerms ? 0 : 1,
-                borderColor: colors.border_light,
-              }}
-            >
-              {acceptedTerms && (
-                <Text style={{ color: colors.white, fontSize: typography.size.base }}>✓</Text>
-              )}
-            </Pressable>
-          </Row>
+            )}
+          </Column>
         </Card>
 
         {/* Action Buttons */}
@@ -284,7 +258,7 @@ const CreateIdentityScreen = ({ navigation }: CreateIdentityScreenProps) => {
           actions={[
             {
               label: t.auth.createIdentity.button,
-              onPress: () => handleCreateIdentity(),
+              onPress: () => void handleCreateIdentity().catch(() => {}),
               disabled: isCreateDisabled,
               loading: isLoading,
             },

@@ -1,0 +1,170 @@
+/**
+ * Select Component
+ * Dropdown selector with modal options
+ */
+
+import React, { useState } from 'react';
+import { Modal, Pressable, ScrollView, View } from 'react-native';
+import { Text } from '../../atoms';
+import { colors, spacing, typography, borderRadius } from '../../../theme';
+
+export interface SelectOption {
+  id: string | number;
+  label: string;
+  description?: string;
+}
+
+export interface SelectProps {
+  options: SelectOption[];
+  selectedId: string | number;
+  onSelect: (id: string | number) => void;
+  label?: string;
+  placeholder?: string;
+  disabled?: boolean;
+}
+
+export const Select: React.FC<SelectProps> = ({
+  options,
+  selectedId,
+  onSelect,
+  label,
+  placeholder = 'Select an option',
+  disabled = false,
+}) => {
+  const [isOpen, setIsOpen] = useState(false);
+  const selectedOption = options.find((opt) => opt.id === selectedId);
+
+  const handleSelect = (id: string | number) => {
+    onSelect(id);
+    setIsOpen(false);
+  };
+
+  return (
+    <>
+      {/* Select Button */}
+      <Pressable
+        onPress={() => setIsOpen(true)}
+        disabled={disabled}
+        style={{
+          paddingVertical: spacing.sm,
+          paddingHorizontal: spacing.md,
+          borderRadius: borderRadius.sm,
+          backgroundColor: disabled ? colors.bg_light : colors.bg_medium,
+          borderWidth: 1,
+          borderColor: colors.border_light,
+          minHeight: 44,
+          justifyContent: 'center',
+        }}
+      >
+        <Text
+          style={{
+            fontSize: typography.size.sm,
+            color: selectedOption ? colors.text_primary : colors.text_secondary,
+            fontWeight: typography.weight.medium,
+          }}
+        >
+          {selectedOption?.label || placeholder}
+        </Text>
+      </Pressable>
+
+      {/* Dropdown Modal */}
+      <Modal
+        visible={isOpen}
+        transparent={true}
+        animationType="fade"
+        onRequestClose={() => setIsOpen(false)}
+      >
+        <Pressable
+          style={{
+            flex: 1,
+            backgroundColor: 'rgba(0, 0, 0, 0.5)',
+            justifyContent: 'flex-end',
+          }}
+          onPress={() => setIsOpen(false)}
+        >
+          <Pressable
+            onPress={(e) => e.stopPropagation()}
+            style={{
+              backgroundColor: colors.bg_dark,
+              borderTopLeftRadius: borderRadius.lg,
+              borderTopRightRadius: borderRadius.lg,
+              maxHeight: '70%',
+              paddingTop: spacing.md,
+            }}
+          >
+            {/* Header */}
+            <View
+              style={{
+                paddingHorizontal: spacing.lg,
+                paddingBottom: spacing.md,
+                borderBottomWidth: 1,
+                borderBottomColor: colors.border_light,
+              }}
+            >
+              <Text
+                style={{
+                  fontSize: typography.size.sm,
+                  fontWeight: typography.weight.semibold,
+                  color: colors.text_primary,
+                }}
+              >
+                {label || 'Select'}
+              </Text>
+            </View>
+
+            {/* Options List */}
+            <ScrollView
+              showsVerticalScrollIndicator={false}
+              style={{ paddingHorizontal: 0 }}
+            >
+              {options.map((option) => {
+                const isSelected = option.id === selectedId;
+                return (
+                  <Pressable
+                    key={option.id}
+                    onPress={() => handleSelect(option.id)}
+                    style={{
+                      paddingVertical: spacing.sm,
+                      paddingHorizontal: spacing.lg,
+                      backgroundColor: isSelected ? colors.primary + '20' : 'transparent',
+                      borderLeftWidth: isSelected ? 3 : 0,
+                      borderLeftColor: isSelected ? colors.primary : 'transparent',
+                      minHeight: 48,
+                      justifyContent: 'center',
+                    }}
+                  >
+                    <Text
+                      style={{
+                        fontSize: typography.size.sm,
+                        fontWeight: isSelected ? typography.weight.semibold : typography.weight.normal,
+                        color: isSelected ? colors.primary : colors.text_primary,
+                      }}
+                    >
+                      {option.label}
+                    </Text>
+                    {option.description && (
+                      <Text
+                        style={{
+                          fontSize: typography.size.xs,
+                          color: colors.text_secondary,
+                          marginTop: spacing.xs,
+                        }}
+                      >
+                        {option.description}
+                      </Text>
+                    )}
+                  </Pressable>
+                );
+              })}
+            </ScrollView>
+
+            {/* Footer Spacing */}
+            <View style={{ height: spacing.lg }} />
+          </Pressable>
+        </Pressable>
+      </Modal>
+    </>
+  );
+};
+
+Select.displayName = 'Select';

@@ -49,6 +49,16 @@ jest.mock('react-native', () => {
       OS: 'ios',
       select: (obj: any) => obj.ios,
     },
+    NativeModules: {
+      NativeStorage: {
+        setItem: jest.fn().mockResolvedValue(undefined),
+        getItem: jest.fn().mockResolvedValue(null),
+        removeItem: jest.fn().mockResolvedValue(undefined),
+      },
+    },
+    Pressable: ({ children, onPress }: any) =>
+      React.createElement('Pressable', { onPress }, children),
+    requireNativeComponent: jest.fn(() => 'LinearGradient'),
   };
 }, { virtual: true });
 
@@ -59,6 +69,14 @@ jest.mock('@react-native-async-storage/async-storage', () => ({
   removeItem: jest.fn().mockResolvedValue(undefined),
   clear: jest.fn().mockResolvedValue(undefined),
 }), { virtual: true });
+
+// Mock react-native-linear-gradient
+jest.mock('react-native-linear-gradient', () => {
+  const React = require('react');
+  return React.forwardRef(({ children }: any, ref: any) =>
+    React.createElement('LinearGradient', { ref }, children)
+  );
+}, { virtual: true });
 
 // Mock react-native-safe-area-context
 jest.mock('react-native-safe-area-context', () => {

@@ -60,6 +60,9 @@ export type { SelectableOptionCardProps } from './SelectableOptionCard';
 export { TabSelector } from './TabSelector';
 export type { TabSelectorProps, TabOption } from './TabSelector';
 
+export { Select } from './Select';
+export type { SelectProps, SelectOption } from './Select';
+
 export { HeaderBar } from './HeaderBar';
 export type { HeaderBarProps } from './HeaderBar';
 

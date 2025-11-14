@@ -55,6 +55,7 @@ export {
   ActionFooter,
   SelectableOptionCard,
   TabSelector,
+  Select,
   HeaderBar,
   SideDrawer,
 } from './molecules';
@@ -86,6 +87,8 @@ export type {
   SelectableOptionCardProps,
   TabSelectorProps,
   TabOption,
+  SelectProps,
+  SelectOption,
   HeaderBarProps,
   SideDrawerProps,
   DrawerItem,
