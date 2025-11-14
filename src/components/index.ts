@@ -11,6 +11,7 @@ export {
   Badge,
   Checkbox,
   Switch,
+  SectionLabel,
 } from './atoms';
 export type {
   CardProps,
@@ -31,6 +32,7 @@ export type {
   BadgeSize,
   CheckboxProps,
   SwitchProps,
+  SectionLabelProps,
 } from './atoms';
 
 // Molecules
@@ -51,6 +53,7 @@ export {
   OptionCardGroup,
   ScreenLayout,
   FormField,
+  PasswordField,
   SectionHeader,
   ActionFooter,
   SelectableOptionCard,
@@ -81,6 +84,7 @@ export type {
   OptionCardItem,
   ScreenLayoutProps,
   FormFieldProps,
+  PasswordFieldProps,
   SectionHeaderProps,
   ActionFooterProps,
   ActionFooterAction,

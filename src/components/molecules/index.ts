@@ -48,6 +48,9 @@ export type { ScreenLayoutProps } from './ScreenLayout';
 export { FormField } from './FormField';
 export type { FormFieldProps } from './FormField';
 
+export { PasswordField } from './PasswordField';
+export type { PasswordFieldProps } from './PasswordField';
+
 export { SectionHeader } from './SectionHeader';
 export type { SectionHeaderProps } from './SectionHeader';
 

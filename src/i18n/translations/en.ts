@@ -198,6 +198,7 @@ export const en = {
         usernameInvalid: 'Username can only contain letters, numbers, and underscores',
         usernameUnavailable: 'This username is already taken',
         authMethodRequired: 'You must set either a passphrase or enable biometric authentication',
+        passphraseRequired: 'Passphrase is required',
         passphraseTooShort: 'Passphrase must be at least 8 characters',
         passphraseNoMatch: 'Passphrases do not match',
         termsRequired: 'You must accept the terms and conditions',
@@ -525,6 +526,7 @@ export const en = {
       title: 'Actions',
       send: 'Send',
       receive: 'Receive',
+      copy: 'Copy',
       sendZhtp: 'SEND ZHTP',
       receiveZhtp: 'RECEIVE ZHTP',
       claimUbi: 'CLAIM UBI',
@@ -540,6 +542,7 @@ export const en = {
       name: 'Name',
       address: 'Address',
       balance: 'Balance',
+      notSynced: 'Not synced',
     },
     quickActions: {
       title: 'Quick Actions',
@@ -551,6 +554,18 @@ export const en = {
     transactions: {
       title: 'Recent Transactions',
       noTransactions: 'No transactions yet',
+    },
+    tabs: {
+      tokens: 'Tokens',
+      nfts: 'NFTs',
+      activity: 'Activity',
+    },
+    empty: {
+      defaultWallet: 'Wallet',
+      nftTitle: 'No NFTs',
+      nftDescription: 'You don\'t have any NFTs yet',
+      activityTitle: 'No Activity',
+      activityDescription: 'Your transaction history will appear here',
     },
   },
 

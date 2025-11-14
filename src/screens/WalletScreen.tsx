@@ -58,8 +58,10 @@ const WalletScreen = ({ navigation }: any) => {
     return <LoadingView />;
   }
 
-  const wallets = currentIdentity.wallets || [];
-  const selectedWallet = wallets[0];
+  const wallets = currentIdentity.wallets
+    ? Object.values(currentIdentity.wallets)
+    : [];
+  const selectedWallet = wallets[0] || null;
 
   return (
     <View style={{ flex: 1, backgroundColor: colors.bg_darkest }}>
@@ -91,7 +93,7 @@ const WalletScreen = ({ navigation }: any) => {
                     color: colors.text_primary,
                   }}
                 >
-                  {selectedWallet?.name || 'Wallet'}
+                  {selectedWallet?.name || t.wallet.empty.defaultWallet}
                 </Text>
                 <Text
                   style={{
@@ -100,14 +102,14 @@ const WalletScreen = ({ navigation }: any) => {
                     marginTop: spacing.xs,
                   }}
                 >
-                  {selectedWallet?.id} • Not synced
+                  {selectedWallet?.id} • {t.wallet.details.notSynced}
                 </Text>
               </View>
               <View
                 style={{
                   width: 36,
                   height: 36,
-                  borderRadius: 18,
+                  borderRadius: borderRadius.full,
                   backgroundColor: colors.bg_darker,
                   justifyContent: 'center',
                   alignItems: 'center',
@@ -115,7 +117,7 @@ const WalletScreen = ({ navigation }: any) => {
                   borderColor: colors.border,
                 }}
               >
-                <Text style={{ fontSize: 20 }}>⚙️</Text>
+                <Text style={{ fontSize: typography.size['3xl'] }}>⚙️</Text>
               </View>
             </View>
           </View>
@@ -137,7 +139,7 @@ const WalletScreen = ({ navigation }: any) => {
                       {t.wallet.details.address}
                     </Text>
                     <TouchableOpacity>
-                      <Text style={{ fontSize: typography.size.xs, color: colors.primary }}>Copy</Text>
+                      <Text style={{ fontSize: typography.size.xs, color: colors.primary }}>{t.wallet.actions.copy}</Text>
                     </TouchableOpacity>
                   </View>
                   <Text
@@ -148,7 +150,7 @@ const WalletScreen = ({ navigation }: any) => {
                       letterSpacing: 0.5,
                     }}
                   >
-                    {selectedWallet.address.substring(0, 10)}...{selectedWallet.address.substring(selectedWallet.address.length - 8)}
+                    {selectedWallet?.id?.substring(0, 10)}...{selectedWallet?.id?.substring(selectedWallet.id.length - 8) || 'unknown'}
                   </Text>
                 </View>
 
@@ -252,7 +254,7 @@ const WalletScreen = ({ navigation }: any) => {
                           style={{
                             width: 48,
                             height: 48,
-                            borderRadius: 24,
+                            borderRadius: borderRadius.full,
                             backgroundColor: colors.primary,
                             justifyContent: 'center',
                             alignItems: 'center',
@@ -276,7 +278,7 @@ const WalletScreen = ({ navigation }: any) => {
                             style={{
                               fontSize: typography.size.xs,
                               color: colors.text_secondary,
-                              marginTop: 2,
+                              marginTop: spacing.xxs,
                             }}
                           >
                             {wallet.id}
@@ -304,10 +306,10 @@ const WalletScreen = ({ navigation }: any) => {
               <Card>
                 <Column gap="md" style={{ alignItems: 'center', paddingVertical: spacing.lg }}>
                   <Text style={{ fontSize: typography.size.lg, fontWeight: typography.weight.semibold, color: colors.text_primary }}>
-                    No NFTs
+                    {t.wallet.empty.nftTitle}
                   </Text>
                   <Text style={{ fontSize: typography.size.sm, color: colors.text_secondary }}>
-                    You don't have any NFTs yet
+                    {t.wallet.empty.nftDescription}
                   </Text>
                 </Column>
               </Card>
@@ -319,10 +321,10 @@ const WalletScreen = ({ navigation }: any) => {
               <Card>
                 <Column gap="md" style={{ alignItems: 'center', paddingVertical: spacing.lg }}>
                   <Text style={{ fontSize: typography.size.lg, fontWeight: typography.weight.semibold, color: colors.text_primary }}>
-                    No Activity
+                    {t.wallet.empty.activityTitle}
                   </Text>
                   <Text style={{ fontSize: typography.size.sm, color: colors.text_secondary }}>
-                    Your transaction history will appear here
+                    {t.wallet.empty.activityDescription}
                   </Text>
                 </Column>
               </Card>
@@ -342,26 +344,30 @@ const WalletScreen = ({ navigation }: any) => {
               paddingHorizontal: spacing.md,
             }}
           >
-            {['Tokens', 'NFTs', 'Activity'].map((tab) => (
+            {[
+              { id: 'Tokens', label: t.wallet.tabs.tokens },
+              { id: 'NFTs', label: t.wallet.tabs.nfts },
+              { id: 'Activity', label: t.wallet.tabs.activity },
+            ].map((tabItem) => (
               <TouchableOpacity
-                key={tab}
-                onPress={() => setActiveTab(tab)}
+                key={tabItem.id}
+                onPress={() => setActiveTab(tabItem.id)}
                 style={{
                   flex: 1,
                   alignItems: 'center',
                   paddingVertical: spacing.md,
                   borderRadius: borderRadius.base,
-                  backgroundColor: activeTab === tab ? 'rgba(0,0,0,0.3)' : 'transparent',
+                  backgroundColor: activeTab === tabItem.id ? colors.bg_medium : 'transparent',
                 }}
               >
                 <Text
                   style={{
                     fontSize: typography.size.xs,
-                    color: activeTab === tab ? colors.primary : colors.text_secondary,
-                    fontWeight: activeTab === tab ? typography.weight.semibold : typography.weight.normal,
+                    color: activeTab === tabItem.id ? colors.primary : colors.text_secondary,
+                    fontWeight: activeTab === tabItem.id ? typography.weight.semibold : typography.weight.normal,
                   }}
                 >
-                  {tab}
+                  {tabItem.label}
                 </Text>
               </TouchableOpacity>
             ))}

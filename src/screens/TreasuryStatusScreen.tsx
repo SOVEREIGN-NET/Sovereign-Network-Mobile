@@ -9,6 +9,7 @@ import {
   StatBox,
   ProgressBar,
   ScreenLayout,
+  SectionLabel,
 } from '../components';
 import { useAsyncData } from '../hooks';
 import { useTranslation } from '../i18n';
@@ -91,20 +92,11 @@ const TreasuryStatusScreen = ({ navigation }: any) => {
   };
 
   return (
-    <ScreenLayout>
+    <ScreenLayout paddingTop={spacing.xl}>
       <Column gap="xl">
           {/* Treasury Overview */}
           <Card>
-            <Text
-              style={{
-                fontSize: typography.size.sm,
-                fontWeight: typography.weight.semibold,
-                color: colors.text_primary,
-                marginBottom: spacing.md,
-              }}
-            >
-              {t.dao.treasury.overview.title}
-            </Text>
+            <SectionLabel>{t.dao.treasury.overview.title}</SectionLabel>
             <View
               style={{
                 backgroundColor: colors.bg_darker,
@@ -131,7 +123,7 @@ const TreasuryStatusScreen = ({ navigation }: any) => {
                   marginBottom: spacing.xs,
                 }}
               >
-                {(daoStats?.treasuryBalance || 0).toLocaleString()}
+                {(daoStats?.treasury || 0).toLocaleString()}
               </Text>
               <Text
                 style={{
@@ -153,7 +145,7 @@ const TreasuryStatusScreen = ({ navigation }: any) => {
             >
               <StatBox
                 label={t.dao.treasury.overview.members}
-                value={(daoStats?.totalMembers || 0).toLocaleString()}
+                value={(daoStats?.delegates || 0).toLocaleString()}
                 style={{ flex: 1 }}
               />
               <StatBox
@@ -166,16 +158,7 @@ const TreasuryStatusScreen = ({ navigation }: any) => {
 
           {/* Budget Allocation */}
           <Card>
-            <Text
-              style={{
-                fontSize: typography.size.sm,
-                fontWeight: typography.weight.semibold,
-                color: colors.text_primary,
-                marginBottom: spacing.md,
-              }}
-            >
-              {t.dao.treasury.allocation.title}
-            </Text>
+            <SectionLabel>{t.dao.treasury.allocation.title}</SectionLabel>
 
             <Column gap="md">
               {budgetAllocation.map(item => (
@@ -258,16 +241,7 @@ const TreasuryStatusScreen = ({ navigation }: any) => {
 
           {/* Recent Transactions */}
           <Card>
-            <Text
-              style={{
-                fontSize: typography.size.sm,
-                fontWeight: typography.weight.semibold,
-                color: colors.text_primary,
-                marginBottom: spacing.md,
-              }}
-            >
-              {t.dao.treasury.transactions.title}
-            </Text>
+            <SectionLabel>{t.dao.treasury.transactions.title}</SectionLabel>
 
             <Column gap="sm">
               {recentTransactions.map(tx => (
@@ -351,7 +325,7 @@ const TreasuryStatusScreen = ({ navigation }: any) => {
                 style={{
                   fontSize: typography.size.xs,
                   color: colors.text_secondary,
-                  lineHeight: typography.size.sm * 1.5,
+                  lineHeight: typography.lineHeight.relaxed,
                 }}
               >
                 {t.dao.treasury.info.description}

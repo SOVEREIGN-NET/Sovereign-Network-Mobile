@@ -284,6 +284,11 @@ class MockAuthService {
         votingPower: 1,
         soulboundNftIssued: true,
       } : undefined,
+      seedPhrases: {
+        primary: this.generateSeedPhrase(),
+        ubi: this.generateSeedPhrase(),
+        savings: this.generateSeedPhrase(),
+      },
       votingPower: data.identityType === 'citizen' ? 1 : 0,
       ubiEarned: 0,
     };
@@ -421,6 +426,22 @@ class MockAuthService {
    */
   private simulateDelay(): Promise<void> {
     return new Promise((resolve) => setTimeout(resolve, this.delay));
+  }
+
+  /**
+   * Generate mock seed phrase (20 words)
+   */
+  private generateSeedPhrase(): string[] {
+    const words = [
+      'abandon', 'ability', 'able', 'about', 'above', 'absent', 'absorb', 'abstract', 'abuse', 'access',
+      'accident', 'account', 'accuse', 'achieve', 'acid', 'acoustic', 'acquire', 'across', 'act', 'action',
+      'activate', 'active', 'actor', 'acts', 'actual', 'acute', 'addition', 'address', 'adjacent', 'adjust',
+    ];
+    const phrase: string[] = [];
+    for (let i = 0; i < 20; i++) {
+      phrase.push(words[Math.floor(Math.random() * words.length)]);
+    }
+    return phrase;
   }
 
   /**

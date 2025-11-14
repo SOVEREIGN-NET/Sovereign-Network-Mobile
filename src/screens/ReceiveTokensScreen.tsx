@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { View, Share, Alert } from 'react-native';
-import { Card, Text, Button, Column, ScreenLayout } from '../components';
+import { Card, Text, Button, Column, ScreenLayout, SectionLabel } from '../components';
 import { useAuth } from '../hooks';
 import { useTranslation } from '../i18n';
 import { colors, spacing, typography, borderRadius } from '../theme';
@@ -12,8 +12,11 @@ const ReceiveTokensScreen = () => {
   const [copied, setCopied] = useState(false);
   const [selectedCurrency, setSelectedCurrency] = useState('ZHTP');
 
-  // Mock wallet address
-  const walletAddress = currentIdentity?.wallets?.[0]?.address || '0x' + Math.random().toString(16).slice(2, 42);
+  // Mock wallet address - generate from wallet ID if available
+  const primaryWallet = currentIdentity?.wallets?.primary;
+  const walletAddress = primaryWallet?.id
+    ? '0x' + primaryWallet.id.substring(0, 40).padEnd(40, '0')
+    : '0x' + Math.random().toString(16).slice(2, 42);
 
   const handleCopyAddress = () => {
     setCopied(true);
@@ -24,7 +27,7 @@ const ReceiveTokensScreen = () => {
     try {
       await Share.share({
         message: `${t.receiveTokens.address}: ${walletAddress}`,
-        title: `Receive ${selectedCurrency}`,
+        title: t.receiveTokens.title.replace('{currency}', selectedCurrency),
       });
     } catch (error: any) {
       console.error('Share failed:', error);
@@ -55,7 +58,7 @@ const ReceiveTokensScreen = () => {
   ];
 
   return (
-    <ScreenLayout paddingTop={40}>
+    <ScreenLayout paddingTop={spacing['2xl']}>
       <Column gap="lg">
 
         {/* Currency Selector */}
@@ -75,7 +78,6 @@ const ReceiveTokensScreen = () => {
                 key={currency}
                 variant={selectedCurrency === currency ? 'primary' : 'outline'}
                 onPress={() => setSelectedCurrency(currency)}
-                style={{ flex: 0, paddingHorizontal: spacing.md }}
               >
                 {currency}
               </Button>
@@ -108,10 +110,8 @@ const ReceiveTokensScreen = () => {
                 <Text
                   style={{
                     fontSize: typography.size.sm,
-                    fontFamily: 'monospace',
                     color: colors.primary,
                     letterSpacing: 0.5,
-                    userSelect: 'text',
                   }}
                 >
                   {walletAddress}
@@ -160,13 +160,13 @@ const ReceiveTokensScreen = () => {
                     width: 200,
                     height: 200,
                     backgroundColor: colors.white,
-                    borderRadius: 8,
+                    borderRadius: borderRadius.base,
                     justifyContent: 'center',
                     alignItems: 'center',
                   }}
                 >
                   <Text style={{ color: colors.bg_darkest, fontSize: typography.size.lg }}>
-                    QR Code
+                    {t.receiveTokens.qrCode}
                   </Text>
                   <Text
                     style={{
@@ -186,15 +186,7 @@ const ReceiveTokensScreen = () => {
         {/* Info Section */}
         <Card style={{ backgroundColor: colors.bg_darker }}>
           <Column gap="sm">
-            <Text
-              style={{
-                fontSize: typography.size.sm,
-                fontWeight: typography.weight.semibold,
-                color: colors.text_primary,
-              }}
-            >
-              {t.receiveTokens.info.title}
-            </Text>
+            <SectionLabel>{t.receiveTokens.info.title}</SectionLabel>
             <Text variant="body" style={{ color: colors.text_secondary }}>
               {t.receiveTokens.info.description}
             </Text>
@@ -205,15 +197,7 @@ const ReceiveTokensScreen = () => {
         {recentTransactions.length > 0 && (
           <Card>
             <Column gap="md">
-              <Text
-                style={{
-                  fontSize: typography.size.sm,
-                  fontWeight: typography.weight.semibold,
-                  color: colors.text_primary,
-                }}
-              >
-                {t.receiveTokens.recentlyReceived}
-              </Text>
+              <SectionLabel>{t.receiveTokens.recentlyReceived}</SectionLabel>
 
               <Column gap="sm">
                 {recentTransactions.map((tx) => (

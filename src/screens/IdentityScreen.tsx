@@ -11,6 +11,7 @@ import {
   HeaderBar,
   SideDrawer,
   DrawerItem,
+  SectionLabel,
 } from '../components';
 import { useAuth, useApi, useAsyncData } from '../hooks';
 import { useTranslation } from '../i18n';
@@ -111,7 +112,7 @@ const IdentityScreen = ({ navigation }: any) => {
   const isLoading = authLoading || loggingOut;
   const votingPowerFormatted = currentIdentity.votingPower?.toLocaleString() || '0';
   const ubiEarnedFormatted = currentIdentity.ubiEarned?.toFixed(2) || '0.00';
-  const walletCount = currentIdentity.wallets?.length || 0;
+  const walletCount = currentIdentity.wallets ? Object.keys(currentIdentity.wallets).length : 0;
 
   return (
     <View style={{ flex: 1, backgroundColor: colors.bg_darkest }}>
@@ -129,7 +130,7 @@ const IdentityScreen = ({ navigation }: any) => {
         title="Menu"
       />
 
-      <ScreenLayout paddingTop={20}>
+      <ScreenLayout paddingTop={spacing.xl}>
       <Column gap="xl">
           {/* Identity Card */}
           <Card>
@@ -179,16 +180,7 @@ const IdentityScreen = ({ navigation }: any) => {
 
           {/* Stats Card */}
           <Card>
-            <Text
-              style={{
-                fontSize: typography.size.sm,
-                fontWeight: typography.weight.semibold,
-                color: colors.text_primary,
-                marginBottom: spacing.md,
-              }}
-            >
-              {t.identity.stats.title}
-            </Text>
+            <SectionLabel>{t.identity.stats.title}</SectionLabel>
             <Column gap="sm">
               <DetailRow
                 label={t.identity.stats.votingPower}

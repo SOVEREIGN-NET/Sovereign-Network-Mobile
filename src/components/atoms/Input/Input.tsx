@@ -85,7 +85,6 @@ export const Input = React.memo(
   React.forwardRef<RNTextInput, InputProps>(
     (
       {
-        // eslint-disable-next-line @typescript-eslint/no-unused-vars
         label,
         error,
         hint,
