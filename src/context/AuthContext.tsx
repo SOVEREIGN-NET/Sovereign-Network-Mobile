@@ -12,11 +12,13 @@ import type { CreateIdentityData } from '../services/RealAuthService';
 
 // Toggle between mock and real auth service
 // Set to false to use real API backend
-const USE_MOCK_SERVICE = __DEV__; // Use mock in development, real in production
+// In development, set REACT_APP_USE_REAL_AUTH=true to use real service
+const USE_REAL_AUTH = process.env.REACT_APP_USE_REAL_AUTH === 'true';
+const USE_MOCK_SERVICE = !USE_REAL_AUTH && __DEV__;
 
-// Only import RealAuthService in production to avoid initialization errors in dev
+// Import based on configuration
 let RealAuthService: any = null;
-if (!USE_MOCK_SERVICE) {
+if (USE_REAL_AUTH || !__DEV__) {
   RealAuthService = require('../services/RealAuthService').default;
 }
 
@@ -161,7 +163,9 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
           const [fileContent, password] = data.split('|||');
           identity = await MockAuthService.recoverWithBackup(fileContent, password);
         } else if (method === 'social') {
-          identity = await MockAuthService.recoverWithSocial(data);
+          // Parse guardian IDs from JSON string
+          const guardianIds = JSON.parse(data) as string[];
+          identity = await MockAuthService.recoverWithSocial(guardianIds);
         } else {
           throw new Error('Unknown recovery method');
         }
@@ -171,7 +175,9 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
         const [fileContent, password] = data.split('|||');
         identity = await RealAuthService.recoverWithBackup(fileContent, password);
       } else if (method === 'social') {
-        identity = await RealAuthService.recoverWithSocial(data);
+        // Parse guardian IDs from JSON string
+        const guardianIds = JSON.parse(data) as string[];
+        identity = await RealAuthService.recoverWithSocial(guardianIds);
       } else {
         throw new Error('Unknown recovery method');
       }

@@ -15,7 +15,7 @@ export interface InputProps extends Omit<RNTextInputProps, 'style'> {
   error?: string;
   hint?: string;
   leftIcon?: string;
-  rightIcon?: string;
+  rightIcon?: string | React.ReactNode;
   containerStyle?: ViewStyle;
   style?: ViewStyle | TextStyle;
   textInputStyle?: TextStyle;
@@ -111,35 +111,50 @@ export const Input = React.memo(
         onBlur?.(e);
       };
 
+      const wrapperStyles: any[] = [styles.inputWrapper];
+      if (isFocused && styles.inputWrapperFocused) {
+        wrapperStyles.push(styles.inputWrapperFocused);
+      }
+      if (error && styles.inputWrapperError) {
+        wrapperStyles.push(styles.inputWrapperError);
+      }
+      if (style) {
+        wrapperStyles.push(style);
+      }
+
+      const inputStyles: any[] = [styles.input];
+      if (textInputStyle) {
+        inputStyles.push(textInputStyle);
+      }
+
       return (
-        <View style={[styles.container, containerStyle]}>
+        <View style={containerStyle ? [styles.container, containerStyle] : styles.container}>
           {label && (
             <View style={styles.labelContainer}>
               <Text style={styles.label}>{label}</Text>
             </View>
           )}
 
-          <View
-            style={[
-              styles.inputWrapper,
-              isFocused && styles.inputWrapperFocused,
-              error && styles.inputWrapperError,
-              style as ViewStyle,
-            ]}
-          >
+          <View style={wrapperStyles}>
             {leftIcon && <Text style={styles.icon}>{leftIcon}</Text>}
 
             <RNTextInput
               ref={ref}
-              style={[styles.input, textInputStyle]}
+              style={inputStyles}
               placeholderTextColor={colors.text_tertiary}
               onFocus={handleFocus}
               onBlur={handleBlur}
-              autoCapitalize="none"
               {...props}
             />
 
-            {rightIcon && <Text style={[styles.icon, styles.rightIcon]}>{rightIcon}</Text>}
+            {rightIcon && typeof rightIcon === 'string' && (
+              <Text style={[styles.icon, styles.rightIcon]}>{rightIcon}</Text>
+            )}
+            {rightIcon && typeof rightIcon !== 'string' && (
+              <View style={[styles.icon, styles.rightIcon]}>
+                {rightIcon}
+              </View>
+            )}
           </View>
 
           {error && (

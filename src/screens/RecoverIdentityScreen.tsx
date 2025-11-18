@@ -35,7 +35,7 @@ const RecoverIdentityScreen = ({ navigation }: RecoverIdentityScreenProps) => {
   const [seedPhrase, setSeedPhrase] = useState('');
   const [backupJson, setBackupJson] = useState('');
   const [backupPassword, setBackupPassword] = useState('');
-  const [guardianCode, setGuardianCode] = useState('');
+  const [guardianIds, setGuardianIds] = useState('');
   const [showPassword, setShowPassword] = useState(false);
   const [localError, setLocalError] = useState<string | null>(null);
 
@@ -69,11 +69,23 @@ const RecoverIdentityScreen = ({ navigation }: RecoverIdentityScreenProps) => {
         break;
 
       case 'social':
-        if (!guardianCode.trim()) {
+        if (!guardianIds.trim()) {
           setLocalError(t.auth.recoverIdentity.validation.guardianCodeRequired);
           return;
         }
-        data = guardianCode;
+        // Convert comma-separated guardian IDs to array
+        const ids = guardianIds
+          .split(',')
+          .map((id) => id.trim())
+          .filter((id) => id.length > 0);
+
+        if (ids.length === 0) {
+          setLocalError(t.auth.recoverIdentity.validation.guardianCodeRequired);
+          return;
+        }
+
+        // Pass as JSON string since recoverIdentity expects string data
+        data = JSON.stringify(ids);
         method = 'social';
         break;
 
@@ -89,7 +101,7 @@ const RecoverIdentityScreen = ({ navigation }: RecoverIdentityScreenProps) => {
       setSeedPhrase('');
       setBackupJson('');
       setBackupPassword('');
-      setGuardianCode('');
+      setGuardianIds('');
 
       // App.tsx will detect authenticated state and switch to RootNavigator
     } catch (err: any) {
@@ -268,10 +280,11 @@ const RecoverIdentityScreen = ({ navigation }: RecoverIdentityScreenProps) => {
               <FormField
                 label={t.auth.recoverIdentity.social.title}
                 placeholder={t.auth.recoverIdentity.social.placeholder}
-                value={guardianCode}
-                onChangeText={setGuardianCode}
+                value={guardianIds}
+                onChangeText={setGuardianIds}
                 editable={!isLoading}
                 containerStyle={{ marginBottom: spacing.md }}
+                helperText="Enter guardian IDs separated by commas (e.g., guardian-1, guardian-2, guardian-3)"
               />
 
               <Text

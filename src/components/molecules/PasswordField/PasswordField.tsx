@@ -8,7 +8,7 @@ import React, { useState } from 'react';
 import { View, Pressable, TextInputProps as RNTextInputProps } from 'react-native';
 import { Text } from '../../atoms';
 import { FormField } from '../FormField/FormField';
-import { spacing, typography } from '../../../theme';
+import { typography } from '../../../theme';
 
 export interface PasswordFieldProps extends Omit<RNTextInputProps, 'style' | 'error'> {
   label: string;
@@ -35,7 +35,7 @@ export const PasswordField = React.forwardRef<any, PasswordFieldProps>(
     const [isVisible, setIsVisible] = useState(false);
 
     return (
-      <View style={{ position: 'relative' }}>
+      <View>
         <FormField
           ref={ref}
           label={label}
@@ -45,20 +45,16 @@ export const PasswordField = React.forwardRef<any, PasswordFieldProps>(
           containerStyle={containerStyle}
           textInputStyle={textInputStyle}
           secureTextEntry={!isVisible}
+          rightIcon={
+            <Pressable
+              onPress={() => setIsVisible(!isVisible)}
+              style={{ opacity: isVisible ? 1 : 0.5 }}
+            >
+              <Text style={{ fontSize: typography.size.lg }}>👁️</Text>
+            </Pressable>
+          }
           {...inputProps}
         />
-        <Pressable
-          onPress={() => setIsVisible(!isVisible)}
-          style={{
-            position: 'absolute',
-            right: spacing.lg,
-            top: '50%',
-            transform: [{ translateY: -12 }],
-            opacity: isVisible ? 1 : 0.5,
-          }}
-        >
-          <Text style={{ fontSize: typography.size.xl }}>👁️</Text>
-        </Pressable>
       </View>
     );
   }

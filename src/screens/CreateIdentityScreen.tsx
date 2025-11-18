@@ -47,11 +47,11 @@ const CreateIdentityScreen = ({ navigation }: CreateIdentityScreenProps) => {
   }>({});
 
   const identityTypes = [
-    { id: 'citizen' as const, label: t.auth.createIdentity.types.citizen },
-    { id: 'organization' as const, label: t.auth.createIdentity.types.organization },
-    { id: 'developer' as const, label: t.auth.createIdentity.types.developer },
-    { id: 'validator' as const, label: t.auth.createIdentity.types.validator },
-  ];
+    { id: 'citizen' as const, label: t.auth.createIdentity.types.citizen || 'Citizen' },
+    { id: 'organization' as const, label: t.auth.createIdentity.types.organization || 'Organization' },
+    { id: 'developer' as const, label: t.auth.createIdentity.types.developer || 'Developer' },
+    { id: 'validator' as const, label: t.auth.createIdentity.types.validator || 'Validator' },
+  ].filter(item => item.label);
 
   const handleCreateIdentity = async () => {
     setFieldErrors({});
@@ -160,12 +160,10 @@ const CreateIdentityScreen = ({ navigation }: CreateIdentityScreenProps) => {
             placeholder={t.auth.createIdentity.displayNamePlaceholder}
             value={displayName}
             onChangeText={setDisplayName}
-            editable={!isLoading || !isCreateDisabled}
-            helperText={fieldErrors.displayName || t.auth.createIdentity.displayNameHint}
+            editable={!isCreateDisabled}
+            helperText={!fieldErrors.displayName ? t.auth.createIdentity.displayNameHint : undefined}
             error={fieldErrors.displayName}
             containerStyle={{ marginBottom: 0 }}
-            secureTextEntry={false}
-            autoComplete="off"
           />
         </Card>
 
@@ -179,8 +177,6 @@ const CreateIdentityScreen = ({ navigation }: CreateIdentityScreenProps) => {
               onChangeText={setPassword}
               editable={!isCreateDisabled}
               containerStyle={{ marginBottom: 0 }}
-              autoComplete="off"
-              textContentType="none"
               error={fieldErrors.password}
               helperText={t.auth.createIdentity.passphraseMinHint}
             />
@@ -191,8 +187,6 @@ const CreateIdentityScreen = ({ navigation }: CreateIdentityScreenProps) => {
               onChangeText={setConfirmPassword}
               editable={!isCreateDisabled}
               containerStyle={{ marginBottom: 0 }}
-              autoComplete="off"
-              textContentType="none"
               error={fieldErrors.confirmPassword}
             />
             <Text

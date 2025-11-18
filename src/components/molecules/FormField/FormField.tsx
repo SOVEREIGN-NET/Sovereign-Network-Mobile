@@ -16,6 +16,7 @@ export interface FormFieldProps extends Omit<RNTextInputProps, 'style' | 'error'
   helperText?: string;
   containerStyle?: any;
   textInputStyle?: any;
+  rightIcon?: React.ReactNode;
 }
 
 export const FormField = React.forwardRef<any, FormFieldProps>(
@@ -27,6 +28,7 @@ export const FormField = React.forwardRef<any, FormFieldProps>(
       helperText,
       containerStyle,
       textInputStyle,
+      rightIcon,
       ...inputProps
     },
     ref
@@ -47,8 +49,9 @@ export const FormField = React.forwardRef<any, FormFieldProps>(
         <Input
           ref={ref}
           {...inputProps}
-          error={error ?? undefined}
-          textInputStyle={textInputStyle}
+          error={error || undefined}
+          textInputStyle={textInputStyle || undefined}
+          rightIcon={rightIcon}
         />
         {helperText && !error && (
           <Text

@@ -32,7 +32,9 @@ export const Select: React.FC<SelectProps> = ({
   disabled = false,
 }) => {
   const [isOpen, setIsOpen] = useState(false);
-  const selectedOption = options.find((opt) => opt.id === selectedId);
+  // Filter out options with missing labels to prevent nil insertion errors
+  const validOptions = options.filter(opt => opt.label && opt.label.length > 0);
+  const selectedOption = validOptions.find((opt) => opt.id === selectedId);
 
   const handleSelect = (id: string | number) => {
     onSelect(id);
@@ -117,7 +119,7 @@ export const Select: React.FC<SelectProps> = ({
               showsVerticalScrollIndicator={false}
               style={{ paddingHorizontal: 0 }}
             >
-              {options.map((option) => {
+              {validOptions.map((option) => {
                 const isSelected = option.id === selectedId;
                 return (
                   <Pressable
