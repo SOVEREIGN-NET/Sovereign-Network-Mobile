@@ -55,5 +55,24 @@ target 'SovereignNetworkMobile' do
         ]
       end
     end
+
+    # Patch React Native TextInput to disable Safari password autofill
+    # Prevents crash in _SFPasswordViewController when password fields are present
+    react_native_path = File.join(Pod::Config.instance.installation_root, config[:reactNativePath])
+    rct_text_input_path = File.join(react_native_path, 'React/Views/RCTTextInputView.m')
+
+    if File.exist?(rct_text_input_path)
+      content = File.read(rct_text_input_path)
+
+      # Check if patch already applied
+      unless content.include?('textInputView.textContentType = UITextContentTypeOneTimeCode')
+        # Find becomeFirstResponder method and add patch before it
+        patch = 'textInputView.textContentType = UITextContentTypeOneTimeCode;'
+        if content.gsub!(/(\[.*?becomeFirstResponder\])/, "#{patch}\n\\1")
+          File.write(rct_text_input_path, content)
+          puts "[PATCH] Applied Safari autofill disable to RCTTextInputView.m"
+        end
+      end
+    end
   end
 end

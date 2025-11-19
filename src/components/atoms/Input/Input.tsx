@@ -1,16 +1,16 @@
 import React, { useState } from 'react';
 import {
   View,
-  TextInput as RNTextInput,
+  TextInput,
   Text,
   StyleSheet,
   ViewStyle,
   TextStyle,
-  TextInputProps as RNTextInputProps,
+  TextInputProps,
 } from 'react-native';
 import { colors, spacing, typography, borderRadius } from '../../../theme';
 
-export interface InputProps extends Omit<RNTextInputProps, 'style'> {
+export interface InputProps extends Omit<TextInputProps, 'style'> {
   label?: string;
   error?: string;
   hint?: string;
@@ -21,7 +21,7 @@ export interface InputProps extends Omit<RNTextInputProps, 'style'> {
   textInputStyle?: TextStyle;
 }
 
-const styles = StyleSheet.create({
+const baseStyles = StyleSheet.create({
   container: {
     marginBottom: spacing.md,
   },
@@ -32,21 +32,6 @@ const styles = StyleSheet.create({
     fontSize: typography.size.sm,
     color: colors.text_primary,
     fontWeight: '600' as const,
-  },
-  inputWrapper: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    backgroundColor: colors.bg_medium,
-    borderRadius: borderRadius.base,
-    paddingHorizontal: spacing.lg,
-    borderWidth: 1,
-    borderColor: colors.border,
-  },
-  inputWrapperFocused: {
-    borderColor: colors.primary,
-  },
-  inputWrapperError: {
-    borderColor: colors.error,
   },
   icon: {
     fontSize: typography.size.lg,
@@ -81,97 +66,113 @@ const styles = StyleSheet.create({
   },
 });
 
-export const Input = React.memo(
-  React.forwardRef<RNTextInput, InputProps>(
-    (
-      {
+export const Input = React.forwardRef<TextInput | null, InputProps>(
+  (
+    {
+      label,
+      error,
+      hint,
+      leftIcon,
+      rightIcon,
+      containerStyle,
+      style,
+      textInputStyle,
+      onFocus,
+      onBlur,
+      ...props
+    },
+    ref,
+  ) => {
+      const [isFocused, setIsFocused] = useState(false);
+
+      console.log('📥 Input component received props:', {
         label,
         error,
         hint,
         leftIcon,
-        rightIcon,
+        rightIcon: rightIcon ? 'present' : 'none',
         containerStyle,
         style,
         textInputStyle,
-        onFocus,
-        onBlur,
-        ...props
-      },
-      ref,
-    ) => {
-      const [isFocused, setIsFocused] = useState(false);
+        ...Object.fromEntries(
+          Object.entries(props).filter(([_, v]) => v !== undefined && v !== null)
+        ),
+      });
 
       const handleFocus = (e: any) => {
+        console.log('🔥 Input.onFocus TRIGGERED - Field becoming active:', {
+          label,
+          error,
+          allProps: props,
+        });
         setIsFocused(true);
         onFocus?.(e);
       };
 
       const handleBlur = (e: any) => {
+        console.log('🔍 Input.onBlur triggered', { label });
         setIsFocused(false);
         onBlur?.(e);
       };
 
-      const wrapperStyles: any[] = [styles.inputWrapper];
-      if (isFocused && styles.inputWrapperFocused) {
-        wrapperStyles.push(styles.inputWrapperFocused);
-      }
-      if (error && styles.inputWrapperError) {
-        wrapperStyles.push(styles.inputWrapperError);
-      }
-      if (style) {
-        wrapperStyles.push(style);
-      }
-
-      const inputStyles: any[] = [styles.input];
-      if (textInputStyle) {
-        inputStyles.push(textInputStyle);
-      }
+      const borderColor = error ? '#ff6b6b' : isFocused ? '#00d4ff' : 'rgba(255, 0, 212, 0.06)';
 
       return (
-        <View style={containerStyle ? [styles.container, containerStyle] : styles.container}>
+        <View style={[baseStyles.container, containerStyle]}>
           {label && (
-            <View style={styles.labelContainer}>
-              <Text style={styles.label}>{label}</Text>
+            <View style={baseStyles.labelContainer}>
+              <Text style={baseStyles.label}>{label}</Text>
             </View>
           )}
 
-          <View style={wrapperStyles}>
-            {leftIcon && <Text style={styles.icon}>{leftIcon}</Text>}
+          <View
+            style={{
+              flexDirection: 'row',
+              alignItems: 'center',
+              backgroundColor: '#2f2f2f',
+              borderRadius: 10,
+              paddingHorizontal: 18,
+              borderWidth: 1,
+              borderColor,
+            }}
+          >
+            {leftIcon && <Text style={baseStyles.icon}>{leftIcon}</Text>}
 
-            <RNTextInput
+            <TextInput
               ref={ref}
-              style={inputStyles}
-              placeholderTextColor={colors.text_tertiary}
+              style={baseStyles.input}
+              placeholderTextColor="#888888"
               onFocus={handleFocus}
               onBlur={handleBlur}
-              {...props}
+              {...Object.fromEntries(
+                Object.entries(props).filter(([_, v]) => v !== undefined && v !== null)
+              )}
             />
 
             {rightIcon && typeof rightIcon === 'string' && (
-              <Text style={[styles.icon, styles.rightIcon]}>{rightIcon}</Text>
+              <Text style={[baseStyles.icon, baseStyles.rightIcon]}>{rightIcon}</Text>
             )}
             {rightIcon && typeof rightIcon !== 'string' && (
-              <View style={[styles.icon, styles.rightIcon]}>
+              <View style={[baseStyles.icon, baseStyles.rightIcon]}>
                 {rightIcon}
               </View>
             )}
           </View>
 
           {error && (
-            <View style={styles.errorContainer}>
-              <Text style={styles.errorText}>{error}</Text>
+            <View style={baseStyles.errorContainer}>
+              <Text style={baseStyles.errorText}>{error}</Text>
             </View>
           )}
 
           {!error && hint && (
-            <View style={styles.hintContainer}>
-              <Text style={styles.hintText}>{hint}</Text>
+            <View style={baseStyles.hintContainer}>
+              <Text style={baseStyles.hintText}>{hint}</Text>
             </View>
           )}
         </View>
       );
-    },
-  ),
+    }
 );
 
 Input.displayName = 'Input';

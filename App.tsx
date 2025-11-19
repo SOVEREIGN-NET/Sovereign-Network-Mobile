@@ -30,10 +30,10 @@ function AppContent() {
     );
   }
 
-  const { isAuthenticated, isLoading } = authContext;
+  const { isAuthenticated, isBootstrapping } = authContext;
 
   // Show loading indicator while checking auth state
-  if (isLoading) {
+  if (isBootstrapping) {
     return (
       <View
         style={{

@@ -16,7 +16,6 @@ export interface PasswordFieldProps extends Omit<RNTextInputProps, 'style' | 'er
   required?: boolean;
   helperText?: string;
   containerStyle?: any;
-  textInputStyle?: any;
 }
 
 export const PasswordField = React.forwardRef<any, PasswordFieldProps>(
@@ -45,6 +44,8 @@ export const PasswordField = React.forwardRef<any, PasswordFieldProps>(
           containerStyle={containerStyle}
           textInputStyle={textInputStyle}
           secureTextEntry={!isVisible}
+          textContentType="none"
+          autoComplete="off"
           rightIcon={
             <Pressable
               onPress={() => setIsVisible(!isVisible)}

@@ -10,17 +10,15 @@ import { NativeStorage } from '../services/NativeStorage';
 import MockAuthService, { Identity } from '../services/MockAuthService';
 import type { CreateIdentityData } from '../services/RealAuthService';
 
-// Toggle between mock and real auth service
-// Set to false to use real API backend
-// In development, set REACT_APP_USE_REAL_AUTH=true to use real service
-const USE_REAL_AUTH = process.env.REACT_APP_USE_REAL_AUTH === 'true';
-const USE_MOCK_SERVICE = !USE_REAL_AUTH && __DEV__;
+// Always import RealAuthService, use it when node is available
+import RealAuthServiceModule from '../services/RealAuthService';
 
-// Import based on configuration
-let RealAuthService: any = null;
-if (USE_REAL_AUTH || !__DEV__) {
-  RealAuthService = require('../services/RealAuthService').default;
-}
+// Toggle between mock and real auth service
+// In development, set REACT_APP_USE_MOCK_AUTH=true to use mock service for testing
+const USE_MOCK_SERVICE = process.env.REACT_APP_USE_MOCK_AUTH === 'true' && __DEV__;
+
+// Use real auth service instance
+const RealAuthService = RealAuthServiceModule;
 
 // Use native storage on Android, AsyncStorage on iOS
 const storage = Platform.OS === 'android' ? NativeStorage : AsyncStorage;
@@ -29,6 +27,7 @@ export interface AuthContextType {
   currentIdentity: Identity | null;
   isAuthenticated: boolean;
   isLoading: boolean;
+  isBootstrapping: boolean;
   error: string | null;
   signIn: (identity_id: string, password: string) => Promise<Identity>;
   createIdentity: (data: CreateIdentityData) => Promise<Identity>;
@@ -38,6 +37,7 @@ export interface AuthContextType {
   updateProfile: (displayName: string, avatar?: string) => Promise<void>;
   updatePassphrase: (newPassphrase: string) => Promise<void>;
   updateBiometric: (enabled: boolean) => Promise<void>;
+  setCurrentIdentity: (identity: Identity) => Promise<void>;
 }
 
 export const AuthContext = createContext<AuthContextType | undefined>(undefined);
@@ -52,7 +52,8 @@ interface AuthProviderProps {
  */
 export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
   const [currentIdentity, setCurrentIdentity] = useState<Identity | null>(null);
-  const [isLoading, setIsLoading] = useState(true);
+  const [isLoading, setIsLoading] = useState(false);
+  const [isBootstrapping, setIsBootstrapping] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
   /**
@@ -64,13 +65,14 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
         const saved = await storage.getItem('zhtp_identity');
         if (saved) {
           const identity = JSON.parse(saved);
+          console.log('🔐 AuthContext: Restoring identity from storage:', identity.did);
           setCurrentIdentity(identity);
         }
       } catch (err) {
         console.error('Failed to restore identity:', err);
         // Continue with no identity if restoration fails
       } finally {
-        setIsLoading(false);
+        setIsBootstrapping(false);
       }
     };
 
@@ -129,13 +131,12 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
           acceptedTerms: true,
         });
       } else {
-        identity = await RealAuthService.createIdentity(data);
+        identity = await RealAuthService!.createIdentity(data);
       }
 
-      // Save to storage
-      await storage.setItem('zhtp_identity', JSON.stringify(identity));
-
-      setCurrentIdentity(identity);
+      // Don't save to storage or set as currentIdentity yet
+      // The CreateIdentityScreen will show seed phrases first
+      // Only save to storage after user confirms via SeedPhraseScreen
       return identity;
     } catch (err: any) {
       const message = err.message || 'Identity creation failed';
@@ -313,10 +314,28 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
     setError(null);
   }, []);
 
+  /**
+   * Manually set the current identity
+   * Used after saving identity to storage (e.g., after seed phrase confirmation)
+   */
+  const setIdentity = useCallback(async (identity: Identity) => {
+    try {
+      console.log('🔐 AuthContext.setIdentity: Setting identity:', identity.did);
+      await storage.setItem('zhtp_identity', JSON.stringify(identity));
+      console.log('✅ AuthContext: Identity saved to storage, calling setCurrentIdentity');
+      setCurrentIdentity(identity);
+    } catch (err: any) {
+      const message = err.message || 'Failed to set identity';
+      setError(message);
+      throw err;
+    }
+  }, []);
+
   const value = useMemo<AuthContextType>(() => ({
     currentIdentity,
     isAuthenticated: currentIdentity !== null,
     isLoading,
+    isBootstrapping,
     error,
     signIn,
     createIdentity,
@@ -326,7 +345,8 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
     updateProfile,
     updatePassphrase,
     updateBiometric,
-  }), [currentIdentity, isLoading, error, signIn, createIdentity, recoverIdentity, signOut, clearError, updateProfile, updatePassphrase, updateBiometric]);
+    setCurrentIdentity: setIdentity,
+  }), [currentIdentity, isLoading, isBootstrapping, error, signIn, createIdentity, recoverIdentity, signOut, clearError, updateProfile, updatePassphrase, updateBiometric, setIdentity]);
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
 };

@@ -3,7 +3,7 @@
  * Display and confirm seed phrases after identity creation
  */
 
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { View, ScrollView, Pressable } from 'react-native';
 import { NativeStackScreenProps } from '@react-navigation/native-stack';
 import {
@@ -18,6 +18,7 @@ import {
   Checkbox,
 } from '../components';
 import { useTranslation } from '../i18n';
+import { useAuth } from '../hooks';
 import { colors, spacing, typography, borderRadius } from '../theme';
 import { AuthStackParamList } from '../navigation/AuthNavigator';
 
@@ -25,10 +26,21 @@ type SeedPhraseScreenProps = NativeStackScreenProps<AuthStackParamList, 'SeedPhr
 
 const SeedPhraseScreen = ({ navigation, route }: SeedPhraseScreenProps) => {
   const { t } = useTranslation();
-  const { seedPhrases, walletType = 'primary' } = route.params || {};
+  const { seedPhrases, walletType = 'primary', identity } = route.params || {};
+  const { setCurrentIdentity } = useAuth();
   const [copied, setCopied] = useState(false);
   const [confirmedSaved, setConfirmedSaved] = useState(false);
   const [showPhrase, setShowPhrase] = useState(false);
+  const [isSaving, setIsSaving] = useState(false);
+
+  useEffect(() => {
+    console.log('🌱 SeedPhraseScreen mounted', {
+      hasSeedPhrases: !!seedPhrases,
+      seedPhraseCount: seedPhrases?.length,
+      hasIdentity: !!identity,
+      identityDid: identity?.did,
+    });
+  }, [seedPhrases, identity]);
 
   if (!seedPhrases || !Array.isArray(seedPhrases)) {
     return (
@@ -56,12 +68,28 @@ const SeedPhraseScreen = ({ navigation, route }: SeedPhraseScreenProps) => {
     setTimeout(() => setCopied(false), 2000);
   };
 
-  const handleContinue = () => {
+  const handleContinue = async () => {
     if (!confirmedSaved) {
       return;
     }
-    // Navigate to next screen or main app
-    navigation.navigate('SignIn');
+
+    setIsSaving(true);
+    try {
+      // Get the identity object from route params (passed from CreateIdentityScreen)
+      if (identity) {
+        // Save identity to storage and set in auth context
+        await setCurrentIdentity(identity);
+        console.log('✅ Identity saved after seed phrase confirmation:', identity.did);
+
+        // Navigate back - the app will now detect the authenticated state
+        // and switch to the main app automatically
+        navigation.goBack();
+      }
+    } catch (err) {
+      console.error('❌ Failed to save identity:', err);
+    } finally {
+      setIsSaving(false);
+    }
   };
 
   return (
@@ -241,8 +269,8 @@ const SeedPhraseScreen = ({ navigation, route }: SeedPhraseScreenProps) => {
             actions={[
               {
                 label: t.auth.seedPhrase.continueButton,
-                onPress: handleContinue,
-                disabled: !confirmedSaved,
+                onPress: () => void handleContinue().catch(() => {}),
+                disabled: !confirmedSaved || isSaving,
               },
               {
                 label: t.app.back,

@@ -1,8 +1,3 @@
-/**
- * CreateIdentityScreen
- * Screen for creating a new ZK-DID identity
- */
-
 import React, { useState } from 'react';
 import { NativeStackScreenProps } from '@react-navigation/native-stack';
 import {
@@ -18,6 +13,8 @@ import {
   Badge,
   Select,
   Checkbox,
+  Button,
+  Modal,
 } from '../components';
 import { useAuth, useNodeConnection } from '../hooks';
 import { useTranslation } from '../i18n';
@@ -28,7 +25,7 @@ type CreateIdentityScreenProps = NativeStackScreenProps<AuthStackParamList, 'Cre
 
 const CreateIdentityScreen = ({ navigation }: CreateIdentityScreenProps) => {
   const { t } = useTranslation();
-  const { createIdentity, isLoading } = useAuth();
+  const { createIdentity } = useAuth();
   const { isConnected, isLoading: nodeLoading } = useNodeConnection(true);
 
   // Form state
@@ -39,6 +36,8 @@ const CreateIdentityScreen = ({ navigation }: CreateIdentityScreenProps) => {
   const [password, setPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
   const [acceptedTerms, setAcceptedTerms] = useState(false);
+  const [isPassphraseModalVisible, setIsPassphraseModalVisible] = useState(false);
+  const [isCreatingIdentity, setIsCreatingIdentity] = useState(false);
   const [fieldErrors, setFieldErrors] = useState<{
     displayName?: string;
     password?: string;
@@ -83,33 +82,71 @@ const CreateIdentityScreen = ({ navigation }: CreateIdentityScreenProps) => {
       return;
     }
 
+    setIsCreatingIdentity(true);
+
+    const backendType = identityType === 'citizen' ? 'human' : identityType;
+
     createIdentity({
       display_name: displayName.trim(),
       password,
-      identity_type: identityType,
+      identity_type: backendType,
       recovery_options: [],
     }).then((identity) => {
-      // Show seed phrases if available
-      if (identity?.seedPhrases) {
+      if (identity?.seedPhrases?.primary?.length) {
+        console.log('✅ Identity created, navigating to SeedPhrase:', identity.did);
         navigation.navigate('SeedPhrase', {
           seedPhrases: identity.seedPhrases.primary,
           walletType: 'primary',
+          identity,
         });
       } else {
-        // Fallback: reset form and app will detect authenticated state
+        console.warn('⚠️ Identity created but no seed phrases returned');
         setDisplayName('');
         setPassword('');
         setConfirmPassword('');
         setAcceptedTerms(false);
       }
-    }).catch(() => {
-      // Error is handled by auth context and displayed via error state
+    }).catch((err) => {
+      console.error('❌ Identity creation error:', err);
+    }).finally(() => {
+      setIsCreatingIdentity(false);
     });
   };
 
-  const isCreateDisabled = isLoading || nodeLoading || !isConnected;
+  const isCreateDisabled = isCreatingIdentity || nodeLoading || !isConnected;
+  const isPassphraseSet = password.length >= 8 && password === confirmPassword;
 
-  if (isLoading) {
+  const validatePassphraseFields = () => {
+    const errors: typeof fieldErrors = {};
+
+    if (!password) {
+      errors.password = t.auth.createIdentity.validation.passphraseRequired;
+    } else if (password.length < 8) {
+      errors.password = t.auth.createIdentity.validation.passphraseTooShort;
+    }
+
+    if (password && confirmPassword && password !== confirmPassword) {
+      errors.confirmPassword = t.auth.createIdentity.validation.passphraseNoMatch;
+    }
+
+    if (Object.keys(errors).length > 0) {
+      setFieldErrors(prev => ({
+        ...prev,
+        password: errors.password,
+        confirmPassword: errors.confirmPassword,
+      }));
+      return false;
+    }
+
+    setFieldErrors(prev => ({
+      ...prev,
+      password: undefined,
+      confirmPassword: undefined,
+    }));
+    return true;
+  };
+
+  if (isCreatingIdentity) {
     return <LoadingView />;
   }
 
@@ -161,42 +198,62 @@ const CreateIdentityScreen = ({ navigation }: CreateIdentityScreenProps) => {
             value={displayName}
             onChangeText={setDisplayName}
             editable={!isCreateDisabled}
-            helperText={!fieldErrors.displayName ? t.auth.createIdentity.displayNameHint : undefined}
+            helperText={t.auth.createIdentity.displayNameHint}
             error={fieldErrors.displayName}
             containerStyle={{ marginBottom: 0 }}
+            textContentType="none"
+            autoComplete="off"
+            autoCapitalize="words"
+            autoCorrect={false}
+            importantForAutofill="no"
+            spellCheck={false}
           />
         </Card>
 
-        {/* Password Input */}
+        {/* Passphrase Summary */}
         <Card>
           <Column gap="md">
-            <PasswordField
-              label={t.auth.createIdentity.passphrase}
-              placeholder={t.auth.createIdentity.passphraseMinHint}
-              value={password}
-              onChangeText={setPassword}
-              editable={!isCreateDisabled}
-              containerStyle={{ marginBottom: 0 }}
-              error={fieldErrors.password}
-              helperText={t.auth.createIdentity.passphraseMinHint}
-            />
-            <PasswordField
-              label={t.auth.createIdentity.passphraseConfirm}
-              placeholder={t.auth.createIdentity.passphraseConfirm}
-              value={confirmPassword}
-              onChangeText={setConfirmPassword}
-              editable={!isCreateDisabled}
-              containerStyle={{ marginBottom: 0 }}
-              error={fieldErrors.confirmPassword}
-            />
+            <Row style={{ justifyContent: 'space-between', alignItems: 'center' }}>
+              <Text
+                style={{
+                  fontSize: typography.size.sm,
+                  fontWeight: typography.weight.semibold,
+                  color: colors.text_primary,
+                }}
+              >
+                {t.auth.createIdentity.passphrase}
+              </Text>
+              <Badge
+                label={
+                  isPassphraseSet
+                    ? t.auth.createIdentity.passphraseStatus.secure
+                    : t.auth.createIdentity.passphraseStatus.pending
+                }
+                variant={isPassphraseSet ? 'success' : 'warning'}
+              />
+            </Row>
             <Text
               style={{
                 fontSize: typography.size.xs,
-                color: colors.text_tertiary,
+                color: colors.text_secondary,
               }}
             >
-              {t.auth.createIdentity.passphraseBlankHint}
+              {t.auth.createIdentity.passphraseStatus.description}
             </Text>
+            {(fieldErrors.password || fieldErrors.confirmPassword) && (
+              <Text style={{ color: colors.error, fontSize: typography.size.xs }}>
+                {fieldErrors.password || fieldErrors.confirmPassword}
+              </Text>
+            )}
+            <Button
+              onPress={() => setIsPassphraseModalVisible(true)}
+              variant="secondary"
+              disabled={isCreateDisabled}
+            >
+              {isPassphraseSet
+                ? t.auth.createIdentity.passphraseStatus.updateButton
+                : t.auth.createIdentity.passphraseStatus.setButton}
+            </Button>
           </Column>
         </Card>
 
@@ -254,17 +311,87 @@ const CreateIdentityScreen = ({ navigation }: CreateIdentityScreenProps) => {
               label: t.auth.createIdentity.button,
               onPress: () => void handleCreateIdentity().catch(() => {}),
               disabled: isCreateDisabled,
-              loading: isLoading,
+              loading: isCreatingIdentity,
             },
             {
               label: t.app.back,
               onPress: () => navigation.goBack(),
               variant: 'secondary' as const,
-              disabled: isLoading,
+              disabled: isCreatingIdentity,
             },
           ]}
         />
       </Column>
+
+      <Modal
+        visible={isPassphraseModalVisible}
+        onClose={() => setIsPassphraseModalVisible(false)}
+        title={t.auth.createIdentity.passphraseModal.title}
+        closeOnBackdropPress={false}
+      >
+        <Column gap="md">
+          <Text
+            style={{
+              fontSize: typography.size.xs,
+              color: colors.text_secondary,
+            }}
+          >
+            {t.auth.createIdentity.passphraseModal.description}
+          </Text>
+          <PasswordField
+            label={t.auth.createIdentity.passphrase}
+            placeholder={t.auth.createIdentity.passphraseMinHint}
+            value={password}
+            onChangeText={setPassword}
+            helperText={t.auth.createIdentity.passphraseMinHint}
+            error={fieldErrors.password}
+            textContentType="none"
+            autoComplete="off"
+            importantForAutofill="no"
+            autoCapitalize="none"
+            autoCorrect={false}
+            spellCheck={false}
+          />
+          <PasswordField
+            label={t.auth.createIdentity.passphraseConfirm}
+            placeholder={t.auth.createIdentity.passphraseConfirm}
+            value={confirmPassword}
+            onChangeText={setConfirmPassword}
+            error={fieldErrors.confirmPassword}
+            textContentType="none"
+            autoComplete="off"
+            importantForAutofill="no"
+            autoCapitalize="none"
+            autoCorrect={false}
+            spellCheck={false}
+          />
+          <Text
+            style={{
+              fontSize: typography.size.xs,
+              color: colors.text_tertiary,
+            }}
+          >
+            {t.auth.createIdentity.passphraseBlankHint}
+          </Text>
+          <Row gap="md" style={{ justifyContent: 'flex-end' }}>
+            <Button
+              variant="secondary"
+              onPress={() => setIsPassphraseModalVisible(false)}
+            >
+              {t.auth.createIdentity.passphraseModal.cancel}
+            </Button>
+            <Button
+              onPress={() => {
+                if (validatePassphraseFields()) {
+                  setIsPassphraseModalVisible(false);
+                }
+              }}
+            >
+              {t.auth.createIdentity.passphraseModal.save}
+            </Button>
+          </Row>
+        </Column>
+      </Modal>
     </ScreenLayout>
   );
 };
