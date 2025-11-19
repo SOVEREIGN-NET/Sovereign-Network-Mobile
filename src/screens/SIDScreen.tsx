@@ -44,6 +44,30 @@ const SIDScreen = ({ navigation }: any) => {
 
   const drawerItems: DrawerItem[] = [
     {
+      id: 'history',
+      label: 'History',
+      icon: '',
+      onPress: () => {
+        navigation.navigate('History');
+      },
+    },
+    {
+      id: 'bookmarks',
+      label: 'Bookmarks',
+      icon: '',
+      onPress: () => {
+        navigation.navigate('Bookmarks');
+      },
+    },
+    {
+      id: 'favorites',
+      label: 'Favorites',
+      icon: '',
+      onPress: () => {
+        navigation.navigate('Favorites');
+      },
+    },
+    {
       id: 'settings',
       label: 'App Settings',
       icon: '',

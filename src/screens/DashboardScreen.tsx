@@ -79,7 +79,7 @@ const DashboardScreen = ({ navigation }: any) => {
       label: 'History',
       icon: '',
       onPress: () => {
-        // TODO: Navigate to history
+        navigation.navigate('SIDTab', { screen: 'History' });
       },
     },
     {
@@ -87,7 +87,7 @@ const DashboardScreen = ({ navigation }: any) => {
       label: 'Bookmarks',
       icon: '',
       onPress: () => {
-        // TODO: Navigate to bookmarks
+        navigation.navigate('SIDTab', { screen: 'Bookmarks' });
       },
     },
     {
@@ -95,15 +95,15 @@ const DashboardScreen = ({ navigation }: any) => {
       label: 'Favorites',
       icon: '',
       onPress: () => {
-        // TODO: Navigate to favorites
+        navigation.navigate('SIDTab', { screen: 'Favorites' });
       },
     },
     {
       id: 'settings',
-      label: 'Settings',
+      label: 'App Settings',
       icon: '',
       onPress: () => {
-        navigation.navigate('AppSettings');
+        navigation.navigate('SIDTab', { screen: 'AppSettings' });
       },
     },
   ];

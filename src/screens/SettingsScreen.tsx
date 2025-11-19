@@ -1,5 +1,7 @@
-import React, { useState } from 'react';
-import { View, Alert, Pressable, useColorScheme } from 'react-native';
+import React, { useState, useEffect } from 'react';
+import { View, Alert, Pressable, useColorScheme, ScrollView, TextInput } from 'react-native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import {
   Card,
   Text,
@@ -7,15 +9,18 @@ import {
   Column,
   Row,
   ScreenLayout,
+  HeaderBar,
 } from '../components';
 import { useAuth } from '../hooks';
 import { useTranslation } from '../i18n';
 import { colors, spacing, typography, borderRadius } from '../theme';
+import { setUseMockService } from '../context/AuthContext';
 
 type Theme = 'light' | 'dark' | 'system';
 type Language = 'en' | 'es' | 'fr' | 'de';
 
-const SettingsScreen = ({ _navigation }: any) => {
+const SettingsScreen = ({ navigation }: any) => {
+  const insets = useSafeAreaInsets();
   const { t } = useTranslation();
   const { signOut, isLoading } = useAuth();
   const deviceColorScheme = useColorScheme();
@@ -29,6 +34,30 @@ const SettingsScreen = ({ _navigation }: any) => {
   const [showThemeOptions, setShowThemeOptions] = useState(false);
   const [showLanguageOptions, setShowLanguageOptions] = useState(false);
   const [showFontOptions, setShowFontOptions] = useState(false);
+
+  // Developer settings
+  const [useMockData, setUseMockData] = useState(true);
+  const [nodeUrl, setNodeUrl] = useState('http://192.168.1.31:9333');
+
+  // Load developer settings on mount
+  useEffect(() => {
+    const loadDeveloperSettings = async () => {
+      try {
+        const mockDataSetting = await AsyncStorage.getItem('useMockData');
+        const nodeUrlSetting = await AsyncStorage.getItem('nodeUrl');
+
+        if (mockDataSetting !== null) {
+          setUseMockData(mockDataSetting === 'true');
+        }
+        if (nodeUrlSetting !== null) {
+          setNodeUrl(nodeUrlSetting);
+        }
+      } catch (error) {
+        console.warn('Failed to load developer settings:', error);
+      }
+    };
+    loadDeveloperSettings();
+  }, []);
 
   const handleLogout = () => {
     Alert.alert(
@@ -87,6 +116,21 @@ const SettingsScreen = ({ _navigation }: any) => {
     );
   };
 
+  const handleSaveDeveloperSettings = async () => {
+    try {
+      await AsyncStorage.setItem('useMockData', useMockData.toString());
+      await AsyncStorage.setItem('nodeUrl', nodeUrl);
+
+      // Update the global feature flag
+      setUseMockService(useMockData);
+
+      Alert.alert(t.settings.developer.saved, `Mock Data: ${useMockData}\nNode URL: ${nodeUrl}`);
+    } catch (error) {
+      Alert.alert('Error', 'Failed to save developer settings');
+      console.error('Failed to save developer settings:', error);
+    }
+  };
+
   const getThemeLabel = () => {
     if (theme === 'system') {
       return deviceColorScheme === 'dark'
@@ -110,8 +154,19 @@ const SettingsScreen = ({ _navigation }: any) => {
   };
 
   return (
-    <ScreenLayout>
-      <Column gap="xl">
+    <View style={{ flex: 1, backgroundColor: colors.bg_darkest }}>
+      <HeaderBar
+        onMenuPress={() => {
+          // Settings doesn't have a drawer menu
+        }}
+        onBLEPress={() => {
+          // TODO: Handle BLE connection
+        }}
+      />
+
+      <ScreenLayout paddingTop={spacing.md}>
+        <ScrollView showsVerticalScrollIndicator={false}>
+        <Column gap="xl">
           {/* Display Settings */}
           <Card>
             <Text
@@ -152,9 +207,9 @@ const SettingsScreen = ({ _navigation }: any) => {
                   }}
                 >
                   <Text style={{ color: colors.text_primary }}>
-                    🎨 {currentTheme}
+                    {currentTheme}
                   </Text>
-                  <Text style={{ color: colors.primary }}>
+                  <Text style={{ color: colors.text_secondary }}>
                     {showThemeOptions ? '▲' : '▼'}
                   </Text>
                 </Pressable>
@@ -217,9 +272,9 @@ const SettingsScreen = ({ _navigation }: any) => {
                   }}
                 >
                   <Text style={{ color: colors.text_primary }}>
-                    📝 {fontSizeLabel}
+                    {fontSizeLabel}
                   </Text>
-                  <Text style={{ color: colors.primary }}>
+                  <Text style={{ color: colors.text_secondary }}>
                     {showFontOptions ? '▲' : '▼'}
                   </Text>
                 </Pressable>
@@ -259,6 +314,118 @@ const SettingsScreen = ({ _navigation }: any) => {
             </Column>
           </Card>
 
+          {/* Developer Settings */}
+          <Card>
+            <Text
+              style={{
+                fontSize: typography.size.sm,
+                fontWeight: typography.weight.semibold,
+                color: colors.text_primary,
+                marginBottom: spacing.md,
+              }}
+            >
+              {t.settings.developer.title}
+            </Text>
+
+            <Column gap="md">
+              {/* Mock Data Toggle */}
+              <Row
+                style={{
+                  justifyContent: 'space-between',
+                  alignItems: 'center',
+                }}
+              >
+                <Column style={{ flex: 1 }}>
+                  <Text
+                    style={{
+                      fontSize: typography.size.sm,
+                      fontWeight: typography.weight.semibold,
+                      color: colors.text_primary,
+                    }}
+                  >
+                    {t.settings.developer.mockData}
+                  </Text>
+                  <Text
+                    style={{
+                      fontSize: typography.size.xs,
+                      color: colors.text_secondary,
+                      marginTop: spacing.xs,
+                    }}
+                  >
+                    {t.settings.developer.mockDataDescription}
+                  </Text>
+                </Column>
+                <Pressable
+                  onPress={() => setUseMockData(!useMockData)}
+                  style={{
+                    backgroundColor: useMockData ? colors.success : colors.bg_light,
+                    width: 50,
+                    height: 28,
+                    borderRadius: 14,
+                    justifyContent: 'center',
+                    alignItems: useMockData ? 'flex-end' : 'flex-start',
+                    paddingHorizontal: 2,
+                  }}
+                >
+                  <View
+                    style={{
+                      width: 24,
+                      height: 24,
+                      borderRadius: 12,
+                      backgroundColor: colors.white,
+                    }}
+                  />
+                </Pressable>
+              </Row>
+
+              {/* Node URL Input */}
+              <View>
+                <Text
+                  style={{
+                    fontSize: typography.size.xs,
+                    fontWeight: typography.weight.semibold,
+                    color: colors.text_primary,
+                    marginBottom: spacing.sm,
+                  }}
+                >
+                  {t.settings.developer.nodeUrl}
+                </Text>
+                <TextInput
+                  value={nodeUrl}
+                  onChangeText={setNodeUrl}
+                  placeholder={t.settings.developer.nodeUrlPlaceholder}
+                  placeholderTextColor={colors.text_tertiary}
+                  style={{
+                    backgroundColor: colors.bg_darker,
+                    color: colors.text_primary,
+                    padding: spacing.md,
+                    borderRadius: borderRadius.base,
+                    borderWidth: 1,
+                    borderColor: colors.border,
+                    fontSize: typography.size.sm,
+                  }}
+                />
+                <Text
+                  style={{
+                    fontSize: typography.size.xs,
+                    color: colors.text_secondary,
+                    marginTop: spacing.xs,
+                  }}
+                >
+                  {t.settings.developer.nodeUrlHint}
+                </Text>
+              </View>
+
+              {/* Save Button */}
+              <Button
+                variant="secondary"
+                onPress={handleSaveDeveloperSettings}
+              >
+                {t.settings.developer.save}
+              </Button>
+            </Column>
+          </Card>
+
           {/* Language Settings */}
           <Card>
             <Text
@@ -286,9 +453,9 @@ const SettingsScreen = ({ _navigation }: any) => {
               }}
             >
               <Text style={{ color: colors.text_primary }}>
-                🌐 {languageLabel}
+                {languageLabel}
               </Text>
-              <Text style={{ color: colors.primary }}>
+              <Text style={{ color: colors.text_secondary }}>
                 {showLanguageOptions ? '▲' : '▼'}
               </Text>
             </Pressable>
@@ -594,9 +761,6 @@ const SettingsScreen = ({ _navigation }: any) => {
               <Button
                 variant="secondary"
                 onPress={handleResetSettings}
-                style={{
-                  backgroundColor: colors.warning,
-                }}
               >
                 {t.settings.danger.resetSettings}
               </Button>
@@ -605,20 +769,18 @@ const SettingsScreen = ({ _navigation }: any) => {
                 variant="secondary"
                 onPress={handleLogout}
                 disabled={isLoading}
-                style={{
-                  backgroundColor: colors.error,
-                  opacity: isLoading ? 0.6 : 1,
-                }}
               >
                 {isLoading ? t.settings.danger.loggingOut : t.settings.danger.logout}
               </Button>
             </Column>
           </Card>
 
-        {/* Footer spacing */}
-        <View style={{ height: spacing.xl }} />
-      </Column>
-    </ScreenLayout>
+          {/* Footer spacing */}
+          <View style={{ height: spacing.xl }} />
+        </Column>
+        </ScrollView>
+      </ScreenLayout>
+    </View>
   );
 };
 

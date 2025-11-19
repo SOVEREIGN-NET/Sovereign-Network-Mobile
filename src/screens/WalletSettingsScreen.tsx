@@ -17,7 +17,7 @@ import { colors, spacing, typography, borderRadius } from '../theme';
 const WalletSettingsScreen = ({ navigation }: any) => {
   const { t } = useTranslation();
   const { currentIdentity, isLoading } = useAuth();
-  const [activeWallet, setActiveWallet] = useState<string>('primary');
+  const [activeWallet] = useState<string>('primary');
   const insets = useSafeAreaInsets();
 
   if (!currentIdentity || isLoading) {
@@ -143,10 +143,20 @@ const WalletSettingsScreen = ({ navigation }: any) => {
           </Text>
 
           <Column gap="sm">
-            <Button variant="secondary">
+            <Button
+              variant="secondary"
+              onPress={() => {
+                // TODO: Implement wallet export
+              }}
+            >
               {t.wallet.settings.exportWallet}
             </Button>
-            <Button variant="secondary">
+            <Button
+              variant="secondary"
+              onPress={() => {
+                // TODO: Implement recovery options view
+              }}
+            >
               {t.wallet.settings.viewRecoveryOptions}
             </Button>
           </Column>

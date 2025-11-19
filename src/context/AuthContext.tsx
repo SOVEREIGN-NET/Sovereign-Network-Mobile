@@ -13,15 +13,29 @@ import type { CreateIdentityData } from '../services/RealAuthService';
 // Always import RealAuthService, use it when node is available
 import RealAuthServiceModule from '../services/RealAuthService';
 
-// Toggle between mock and real auth service
-// In development, set REACT_APP_USE_MOCK_AUTH=true to use mock service for testing
-const USE_MOCK_SERVICE = process.env.REACT_APP_USE_MOCK_AUTH === 'true' && __DEV__;
-
 // Use real auth service instance
 const RealAuthService = RealAuthServiceModule;
 
 // Use native storage on Android, AsyncStorage on iOS
 const storage = Platform.OS === 'android' ? NativeStorage : AsyncStorage;
+
+// Global state for feature flag (will be updated by settings)
+let globalUseMockService = process.env.REACT_APP_USE_MOCK_AUTH === 'true' && __DEV__;
+
+/**
+ * Get current feature flag state (mock vs real data)
+ */
+export function getUseMockService(): boolean {
+  return globalUseMockService;
+}
+
+/**
+ * Set feature flag state (called from Developer Settings)
+ */
+export function setUseMockService(value: boolean): void {
+  globalUseMockService = value;
+  console.log(`🔄 Auth data source changed to: ${value ? 'MOCK' : 'REAL'}`);
+}
 
 export interface AuthContextType {
   currentIdentity: Identity | null;
@@ -89,7 +103,7 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
     try {
       let identity: Identity;
 
-      if (USE_MOCK_SERVICE) {
+      if (getUseMockService()) {
         identity = await MockAuthService.signIn({ did: identity_id, passphrase: password });
       } else {
         identity = await RealAuthService!.signIn({ identity_id, password });
@@ -119,7 +133,7 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
     try {
       let identity: Identity;
 
-      if (USE_MOCK_SERVICE) {
+      if (getUseMockService()) {
         const identityType: 'citizen' | 'organization' | 'developer' | 'validator' =
           data.identity_type as 'citizen' | 'organization' | 'developer' | 'validator';
 
@@ -157,7 +171,7 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
     try {
       let identity: Identity;
 
-      if (USE_MOCK_SERVICE) {
+      if (getUseMockService()) {
         if (method === 'seed') {
           identity = await MockAuthService.recoverWithSeed(data);
         } else if (method === 'backup') {

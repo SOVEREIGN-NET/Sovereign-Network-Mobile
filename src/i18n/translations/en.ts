@@ -595,6 +595,15 @@ export const en = {
       activityTitle: 'No Activity',
       activityDescription: 'Your transaction history will appear here',
     },
+    settings: {
+      title: 'Wallet Settings',
+      walletDetails: 'Wallet Details',
+      exportWallet: 'Export Wallet',
+      viewRecoveryOptions: 'View Recovery Options',
+      copyId: 'Copy ID',
+      copied: 'Copied',
+      back: 'Back to Wallet',
+    },
   },
 
   // DAO Screen
@@ -721,6 +730,16 @@ export const en = {
 
   // Settings Screen
   settings: {
+    developer: {
+      title: 'Developer Settings',
+      mockData: 'Use Mock Data',
+      mockDataDescription: 'Toggle between mock data and real network',
+      nodeUrl: 'Node URL',
+      nodeUrlPlaceholder: 'http://192.168.1.31:9333',
+      nodeUrlHint: 'Enter test node URL with port',
+      save: 'Save Configuration',
+      saved: 'Configuration saved',
+    },
     display: {
       title: 'Display Settings',
       theme: 'Theme',
@@ -852,6 +871,51 @@ export const en = {
     ble: 'Start BLE',
     connected: 'Connected',
     offline: 'Offline',
+  },
+
+  // History Screen
+  history: {
+    title: 'Transaction History',
+    empty: 'No transactions yet',
+    emptyDescription: 'Your transaction history will appear here',
+    sent: 'Sent',
+    received: 'Received',
+    time: 'Time',
+    amount: 'Amount',
+    status: 'Status',
+    pending: 'Pending',
+    completed: 'Completed',
+    failed: 'Failed',
+    from: 'From',
+    to: 'To',
+  },
+
+  // Bookmarks Screen
+  bookmarks: {
+    title: 'Bookmarks',
+    empty: 'No bookmarks yet',
+    emptyDescription: 'Save your favorite addresses and dApps',
+    addBookmark: 'Add Bookmark',
+    name: 'Name',
+    address: 'Address',
+    type: 'Type',
+    wallet: 'Wallet Address',
+    dapp: 'dApp',
+    website: 'Website',
+    lastUsed: 'Last Used',
+    never: 'Never',
+  },
+
+  // Favorites Screen
+  favorites: {
+    title: 'Favorites',
+    empty: 'No favorites yet',
+    emptyDescription: 'Mark frequently used items as favorites for quick access',
+    addToFavorites: 'Add to Favorites',
+    removeFromFavorites: 'Remove from Favorites',
+    wallets: 'Favorite Wallets',
+    dapps: 'Favorite dApps',
+    contacts: 'Favorite Contacts',
   },
 
   // Browser Screen

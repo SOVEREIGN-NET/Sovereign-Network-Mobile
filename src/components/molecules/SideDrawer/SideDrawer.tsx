@@ -163,8 +163,9 @@ const SideDrawer: React.FC<SideDrawerProps> = ({
                   <View key={item.id}>
                     <Pressable
                       onPress={() => {
-                        item.onPress();
                         onClose();
+                        // Delay navigation to allow drawer to close first
+                        setTimeout(() => item.onPress(), 50);
                       }}
                       style={({ pressed }) => [
                         styles.menuItem,
