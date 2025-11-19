@@ -47,7 +47,10 @@ const SettingsScreen = ({ navigation }: any) => {
         const nodeUrlSetting = await AsyncStorage.getItem('nodeUrl');
 
         if (mockDataSetting !== null) {
-          setUseMockData(mockDataSetting === 'true');
+          const useMock = mockDataSetting === 'true';
+          setUseMockData(useMock);
+          // Sync global feature flag
+          setUseMockService(useMock);
         }
         if (nodeUrlSetting !== null) {
           setNodeUrl(nodeUrlSetting);
