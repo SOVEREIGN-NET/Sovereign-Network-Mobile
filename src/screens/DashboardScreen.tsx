@@ -49,7 +49,8 @@ const DashboardScreen = ({ navigation }: any) => {
           };
         }
       } catch (error) {
-        console.warn('Failed to fetch real data, using mock:', error);
+        // Silently fallback to mock data if API is unavailable
+        // This is expected in development when node is not running
       }
 
       // Fallback to mock data
