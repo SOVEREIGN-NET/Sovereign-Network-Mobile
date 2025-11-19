@@ -11,3 +11,6 @@ export { useApi } from './useApi';
 
 export { useNodeConnection } from './useNodeConnection';
 export type { ProtocolInfo, UseNodeConnectionState, UseNodeConnectionReturn } from './useNodeConnection';
+
+export { useNativeSettings } from './useNativeSettings';
+export type { DeveloperSettings } from './useNativeSettings';

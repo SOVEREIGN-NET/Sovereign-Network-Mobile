@@ -11,7 +11,7 @@ import {
   ScreenLayout,
   HeaderBar,
 } from '../components';
-import { useAuth } from '../hooks';
+import { useAuth, useNativeSettings } from '../hooks';
 import { useTranslation } from '../i18n';
 import { colors, spacing, typography, borderRadius } from '../theme';
 import { setUseMockService } from '../context/AuthContext';
@@ -24,6 +24,7 @@ const SettingsScreen = ({ navigation }: any) => {
   const { t } = useTranslation();
   const { signOut, isLoading } = useAuth();
   const deviceColorScheme = useColorScheme();
+  const { settings: nativeSettings, saveSettings: saveNativeSettings } = useNativeSettings();
 
   // Local state for settings (would be persisted in real app)
   const [theme, setTheme] = useState<Theme>('system');
@@ -35,32 +36,19 @@ const SettingsScreen = ({ navigation }: any) => {
   const [showLanguageOptions, setShowLanguageOptions] = useState(false);
   const [showFontOptions, setShowFontOptions] = useState(false);
 
-  // Developer settings
-  const [useMockData, setUseMockData] = useState(true);
-  const [nodeUrl, setNodeUrl] = useState('http://192.168.1.31:9333');
+  // Developer settings (synced with native phone settings)
+  const [useMockData, setUseMockData] = useState(nativeSettings?.useMockData ?? true);
+  const [nodeUrl, setNodeUrl] = useState(nativeSettings?.nodeUrl ?? 'http://192.168.1.31:9333');
 
-  // Load developer settings on mount
+  // Sync when native settings load
   useEffect(() => {
-    const loadDeveloperSettings = async () => {
-      try {
-        const mockDataSetting = await AsyncStorage.getItem('useMockData');
-        const nodeUrlSetting = await AsyncStorage.getItem('nodeUrl');
-
-        if (mockDataSetting !== null) {
-          const useMock = mockDataSetting === 'true';
-          setUseMockData(useMock);
-          // Sync global feature flag
-          setUseMockService(useMock);
-        }
-        if (nodeUrlSetting !== null) {
-          setNodeUrl(nodeUrlSetting);
-        }
-      } catch (error) {
-        console.warn('Failed to load developer settings:', error);
-      }
-    };
-    loadDeveloperSettings();
-  }, []);
+    if (nativeSettings) {
+      setUseMockData(nativeSettings.useMockData);
+      setNodeUrl(nativeSettings.nodeUrl);
+      // Sync global feature flag
+      setUseMockService(nativeSettings.useMockData);
+    }
+  }, [nativeSettings]);
 
   const handleLogout = () => {
     Alert.alert(
@@ -121,8 +109,15 @@ const SettingsScreen = ({ navigation }: any) => {
 
   const handleSaveDeveloperSettings = async () => {
     try {
+      // Save to both AsyncStorage (app) and native settings (phone)
       await AsyncStorage.setItem('useMockData', useMockData.toString());
       await AsyncStorage.setItem('nodeUrl', nodeUrl);
+
+      // Also save to native phone settings
+      await saveNativeSettings({
+        useMockData,
+        nodeUrl,
+      });
 
       // Update the global feature flag
       setUseMockService(useMockData);
