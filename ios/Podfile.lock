@@ -2598,6 +2598,34 @@ PODS:
     - FirebaseCoreExtension
     - React-Core
     - RNFBApp
+  - RNKeychain (10.0.0):
+    - boost
+    - DoubleConversion
+    - fast_float
+    - fmt
+    - glog
+    - hermes-engine
+    - RCT-Folly
+    - RCT-Folly/Fabric
+    - RCTRequired
+    - RCTTypeSafety
+    - React-Core
+    - React-debug
+    - React-Fabric
+    - React-featureflags
+    - React-graphics
+    - React-ImageManager
+    - React-jsi
+    - React-NativeModulesApple
+    - React-RCTFabric
+    - React-renderercss
+    - React-rendererdebug
+    - React-utils
+    - ReactCodegen
+    - ReactCommon/turbomodule/bridging
+    - ReactCommon/turbomodule/core
+    - SocketRocket
+    - Yoga
   - RNScreens (4.18.0):
     - boost
     - DoubleConversion
@@ -2779,6 +2807,7 @@ DEPENDENCIES:
   - "RNFBAnalytics (from `../node_modules/@react-native-firebase/analytics`)"
   - "RNFBApp (from `../node_modules/@react-native-firebase/app`)"
   - "RNFBCrashlytics (from `../node_modules/@react-native-firebase/crashlytics`)"
+  - RNKeychain (from `../node_modules/react-native-keychain`)
   - RNScreens (from `../node_modules/react-native-screens`)
   - RNVectorIcons (from `../node_modules/react-native-vector-icons`)
   - SocketRocket (~> 0.7.1)
@@ -2963,6 +2992,8 @@ EXTERNAL SOURCES:
     :path: "../node_modules/@react-native-firebase/app"
   RNFBCrashlytics:
     :path: "../node_modules/@react-native-firebase/crashlytics"
+  RNKeychain:
+    :path: "../node_modules/react-native-keychain"
   RNScreens:
     :path: "../node_modules/react-native-screens"
   RNVectorIcons:
@@ -3065,6 +3096,7 @@ SPEC CHECKSUMS:
   RNFBAnalytics: c8f3d38ea6cb396cac0265d9b077b9a98a7a0c9f
   RNFBApp: 255fa19a91d6c1309e021ee75d5d209754e5961b
   RNFBCrashlytics: ab632410ce1383051ac26ef44c966da651b7cf91
+  RNKeychain: a2c134ab796272c3d605e035ab727591000b30f3
   RNScreens: d821082c6dd1cb397cc0c98b026eeafaa68be479
   RNVectorIcons: 791f13226ec4a3fd13062eda9e892159f0981fae
   SocketRocket: d4aabe649be1e368d1318fdf28a022d714d65748

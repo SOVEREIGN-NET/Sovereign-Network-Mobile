@@ -285,11 +285,21 @@ export const en = {
       writeDown: 'Write down these words in order on paper. Do not take a screenshot.',
       copy: 'Copy to Clipboard',
       copied: 'Copied!',
+      secureSave: {
+        title: 'Secure on this device',
+        description: 'Store this phrase inside your device Keychain/Keystore protected by biometrics or device passcode.',
+        button: 'Securely store on this device',
+        saving: 'Saving securely...',
+        success: 'Seed phrase stored securely on this device.',
+        unavailable: 'Secure storage is unavailable on this device. Please write the phrase down manually.',
+        error: 'Unable to store seed phrase securely. Please try again.',
+      },
       confirmSaved: 'I have securely saved my seed phrase',
       confirmSavedDescription: 'Check this box to confirm you have written down and safely stored your seed phrase. You will need it if you need to recover your identity.',
       continueButton: 'I\'ve Saved My Seed Phrase',
       errors: {
         invalidPhrases: 'Invalid seed phrases received from server',
+        vaultSaveFailed: 'Failed to store your seed phrase securely',
       },
     },
     backup: {

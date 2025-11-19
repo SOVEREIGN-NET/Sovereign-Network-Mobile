@@ -16,9 +16,11 @@ import {
   ActionFooter,
   SectionLabel,
   Checkbox,
+  Button,
 } from '../components';
 import { useTranslation } from '../i18n';
 import { useAuth } from '../hooks';
+import SeedVaultService from '../services/SeedVaultService';
 import { colors, spacing, typography, borderRadius } from '../theme';
 import { AuthStackParamList } from '../navigation/AuthNavigator';
 
@@ -32,6 +34,9 @@ const SeedPhraseScreen = ({ navigation, route }: SeedPhraseScreenProps) => {
   const [confirmedSaved, setConfirmedSaved] = useState(false);
   const [showPhrase, setShowPhrase] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
+  const [isSecureStorageSupported, setIsSecureStorageSupported] = useState(false);
+  const [vaultState, setVaultState] = useState<'idle' | 'saving' | 'saved' | 'error'>('idle');
+  const [vaultError, setVaultError] = useState<string | null>(null);
 
   useEffect(() => {
     console.log('🌱 SeedPhraseScreen mounted', {
@@ -40,6 +45,10 @@ const SeedPhraseScreen = ({ navigation, route }: SeedPhraseScreenProps) => {
       hasIdentity: !!identity,
       identityDid: identity?.did,
     });
+
+    SeedVaultService.isSecureStorageAvailable()
+      .then(setIsSecureStorageSupported)
+      .catch(() => setIsSecureStorageSupported(false));
   }, [seedPhrases, identity]);
 
   if (!seedPhrases || !Array.isArray(seedPhrases)) {
@@ -66,6 +75,24 @@ const SeedPhraseScreen = ({ navigation, route }: SeedPhraseScreenProps) => {
     // For now, just show feedback
     setCopied(true);
     setTimeout(() => setCopied(false), 2000);
+  };
+
+  const handleSecureSave = async () => {
+    if (!seedPhrases?.length || !isSecureStorageSupported) {
+      setVaultError(t.auth.seedPhrase.secureSave.unavailable);
+      setVaultState('error');
+      return;
+    }
+
+    setVaultState('saving');
+    setVaultError(null);
+    try {
+      await SeedVaultService.saveSeedPhrase(seedPhrases);
+      setVaultState('saved');
+    } catch (err: any) {
+      setVaultError(err?.message || t.auth.seedPhrase.secureSave.error);
+      setVaultState('error');
+    }
   };
 
   const handleContinue = async () => {
@@ -239,6 +266,71 @@ const SeedPhraseScreen = ({ navigation, route }: SeedPhraseScreenProps) => {
               >
                 {t.auth.seedPhrase.writeDown}
               </Text>
+            </Column>
+          </Card>
+
+          {/* Secure Save Card */}
+          <Card>
+            <Column gap="sm">
+              <Row style={{ justifyContent: 'space-between', alignItems: 'center' }}>
+                <Text
+                  style={{
+                    fontSize: typography.size.sm,
+                    fontWeight: typography.weight.semibold,
+                    color: colors.text_primary,
+                  }}
+                >
+                  {t.auth.seedPhrase.secureSave.title}
+                </Text>
+              </Row>
+              <Text
+                style={{
+                  fontSize: typography.size.xs,
+                  color: colors.text_secondary,
+                  lineHeight: typography.lineHeight.relaxed,
+                }}
+              >
+                {t.auth.seedPhrase.secureSave.description}
+              </Text>
+              <Button
+                onPress={handleSecureSave}
+                disabled={vaultState === 'saving' || !isSecureStorageSupported}
+                variant="secondary"
+              >
+                {vaultState === 'saving'
+                  ? t.auth.seedPhrase.secureSave.saving
+                  : t.auth.seedPhrase.secureSave.button}
+              </Button>
+              {vaultState === 'saved' && (
+                <Text
+                  style={{
+                    fontSize: typography.size.xs,
+                    color: colors.success,
+                  }}
+                >
+                  {t.auth.seedPhrase.secureSave.success}
+                </Text>
+              )}
+              {!isSecureStorageSupported && (
+                <Text
+                  style={{
+                    fontSize: typography.size.xs,
+                    color: colors.warning,
+                  }}
+                >
+                  {t.auth.seedPhrase.secureSave.unavailable}
+                </Text>
+              )}
+              {vaultState === 'error' && (
+                <Text
+                  style={{
+                    fontSize: typography.size.xs,
+                    color: colors.error,
+                  }}
+                >
+                  {vaultError || t.auth.seedPhrase.secureSave.error}
+                </Text>
+              )}
             </Column>
           </Card>
 

@@ -23,7 +23,7 @@ const styles = StyleSheet.create({
   },
   // Variants
   primary: {
-    backgroundColor: colors.primary,
+    backgroundColor: '#006688',
   },
   success: {
     backgroundColor: colors.success,
@@ -42,16 +42,16 @@ const styles = StyleSheet.create({
   },
   // Sizes
   smBadge: {
-    paddingHorizontal: spacing.sm,
-    paddingVertical: spacing.xs,
-  },
-  mdBadge: {
     paddingHorizontal: spacing.md,
     paddingVertical: spacing.sm,
   },
-  lgBadge: {
+  mdBadge: {
     paddingHorizontal: spacing.lg,
     paddingVertical: spacing.md,
+  },
+  lgBadge: {
+    paddingHorizontal: spacing.xl,
+    paddingVertical: spacing.lg,
   },
   // Text sizes
   smText: {
@@ -112,7 +112,7 @@ export const Badge = React.memo(
 
     const textColor =
       variant === 'primary'
-        ? styles.primaryText
+        ? styles.lightText
         : variant === 'default'
           ? styles.defaultText
           : styles.lightText;

@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { View, TouchableOpacity, ScrollView } from 'react-native';
+import { View, TouchableOpacity, ScrollView, Clipboard, Alert } from 'react-native';
 import {
   Card,
   Text, LoadingView,
@@ -63,6 +63,37 @@ const WalletScreen = ({ navigation }: any) => {
     : [];
   const selectedWallet = wallets[0] || null;
 
+  const truncateId = (id: any) => {
+    if (!id) return 'unknown';
+
+    // If it's a byte array, convert to hex string
+    if (Array.isArray(id)) {
+      const hexString = id.map(byte => byte.toString(16).padStart(2, '0')).join('');
+      return `${hexString.substring(0, 12)}...${hexString.substring(hexString.length - 12)}`;
+    }
+
+    // If it's already a string
+    if (typeof id === 'string' && id !== '') {
+      return `${id.substring(0, 12)}...${id.substring(id.length - 12)}`;
+    }
+
+    return 'unknown';
+  };
+
+  const copyToClipboard = (id: any) => {
+    let textToCopy = '';
+    if (Array.isArray(id)) {
+      textToCopy = id.map(byte => byte.toString(16).padStart(2, '0')).join('');
+    } else if (typeof id === 'string') {
+      textToCopy = id;
+    }
+
+    if (textToCopy) {
+      Clipboard.setString(textToCopy);
+      Alert.alert('Copied', 'Wallet ID copied to clipboard');
+    }
+  };
+
   return (
     <View style={{ flex: 1, backgroundColor: colors.bg_darkest }}>
       <HeaderBar
@@ -101,11 +132,12 @@ const WalletScreen = ({ navigation }: any) => {
                     color: colors.text_secondary,
                     marginTop: spacing.xs,
                   }}
+                  numberOfLines={1}
                 >
-                  {selectedWallet?.id} • {t.wallet.details.notSynced}
+                  {truncateId(selectedWallet?.id)} • {t.wallet.details.notSynced}
                 </Text>
               </View>
-              <View
+              <TouchableOpacity
                 style={{
                   width: 36,
                   height: 36,
@@ -116,9 +148,10 @@ const WalletScreen = ({ navigation }: any) => {
                   borderWidth: 1,
                   borderColor: colors.border,
                 }}
+                onPress={() => navigation?.navigate('WalletSettings')}
               >
                 <Text style={{ fontSize: typography.size['3xl'] }}>⚙️</Text>
-              </View>
+              </TouchableOpacity>
             </View>
           </View>
 
@@ -131,31 +164,32 @@ const WalletScreen = ({ navigation }: any) => {
                     borderTopWidth: 2,
                     borderTopColor: colors.primary,
                     paddingHorizontal: spacing.lg,
-                    paddingVertical: spacing.lg,
+                    paddingVertical: spacing.sm,
                   }}
                 >
                   <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: spacing.md }}>
                     <Text style={{ fontSize: typography.size.xs, color: colors.text_secondary }}>
                       {t.wallet.details.address}
                     </Text>
-                    <TouchableOpacity>
+                    <TouchableOpacity onPress={() => selectedWallet?.id && copyToClipboard(selectedWallet.id)}>
                       <Text style={{ fontSize: typography.size.xs, color: colors.primary }}>{t.wallet.actions.copy}</Text>
                     </TouchableOpacity>
                   </View>
                   <Text
                     style={{
-                      fontSize: typography.size.lg,
+                      fontSize: typography.size.sm,
                       fontWeight: typography.weight.semibold,
                       color: colors.text_primary,
                       letterSpacing: 0.5,
                     }}
+                    numberOfLines={1}
                   >
-                    {selectedWallet?.id?.substring(0, 10)}...{selectedWallet?.id?.substring(selectedWallet.id.length - 8) || 'unknown'}
+                    {truncateId(selectedWallet?.id)}
                   </Text>
                 </View>
 
                 {/* Balance Section */}
-                <View style={{ paddingHorizontal: spacing.lg, paddingVertical: spacing.xl, alignItems: 'center' }}>
+                <View style={{ paddingHorizontal: spacing.lg, paddingVertical: spacing.xs, alignItems: 'center' }}>
                   <Text
                     style={{
                       fontSize: typography.size['5xl'],
@@ -188,7 +222,7 @@ const WalletScreen = ({ navigation }: any) => {
                 paddingVertical: spacing.lg,
                 borderRadius: borderRadius.base,
                 borderWidth: 2,
-                borderColor: colors.border,
+                borderColor: '#006688',
                 justifyContent: 'center',
                 alignItems: 'center',
               }}
@@ -212,7 +246,7 @@ const WalletScreen = ({ navigation }: any) => {
                 paddingVertical: spacing.lg,
                 borderRadius: borderRadius.base,
                 borderWidth: 2,
-                borderColor: colors.border,
+                borderColor: '#006688',
                 justifyContent: 'center',
                 alignItems: 'center',
               }}
@@ -243,56 +277,62 @@ const WalletScreen = ({ navigation }: any) => {
                     <Card style={{ marginHorizontal: 0 }}>
                       <View
                         style={{
-                          flexDirection: 'row',
-                          justifyContent: 'space-between',
-                          alignItems: 'center',
                           paddingHorizontal: spacing.md,
-                          paddingVertical: spacing.lg,
+                          paddingVertical: spacing.xs,
                         }}
                       >
-                        <View
-                          style={{
-                            width: 48,
-                            height: 48,
-                            borderRadius: borderRadius.full,
-                            backgroundColor: colors.primary,
-                            justifyContent: 'center',
-                            alignItems: 'center',
-                            marginRight: spacing.md,
-                            overflow: 'hidden',
-                          }}
-                        >
-                          <SShieldLogo size={48} />
+                        <View style={{ flexDirection: 'row', alignItems: 'flex-start', gap: spacing.md, marginBottom: spacing.xxs }}>
+                          <View
+                            style={{
+                              width: 48,
+                              height: 48,
+                              borderRadius: borderRadius.full,
+                              backgroundColor: colors.primary,
+                              justifyContent: 'center',
+                              alignItems: 'center',
+                              overflow: 'hidden',
+                            }}
+                          >
+                            <SShieldLogo size={48} />
+                          </View>
+                          <View style={{ flex: 1 }}>
+                            <Text
+                              style={{
+                                fontSize: typography.size.sm,
+                                fontWeight: typography.weight.semibold,
+                                color: colors.text_primary,
+                              }}
+                            >
+                              {wallet.name}
+                            </Text>
+                            <Text
+                              style={{
+                                fontSize: typography.size.xs,
+                                color: colors.text_secondary,
+                                marginTop: spacing.xxs,
+                              }}
+                              numberOfLines={1}
+                            >
+                              {truncateId((wallet as any).id)}
+                            </Text>
+                            <TouchableOpacity onPress={() => (wallet as any).id && copyToClipboard((wallet as any).id)}>
+                              <Text style={{ fontSize: typography.size.xs, color: colors.primary, marginTop: spacing.xxs }}>
+                                Copy
+                              </Text>
+                            </TouchableOpacity>
+                          </View>
                         </View>
-                        <View style={{ flex: 1 }}>
+                        <View style={{ alignItems: 'flex-end' }}>
                           <Text
                             style={{
-                              fontSize: typography.size.sm,
-                              fontWeight: typography.weight.semibold,
+                              fontSize: typography.size.lg,
+                              fontWeight: typography.weight.bold,
                               color: colors.text_primary,
                             }}
                           >
-                            {wallet.name}
-                          </Text>
-                          <Text
-                            style={{
-                              fontSize: typography.size.xs,
-                              color: colors.text_secondary,
-                              marginTop: spacing.xxs,
-                            }}
-                          >
-                            {wallet.id}
+                            {wallet.balance.toLocaleString()} ZHTP
                           </Text>
                         </View>
-                        <Text
-                          style={{
-                            fontSize: typography.size.md,
-                            fontWeight: typography.weight.bold,
-                            color: colors.text_primary,
-                          }}
-                        >
-                          {wallet.balance.toLocaleString()}
-                        </Text>
                       </View>
                     </Card>
                   </TouchableOpacity>
