@@ -11,11 +11,14 @@ import { colors } from '../theme/tokens';
 
 // Screens
 import DashboardScreen from '../screens/DashboardScreen';
-import IdentityScreen from '../screens/IdentityScreen';
 import ProfileEditScreen from '../screens/ProfileEditScreen';
 import IdentitySettingsScreen from '../screens/IdentitySettingsScreen';
-import WalletScreen from '../screens/WalletScreen';
+import WalletSettingsScreen from '../screens/WalletSettingsScreen';
 import DAOScreen from '../screens/DAOScreen';
+import SIDScreen from '../screens/SIDScreen';
+import HistoryScreen from '../screens/HistoryScreen';
+import BookmarksScreen from '../screens/BookmarksScreen';
+import FavoritesScreen from '../screens/FavoritesScreen';
 import SendTokensScreen from '../screens/SendTokensScreen';
 import ReceiveTokensScreen from '../screens/ReceiveTokensScreen';
 import ConfirmTransactionScreen from '../screens/ConfirmTransactionScreen';
@@ -57,51 +60,6 @@ const DashboardStack = () => {
   );
 };
 
-const IdentityStack = () => {
-  return (
-    <Stack.Navigator
-      screenOptions={{
-        headerShown: false,
-      }}
-    >
-      <Stack.Screen
-        name="IdentityMain"
-        component={IdentityScreen}
-        options={{ headerShown: false }}
-      />
-      <Stack.Screen
-        name="ProfileEdit"
-        component={ProfileEditScreen}
-        options={{ title: 'Edit Profile', headerBackTitle: 'Back' }}
-      />
-      <Stack.Screen
-        name="IdentitySettings"
-        component={IdentitySettingsScreen}
-        options={{ title: 'Identity Settings', headerBackTitle: 'Back' }}
-      />
-      <Stack.Screen
-        name="AppSettings"
-        component={SettingsScreen}
-        options={{ title: 'App Settings', headerBackTitle: 'Back' }}
-      />
-      <Stack.Screen
-        name="Wallet"
-        component={WalletScreen}
-        options={{ title: 'Wallets', headerBackTitle: 'Back' }}
-      />
-      <Stack.Screen
-        name="BackupIdentity"
-        component={BackupIdentityScreen as any}
-        options={{ title: 'Backup Identity', headerBackTitle: 'Back' }}
-      />
-      <Stack.Screen
-        name="BiometricVerification"
-        component={BiometricVerificationScreen as any}
-        options={{ title: 'Biometric Authentication', headerBackTitle: 'Back' }}
-      />
-    </Stack.Navigator>
-  );
-};
 
 const SIDStack = () => {
   return (
@@ -112,7 +70,22 @@ const SIDStack = () => {
     >
       <Stack.Screen
         name="SIDMain"
-        component={WalletScreen}
+        component={SIDScreen}
+        options={{ headerShown: false }}
+      />
+      <Stack.Screen
+        name="History"
+        component={HistoryScreen}
+        options={{ headerShown: false }}
+      />
+      <Stack.Screen
+        name="Bookmarks"
+        component={BookmarksScreen}
+        options={{ headerShown: false }}
+      />
+      <Stack.Screen
+        name="Favorites"
+        component={FavoritesScreen}
         options={{ headerShown: false }}
       />
       <Stack.Screen
@@ -134,6 +107,36 @@ const SIDStack = () => {
         name="ConfirmTransaction"
         component={ConfirmTransactionScreen}
         options={{ title: 'Confirm Transaction', headerBackTitle: 'Back' }}
+      />
+      <Stack.Screen
+        name="WalletSettings"
+        component={WalletSettingsScreen}
+        options={{ title: 'Wallet Settings', headerBackTitle: 'Back' }}
+      />
+      <Stack.Screen
+        name="ProfileEdit"
+        component={ProfileEditScreen}
+        options={{ title: 'Edit Profile', headerBackTitle: 'Back' }}
+      />
+      <Stack.Screen
+        name="IdentitySettings"
+        component={IdentitySettingsScreen}
+        options={{ title: 'Identity Settings', headerBackTitle: 'Back' }}
+      />
+      <Stack.Screen
+        name="AppSettings"
+        component={SettingsScreen}
+        options={{ title: 'App Settings', headerBackTitle: 'Back' }}
+      />
+      <Stack.Screen
+        name="BackupIdentity"
+        component={BackupIdentityScreen as any}
+        options={{ title: 'Backup Identity', headerBackTitle: 'Back' }}
+      />
+      <Stack.Screen
+        name="BiometricVerification"
+        component={BiometricVerificationScreen as any}
+        options={{ title: 'Biometric Authentication', headerBackTitle: 'Back' }}
       />
     </Stack.Navigator>
   );
@@ -179,13 +182,6 @@ const HomeIcon = ({ color }: { color: string }) => (
   </View>
 );
 
-const UserIcon = ({ color }: { color: string }) => (
-  <View style={{ width: 24, height: 24, justifyContent: 'center', alignItems: 'center' }}>
-    <View style={{ width: 8, height: 8, borderRadius: 4, borderWidth: 1.5, borderColor: color }} />
-    <View style={{ width: 12, height: 8, borderWidth: 1.5, borderColor: color, borderTopWidth: 0, marginTop: 2 }} />
-  </View>
-);
-
 const BriefcaseIcon = ({ color }: { color: string }) => (
   <View style={{ width: 24, height: 24, justifyContent: 'center', alignItems: 'center' }}>
     <View style={{ width: 14, height: 10, borderWidth: 1.5, borderColor: color }} />
@@ -197,13 +193,6 @@ const VoteIcon = ({ color }: { color: string }) => (
   <View style={{ width: 24, height: 24, justifyContent: 'center', alignItems: 'center' }}>
     <View style={{ width: 10, height: 10, borderRadius: 5, borderWidth: 1.5, borderColor: color }} />
     <View style={{ width: 1.5, height: 6, backgroundColor: color, position: 'absolute', bottom: 2 }} />
-  </View>
-);
-
-const GlobeIcon = ({ color }: { color: string }) => (
-  <View style={{ width: 24, height: 24, justifyContent: 'center', alignItems: 'center' }}>
-    <View style={{ width: 12, height: 12, borderRadius: 6, borderWidth: 1.5, borderColor: color }} />
-    <View style={{ width: 14, height: 1, backgroundColor: color, position: 'absolute' }} />
   </View>
 );
 
@@ -249,15 +238,6 @@ const RootNavigator = () => {
             title: 'SID',
             tabBarLabel: 'SID',
             tabBarIcon: BriefcaseIcon,
-          } as any}
-        />
-        <Tab.Screen
-          name="IdentityTab"
-          component={IdentityStack}
-          options={{
-            title: 'Identity',
-            tabBarLabel: 'Identity',
-            tabBarIcon: UserIcon,
           } as any}
         />
       </Tab.Navigator>

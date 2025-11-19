@@ -31,22 +31,18 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     gap: spacing.sm,
   },
-  // Variant: Primary
+  // Variant: Primary (Solid muted blue)
   primaryButton: {
-    backgroundColor: colors.transparent,
-    borderWidth: 1,
-    borderColor: gradientAccents.gradient_end,
+    backgroundColor: '#006688',
+    borderWidth: 0,
   },
   primaryButtonDisabled: {
-    backgroundColor: colors.transparent,
-    borderColor: colors.text_tertiary,
+    backgroundColor: colors.bg_medium,
+    borderWidth: 0,
   },
   primaryText: {
-    color: colors.primary,
+    color: colors.white,
     fontWeight: '700' as const,
-    textShadowColor: 'rgba(0, 0, 0, 0.3)',
-    textShadowOffset: { width: -0.5, height: -0.5 },
-    textShadowRadius: 0.5,
   },
   primaryTextDisabled: {
     color: colors.text_tertiary,
@@ -64,9 +60,6 @@ const styles = StyleSheet.create({
   secondaryText: {
     color: colors.text_primary,
     fontWeight: '700' as const,
-    textShadowColor: 'rgba(0, 0, 0, 0.3)',
-    textShadowOffset: { width: -0.5, height: -0.5 },
-    textShadowRadius: 0.5,
   },
   secondaryTextDisabled: {
     color: colors.text_tertiary,
@@ -74,18 +67,15 @@ const styles = StyleSheet.create({
   // Variant: Outline
   outlineButton: {
     backgroundColor: colors.transparent,
-    borderWidth: 1,
+    borderWidth: 2,
     borderColor: gradientAccents.gradient_start,
   },
   outlineButtonDisabled: {
     borderColor: colors.text_tertiary,
   },
   outlineText: {
-    color: colors.primary,
+    color: gradientAccents.gradient_start,
     fontWeight: '700' as const,
-    textShadowColor: 'rgba(0, 0, 0, 0.3)',
-    textShadowOffset: { width: -0.5, height: -0.5 },
-    textShadowRadius: 0.5,
   },
   outlineTextDisabled: {
     color: colors.text_tertiary,
@@ -100,9 +90,6 @@ const styles = StyleSheet.create({
   dangerText: {
     color: colors.white,
     fontWeight: '700' as const,
-    textShadowColor: 'rgba(0, 0, 0, 0.4)',
-    textShadowOffset: { width: -1, height: -1 },
-    textShadowRadius: 0.5,
   },
   dangerTextDisabled: {
     color: colors.text_tertiary,
@@ -239,7 +226,7 @@ export const Button = React.memo(
         activeOpacity={0.7}
         testID={testID}
       >
-        {loading && <ActivityIndicator size="small" color={gradientAccents.gradient_end} />}
+        {loading && <ActivityIndicator size="small" color={colors.primary} />}
         {renderChildren()}
       </TouchableOpacity>
     );

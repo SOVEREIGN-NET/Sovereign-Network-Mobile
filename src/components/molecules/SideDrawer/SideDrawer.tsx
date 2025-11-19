@@ -12,9 +12,9 @@ import {
   StyleSheet,
   Modal,
   useWindowDimensions,
-  SafeAreaView,
   Animated,
 } from 'react-native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Text, Divider, Column } from '../../atoms';
 import { colors, spacing, typography, shadows } from '../../../theme';
 
@@ -40,6 +40,7 @@ const SideDrawer: React.FC<SideDrawerProps> = ({
   title = 'Menu',
 }) => {
   const { width } = useWindowDimensions();
+  const insets = useSafeAreaInsets();
   const drawerWidth = width * 0.5;
   const [slideAnim] = useState(new Animated.Value(-drawerWidth));
 
@@ -143,7 +144,7 @@ const SideDrawer: React.FC<SideDrawerProps> = ({
             },
           ]}
         >
-          <SafeAreaView style={styles.safeArea}>
+          <View style={[styles.safeArea, { paddingTop: insets.top, paddingBottom: insets.bottom }]}>
             {/* Header with Close Button */}
             <View style={styles.header}>
               <Text style={styles.headerTitle}>{title}</Text>
@@ -163,8 +164,9 @@ const SideDrawer: React.FC<SideDrawerProps> = ({
                   <View key={item.id}>
                     <Pressable
                       onPress={() => {
-                        item.onPress();
                         onClose();
+                        // Delay navigation to allow drawer to close first
+                        setTimeout(() => item.onPress(), 50);
                       }}
                       style={({ pressed }) => [
                         styles.menuItem,
@@ -190,7 +192,7 @@ const SideDrawer: React.FC<SideDrawerProps> = ({
                 ))}
               </Column>
             </ScrollView>
-          </SafeAreaView>
+          </View>
         </Animated.View>
 
         {/* Overlay */}

@@ -10,23 +10,38 @@ import { NativeStorage } from '../services/NativeStorage';
 import MockAuthService, { Identity } from '../services/MockAuthService';
 import type { CreateIdentityData } from '../services/RealAuthService';
 
-// Toggle between mock and real auth service
-// Set to false to use real API backend
-const USE_MOCK_SERVICE = __DEV__; // Use mock in development, real in production
+// Always import RealAuthService, use it when node is available
+import RealAuthServiceModule from '../services/RealAuthService';
 
-// Only import RealAuthService in production to avoid initialization errors in dev
-let RealAuthService: any = null;
-if (!USE_MOCK_SERVICE) {
-  RealAuthService = require('../services/RealAuthService').default;
-}
+// Use real auth service instance
+const RealAuthService = RealAuthServiceModule;
 
 // Use native storage on Android, AsyncStorage on iOS
 const storage = Platform.OS === 'android' ? NativeStorage : AsyncStorage;
+
+// Global state for feature flag (will be updated by settings)
+let globalUseMockService = process.env.REACT_APP_USE_MOCK_AUTH === 'true' && __DEV__;
+
+/**
+ * Get current feature flag state (mock vs real data)
+ */
+export function getUseMockService(): boolean {
+  return globalUseMockService;
+}
+
+/**
+ * Set feature flag state (called from Developer Settings)
+ */
+export function setUseMockService(value: boolean): void {
+  globalUseMockService = value;
+  console.log(`🔄 Auth data source changed to: ${value ? 'MOCK' : 'REAL'}`);
+}
 
 export interface AuthContextType {
   currentIdentity: Identity | null;
   isAuthenticated: boolean;
   isLoading: boolean;
+  isBootstrapping: boolean;
   error: string | null;
   signIn: (identity_id: string, password: string) => Promise<Identity>;
   createIdentity: (data: CreateIdentityData) => Promise<Identity>;
@@ -36,6 +51,7 @@ export interface AuthContextType {
   updateProfile: (displayName: string, avatar?: string) => Promise<void>;
   updatePassphrase: (newPassphrase: string) => Promise<void>;
   updateBiometric: (enabled: boolean) => Promise<void>;
+  setCurrentIdentity: (identity: Identity) => Promise<void>;
 }
 
 export const AuthContext = createContext<AuthContextType | undefined>(undefined);
@@ -50,7 +66,8 @@ interface AuthProviderProps {
  */
 export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
   const [currentIdentity, setCurrentIdentity] = useState<Identity | null>(null);
-  const [isLoading, setIsLoading] = useState(true);
+  const [isLoading, setIsLoading] = useState(false);
+  const [isBootstrapping, setIsBootstrapping] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
   /**
@@ -62,13 +79,14 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
         const saved = await storage.getItem('zhtp_identity');
         if (saved) {
           const identity = JSON.parse(saved);
+          console.log('🔐 AuthContext: Restoring identity from storage:', identity.did);
           setCurrentIdentity(identity);
         }
       } catch (err) {
         console.error('Failed to restore identity:', err);
         // Continue with no identity if restoration fails
       } finally {
-        setIsLoading(false);
+        setIsBootstrapping(false);
       }
     };
 
@@ -85,7 +103,7 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
     try {
       let identity: Identity;
 
-      if (USE_MOCK_SERVICE) {
+      if (getUseMockService()) {
         identity = await MockAuthService.signIn({ did: identity_id, passphrase: password });
       } else {
         identity = await RealAuthService!.signIn({ identity_id, password });
@@ -115,7 +133,7 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
     try {
       let identity: Identity;
 
-      if (USE_MOCK_SERVICE) {
+      if (getUseMockService()) {
         const identityType: 'citizen' | 'organization' | 'developer' | 'validator' =
           data.identity_type as 'citizen' | 'organization' | 'developer' | 'validator';
 
@@ -127,13 +145,12 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
           acceptedTerms: true,
         });
       } else {
-        identity = await RealAuthService.createIdentity(data);
+        identity = await RealAuthService!.createIdentity(data);
       }
 
-      // Save to storage
-      await storage.setItem('zhtp_identity', JSON.stringify(identity));
-
-      setCurrentIdentity(identity);
+      // Don't save to storage or set as currentIdentity yet
+      // The CreateIdentityScreen will show seed phrases first
+      // Only save to storage after user confirms via SeedPhraseScreen
       return identity;
     } catch (err: any) {
       const message = err.message || 'Identity creation failed';
@@ -154,14 +171,16 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
     try {
       let identity: Identity;
 
-      if (USE_MOCK_SERVICE) {
+      if (getUseMockService()) {
         if (method === 'seed') {
           identity = await MockAuthService.recoverWithSeed(data);
         } else if (method === 'backup') {
           const [fileContent, password] = data.split('|||');
           identity = await MockAuthService.recoverWithBackup(fileContent, password);
         } else if (method === 'social') {
-          identity = await MockAuthService.recoverWithSocial(data);
+          // Parse guardian IDs from JSON string
+          const guardianIds = JSON.parse(data) as string[];
+          identity = await MockAuthService.recoverWithSocial(guardianIds);
         } else {
           throw new Error('Unknown recovery method');
         }
@@ -171,7 +190,9 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
         const [fileContent, password] = data.split('|||');
         identity = await RealAuthService.recoverWithBackup(fileContent, password);
       } else if (method === 'social') {
-        identity = await RealAuthService.recoverWithSocial(data);
+        // Parse guardian IDs from JSON string
+        const guardianIds = JSON.parse(data) as string[];
+        identity = await RealAuthService.recoverWithSocial(guardianIds);
       } else {
         throw new Error('Unknown recovery method');
       }
@@ -307,10 +328,28 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
     setError(null);
   }, []);
 
+  /**
+   * Manually set the current identity
+   * Used after saving identity to storage (e.g., after seed phrase confirmation)
+   */
+  const setIdentity = useCallback(async (identity: Identity) => {
+    try {
+      console.log('🔐 AuthContext.setIdentity: Setting identity:', identity.did);
+      await storage.setItem('zhtp_identity', JSON.stringify(identity));
+      console.log('✅ AuthContext: Identity saved to storage, calling setCurrentIdentity');
+      setCurrentIdentity(identity);
+    } catch (err: any) {
+      const message = err.message || 'Failed to set identity';
+      setError(message);
+      throw err;
+    }
+  }, []);
+
   const value = useMemo<AuthContextType>(() => ({
     currentIdentity,
     isAuthenticated: currentIdentity !== null,
     isLoading,
+    isBootstrapping,
     error,
     signIn,
     createIdentity,
@@ -320,7 +359,8 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
     updateProfile,
     updatePassphrase,
     updateBiometric,
-  }), [currentIdentity, isLoading, error, signIn, createIdentity, recoverIdentity, signOut, clearError, updateProfile, updatePassphrase, updateBiometric]);
+    setCurrentIdentity: setIdentity,
+  }), [currentIdentity, isLoading, isBootstrapping, error, signIn, createIdentity, recoverIdentity, signOut, clearError, updateProfile, updatePassphrase, updateBiometric, setIdentity]);
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
 };

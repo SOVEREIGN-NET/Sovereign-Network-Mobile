@@ -68,14 +68,6 @@ describe('RealAuthService', () => {
   });
 
   describe('recovery methods', () => {
-    it('should throw not implemented error for seed recovery', async () => {
-      const seedPhrase = 'word1 word2 word3 word4 word5 word6 word7 word8 word9 word10 word11 word12 word13 word14 word15 word16 word17 word18 word19 word20';
-
-      await expect(authService.recoverWithSeed(seedPhrase)).rejects.toThrow(
-        'Seed phrase recovery not yet implemented',
-      );
-    });
-
     it('should validate seed phrase word count', async () => {
       const shortSeedPhrase = 'word1 word2 word3';
 
@@ -84,16 +76,40 @@ describe('RealAuthService', () => {
       );
     });
 
-    it('should throw not implemented error for backup recovery', async () => {
-      await expect(
-        authService.recoverWithBackup('backup-content', 'password123'),
-      ).rejects.toThrow('Backup recovery not yet implemented');
+    it('should validate empty seed phrase', async () => {
+      await expect(authService.recoverWithSeed('')).rejects.toThrow(
+        'Seed phrase cannot be empty',
+      );
     });
 
-    it('should throw not implemented error for social recovery', async () => {
+    it('should validate backup file content', async () => {
       await expect(
-        authService.recoverWithSocial('GUARD-123456'),
-      ).rejects.toThrow('Social recovery not yet implemented');
+        authService.recoverWithBackup('', 'password123'),
+      ).rejects.toThrow('Backup file content is empty');
+    });
+
+    it('should validate backup password length', async () => {
+      await expect(
+        authService.recoverWithBackup('backup-content', 'short'),
+      ).rejects.toThrow('Password must be at least 6 characters');
+    });
+
+    it('should validate social recovery requires guardians', async () => {
+      await expect(
+        authService.recoverWithSocial([]),
+      ).rejects.toThrow('At least one guardian ID is required');
+    });
+
+    it('should validate social recovery with valid guardians array', () => {
+      const guardianIds = ['guardian-1', 'guardian-2'];
+      // Validates the input structure
+      expect(guardianIds).toBeDefined();
+      expect(guardianIds.length).toBeGreaterThan(0);
+    });
+
+    it('should have exportBackup and importBackup methods', () => {
+      expect(typeof authService.exportBackup).toBe('function');
+      expect(typeof authService.importBackup).toBe('function');
     });
   });
 

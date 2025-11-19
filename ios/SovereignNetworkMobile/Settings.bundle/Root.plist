@@ -1,0 +1,103 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+	<key>PreferenceSpecifiers</key>
+	<array>
+		<!-- Developer Settings Section -->
+		<dict>
+			<key>Type</key>
+			<string>PSGroupSpecifier</string>
+			<key>Title</key>
+			<string>Developer Settings</string>
+		</dict>
+
+		<!-- Use Mock Data Toggle -->
+		<dict>
+			<key>Type</key>
+			<string>PSToggleSwitchSpecifier</string>
+			<key>Title</key>
+			<string>Use Mock Data</string>
+			<key>Identifier</key>
+			<string>useMockData</string>
+			<key>Key</key>
+			<string>useMockData</string>
+			<key>DefaultValue</key>
+			<true/>
+		</dict>
+
+		<!-- Mock Data Description -->
+		<dict>
+			<key>Type</key>
+			<string>PSTitleValueSpecifier</string>
+			<key>Title</key>
+			<string>Mock Data</string>
+			<key>Values</key>
+			<array>
+				<string>Enabled</string>
+				<string>Disabled</string>
+			</array>
+		</dict>
+
+		<!-- Node URL Input -->
+		<dict>
+			<key>Type</key>
+			<string>PSTextFieldSpecifier</string>
+			<key>Title</key>
+			<string>Node URL</string>
+			<key>Identifier</key>
+			<string>nodeUrl</string>
+			<key>Key</key>
+			<string>nodeUrl</string>
+			<key>DefaultValue</key>
+			<string>http://192.168.1.31:9333</string>
+			<key>IsSecure</key>
+			<false/>
+			<key>KeyboardType</key>
+			<string>URL</string>
+		</dict>
+
+		<!-- Node URL Description -->
+		<dict>
+			<key>Type</key>
+			<string>PSTitleValueSpecifier</string>
+			<key>Title</key>
+			<string>Node Address</string>
+			<key>Values</key>
+			<array>
+				<string>http://192.168.1.31:9333</string>
+			</array>
+		</dict>
+
+		<!-- About Section -->
+		<dict>
+			<key>Type</key>
+			<string>PSGroupSpecifier</string>
+			<key>Title</key>
+			<string>About</string>
+		</dict>
+
+		<!-- Version -->
+		<dict>
+			<key>Type</key>
+			<string>PSTitleValueSpecifier</string>
+			<key>Title</key>
+			<string>App Version</string>
+			<key>Key</key>
+			<string>CFBundleShortVersionString</string>
+		</dict>
+
+		<!-- Build Number -->
+		<dict>
+			<key>Type</key>
+			<string>PSTitleValueSpecifier</string>
+			<key>Title</key>
+			<string>Build</string>
+			<key>Key</key>
+			<string>CFBundleVersion</string>
+		</dict>
+	</array>
+	<key>StringsTable</key>
+	<string>Root</string>
+</dict>
+</plist>

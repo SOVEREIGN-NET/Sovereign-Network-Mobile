@@ -15,7 +15,7 @@ export interface FormFieldProps extends Omit<RNTextInputProps, 'style' | 'error'
   required?: boolean;
   helperText?: string;
   containerStyle?: any;
-  textInputStyle?: any;
+  rightIcon?: React.ReactNode;
 }
 
 export const FormField = React.forwardRef<any, FormFieldProps>(
@@ -26,13 +26,23 @@ export const FormField = React.forwardRef<any, FormFieldProps>(
       required = false,
       helperText,
       containerStyle,
-      textInputStyle,
+      rightIcon,
       ...inputProps
     },
     ref
   ) => {
+    console.log('📝 FormField render - Display Name received:', {
+      label,
+      error,
+      required,
+      helperText,
+      containerStyle,
+      rightIcon: rightIcon ? 'present' : 'none',
+      allInputProps: inputProps,
+    });
+
     return (
-      <View style={containerStyle}>
+      <View style={containerStyle || {}}>
         <Text
           style={{
             fontSize: typography.size.sm,
@@ -47,8 +57,8 @@ export const FormField = React.forwardRef<any, FormFieldProps>(
         <Input
           ref={ref}
           {...inputProps}
-          error={error ?? undefined}
-          textInputStyle={textInputStyle}
+          error={error || undefined}
+          rightIcon={rightIcon}
         />
         {helperText && !error && (
           <Text

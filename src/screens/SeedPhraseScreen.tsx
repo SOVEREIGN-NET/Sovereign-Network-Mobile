@@ -3,7 +3,7 @@
  * Display and confirm seed phrases after identity creation
  */
 
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { View, ScrollView, Pressable } from 'react-native';
 import { NativeStackScreenProps } from '@react-navigation/native-stack';
 import {
@@ -16,8 +16,11 @@ import {
   ActionFooter,
   SectionLabel,
   Checkbox,
+  Button,
 } from '../components';
 import { useTranslation } from '../i18n';
+import { useAuth } from '../hooks';
+import SeedVaultService from '../services/SeedVaultService';
 import { colors, spacing, typography, borderRadius } from '../theme';
 import { AuthStackParamList } from '../navigation/AuthNavigator';
 
@@ -25,10 +28,28 @@ type SeedPhraseScreenProps = NativeStackScreenProps<AuthStackParamList, 'SeedPhr
 
 const SeedPhraseScreen = ({ navigation, route }: SeedPhraseScreenProps) => {
   const { t } = useTranslation();
-  const { seedPhrases, walletType = 'primary' } = route.params || {};
+  const { seedPhrases, walletType = 'primary', identity } = route.params || {};
+  const { setCurrentIdentity } = useAuth();
   const [copied, setCopied] = useState(false);
   const [confirmedSaved, setConfirmedSaved] = useState(false);
   const [showPhrase, setShowPhrase] = useState(false);
+  const [isSaving, setIsSaving] = useState(false);
+  const [isSecureStorageSupported, setIsSecureStorageSupported] = useState(false);
+  const [vaultState, setVaultState] = useState<'idle' | 'saving' | 'saved' | 'error'>('idle');
+  const [vaultError, setVaultError] = useState<string | null>(null);
+
+  useEffect(() => {
+    console.log('🌱 SeedPhraseScreen mounted', {
+      hasSeedPhrases: !!seedPhrases,
+      seedPhraseCount: seedPhrases?.length,
+      hasIdentity: !!identity,
+      identityDid: identity?.did,
+    });
+
+    SeedVaultService.isSecureStorageAvailable()
+      .then(setIsSecureStorageSupported)
+      .catch(() => setIsSecureStorageSupported(false));
+  }, [seedPhrases, identity]);
 
   if (!seedPhrases || !Array.isArray(seedPhrases)) {
     return (
@@ -56,12 +77,46 @@ const SeedPhraseScreen = ({ navigation, route }: SeedPhraseScreenProps) => {
     setTimeout(() => setCopied(false), 2000);
   };
 
-  const handleContinue = () => {
+  const handleSecureSave = async () => {
+    if (!seedPhrases?.length || !isSecureStorageSupported) {
+      setVaultError(t.auth.seedPhrase.secureSave.unavailable);
+      setVaultState('error');
+      return;
+    }
+
+    setVaultState('saving');
+    setVaultError(null);
+    try {
+      await SeedVaultService.saveSeedPhrase(seedPhrases);
+      setVaultState('saved');
+    } catch (err: any) {
+      setVaultError(err?.message || t.auth.seedPhrase.secureSave.error);
+      setVaultState('error');
+    }
+  };
+
+  const handleContinue = async () => {
     if (!confirmedSaved) {
       return;
     }
-    // Navigate to next screen or main app
-    navigation.navigate('SignIn');
+
+    setIsSaving(true);
+    try {
+      // Get the identity object from route params (passed from CreateIdentityScreen)
+      if (identity) {
+        // Save identity to storage and set in auth context
+        await setCurrentIdentity(identity);
+        console.log('✅ Identity saved after seed phrase confirmation:', identity.did);
+
+        // Navigate back - the app will now detect the authenticated state
+        // and switch to the main app automatically
+        navigation.goBack();
+      }
+    } catch (err) {
+      console.error('❌ Failed to save identity:', err);
+    } finally {
+      setIsSaving(false);
+    }
   };
 
   return (
@@ -214,6 +269,71 @@ const SeedPhraseScreen = ({ navigation, route }: SeedPhraseScreenProps) => {
             </Column>
           </Card>
 
+          {/* Secure Save Card */}
+          <Card>
+            <Column gap="sm">
+              <Row style={{ justifyContent: 'space-between', alignItems: 'center' }}>
+                <Text
+                  style={{
+                    fontSize: typography.size.sm,
+                    fontWeight: typography.weight.semibold,
+                    color: colors.text_primary,
+                  }}
+                >
+                  {t.auth.seedPhrase.secureSave.title}
+                </Text>
+              </Row>
+              <Text
+                style={{
+                  fontSize: typography.size.xs,
+                  color: colors.text_secondary,
+                  lineHeight: typography.lineHeight.relaxed,
+                }}
+              >
+                {t.auth.seedPhrase.secureSave.description}
+              </Text>
+              <Button
+                onPress={handleSecureSave}
+                disabled={vaultState === 'saving' || !isSecureStorageSupported}
+                variant="secondary"
+              >
+                {vaultState === 'saving'
+                  ? t.auth.seedPhrase.secureSave.saving
+                  : t.auth.seedPhrase.secureSave.button}
+              </Button>
+              {vaultState === 'saved' && (
+                <Text
+                  style={{
+                    fontSize: typography.size.xs,
+                    color: colors.success,
+                  }}
+                >
+                  {t.auth.seedPhrase.secureSave.success}
+                </Text>
+              )}
+              {!isSecureStorageSupported && (
+                <Text
+                  style={{
+                    fontSize: typography.size.xs,
+                    color: colors.warning,
+                  }}
+                >
+                  {t.auth.seedPhrase.secureSave.unavailable}
+                </Text>
+              )}
+              {vaultState === 'error' && (
+                <Text
+                  style={{
+                    fontSize: typography.size.xs,
+                    color: colors.error,
+                  }}
+                >
+                  {vaultError || t.auth.seedPhrase.secureSave.error}
+                </Text>
+              )}
+            </Column>
+          </Card>
+
           {/* Confirmation Checkbox */}
           <Card>
             <Column gap="xs">
@@ -241,8 +361,8 @@ const SeedPhraseScreen = ({ navigation, route }: SeedPhraseScreenProps) => {
             actions={[
               {
                 label: t.auth.seedPhrase.continueButton,
-                onPress: handleContinue,
-                disabled: !confirmedSaved,
+                onPress: () => void handleContinue().catch(() => {}),
+                disabled: !confirmedSaved || isSaving,
               },
               {
                 label: t.app.back,

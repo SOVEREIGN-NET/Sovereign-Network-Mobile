@@ -278,6 +278,40 @@ class MockDataService {
       transactionHash: `0x${Math.random().toString(16).slice(2)}`,
     };
   }
+
+  /**
+   * Generate mock seed phrase (20 words)
+   */
+  static generateSeedPhrase(): string[] {
+    const wordList = [
+      'abandon', 'ability', 'able', 'about', 'above', 'absent', 'absorb', 'abstract', 'absurd', 'access',
+      'accident', 'account', 'accuse', 'achieve', 'acid', 'acoustic', 'acquire', 'across', 'act', 'action',
+      'activate', 'active', 'activity', 'actor', 'actual', 'acute', 'adapt', 'add', 'addict', 'added',
+      'address', 'adjust', 'admit', 'adopt', 'adore', 'adorn', 'adult', 'advance', 'advent', 'adventure',
+      'advice', 'advise', 'affair', 'afford', 'afraid', 'after', 'again', 'against', 'age', 'agency',
+    ];
+
+    const shuffled = [...wordList].sort(() => Math.random() - 0.5);
+    return shuffled.slice(0, 20);
+  }
+
+  /**
+   * Simulate identity creation with seed phrase
+   */
+  static createIdentity(displayName: string, identityType: string) {
+    const seedPhrase = this.generateSeedPhrase();
+    const did = `did:zhtp:${Math.random().toString(16).slice(2).substring(0, 16)}`;
+
+    return {
+      success: true,
+      did,
+      displayName,
+      identityType,
+      seedPhrase,
+      createdAt: new Date().toISOString(),
+      message: 'Identity created successfully',
+    };
+  }
 }
 
 export default MockDataService;

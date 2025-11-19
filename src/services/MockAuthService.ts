@@ -373,16 +373,18 @@ class MockAuthService {
    * @param guardianCode - Guardian recovery code
    * @returns Recovered identity
    */
-  async recoverWithSocial(guardianCode: string): Promise<Identity> {
+  async recoverWithSocial(guardianIds: string[]): Promise<Identity> {
     await this.simulateDelay();
 
-    if (!guardianCode || guardianCode.length < 6) {
-      throw new Error('Invalid guardian code');
+    if (!guardianIds || !Array.isArray(guardianIds) || guardianIds.length === 0) {
+      throw new Error('At least one guardian ID is required');
     }
 
-    // Mock code validation
-    if (!guardianCode.startsWith('GUARD-')) {
-      throw new Error('Guardian code must start with GUARD-');
+    // Validate guardian IDs format
+    for (const id of guardianIds) {
+      if (!id || typeof id !== 'string' || id.length < 3) {
+        throw new Error('Invalid guardian ID format');
+      }
     }
 
     // Mock recovery - return first demo identity
@@ -391,7 +393,7 @@ class MockAuthService {
       throw new Error('No identities available for recovery');
     }
 
-    console.log(`✅ Identity recovered via social recovery`);
+    console.log(`✅ Identity recovered via social recovery with ${guardianIds.length} guardian(s)`);
     return MOCK_IDENTITIES[didKey];
   }
 

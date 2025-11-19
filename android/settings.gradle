@@ -1,10 +1,6 @@
 pluginManagement { includeBuild("../node_modules/@react-native/gradle-plugin") }
 plugins { id("com.facebook.react.settings") }
 
-// Set NODE_PATH for Gradle to find npx
-def nodePath = System.getenv('NODE_PATH') ?: '/Users/supertramp/.nvm/versions/node/v20.19.4/bin'
-System.setProperty("PATH", nodePath + File.pathSeparator + System.getProperty("PATH"))
-
 extensions.configure(com.facebook.react.ReactSettingsExtension){ ex -> ex.autolinkLibrariesFromCommand() }
 rootProject.name = 'SovereignNetworkMobile'
 include ':app'

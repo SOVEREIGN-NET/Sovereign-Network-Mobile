@@ -49,7 +49,8 @@ const DashboardScreen = ({ navigation }: any) => {
           };
         }
       } catch (error) {
-        console.warn('Failed to fetch real data, using mock:', error);
+        // Silently fallback to mock data if API is unavailable
+        // This is expected in development when node is not running
       }
 
       // Fallback to mock data
@@ -79,7 +80,7 @@ const DashboardScreen = ({ navigation }: any) => {
       label: 'History',
       icon: '',
       onPress: () => {
-        // TODO: Navigate to history
+        navigation.navigate('SIDTab', { screen: 'History' });
       },
     },
     {
@@ -87,7 +88,7 @@ const DashboardScreen = ({ navigation }: any) => {
       label: 'Bookmarks',
       icon: '',
       onPress: () => {
-        // TODO: Navigate to bookmarks
+        navigation.navigate('SIDTab', { screen: 'Bookmarks' });
       },
     },
     {
@@ -95,15 +96,15 @@ const DashboardScreen = ({ navigation }: any) => {
       label: 'Favorites',
       icon: '',
       onPress: () => {
-        // TODO: Navigate to favorites
+        navigation.navigate('SIDTab', { screen: 'Favorites' });
       },
     },
     {
       id: 'settings',
-      label: 'Settings',
+      label: 'App Settings',
       icon: '',
       onPress: () => {
-        navigation.navigate('AppSettings');
+        navigation.navigate('SIDTab', { screen: 'AppSettings' });
       },
     },
   ];
