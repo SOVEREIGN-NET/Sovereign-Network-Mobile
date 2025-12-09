@@ -15,8 +15,9 @@ export interface AppConfig {
 const CONFIG_KEY = 'app_config';
 
 // Default values from .env or hardcoded fallbacks
+// Note: The dev node (77.42.37.161:9334) is pure QUIC - no HTTP/TCP support
 const DEFAULT_CONFIG: AppConfig = {
-  zhtpNodeUrl: __DEV__ ? 'http://localhost:3000' : 'https://node.sovereign-network.org',
+  zhtpNodeUrl: 'http://77.42.37.161:9334',
   networkType: 'testnet',
   useRealAuth: false, // Use mock service by default in dev
 };
