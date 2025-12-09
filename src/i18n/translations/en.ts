@@ -735,7 +735,7 @@ export const en = {
       mockData: 'Use Mock Data',
       mockDataDescription: 'Toggle between mock data and real network',
       nodeUrl: 'Node URL',
-      nodeUrlPlaceholder: 'http://192.168.1.31:9333',
+      nodeUrlPlaceholder: 'http://77.42.37.161:9334',
       nodeUrlHint: 'Enter test node URL with port',
       save: 'Save Configuration',
       saved: 'Configuration saved',

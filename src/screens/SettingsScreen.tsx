@@ -38,7 +38,7 @@ const SettingsScreen = ({ navigation }: any) => {
 
   // Developer settings (synced with native phone settings)
   const [useMockData, setUseMockData] = useState(nativeSettings?.useMockData ?? true);
-  const [nodeUrl, setNodeUrl] = useState(nativeSettings?.nodeUrl ?? 'http://192.168.1.31:9333');
+  const [nodeUrl, setNodeUrl] = useState(nativeSettings?.nodeUrl ?? 'http://77.42.37.161:9334');
 
   // Sync when native settings load
   useEffect(() => {

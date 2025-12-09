@@ -24,6 +24,7 @@ import { useTranslation } from '../i18n';
 import { colors, spacing, typography } from '../theme';
 import { AuthStackParamList } from '../navigation/AuthNavigator';
 import MockAuthService from '../services/MockAuthService';
+import QuicClient from '../services/QuicClient';
 
 type SignInScreenProps = NativeStackScreenProps<AuthStackParamList, 'SignIn'>;
 
@@ -140,58 +141,91 @@ const SignInScreen = ({ navigation }: SignInScreenProps) => {
           </Text>
         </View>
 
-        {/* Node Connection Status */}
-        <Card>
-          <Row style={{ justifyContent: 'space-between', alignItems: 'center' }}>
-            <Column gap="xs" style={{ flex: 1 }}>
-              <Text
+        {/* Node Connection Status - Tap to retry, Long press to test HTTP/3 */}
+        <Pressable
+          onPress={() => checkConnection()}
+          onLongPress={async () => {
+            console.log('[SignIn] Testing full QUIC+HTTP/3 request...');
+            // Extract host and port from nodeUrl
+            try {
+              const url = new URL(nodeUrl || 'http://77.42.37.161:9334');
+              const host = url.hostname;
+              const port = parseInt(url.port, 10) || 9334;
+
+              const result = await QuicClient.testHealthCheck(host, port);
+              if (result.success) {
+                console.log('[SignIn] HTTP/3 health check SUCCESS:', result.data);
+                alert(`QUIC+HTTP/3 Success!\n\nLatency: ${result.latencyMs}ms\n\nResponse: ${JSON.stringify(result.data, null, 2)}`);
+              } else {
+                console.log('[SignIn] HTTP/3 health check FAILED:', result.error);
+                alert(`QUIC+HTTP/3 Failed!\n\nError: ${result.error}\n\nLatency: ${result.latencyMs}ms`);
+              }
+            } catch (err: any) {
+              console.error('[SignIn] HTTP/3 test error:', err);
+              alert(`QUIC+HTTP/3 Error: ${err.message}`);
+            }
+          }}
+        >
+          <Card>
+            <Row style={{ justifyContent: 'space-between', alignItems: 'center' }}>
+              <Column gap="xs" style={{ flex: 1 }}>
+                <Text
+                  style={{
+                    fontSize: typography.size.xs,
+                    color: colors.text_secondary,
+                    fontWeight: typography.weight.medium,
+                  }}
+                >
+                  {t.app.nodeStatus}
+                </Text>
+                <Text
+                  style={{
+                    fontSize: typography.size.sm,
+                    color: colors.text_primary,
+                    fontWeight: typography.weight.semibold,
+                  }}
+                >
+                  {nodeUrl}
+                </Text>
+                <Text
+                  style={{
+                    fontSize: typography.size.xs,
+                    color: colors.text_muted,
+                    fontStyle: 'italic',
+                  }}
+                >
+                  Long press to test QUIC+HTTP/3
+                </Text>
+              </Column>
+              <Badge
+                label={isConnected ? t.app.connected : t.app.disconnected}
+                variant={isConnected ? 'success' : 'error'}
+              />
+            </Row>
+            {!isConnected && !nodeLoading && (
+              <View
                 style={{
-                  fontSize: typography.size.xs,
-                  color: colors.text_secondary,
-                  fontWeight: typography.weight.medium,
+                  marginTop: spacing.sm,
+                  paddingVertical: spacing.xs,
+                  paddingHorizontal: spacing.sm,
+                  backgroundColor: colors.bg_light,
+                  borderRadius: 6,
                 }}
               >
-                {t.app.nodeStatus}
-              </Text>
-              <Text
-                style={{
-                  fontSize: typography.size.sm,
-                  color: colors.text_primary,
-                  fontWeight: typography.weight.semibold,
-                }}
-              >
-                {nodeUrl}
-              </Text>
-            </Column>
-            <Badge
-              label={isConnected ? t.app.connected : t.app.disconnected}
-              variant={isConnected ? 'success' : 'error'}
-            />
-          </Row>
-          {!isConnected && !nodeLoading && (
-            <Pressable
-              onPress={() => checkConnection()}
-              style={{
-                marginTop: spacing.sm,
-                paddingVertical: spacing.xs,
-                paddingHorizontal: spacing.sm,
-                backgroundColor: colors.bg_light,
-                borderRadius: 6,
-              }}
-            >
-              <Text
-                style={{
-                  fontSize: typography.size.xs,
-                  color: colors.primary,
-                  fontWeight: typography.weight.semibold,
-                  textAlign: 'center',
-                }}
-              >
-                {t.app.retryConnection}
-              </Text>
-            </Pressable>
-          )}
-        </Card>
+                <Text
+                  style={{
+                    fontSize: typography.size.xs,
+                    color: colors.primary,
+                    fontWeight: typography.weight.semibold,
+                    textAlign: 'center',
+                  }}
+                >
+                  {t.app.retryConnection}
+                </Text>
+              </View>
+            )}
+          </Card>
+        </Pressable>
 
         {/* Error Message */}
         {displayError && <ErrorAlert message={displayError} icon="❌" />}

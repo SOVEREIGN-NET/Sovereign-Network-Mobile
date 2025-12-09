@@ -87,11 +87,11 @@ class NativeSettingsModule(reactContext: ReactApplicationContext) :
   fun getAllSettings(promise: Promise) {
     try {
       val useMockData = sharedPreferences.getBoolean("useMockData", true)
-      val nodeUrl = sharedPreferences.getString("nodeUrl", "http://192.168.1.31:9333")
+      val nodeUrl = sharedPreferences.getString("nodeUrl", "http://77.42.37.161:9334")
 
       val settings = WritableNativeMap()
       settings.putBoolean("useMockData", useMockData)
-      settings.putString("nodeUrl", nodeUrl ?: "http://192.168.1.31:9333")
+      settings.putString("nodeUrl", nodeUrl ?: "http://77.42.37.161:9334")
 
       promise.resolve(settings)
     } catch (e: Exception) {

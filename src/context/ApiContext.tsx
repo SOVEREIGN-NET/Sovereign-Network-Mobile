@@ -6,6 +6,7 @@
 import React, { createContext, useEffect, useState, useMemo } from 'react';
 import { ZhtpApi } from '@sovereign-net/api-client';
 import { ReactNativeConfigProvider } from '@sovereign-net/api-client/react-native';
+import { createQuicFetchAdapterSync } from '../services/QuicFetchAdapter';
 
 export interface ApiContextType {
   api: ZhtpApi | null;
@@ -84,7 +85,7 @@ interface ApiProviderProps {
  */
 export const ApiProvider: React.FC<ApiProviderProps> = ({
   children,
-  zhtpNodeUrl = 'http://192.168.1.31:9333',
+  zhtpNodeUrl = 'http://77.42.37.161:9334',
   networkType = 'testnet',
 }) => {
   const [api, setApi] = useState<ZhtpApi | null>(null);
@@ -101,7 +102,14 @@ export const ApiProvider: React.FC<ApiProviderProps> = ({
           ENABLE_BIOMETRICS: true,
         });
 
-        const apiInstance = new ZhtpApi(configProvider);
+        // Create QUIC fetch adapter for native QUIC transport
+        const quicFetchAdapter = createQuicFetchAdapterSync({
+          insecure: __DEV__, // Allow self-signed certs in dev
+          timeout: 30,
+          fallbackToHttp: false, // Pure QUIC, no HTTP fallback
+        });
+
+        const apiInstance = new ZhtpApi(configProvider, quicFetchAdapter);
         await apiInstance.ensureInitialized();
 
         setApi(apiInstance);

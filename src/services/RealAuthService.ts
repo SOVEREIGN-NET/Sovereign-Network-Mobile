@@ -5,6 +5,7 @@
 
 import { ZhtpApi, ReactNativeConfigProvider, Identity, SignupRequest, LoginRequest } from '@sovereign-net/api-client/react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import QuicClient from './QuicClient';
 
 export interface SignInCredentials {
   identity_id: string;
@@ -174,59 +175,48 @@ class RealAuthService {
   }
 
   /**
-   * Test connection to ZHTP node
-   * Tries /api/v1/protocol/health endpoint (no authentication required)
+   * Test connection to ZHTP node via UDP reachability check
+   * Uses simple UDP probe instead of full QUIC+PQC handshake
    * @returns True if node is reachable
    */
   async testConnection(): Promise<boolean> {
     try {
       const baseUrl = this.api.getBaseUrl();
+      const url = new URL(baseUrl);
+      const host = url.hostname;
+      const port = parseInt(url.port, 10) || 9334;
 
-      const timeoutPromise = new Promise((_, reject) =>
-        setTimeout(() => reject(new Error('Timeout')), 5000)
-      );
-
-      const fetchPromise = fetch(`${baseUrl}/api/v1/protocol/health`, {
-        method: 'GET',
-      });
-
-      const response = await Promise.race([fetchPromise, timeoutPromise]) as Response;
-
-      // 401/403 means node is reachable but auth required - that's fine
-      const connected = response.ok || response.status === 401 || response.status === 403;
-      console.log(connected ? '✅ Connected to ZHTP node' : `❌ Failed to connect to ZHTP node (${response.status})`);
+      // Use UDP reachability check (doesn't require PQC handshake)
+      const result = await QuicClient.checkReachability(host, port);
+      const connected = result.reachable;
+      console.log(connected
+        ? `✅ Node reachable at ${host}:${port} (${result.latencyMs ? Math.round(result.latencyMs) + 'ms' : 'unknown latency'})`
+        : `❌ Node not reachable: ${result.error}`);
       return connected;
     } catch (error: any) {
-      console.error('❌ Connection test failed:', error.message);
+      console.error('❌ Node reachability check failed:', error.message);
       return false;
     }
   }
 
   /**
-   * Get comprehensive protocol and node information
-   * Fetches node status directly from /api/v1/protocol/health endpoint
+   * Get comprehensive protocol and node information via QUIC
    * @returns Protocol info or null if unavailable
    */
   async getProtocolInfo() {
     try {
       const baseUrl = this.api.getBaseUrl();
-
-      const timeoutPromise = new Promise((_, reject) =>
-        setTimeout(() => reject(new Error('Timeout')), 5000)
-      );
-
-      const fetchPromise = fetch(`${baseUrl}/api/v1/protocol/health`, {
+      const response = await QuicClient.request(`${baseUrl}/api/v1/protocol/health`, {
         method: 'GET',
+        timeout: 10,
       });
 
-      const response = await Promise.race([fetchPromise, timeoutPromise]) as Response;
-
-      if (response.ok || response.status === 401 || response.status === 403) {
-        const data = await response.json();
-        console.log('✅ Protocol info retrieved');
+      if (response.ok) {
+        const data = JSON.parse(response.body);
+        console.log('✅ Protocol info retrieved via QUIC');
         return data;
       } else {
-        throw new Error(`HTTP ${response.status}`);
+        throw new Error(`QUIC ${response.status}`);
       }
     } catch (error: any) {
       console.error('❌ Failed to get protocol info:', error.message);
@@ -631,7 +621,7 @@ class RealAuthService {
 
 // Node URL - hardcoded to your ZHTP node
 // Can be updated at runtime using updateNodeUrl() method
-const DEFAULT_NODE_URL = 'http://192.168.1.31:9333';
+const DEFAULT_NODE_URL = 'http://77.42.37.161:9334';
 
 // Export singleton instance
 const authServiceInstance = new RealAuthService(DEFAULT_NODE_URL);

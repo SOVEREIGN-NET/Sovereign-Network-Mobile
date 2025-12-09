@@ -4,29 +4,108 @@
  * Used in Dashboard/Browser screens
  */
 
-import React from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { View, Pressable, StyleSheet } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import LinearGradient from 'react-native-linear-gradient';
 import { Text, Row } from '../../atoms';
 import { colors, spacing, typography, borderRadius, shadows, gradientAccents } from '../../../theme';
 import { useTranslation } from '../../../i18n';
+import QuicClient from '../../../services/QuicClient';
+
+// Development node configuration
+const DEV_NODE_HOST = '77.42.37.161';
+const DEV_NODE_PORT = 9334;
 
 export interface HeaderBarProps {
   onMenuPress: () => void;
   onBLEPress: () => void;
   sovAddress?: string;
   isConnected?: boolean;
+  onConnectionStatusChange?: (connected: boolean, latencyMs?: number) => void;
 }
 
 const HeaderBar: React.FC<HeaderBarProps> = ({
   onMenuPress,
   onBLEPress,
   sovAddress = 'SOV:1729.1',
-  isConnected = true,
+  isConnected: isConnectedProp,
+  onConnectionStatusChange,
 }) => {
   const insets = useSafeAreaInsets();
   const { t } = useTranslation();
+
+  // Connection state
+  const [connectionStatus, setConnectionStatus] = useState<'checking' | 'connected' | 'disconnected'>('checking');
+  const [latencyMs, setLatencyMs] = useState<number | null>(null);
+  const [quicSupported, setQuicSupported] = useState<boolean | null>(null);
+
+  // Use prop if provided, otherwise use internal state
+  const isConnected = isConnectedProp !== undefined
+    ? isConnectedProp
+    : connectionStatus === 'connected';
+
+  // Check QUIC node reachability (UDP-based, doesn't require full PQC handshake)
+  const checkNodeConnection = useCallback(async () => {
+    try {
+      // First check if QUIC is supported
+      const supported = await QuicClient.isSupported();
+      setQuicSupported(supported);
+
+      if (!supported) {
+        console.warn('QUIC not supported on this device');
+        setConnectionStatus('disconnected');
+        onConnectionStatusChange?.(false);
+        return;
+      }
+
+      // Check node reachability via UDP (simpler than full QUIC handshake)
+      setConnectionStatus('checking');
+      const result = await QuicClient.checkReachability(DEV_NODE_HOST, DEV_NODE_PORT);
+
+      if (result.reachable) {
+        setConnectionStatus('connected');
+        setLatencyMs(result.latencyMs ? Math.round(result.latencyMs) : null);
+        onConnectionStatusChange?.(true, result.latencyMs);
+        console.log(`Node reachable at ${DEV_NODE_HOST}:${DEV_NODE_PORT} (${result.latencyMs ? Math.round(result.latencyMs) + 'ms' : 'unknown latency'})`);
+      } else {
+        setConnectionStatus('disconnected');
+        setLatencyMs(null);
+        onConnectionStatusChange?.(false);
+        console.log(`Node not reachable: ${result.error}`);
+      }
+    } catch (error) {
+      console.warn('Node reachability check failed:', error);
+      setConnectionStatus('disconnected');
+      setLatencyMs(null);
+      onConnectionStatusChange?.(false);
+    }
+  }, [onConnectionStatusChange]);
+
+  // Check connection on mount and periodically
+  useEffect(() => {
+    // Skip auto-check if isConnected is controlled externally
+    if (isConnectedProp !== undefined) {
+      return;
+    }
+
+    checkNodeConnection();
+
+    // Re-check every 30 seconds
+    const interval = setInterval(checkNodeConnection, 30000);
+    return () => clearInterval(interval);
+  }, [checkNodeConnection, isConnectedProp]);
+
+  // Get status text
+  const getStatusText = () => {
+    if (connectionStatus === 'checking') {
+      return 'Checking...';
+    }
+    if (isConnected && latencyMs !== null) {
+      return `${latencyMs}ms`;
+    }
+    return isConnected ? t.headerbar.connected : t.headerbar.offline;
+  };
 
   const styles = StyleSheet.create({
     container: {
@@ -95,6 +174,9 @@ const HeaderBar: React.FC<HeaderBarProps> = ({
     statusDisconnected: {
       backgroundColor: colors.error,
     },
+    statusChecking: {
+      backgroundColor: colors.warning,
+    },
     rightSection: {
       padding: spacing.sm,
       marginRight: -spacing.sm,
@@ -132,32 +214,54 @@ const HeaderBar: React.FC<HeaderBarProps> = ({
           <Text style={styles.addressText}>{sovAddress}</Text>
         </View>
 
-        {/* Right: Connection Status */}
-        <View
-          style={styles.rightSection}
+        {/* Right: Connection Status - Press to refresh, Long press to test HTTP/3 */}
+        <Pressable
+          onPress={checkNodeConnection}
+          onLongPress={async () => {
+            console.log('[HeaderBar] Testing full QUIC+HTTP/3 request...');
+            setConnectionStatus('checking');
+            const result = await QuicClient.testHealthCheck(DEV_NODE_HOST, DEV_NODE_PORT);
+            if (result.success) {
+              console.log('[HeaderBar] HTTP/3 health check SUCCESS:', result.data);
+              setConnectionStatus('connected');
+              setLatencyMs(result.latencyMs ? Math.round(result.latencyMs) : null);
+            } else {
+              console.log('[HeaderBar] HTTP/3 health check FAILED:', result.error);
+              setConnectionStatus('disconnected');
+            }
+          }}
+          style={({ pressed }) => [
+            styles.rightSection,
+            pressed && { opacity: 0.7 },
+          ]}
+          hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
         >
           <Row>
             <View
               style={[
                 styles.statusIndicator,
-                isConnected
-                  ? styles.statusConnected
-                  : styles.statusDisconnected,
+                connectionStatus === 'checking'
+                  ? styles.statusChecking
+                  : isConnected
+                    ? styles.statusConnected
+                    : styles.statusDisconnected,
               ]}
             />
             <Text
               style={{
                 fontSize: typography.size.xs,
-                color: isConnected
-                  ? colors.success
-                  : colors.error,
+                color: connectionStatus === 'checking'
+                  ? colors.warning
+                  : isConnected
+                    ? colors.success
+                    : colors.error,
                 fontWeight: typography.weight.semibold,
               }}
             >
-              {isConnected ? t.headerbar.connected : t.headerbar.offline}
+              {getStatusText()}
             </Text>
           </Row>
-        </View>
+        </Pressable>
       </Row>
       </View>
       {/* Subtle gradient accent line */}

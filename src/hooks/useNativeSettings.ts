@@ -37,7 +37,7 @@ export function useNativeSettings() {
       if (nativeSettings) {
         setSettings({
           useMockData: nativeSettings.useMockData ?? true,
-          nodeUrl: nativeSettings.nodeUrl ?? 'http://192.168.1.31:9333',
+          nodeUrl: nativeSettings.nodeUrl ?? 'http://77.42.37.161:9334',
         });
       }
     } catch (err: any) {
@@ -88,7 +88,7 @@ export function useNativeSettings() {
       await NativeSettings.clearSettings();
       setSettings({
         useMockData: true,
-        nodeUrl: 'http://192.168.1.31:9333',
+        nodeUrl: 'http://77.42.37.161:9334',
       });
       return true;
     } catch (err: any) {
