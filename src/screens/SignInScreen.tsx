@@ -187,15 +187,6 @@ const SignInScreen = ({ navigation }: SignInScreenProps) => {
                 >
                   {nodeUrl}
                 </Text>
-                <Text
-                  style={{
-                    fontSize: typography.size.xs,
-                    color: colors.text_muted,
-                    fontStyle: 'italic',
-                  }}
-                >
-                  Long press to test QUIC+HTTP/3
-                </Text>
               </Column>
               <Badge
                 label={isConnected ? t.app.connected : t.app.disconnected}

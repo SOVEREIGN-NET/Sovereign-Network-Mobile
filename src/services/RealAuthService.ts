@@ -1,11 +1,14 @@
 /**
  * Real Authentication Service
  * Integrates with ZHTP API backend for actual identity operations
+ * Uses native QUIC transport via QuicFetchAdapter
  */
 
 import { ZhtpApi, ReactNativeConfigProvider, Identity, SignupRequest, LoginRequest } from '@sovereign-net/api-client/react-native';
+import type { FetchAdapter } from '@sovereign-net/api-client/react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import QuicClient from './QuicClient';
+import { createQuicFetchAdapterSync } from './QuicFetchAdapter';
 
 export interface SignInCredentials {
   identity_id: string;
@@ -20,11 +23,12 @@ export interface CreateIdentityData {
 }
 
 /**
- * Real auth service using ZHTP API
+ * Real auth service using ZHTP API over native QUIC transport
  */
 class RealAuthService {
   private readonly api: ZhtpApi;
   private readonly configProvider: ReactNativeConfigProvider;
+  private readonly quicFetch: FetchAdapter;
 
   constructor(nodeUrl: string) {
     this.configProvider = new ReactNativeConfigProvider(
@@ -36,7 +40,20 @@ class RealAuthService {
       },
       AsyncStorage,
     );
-    this.api = new ZhtpApi(this.configProvider);
+
+    // Create QUIC-based fetch adapter for native transport
+    // Falls back to HTTP if QUIC unavailable (e.g., older iOS)
+    this.quicFetch = createQuicFetchAdapterSync({
+      insecure: true, // Accept self-signed certs (security in ZHTP layer)
+      timeout: 30,
+      fallbackToHttp: false, // Server only supports QUIC
+      onFallback: (url, reason) => {
+        console.warn(`[RealAuthService] QUIC fallback for ${url}: ${reason}`);
+      },
+    });
+
+    // Pass QUIC adapter to ZhtpApi - all requests now go over QUIC/UDP
+    this.api = new ZhtpApi(this.configProvider, this.quicFetch);
   }
 
   /**
