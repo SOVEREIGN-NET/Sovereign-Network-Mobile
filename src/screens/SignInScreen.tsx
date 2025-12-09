@@ -25,6 +25,7 @@ import { colors, spacing, typography } from '../theme';
 import { AuthStackParamList } from '../navigation/AuthNavigator';
 import MockAuthService from '../services/MockAuthService';
 import QuicClient from '../services/QuicClient';
+import { DEFAULT_NODE_HOST, DEFAULT_NODE_PORT } from '../config';
 
 type SignInScreenProps = NativeStackScreenProps<AuthStackParamList, 'SignIn'>;
 
@@ -146,11 +147,15 @@ const SignInScreen = ({ navigation }: SignInScreenProps) => {
           onPress={() => checkConnection()}
           onLongPress={async () => {
             console.log('[SignIn] Testing full QUIC+HTTP/3 request...');
-            // Extract host and port from nodeUrl
+            // Extract host and port from nodeUrl or use defaults
             try {
-              const url = new URL(nodeUrl || 'http://77.42.37.161:9334');
-              const host = url.hostname;
-              const port = parseInt(url.port, 10) || 9334;
+              let host = DEFAULT_NODE_HOST;
+              let port = DEFAULT_NODE_PORT;
+              if (nodeUrl) {
+                const url = new URL(nodeUrl);
+                host = url.hostname;
+                port = parseInt(url.port, 10) || DEFAULT_NODE_PORT;
+              }
 
               const result = await QuicClient.testHealthCheck(host, port);
               if (result.success) {

@@ -7,6 +7,7 @@ import React, { createContext, useEffect, useState, useMemo } from 'react';
 import { ZhtpApi } from '@sovereign-net/api-client';
 import { ReactNativeConfigProvider } from '@sovereign-net/api-client/react-native';
 import { createQuicFetchAdapterSync } from '../services/QuicFetchAdapter';
+import { DEFAULT_ZHTP_NODE_URL, DEFAULT_NETWORK_TYPE, QUIC_CONFIG, APP_DEFAULTS } from '../config';
 
 export interface ApiContextType {
   api: ZhtpApi | null;
@@ -85,8 +86,8 @@ interface ApiProviderProps {
  */
 export const ApiProvider: React.FC<ApiProviderProps> = ({
   children,
-  zhtpNodeUrl = 'http://77.42.37.161:9334',
-  networkType = 'testnet',
+  zhtpNodeUrl = DEFAULT_ZHTP_NODE_URL,
+  networkType = DEFAULT_NETWORK_TYPE,
 }) => {
   const [api, setApi] = useState<ZhtpApi | null>(null);
   const [isInitialized, setIsInitialized] = useState(false);
@@ -104,9 +105,9 @@ export const ApiProvider: React.FC<ApiProviderProps> = ({
 
         // Create QUIC fetch adapter for native QUIC transport
         const quicFetchAdapter = createQuicFetchAdapterSync({
-          insecure: __DEV__, // Allow self-signed certs in dev
-          timeout: 30,
-          fallbackToHttp: false, // Pure QUIC, no HTTP fallback
+          insecure: QUIC_CONFIG.insecure,
+          timeout: QUIC_CONFIG.defaultTimeout,
+          fallbackToHttp: QUIC_CONFIG.fallbackToHttp,
         });
 
         const apiInstance = new ZhtpApi(configProvider, quicFetchAdapter);

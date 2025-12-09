@@ -12,10 +12,7 @@ import { Text, Row } from '../../atoms';
 import { colors, spacing, typography, borderRadius, shadows, gradientAccents } from '../../../theme';
 import { useTranslation } from '../../../i18n';
 import QuicClient from '../../../services/QuicClient';
-
-// Development node configuration
-const DEV_NODE_HOST = '77.42.37.161';
-const DEV_NODE_PORT = 9334;
+import { DEFAULT_NODE_HOST, DEFAULT_NODE_PORT } from '../../../config';
 
 export interface HeaderBarProps {
   onMenuPress: () => void;
@@ -61,13 +58,13 @@ const HeaderBar: React.FC<HeaderBarProps> = ({
 
       // Check node reachability via UDP (simpler than full QUIC handshake)
       setConnectionStatus('checking');
-      const result = await QuicClient.checkReachability(DEV_NODE_HOST, DEV_NODE_PORT);
+      const result = await QuicClient.checkReachability(DEFAULT_NODE_HOST, DEFAULT_NODE_PORT);
 
       if (result.reachable) {
         setConnectionStatus('connected');
         setLatencyMs(result.latencyMs ? Math.round(result.latencyMs) : null);
         onConnectionStatusChange?.(true, result.latencyMs);
-        console.log(`Node reachable at ${DEV_NODE_HOST}:${DEV_NODE_PORT} (${result.latencyMs ? Math.round(result.latencyMs) + 'ms' : 'unknown latency'})`);
+        console.log(`Node reachable at ${DEFAULT_NODE_HOST}:${DEFAULT_NODE_PORT} (${result.latencyMs ? Math.round(result.latencyMs) + 'ms' : 'unknown latency'})`);
       } else {
         setConnectionStatus('disconnected');
         setLatencyMs(null);
@@ -220,7 +217,7 @@ const HeaderBar: React.FC<HeaderBarProps> = ({
           onLongPress={async () => {
             console.log('[HeaderBar] Testing full QUIC+HTTP/3 request...');
             setConnectionStatus('checking');
-            const result = await QuicClient.testHealthCheck(DEV_NODE_HOST, DEV_NODE_PORT);
+            const result = await QuicClient.testHealthCheck(DEFAULT_NODE_HOST, DEFAULT_NODE_PORT);
             if (result.success) {
               console.log('[HeaderBar] HTTP/3 health check SUCCESS:', result.data);
               setConnectionStatus('connected');

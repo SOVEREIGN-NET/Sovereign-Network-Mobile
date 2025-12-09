@@ -6,6 +6,7 @@
 
 import { useEffect, useState, useCallback } from 'react';
 import { NativeModules } from 'react-native';
+import { DEFAULT_ZHTP_NODE_URL, APP_DEFAULTS } from '../config';
 
 const { NativeSettings } = NativeModules;
 
@@ -36,8 +37,8 @@ export function useNativeSettings() {
 
       if (nativeSettings) {
         setSettings({
-          useMockData: nativeSettings.useMockData ?? true,
-          nodeUrl: nativeSettings.nodeUrl ?? 'http://77.42.37.161:9334',
+          useMockData: nativeSettings.useMockData ?? APP_DEFAULTS.useMockData,
+          nodeUrl: nativeSettings.nodeUrl ?? DEFAULT_ZHTP_NODE_URL,
         });
       }
     } catch (err: any) {
@@ -87,8 +88,8 @@ export function useNativeSettings() {
 
       await NativeSettings.clearSettings();
       setSettings({
-        useMockData: true,
-        nodeUrl: 'http://77.42.37.161:9334',
+        useMockData: APP_DEFAULTS.useMockData,
+        nodeUrl: DEFAULT_ZHTP_NODE_URL,
       });
       return true;
     } catch (err: any) {

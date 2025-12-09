@@ -636,12 +636,10 @@ class RealAuthService {
   }
 }
 
-// Node URL - hardcoded to your ZHTP node
-// Can be updated at runtime using updateNodeUrl() method
-const DEFAULT_NODE_URL = 'http://77.42.37.161:9334';
+import { DEFAULT_ZHTP_NODE_URL } from '../config';
 
-// Export singleton instance
-const authServiceInstance = new RealAuthService(DEFAULT_NODE_URL);
+// Export singleton instance - uses centralized config
+const authServiceInstance = new RealAuthService(DEFAULT_ZHTP_NODE_URL);
 export default authServiceInstance;
 
 // Also export the class for creating custom instances

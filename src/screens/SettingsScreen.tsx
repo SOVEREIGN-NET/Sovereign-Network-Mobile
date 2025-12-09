@@ -15,6 +15,7 @@ import { useAuth, useNativeSettings } from '../hooks';
 import { useTranslation } from '../i18n';
 import { colors, spacing, typography, borderRadius } from '../theme';
 import { setUseMockService } from '../context/AuthContext';
+import { DEFAULT_ZHTP_NODE_URL, APP_DEFAULTS } from '../config';
 
 type Theme = 'light' | 'dark' | 'system';
 type Language = 'en' | 'es' | 'fr' | 'de';
@@ -37,8 +38,8 @@ const SettingsScreen = ({ navigation }: any) => {
   const [showFontOptions, setShowFontOptions] = useState(false);
 
   // Developer settings (synced with native phone settings)
-  const [useMockData, setUseMockData] = useState(nativeSettings?.useMockData ?? true);
-  const [nodeUrl, setNodeUrl] = useState(nativeSettings?.nodeUrl ?? 'http://77.42.37.161:9334');
+  const [useMockData, setUseMockData] = useState(nativeSettings?.useMockData ?? APP_DEFAULTS.useMockData);
+  const [nodeUrl, setNodeUrl] = useState(nativeSettings?.nodeUrl ?? DEFAULT_ZHTP_NODE_URL);
 
   // Sync when native settings load
   useEffect(() => {

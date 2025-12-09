@@ -5,6 +5,7 @@
  */
 
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import { DEFAULT_ZHTP_NODE_URL, DEFAULT_NETWORK_TYPE, APP_DEFAULTS } from '../config';
 
 export interface AppConfig {
   zhtpNodeUrl: string;
@@ -14,12 +15,12 @@ export interface AppConfig {
 
 const CONFIG_KEY = 'app_config';
 
-// Default values from .env or hardcoded fallbacks
-// Note: The dev node (77.42.37.161:9334) is pure QUIC - no HTTP/TCP support
+// Default values from centralized config
+// Note: The dev node is pure QUIC - no HTTP/TCP support
 const DEFAULT_CONFIG: AppConfig = {
-  zhtpNodeUrl: 'http://77.42.37.161:9334',
-  networkType: 'testnet',
-  useRealAuth: false, // Use mock service by default in dev
+  zhtpNodeUrl: DEFAULT_ZHTP_NODE_URL,
+  networkType: DEFAULT_NETWORK_TYPE,
+  useRealAuth: !APP_DEFAULTS.useMockData, // Use mock service by default in dev
 };
 
 /**
