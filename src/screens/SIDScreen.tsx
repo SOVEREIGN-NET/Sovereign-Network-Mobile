@@ -415,7 +415,7 @@ const SIDScreen = ({ navigation }: any) => {
                                 style={{
                                   fontSize: typography.size.lg,
                                   fontWeight: typography.weight.bold,
-                                  color: display.color,
+                                  color: hasData ? display.color : colors.text_tertiary,
                                 }}
                               >
                                 {walletType === 'Primary' ? formatBalance(walletBalance) : (hasData ? formatBalance(wallet.balance || 0) : '—')}
