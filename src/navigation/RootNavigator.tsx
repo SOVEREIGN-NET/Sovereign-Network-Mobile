@@ -111,7 +111,13 @@ const SIDStack = () => {
       <Stack.Screen
         name="WalletSettings"
         component={WalletSettingsScreen}
-        options={{ title: 'Wallet Settings', headerBackTitle: 'Back' }}
+        options={{
+          headerShown: true,
+          title: 'Wallet Settings',
+          headerBackTitle: '',
+          headerStyle: { backgroundColor: colors.bg_dark },
+          headerTintColor: colors.text_primary,
+        }}
       />
       <Stack.Screen
         name="ProfileEdit"

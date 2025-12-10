@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
-import { View, TouchableOpacity, ScrollView, Clipboard, Alert } from 'react-native';
+import { View, TouchableOpacity, ScrollView, Alert } from 'react-native';
+import Clipboard from '@react-native-clipboard/clipboard';
 import {
   Card,
   Text, LoadingView,

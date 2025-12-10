@@ -3,7 +3,7 @@
  * Screen for signing in with existing ZK-DID identity
  */
 
-import React, { useState, useEffect } from 'react';
+import React, { useState } from 'react';
 import { View, Pressable, Text as RNText } from 'react-native';
 import LinearGradient from 'react-native-linear-gradient';
 import MaskedView from '@react-native-masked-view/masked-view';
@@ -23,28 +23,18 @@ import { useAuth, useNodeConnection } from '../hooks';
 import { useTranslation } from '../i18n';
 import { colors, spacing, typography } from '../theme';
 import { AuthStackParamList } from '../navigation/AuthNavigator';
-import MockAuthService from '../services/MockAuthService';
-import QuicClient from '../services/QuicClient';
-import { DEFAULT_NODE_HOST, DEFAULT_NODE_PORT } from '../config';
 
 type SignInScreenProps = NativeStackScreenProps<AuthStackParamList, 'SignIn'>;
 
 const SignInScreen = ({ navigation }: SignInScreenProps) => {
   const { t } = useTranslation();
   const { signIn, isLoading, error } = useAuth();
-  const { isConnected, isLoading: nodeLoading, nodeUrl, checkConnection } = useNodeConnection(true);
+  const { isConnected, isLoading: nodeLoading, checkConnection } = useNodeConnection(true);
 
   const [did, setDid] = useState('');
   const [passphrase, setPassphrase] = useState('');
   const [showPassword, setShowPassword] = useState(false);
   const [localError, setLocalError] = useState<string | null>(null);
-
-  // Load demo credentials on mount
-  useEffect(() => {
-    const demoCredentials = MockAuthService.getDemoCredentials();
-    setDid(demoCredentials.did);
-    setPassphrase(demoCredentials.passphrase);
-  }, []);
 
   const handleSignIn = async () => {
     setLocalError(null);
@@ -142,35 +132,8 @@ const SignInScreen = ({ navigation }: SignInScreenProps) => {
           </Text>
         </View>
 
-        {/* Node Connection Status - Tap to retry, Long press to test HTTP/3 */}
-        <Pressable
-          onPress={() => checkConnection()}
-          onLongPress={async () => {
-            console.log('[SignIn] Testing full QUIC+HTTP/3 request...');
-            // Extract host and port from nodeUrl or use defaults
-            try {
-              let host = DEFAULT_NODE_HOST;
-              let port = DEFAULT_NODE_PORT;
-              if (nodeUrl) {
-                const url = new URL(nodeUrl);
-                host = url.hostname;
-                port = parseInt(url.port, 10) || DEFAULT_NODE_PORT;
-              }
-
-              const result = await QuicClient.testHealthCheck(host, port);
-              if (result.success) {
-                console.log('[SignIn] HTTP/3 health check SUCCESS:', result.data);
-                alert(`QUIC+HTTP/3 Success!\n\nLatency: ${result.latencyMs}ms\n\nResponse: ${JSON.stringify(result.data, null, 2)}`);
-              } else {
-                console.log('[SignIn] HTTP/3 health check FAILED:', result.error);
-                alert(`QUIC+HTTP/3 Failed!\n\nError: ${result.error}\n\nLatency: ${result.latencyMs}ms`);
-              }
-            } catch (err: any) {
-              console.error('[SignIn] HTTP/3 test error:', err);
-              alert(`QUIC+HTTP/3 Error: ${err.message}`);
-            }
-          }}
-        >
+        {/* Node Connection Status - Tap to retry */}
+        <Pressable onPress={() => checkConnection()}>
           <Card>
             <Row style={{ justifyContent: 'space-between', alignItems: 'center' }}>
               <Column gap="xs" style={{ flex: 1 }}>
@@ -190,7 +153,7 @@ const SignInScreen = ({ navigation }: SignInScreenProps) => {
                     fontWeight: typography.weight.semibold,
                   }}
                 >
-                  {nodeUrl}
+                  Sovereign Network (QUIC)
                 </Text>
               </Column>
               <Badge
@@ -232,11 +195,11 @@ const SignInScreen = ({ navigation }: SignInScreenProps) => {
             {/* DID Input */}
             <FormField
               label={t.auth.signIn.didLabel}
-              placeholder={t.auth.signIn.didPlaceholder}
+              placeholder="Enter DID or Identity ID..."
               value={did}
               onChangeText={setDid}
               editable={!isLoading}
-              helperText=''
+              helperText="Your DID (did:zhtp:...) or hex Identity ID from creation"
             />
 
             {/* Passphrase Input */}
@@ -270,12 +233,12 @@ const SignInScreen = ({ navigation }: SignInScreenProps) => {
               </Row>
               <FormField
                 label=""
-                placeholder={t.auth.signIn.passphrasePlaceholder}
+                placeholder="Enter your password..."
                 value={passphrase}
                 onChangeText={setPassphrase}
                 secureTextEntry={!showPassword}
                 editable={!isLoading}
-                helperText=''
+                helperText="The password you set when creating your identity"
                 containerStyle={{ marginBottom: 0 }}
               />
             </View>

@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
-import { View, Alert, Clipboard } from 'react-native';
-import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { View, Alert } from 'react-native';
+import Clipboard from '@react-native-clipboard/clipboard';
 import {
   Card,
   Text,
@@ -18,7 +18,6 @@ const WalletSettingsScreen = ({ navigation }: any) => {
   const { t } = useTranslation();
   const { currentIdentity, isLoading } = useAuth();
   const [activeWallet] = useState<string>('primary');
-  const insets = useSafeAreaInsets();
 
   if (!currentIdentity || isLoading) {
     return <LoadingView />;
@@ -60,7 +59,7 @@ const WalletSettingsScreen = ({ navigation }: any) => {
   };
 
   return (
-    <ScreenLayout paddingTop={insets.top + spacing.lg}>
+    <ScreenLayout paddingTop={spacing.md}>
       <Column gap="lg">
         {/* Wallets List */}
         <Card>
@@ -162,13 +161,6 @@ const WalletSettingsScreen = ({ navigation }: any) => {
           </Column>
         </Card>
 
-        {/* Back Button */}
-        <Button
-          variant="outline"
-          onPress={() => navigation?.goBack()}
-        >
-          {t.wallet.settings.back}
-        </Button>
       </Column>
     </ScreenLayout>
   );

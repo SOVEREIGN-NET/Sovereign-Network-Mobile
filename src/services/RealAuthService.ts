@@ -62,8 +62,16 @@ class RealAuthService {
    * @returns Identity with wallets
    */
   async signIn(credentials: SignInCredentials): Promise<Identity> {
+    // Extract the hex identity ID from full DID if needed
+    // e.g., "did:zhtp:abc123..." -> "abc123..."
+    let identityId = credentials.identity_id;
+    if (identityId.startsWith('did:zhtp:')) {
+      identityId = identityId.substring('did:zhtp:'.length);
+      console.log('📝 Extracted identity ID from DID:', identityId);
+    }
+
     const request: LoginRequest = {
-      identity_id: credentials.identity_id,
+      identity_id: identityId,
       password: credentials.password,
     };
 

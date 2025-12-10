@@ -6,10 +6,13 @@ import {
   Button,
   LoadingView,
   Column,
-  StatBox, ScreenLayout,
+  StatBox,
+  ScreenLayout,
   HeaderBar,
   SideDrawer,
-  DrawerItem
+  DrawerItem,
+  Badge,
+  Row,
 } from '../components';
 import { useAsyncData, useApi } from '../hooks';
 import { useTranslation } from '../i18n';
@@ -103,6 +106,23 @@ const DAOScreen = ({ navigation }: any) => {
       />
 
       <ScreenLayout testID="dao-screen">
+      {/* Coming Soon Banner */}
+      <View style={{ paddingHorizontal: spacing.md, marginBottom: spacing.lg }}>
+        <Row style={{ justifyContent: 'center', alignItems: 'center' }}>
+          <Badge label="Coming Soon" variant="warning" />
+        </Row>
+        <Text
+          style={{
+            fontSize: typography.size.xs,
+            color: colors.text_secondary,
+            textAlign: 'center',
+            marginTop: spacing.sm,
+          }}
+        >
+          DAO governance features are under development
+        </Text>
+      </View>
+
       {/* DAO Statistics */}
       {daoStats && (
         <View style={{ gap: spacing.lg, marginBottom: spacing.lg }}>
