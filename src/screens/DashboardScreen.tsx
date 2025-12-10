@@ -264,8 +264,6 @@ const DashboardScreen = ({ navigation }: any) => {
                           backgroundColor: colors.bg_darker,
                           padding: spacing.sm,
                           borderRadius: borderRadius.sm,
-                          borderLeftWidth: 3,
-                          borderLeftColor: display.color,
                           opacity: pressed ? 0.8 : 1,
                         },
                       ]}

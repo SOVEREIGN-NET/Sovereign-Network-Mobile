@@ -4,7 +4,6 @@ import Clipboard from '@react-native-clipboard/clipboard';
 import {
   Card,
   Text,
-  Button,
   LoadingView,
   Column,
   Row,
@@ -12,11 +11,8 @@ import {
   HeaderBar,
   SideDrawer,
   DrawerItem,
-  DetailRow,
-  SectionLabel,
   Badge,
 } from '../components';
-import SShieldLogo from '../components/atoms/Logo';
 import { useAuth, useApi, useAsyncData } from '../hooks';
 import { useTranslation } from '../i18n';
 import { colors, spacing, typography, borderRadius } from '../theme';
@@ -38,9 +34,8 @@ const formatBalance = (balance: number): string => {
 
 const SIDScreen = ({ navigation }: any) => {
   const { t } = useTranslation();
-  const { currentIdentity, signOut, isLoading } = useAuth();
+  const { currentIdentity, isLoading } = useAuth();
   const { api, isInitialized } = useApi();
-  const [loggingOut, setLoggingOut] = useState(false);
   const [drawerVisible, setDrawerVisible] = useState(false);
   const [activeWalletTab, setActiveWalletTab] = useState('Tokens');
 
@@ -70,19 +65,6 @@ const SIDScreen = ({ navigation }: any) => {
         };
       } catch (error) {
         console.warn('⚠️ SID: Failed to fetch wallet data:', error);
-        // Fallback to identity wallets
-        if (currentIdentity?.wallets) {
-          const wallets = Object.entries(currentIdentity.wallets).map(([type, wallet]: [string, any]) => ({
-            id: wallet?.id,
-            name: `${type.charAt(0).toUpperCase() + type.slice(1)} Wallet`,
-            wallet_type: type.charAt(0).toUpperCase() + type.slice(1),
-            balance: wallet?.balance || 0,
-          }));
-          return {
-            wallets,
-            totalBalance: wallets.reduce((sum, w) => sum + w.balance, 0),
-          };
-        }
         return null;
       }
     },
@@ -119,48 +101,7 @@ const SIDScreen = ({ navigation }: any) => {
         };
       } catch (error) {
         console.warn('⚠️ SID: Failed to fetch UBI data:', error);
-        return {
-          daily_amount: 33,
-          monthly_amount: 1000,
-          eligible: true,
-          total_earned: currentIdentity.ubiEarned || 0,
-          claims_count: 0,
-        };
-      }
-    },
-    [api, isInitialized, currentIdentity?.did],
-  );
-
-  // Fetch DAO/voting stats
-  const { data: daoStats } = useAsyncData(
-    async () => {
-      if (!api || !isInitialized || !currentIdentity?.did) {
         return null;
-      }
-
-      try {
-        const [voteHistory, daoInfo] = await Promise.all([
-          api.request(`/api/v1/dao/vote/history/${currentIdentity.did}`).catch(() => null),
-          api.getDaoStats().catch(() => null),
-        ]);
-
-        console.log('🗳️ SID: Vote history:', voteHistory);
-        console.log('🗳️ SID: DAO stats:', daoInfo);
-
-        return {
-          voting_power: voteHistory?.voting_power || currentIdentity.votingPower || 1,
-          votes_cast: voteHistory?.votes?.length || 0,
-          proposals_created: voteHistory?.proposals_created || 0,
-          reputation_score: voteHistory?.reputation_score || currentIdentity.daoMembership?.reputation || 0,
-        };
-      } catch (error) {
-        console.warn('⚠️ SID: Failed to fetch DAO stats:', error);
-        return {
-          voting_power: currentIdentity.votingPower || 1,
-          votes_cast: 0,
-          proposals_created: 0,
-          reputation_score: currentIdentity.daoMembership?.reputation || 0,
-        };
       }
     },
     [api, isInitialized, currentIdentity?.did],
@@ -201,51 +142,14 @@ const SIDScreen = ({ navigation }: any) => {
     },
   ];
 
-  const handleLogout = () => {
-    Alert.alert(
-      t.identity.logout.confirmTitle,
-      t.identity.logout.confirmMessage,
-      [
-        {
-          text: t.identity.logout.cancel,
-          style: 'cancel',
-        },
-        {
-          text: t.identity.logout.confirm,
-          style: 'destructive',
-          onPress: () => {
-            (async () => {
-              setLoggingOut(true);
-              try {
-                await signOut();
-              } catch (error) {
-                console.error('Logout failed:', error);
-                Alert.alert(t.identity.logout.errorTitle, t.identity.logout.errorMessage);
-              } finally {
-                setLoggingOut(false);
-              }
-            })();
-          },
-        },
-      ]
-    );
-  };
-
   if (!currentIdentity || isLoading) {
     return <LoadingView />;
   }
 
-  // Use API wallet data if available, otherwise fall back to identity wallets
-  const wallets = walletData?.wallets || (currentIdentity.wallets
-    ? Object.entries(currentIdentity.wallets).map(([type, wallet]: [string, any]) => ({
-        id: wallet?.id,
-        name: `${type.charAt(0).toUpperCase() + type.slice(1)} Wallet`,
-        wallet_type: type.charAt(0).toUpperCase() + type.slice(1),
-        balance: wallet?.balance || 0,
-      }))
-    : []);
+  // Only use API wallet data - no mock/fallback data
+  const wallets = walletData?.wallets || [];
   const selectedWallet = wallets[0] || null;
-  const totalBalance = walletData?.totalBalance || wallets.reduce((sum: number, w: any) => sum + (w.balance || 0), 0);
+  const totalBalance = walletData?.totalBalance || 0;
 
   const truncateId = (id: any) => {
     if (!id) return 'unknown';
@@ -275,16 +179,6 @@ const SIDScreen = ({ navigation }: any) => {
       Alert.alert('Copied', 'Wallet ID copied to clipboard');
     }
   };
-
-  // Use API data with fallback to identity data
-  const votingPower = daoStats?.voting_power || currentIdentity.votingPower || 1;
-  const votingPowerFormatted = votingPower.toLocaleString();
-  const ubiEarned = ubiData?.total_earned || currentIdentity.ubiEarned || 0;
-  const ubiEarnedFormatted = ubiEarned.toFixed(2);
-  const walletCount = wallets.length || (currentIdentity.wallets ? Object.keys(currentIdentity.wallets).length : 0);
-  const votesCast = daoStats?.votes_cast || 0;
-  const reputationScore = daoStats?.reputation_score || currentIdentity.daoMembership?.reputation || 0;
-  const authLoading = isLoading || loggingOut;
 
   return (
     <View style={{ flex: 1, backgroundColor: colors.bg_darkest }}>
@@ -329,81 +223,100 @@ const SIDScreen = ({ navigation }: any) => {
                     {truncateId(selectedWallet?.id)}
                   </Text>
                 </View>
-                <TouchableOpacity
-                  style={{
-                    width: 36,
-                    height: 36,
-                    borderRadius: borderRadius.full,
-                    backgroundColor: colors.bg_darker,
-                    justifyContent: 'center',
-                    alignItems: 'center',
-                    borderWidth: 1,
-                    borderColor: colors.border,
-                  }}
-                  onPress={() => navigation?.navigate('WalletSettings')}
-                >
-                  <Text style={{ fontSize: typography.size['3xl'] }}>⚙️</Text>
-                </TouchableOpacity>
+                <Row style={{ gap: spacing.sm }}>
+                  <TouchableOpacity
+                    style={{
+                      width: 36,
+                      height: 36,
+                      borderRadius: borderRadius.full,
+                      backgroundColor: colors.bg_darker,
+                      justifyContent: 'center',
+                      alignItems: 'center',
+                      borderWidth: 1,
+                      borderColor: colors.border,
+                    }}
+                    onPress={() => navigation?.navigate('Profile')}
+                  >
+                    <Text style={{ fontSize: typography.size.xl }}>👤</Text>
+                  </TouchableOpacity>
+                  <TouchableOpacity
+                    style={{
+                      width: 36,
+                      height: 36,
+                      borderRadius: borderRadius.full,
+                      backgroundColor: colors.bg_darker,
+                      justifyContent: 'center',
+                      alignItems: 'center',
+                      borderWidth: 1,
+                      borderColor: colors.border,
+                    }}
+                    onPress={() => navigation?.navigate('WalletSettings')}
+                  >
+                    <Text style={{ fontSize: typography.size.xl }}>⚙️</Text>
+                  </TouchableOpacity>
+                </Row>
               </View>
             </View>
 
-            {/* Wallet Address Card */}
-            {selectedWallet && (
-              <View style={{ paddingHorizontal: spacing.sm }}>
-                <Card style={{ marginHorizontal: 0, overflow: 'hidden' }}>
-                  <View
-                    style={{
-                      borderTopWidth: 2,
-                      borderTopColor: colors.primary,
-                      paddingHorizontal: spacing.lg,
-                      paddingVertical: spacing.sm,
-                    }}
-                  >
-                    <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: spacing.md }}>
-                      <Text style={{ fontSize: typography.size.xs, color: colors.text_secondary }}>
-                        {t.wallet.details.address}
-                      </Text>
-                      <TouchableOpacity onPress={() => selectedWallet?.id && copyToClipboard(selectedWallet.id)}>
+            {/* Wallet Address Card - Always show, populate when data arrives */}
+            <View style={{ paddingHorizontal: spacing.sm }}>
+              <Card style={{ marginHorizontal: 0, overflow: 'hidden' }}>
+                <View
+                  style={{
+                    borderTopWidth: 2,
+                    borderTopColor: colors.primary,
+                    paddingHorizontal: spacing.lg,
+                    paddingVertical: spacing.sm,
+                  }}
+                >
+                  <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: spacing.md }}>
+                    <Text style={{ fontSize: typography.size.xs, color: colors.text_secondary }}>
+                      {t.wallet.details.address}
+                    </Text>
+                    {selectedWallet?.id && (
+                      <TouchableOpacity onPress={() => copyToClipboard(selectedWallet.id)}>
                         <Text style={{ fontSize: typography.size.xs, color: colors.primary }}>{t.wallet.actions.copy}</Text>
                       </TouchableOpacity>
-                    </View>
-                    <Text
-                      style={{
-                        fontSize: typography.size.sm,
-                        fontWeight: typography.weight.semibold,
-                        color: colors.text_primary,
-                        letterSpacing: 0.5,
-                      }}
-                      numberOfLines={1}
-                    >
-                      {truncateId(selectedWallet?.id)}
-                    </Text>
+                    )}
                   </View>
+                  <Text
+                    style={{
+                      fontSize: typography.size.sm,
+                      fontWeight: typography.weight.semibold,
+                      color: selectedWallet?.id ? colors.text_primary : colors.text_tertiary,
+                      letterSpacing: 0.5,
+                    }}
+                    numberOfLines={1}
+                  >
+                    {selectedWallet?.id ? truncateId(selectedWallet.id) : '—'}
+                  </Text>
+                </View>
 
-                  {/* Balance Section */}
-                  <View style={{ paddingHorizontal: spacing.lg, paddingVertical: spacing.xs, alignItems: 'center' }}>
-                    <Text
-                      style={{
-                        fontSize: typography.size['5xl'],
-                        fontWeight: typography.weight.bold,
-                        color: colors.primary,
-                        marginBottom: spacing.sm,
-                      }}
-                    >
-                      {formatBalance(totalBalance)}
-                    </Text>
+                {/* Balance Section */}
+                <View style={{ paddingHorizontal: spacing.lg, paddingVertical: spacing.xs, alignItems: 'center' }}>
+                  <Text
+                    style={{
+                      fontSize: typography.size['5xl'],
+                      fontWeight: typography.weight.bold,
+                      color: walletData ? colors.primary : colors.text_tertiary,
+                      marginBottom: spacing.sm,
+                    }}
+                  >
+                    {walletData ? formatBalance(totalBalance) : '—'}
+                  </Text>
+                  <Row style={{ alignItems: 'center', gap: spacing.sm }}>
                     <Text style={{ fontSize: typography.size.sm, color: colors.text_secondary }}>
                       {t.wallet.currency} (Total)
                     </Text>
                     {walletsLoading && (
-                      <Text style={{ fontSize: typography.size.xs, color: colors.text_tertiary, marginTop: spacing.xs }}>
+                      <Text style={{ fontSize: typography.size.xs, color: colors.text_tertiary }}>
                         Syncing...
                       </Text>
                     )}
-                  </View>
-                </Card>
-              </View>
-            )}
+                  </Row>
+                </View>
+              </Card>
+            </View>
 
             {/* Send & Receive Buttons */}
             <View
@@ -463,18 +376,23 @@ const SIDScreen = ({ navigation }: any) => {
               </TouchableOpacity>
             </View>
 
-            {/* Wallet Tokens Tab */}
-            {activeWalletTab === 'Tokens' && wallets.length > 0 && (
+            {/* Wallet Tokens Tab - Always show skeleton, populate when data arrives */}
+            {activeWalletTab === 'Tokens' && (
               <View style={{ paddingHorizontal: spacing.sm, marginBottom: spacing.xs }}>
                 <Column gap="xs">
-                  {wallets.map((wallet: any) => {
-                    const display = WALLET_DISPLAY[wallet.wallet_type] || { icon: '💰', color: colors.primary, description: 'Wallet' };
+                  {(['Primary', 'UBI', 'Savings'] as const).map((walletType) => {
+                    const display = WALLET_DISPLAY[walletType];
+                    const wallet = wallets.find((w: any) =>
+                      w.wallet_type === walletType || w.wallet_type?.toLowerCase() === walletType.toLowerCase()
+                    );
+                    const hasData = !!wallet;
+
                     return (
                       <TouchableOpacity
-                        key={wallet.id || wallet.wallet_type}
+                        key={walletType}
                         activeOpacity={0.7}
                       >
-                        <Card style={{ marginHorizontal: 0, borderLeftWidth: 3, borderLeftColor: display.color }}>
+                        <Card style={{ marginHorizontal: 0, opacity: hasData ? 1 : 0.6 }}>
                           <View
                             style={{
                               paddingHorizontal: spacing.md,
@@ -489,16 +407,16 @@ const SIDScreen = ({ navigation }: any) => {
                                   color: colors.text_primary,
                                 }}
                               >
-                                {wallet.name || `${wallet.wallet_type} Wallet`}
+                                {walletType} Wallet
                               </Text>
                               <Text
                                 style={{
                                   fontSize: typography.size.lg,
                                   fontWeight: typography.weight.bold,
-                                  color: display.color,
+                                  color: hasData ? display.color : colors.text_tertiary,
                                 }}
                               >
-                                {formatBalance(wallet.balance || 0)}
+                                {hasData ? formatBalance(wallet.balance || 0) : '—'}
                               </Text>
                             </Row>
                             <Row style={{ justifyContent: 'space-between', alignItems: 'center', marginTop: spacing.xs }}>
@@ -519,7 +437,7 @@ const SIDScreen = ({ navigation }: any) => {
                                 ZHTP
                               </Text>
                             </Row>
-                            {wallet.id && (
+                            {wallet?.id && (
                               <TouchableOpacity
                                 onPress={() => copyToClipboard(wallet.id)}
                                 style={{ marginTop: spacing.xs }}
@@ -630,150 +548,6 @@ const SIDScreen = ({ navigation }: any) => {
               </View>
             )}
 
-            {/* IDENTITY SECTION */}
-            <View style={{ borderTopWidth: 1, borderTopColor: colors.border, paddingTop: spacing.lg, marginHorizontal: spacing.sm }} />
-
-            {/* Identity Card */}
-            <View style={{ paddingHorizontal: spacing.sm }}>
-              <Card style={{ marginHorizontal: 0 }}>
-                <View
-                  style={{
-                    alignItems: 'center',
-                    paddingVertical: spacing.lg,
-                    backgroundColor: colors.bg_darker,
-                    borderRadius: borderRadius.base,
-                    marginBottom: spacing.md,
-                  }}
-                >
-                  <Text style={{ fontSize: typography.size['5xl'], marginBottom: spacing.sm }}>
-                    {currentIdentity.avatar || '👤'}
-                  </Text>
-                  <Text variant="h2" style={{ marginBottom: spacing.xs }}>
-                    {currentIdentity.displayName}
-                  </Text>
-                  {currentIdentity.username && (
-                    <Text style={{ fontSize: typography.size.sm, color: colors.primary, marginBottom: spacing.xs }}>
-                      @{currentIdentity.username}
-                    </Text>
-                  )}
-                  <TouchableOpacity onPress={() => currentIdentity.did && copyToClipboard(currentIdentity.did)}>
-                    <Text variant="caption" style={{ color: colors.text_secondary, marginBottom: spacing.md }}>
-                      {truncateId(currentIdentity.did)}
-                    </Text>
-                  </TouchableOpacity>
-                  <Button
-                    variant="secondary"
-                    onPress={() => navigation?.navigate('ProfileEdit')}
-                    disabled={authLoading}
-                  >
-                    {t.identity.actions.editProfile}
-                  </Button>
-                </View>
-
-                {/* Identity Details */}
-                <Column gap="sm">
-                  <DetailRow
-                    label="DID"
-                    value={truncateId(currentIdentity.did)}
-                  />
-                  <DetailRow
-                    label={t.identity.details.identityType}
-                    value={currentIdentity.identityType || 'Citizen'}
-                  />
-                  <DetailRow
-                    label={t.identity.details.citizenship}
-                    value={currentIdentity.citizenship ? t.identity.details.verified : t.identity.details.notVerified}
-                  />
-                  <DetailRow
-                    label={t.identity.details.created}
-                    value={new Date(currentIdentity.createdAt || '').toLocaleDateString()}
-                  />
-                </Column>
-              </Card>
-            </View>
-
-            {/* Stats Card */}
-            <View style={{ paddingHorizontal: spacing.sm }}>
-              <Card style={{ marginHorizontal: 0 }}>
-                <SectionLabel>{t.identity.stats.title}</SectionLabel>
-                <Column gap="sm">
-                  <DetailRow
-                    label={t.identity.stats.votingPower}
-                    value={votingPowerFormatted}
-                  />
-                  <DetailRow
-                    label="Votes Cast"
-                    value={votesCast.toString()}
-                  />
-                  <DetailRow
-                    label="Reputation Score"
-                    value={reputationScore.toLocaleString()}
-                  />
-                  <DetailRow
-                    label={t.identity.stats.ubiEarned}
-                    value={`${ubiEarnedFormatted} ZHTP`}
-                  />
-                  <DetailRow
-                    label={t.identity.stats.wallets}
-                    value={walletCount.toString()}
-                  />
-                </Column>
-              </Card>
-            </View>
-
-            {/* Actions Card */}
-            <View style={{ paddingHorizontal: spacing.sm }}>
-              <Card style={{ marginHorizontal: 0 }}>
-                <Column gap="sm">
-                  <Button
-                    variant="secondary"
-                    onPress={() => navigation?.navigate('IdentitySettings')}
-                    disabled={authLoading}
-                  >
-                    {t.identity.actions.settings}
-                  </Button>
-                  <Button
-                    variant="secondary"
-                    onPress={() => navigation?.navigate('AppSettings')}
-                    disabled={authLoading}
-                  >
-                    {t.identity.actions.appSettings}
-                  </Button>
-                  <Button
-                    variant="secondary"
-                    onPress={() => navigation?.navigate('BackupIdentity')}
-                    disabled={authLoading}
-                  >
-                    {t.identity.actions.backupIdentity}
-                  </Button>
-                </Column>
-              </Card>
-            </View>
-
-            {/* Sign Out Card */}
-            <View style={{ paddingHorizontal: spacing.sm }}>
-              <Card style={{ marginHorizontal: 0 }}>
-                <Column gap="sm">
-                  <Button
-                    onPress={handleLogout}
-                    disabled={authLoading}
-                    variant="danger"
-                  >
-                    {authLoading ? t.identity.logout.buttonLoading : t.identity.logout.button}
-                  </Button>
-                  <Text
-                    style={{
-                      fontSize: typography.size.xs,
-                      color: colors.text_tertiary,
-                      textAlign: 'center',
-                      marginTop: spacing.xs,
-                    }}
-                  >
-                    {t.identity.logout.hint}
-                  </Text>
-                </Column>
-              </Card>
-            </View>
           </Column>
         </ScrollView>
       </ScreenLayout>

@@ -30,6 +30,7 @@ import ClaimUBIScreen from '../screens/ClaimUBIScreen';
 import StakeTokensScreen from '../screens/StakeTokensScreen';
 import BackupIdentityScreen from '../screens/BackupIdentityScreen';
 import BiometricVerificationScreen from '../screens/BiometricVerificationScreen';
+import ProfileScreen from '../screens/ProfileScreen';
 
 const Stack = createNativeStackNavigator();
 const Tab = createBottomTabNavigator();
@@ -91,22 +92,46 @@ const SIDStack = () => {
       <Stack.Screen
         name="SendTokens"
         component={SendTokensScreen}
-        options={{ title: 'Send ZHTP', headerBackTitle: 'Back' }}
+        options={{
+          headerShown: true,
+          title: 'Send ZHTP',
+          headerBackTitle: '',
+          headerStyle: { backgroundColor: colors.bg_dark },
+          headerTintColor: colors.text_primary,
+        }}
       />
       <Stack.Screen
         name="ReceiveTokens"
         component={ReceiveTokensScreen}
-        options={{ title: 'Receive ZHTP', headerBackTitle: 'Back' }}
+        options={{
+          headerShown: true,
+          title: 'Receive ZHTP',
+          headerBackTitle: '',
+          headerStyle: { backgroundColor: colors.bg_dark },
+          headerTintColor: colors.text_primary,
+        }}
       />
       <Stack.Screen
         name="StakeTokens"
         component={StakeTokensScreen}
-        options={{ title: 'Stake ZHTP', headerBackTitle: 'Back' }}
+        options={{
+          headerShown: true,
+          title: 'Stake ZHTP',
+          headerBackTitle: '',
+          headerStyle: { backgroundColor: colors.bg_dark },
+          headerTintColor: colors.text_primary,
+        }}
       />
       <Stack.Screen
         name="ConfirmTransaction"
         component={ConfirmTransactionScreen}
-        options={{ title: 'Confirm Transaction', headerBackTitle: 'Back' }}
+        options={{
+          headerShown: true,
+          title: 'Confirm Transaction',
+          headerBackTitle: '',
+          headerStyle: { backgroundColor: colors.bg_dark },
+          headerTintColor: colors.text_primary,
+        }}
       />
       <Stack.Screen
         name="WalletSettings"
@@ -143,6 +168,17 @@ const SIDStack = () => {
         name="BiometricVerification"
         component={BiometricVerificationScreen as any}
         options={{ title: 'Biometric Authentication', headerBackTitle: 'Back' }}
+      />
+      <Stack.Screen
+        name="Profile"
+        component={ProfileScreen}
+        options={{
+          headerShown: true,
+          title: 'Profile',
+          headerBackTitle: '',
+          headerStyle: { backgroundColor: colors.bg_dark },
+          headerTintColor: colors.text_primary,
+        }}
       />
     </Stack.Navigator>
   );

@@ -84,7 +84,7 @@ const SendTokensScreen = ({ navigation }: any) => {
   const currencies = ['ZHTP', 'USDT', 'ETH', 'BTC'];
 
   return (
-    <ScreenLayout>
+    <ScreenLayout paddingTop={spacing.md}>
       <Card>
         <Text variant="h2" style={{ marginBottom: spacing.md }}>
           {t.sendTokens.title.replace('{currency}', selectedCurrency)}

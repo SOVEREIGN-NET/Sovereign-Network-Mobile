@@ -12,11 +12,24 @@ const ReceiveTokensScreen = () => {
   const [copied, setCopied] = useState(false);
   const [selectedCurrency, setSelectedCurrency] = useState('ZHTP');
 
-  // Mock wallet address - generate from wallet ID if available
+  // Get wallet address from wallet ID
   const primaryWallet = currentIdentity?.wallets?.primary;
-  const walletAddress = primaryWallet?.id
-    ? '0x' + primaryWallet.id.substring(0, 40).padEnd(40, '0')
-    : '0x' + Math.random().toString(16).slice(2, 42);
+  const getWalletAddress = () => {
+    if (!primaryWallet?.id) {
+      return '0x' + Math.random().toString(16).slice(2, 42);
+    }
+    // Handle byte array
+    if (Array.isArray(primaryWallet.id)) {
+      const hexString = primaryWallet.id.map((byte: number) => byte.toString(16).padStart(2, '0')).join('');
+      return '0x' + hexString.substring(0, 40).padEnd(40, '0');
+    }
+    // Handle string
+    if (typeof primaryWallet.id === 'string') {
+      return '0x' + primaryWallet.id.substring(0, 40).padEnd(40, '0');
+    }
+    return '0x' + Math.random().toString(16).slice(2, 42);
+  };
+  const walletAddress = getWalletAddress();
 
   const handleCopyAddress = () => {
     setCopied(true);
@@ -25,9 +38,12 @@ const ReceiveTokensScreen = () => {
 
   const handleShare = async () => {
     try {
+      const title = typeof t.receiveTokens.title === 'string'
+        ? t.receiveTokens.title.replace('{currency}', selectedCurrency)
+        : `Receive ${selectedCurrency}`;
       await Share.share({
         message: `${t.receiveTokens.address}: ${walletAddress}`,
-        title: t.receiveTokens.title.replace('{currency}', selectedCurrency),
+        title,
       });
     } catch (error: any) {
       console.error('Share failed:', error);
@@ -58,7 +74,7 @@ const ReceiveTokensScreen = () => {
   ];
 
   return (
-    <ScreenLayout paddingTop={spacing['2xl']}>
+    <ScreenLayout paddingTop={spacing.md}>
       <Column gap="lg">
 
         {/* Currency Selector */}
