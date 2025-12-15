@@ -147,6 +147,7 @@ export const typography = {
 
   // Font Weights
   weight: {
+    ligth: '100' as const,
     normal: '400' as const,
     medium: '500' as const,
     semibold: '600' as const,

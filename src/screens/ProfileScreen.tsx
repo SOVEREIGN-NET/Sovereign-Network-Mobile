@@ -250,7 +250,7 @@ const ProfileScreen = ({ navigation }: any) => {
                 />
                 <DetailRow
                   label={t.identity.stats.ubiEarned}
-                  value={`${ubiEarnedFormatted} ZHTP`}
+                  value={`${ubiEarnedFormatted} SOV`}
                 />
                 <DetailRow
                   label={t.identity.stats.wallets}

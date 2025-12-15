@@ -30,6 +30,7 @@ import ClaimUBIScreen from '../screens/ClaimUBIScreen';
 import StakeTokensScreen from '../screens/StakeTokensScreen';
 import BackupIdentityScreen from '../screens/BackupIdentityScreen';
 import BiometricVerificationScreen from '../screens/BiometricVerificationScreen';
+import BrowserScreen from '../screens/BrowserScreen';
 import ProfileScreen from '../screens/ProfileScreen';
 
 const Stack = createNativeStackNavigator();
@@ -47,6 +48,15 @@ const DashboardStack = () => {
         component={DashboardScreen}
         options={{
           headerShown: false,
+        }}
+      />
+      <Stack.Screen
+        name="Browser"
+        component={BrowserScreen}
+        options={{
+          headerShown: false,
+          presentation: 'modal',
+          animation: 'slide_from_bottom',
         }}
       />
       <Stack.Screen
@@ -94,7 +104,7 @@ const SIDStack = () => {
         component={SendTokensScreen}
         options={{
           headerShown: true,
-          title: 'Send ZHTP',
+          title: 'Send SOV',
           headerBackTitle: '',
           headerStyle: { backgroundColor: colors.bg_dark },
           headerTintColor: colors.text_primary,
@@ -105,7 +115,7 @@ const SIDStack = () => {
         component={ReceiveTokensScreen}
         options={{
           headerShown: true,
-          title: 'Receive ZHTP',
+          title: 'Receive SOV',
           headerBackTitle: '',
           headerStyle: { backgroundColor: colors.bg_dark },
           headerTintColor: colors.text_primary,
@@ -116,7 +126,7 @@ const SIDStack = () => {
         component={StakeTokensScreen}
         options={{
           headerShown: true,
-          title: 'Stake ZHTP',
+          title: 'Stake SOV',
           headerBackTitle: '',
           headerStyle: { backgroundColor: colors.bg_dark },
           headerTintColor: colors.text_primary,
@@ -274,14 +284,15 @@ const RootNavigator = () => {
           } as any}
         />
         <Tab.Screen
-          name="SIDTab"
-          component={SIDStack}
-          options={{
-            title: 'SID',
-            tabBarLabel: 'SID',
-            tabBarIcon: BriefcaseIcon,
-          } as any}
-        />
+        name="SIDTab"
+        component={SIDStack}
+        options={{
+          title: 'SID',
+          tabBarLabel: 'SID',
+          tabBarIcon: BriefcaseIcon,
+          unmountOnBlur: true,
+        } as any}
+      />
       </Tab.Navigator>
     </NavigationContainer>
   );

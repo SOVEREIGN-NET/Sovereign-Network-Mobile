@@ -99,9 +99,6 @@ const WalletScreen = ({ navigation }: any) => {
     <View style={{ flex: 1, backgroundColor: colors.bg_darkest }}>
       <HeaderBar
         onMenuPress={() => setDrawerVisible(true)}
-        onBLEPress={() => {
-          // TODO: Handle BLE connection
-        }}
       />
 
       <SideDrawer
@@ -331,7 +328,7 @@ const WalletScreen = ({ navigation }: any) => {
                               color: colors.text_primary,
                             }}
                           >
-                            {wallet.balance.toLocaleString()} ZHTP
+                            {wallet.balance.toLocaleString()} SOV
                           </Text>
                         </View>
                       </View>

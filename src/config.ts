@@ -8,12 +8,16 @@
 // =============================================================================
 
 /**
- * Default ZHTP Node URL
+ * Default SOV Node URL
  * The development node at this address only supports pure QUIC/UDP - no HTTP fallback
- * Port 9334 is the standard ZHTP port
+ * Port 9334 is the standard SOV port
  * Note: Use http:// scheme - the QUIC adapter converts to quic:// internally
+ *
+ * ⚠️  SINGLE POINT TO CHANGE NODE URL:
+ *     - Local testing:  'http://192.168.1.30:9334'
+ *     - Remote server:  'http://77.42.37.161:9334'
  */
-export const DEFAULT_ZHTP_NODE_URL = 'http://77.42.37.161:9334';
+export const DEFAULT_SOV_NODE_URL = 'http://77.42.37.161:9334';
 
 /**
  * Default node host and port (parsed from URL)
@@ -112,7 +116,7 @@ export const API_ENDPOINTS = {
  * QUIC transport settings
  */
 export const QUIC_CONFIG = {
-  /** ALPN protocol identifier for ZHTP */
+  /** ALPN protocol identifier for SOV */
   alpnProtocol: 'zhtp/1.0',
 
   /** Default request timeout in seconds */
@@ -154,16 +158,19 @@ export const APP_DEFAULTS = {
 // =============================================================================
 
 /**
- * @deprecated Use DEFAULT_ZHTP_NODE_URL instead
  * Legacy export for backward compatibility during migration
  */
-export const ZHTP_NODE_URL = DEFAULT_ZHTP_NODE_URL;
+export const DEFAULT_ZHTP_NODE_URL = DEFAULT_SOV_NODE_URL;
+export const SOV_NODE_URL = DEFAULT_SOV_NODE_URL;
+export const ZHTP_NODE_URL = DEFAULT_SOV_NODE_URL;
 
 /**
  * Legacy config object - use individual exports above for new code
  */
 export const config = {
-  ZHTP_NODE_URL: DEFAULT_ZHTP_NODE_URL,
+  DEFAULT_ZHTP_NODE_URL: DEFAULT_SOV_NODE_URL,
+  SOV_NODE_URL: DEFAULT_SOV_NODE_URL,
+  ZHTP_NODE_URL: DEFAULT_SOV_NODE_URL,
   NODE_HOST: DEFAULT_NODE_HOST,
   NODE_PORT: DEFAULT_NODE_PORT,
   NETWORK_TYPE: DEFAULT_NETWORK_TYPE,

@@ -89,9 +89,51 @@ function createResponseFromQuic(quicResponse: QuicResponse): Response {
 }
 
 /**
+ * Public endpoints that don't require authentication
+ * These use zhtp-public/1 ALPN instead of zhtp-uhp/1
+ * Note: Server must whitelist POST endpoints on public ALPN
+ */
+const PUBLIC_ENDPOINT_PATTERNS = [
+  // Identity endpoints (read-only or whitelisted POST)
+  '/api/v1/identity/create',
+  '/api/v1/identity/signup',
+  '/api/v1/identity/exists',
+  // Protocol health
+  '/api/v1/protocol/health',
+  // UBI endpoints (read-only GET)
+  '/api/v1/ubi/status',
+  '/api/v1/ubi/history',
+  // DAO endpoints (read-only GET)
+  '/api/v1/dao/proposals',
+  '/api/v1/dao/vote/history',
+  // Wallet endpoints (read-only GET)
+  '/api/v1/wallet/list',
+  '/api/v1/wallet/balance',
+  '/api/v1/wallet/transactions',
+  // Web4 public content
+  '/web4/',
+];
+
+/**
+ * Determine if a URL path requires public (unauthenticated) ALPN
+ */
+function isPublicEndpoint(url: string): boolean {
+  try {
+    const urlObj = new URL(url.replace(/^quic:\/\//, 'https://'));
+    const path = urlObj.pathname;
+    const isPublic = PUBLIC_ENDPOINT_PATTERNS.some(pattern => path.startsWith(pattern));
+    console.log('[QuicFetchAdapter] 🔍 isPublicEndpoint check:', { url, path, isPublic });
+    return isPublic;
+  } catch (e) {
+    console.log('[QuicFetchAdapter] ⚠️ isPublicEndpoint parse error:', { url, error: e });
+    return false;
+  }
+}
+
+/**
  * Convert RequestInit to QuicRequestOptions
  */
-function convertOptions(init?: RequestInit): QuicRequestOptions {
+function convertOptions(init?: RequestInit, url?: string): QuicRequestOptions {
   const headers: Record<string, string> = {};
 
   if (init?.headers) {
@@ -119,10 +161,16 @@ function convertOptions(init?: RequestInit): QuicRequestOptions {
     }
   }
 
+  // Determine ALPN based on endpoint
+  const alpn: 'public' | 'authenticated' = url && isPublicEndpoint(url) ? 'public' : 'authenticated';
+
+  console.log('[QuicFetchAdapter] 🔑 convertOptions ALPN result:', { url, alpn });
+
   return {
     method: (init?.method as QuicRequestOptions['method']) || 'GET',
     headers,
     body,
+    alpn,
   };
 }
 
@@ -161,6 +209,21 @@ export async function createQuicFetchAdapter(
     // Convert HTTP URL to QUIC URL if needed
     const quicUrl = url.replace(/^https?:\/\//, 'quic://');
 
+    // Determine ALPN based on endpoint
+    const quicOptions = convertOptions(init, quicUrl);
+    quicOptions.insecure = insecure;
+    quicOptions.timeout = timeout;
+
+    if (__DEV__) {
+      console.log('[QuicFetchAdapter] ▶️ REQUEST:', {
+        url: quicUrl,
+        method: quicOptions.method,
+        alpn: quicOptions.alpn,
+        headers: quicOptions.headers,
+        bodyLength: quicOptions.body?.length || 0,
+      });
+    }
+
     // If QUIC not supported, fall back to standard fetch
     if (!quicSupported) {
       if (onFallback) {
@@ -170,17 +233,36 @@ export async function createQuicFetchAdapter(
     }
 
     try {
-      const quicOptions = convertOptions(init);
-      quicOptions.insecure = insecure;
-      quicOptions.timeout = timeout;
-
+      const startTime = Date.now();
       const quicResponse = await quicRequest(quicUrl, quicOptions);
+      const elapsed = Date.now() - startTime;
+
+      if (__DEV__) {
+        console.log('[QuicFetchAdapter] ✅ RESPONSE:', {
+          url: quicUrl,
+          status: quicResponse.status,
+          statusText: quicResponse.statusText,
+          ok: quicResponse.ok,
+          elapsed: `${elapsed}ms`,
+          bodyLength: quicResponse.body?.length || 0,
+          bodyPreview: quicResponse.body?.substring(0, 200),
+        });
+      }
+
       return createResponseFromQuic(quicResponse);
     } catch (error) {
+      const errorMessage = error instanceof Error ? error.message : String(error);
+
+      if (__DEV__) {
+        console.log('[QuicFetchAdapter] ❌ ERROR:', {
+          url: quicUrl,
+          error: errorMessage,
+          alpn: quicOptions.alpn,
+        });
+      }
+
       // If QUIC fails and fallback is enabled, try standard fetch
       if (fallbackToHttp) {
-        const errorMessage =
-          error instanceof Error ? error.message : String(error);
         if (onFallback) {
           onFallback(url, `QUIC failed: ${errorMessage}`);
         }
@@ -216,8 +298,23 @@ export function createQuicFetchAdapterSync(
       quicSupportChecked = true;
     }
 
-    // Convert URL
+    // Convert URL to QUIC scheme
     const quicUrl = url.replace(/^https?:\/\//, 'quic://');
+
+    // Determine ALPN based on endpoint
+    const quicOptions = convertOptions(init, quicUrl);
+    quicOptions.insecure = insecure;
+    quicOptions.timeout = timeout;
+
+    if (__DEV__) {
+      console.log('[QuicFetchAdapterSync] ▶️ REQUEST:', {
+        url: quicUrl,
+        method: quicOptions.method,
+        alpn: quicOptions.alpn,
+        headers: quicOptions.headers,
+        bodyLength: quicOptions.body?.length || 0,
+      });
+    }
 
     // Fallback if not supported
     if (!quicSupported) {
@@ -231,16 +328,35 @@ export function createQuicFetchAdapterSync(
     }
 
     try {
-      const quicOptions = convertOptions(init);
-      quicOptions.insecure = insecure;
-      quicOptions.timeout = timeout;
-
+      const startTime = Date.now();
       const quicResponse = await quicRequest(quicUrl, quicOptions);
+      const elapsed = Date.now() - startTime;
+
+      if (__DEV__) {
+        console.log('[QuicFetchAdapterSync] ✅ RESPONSE:', {
+          url: quicUrl,
+          status: quicResponse.status,
+          statusText: quicResponse.statusText,
+          ok: quicResponse.ok,
+          elapsed: `${elapsed}ms`,
+          bodyLength: quicResponse.body?.length || 0,
+          bodyPreview: quicResponse.body?.substring(0, 200),
+        });
+      }
+
       return createResponseFromQuic(quicResponse);
     } catch (error) {
+      const errorMessage = error instanceof Error ? error.message : String(error);
+
+      if (__DEV__) {
+        console.log('[QuicFetchAdapterSync] ❌ ERROR:', {
+          url: quicUrl,
+          error: errorMessage,
+          alpn: quicOptions.alpn,
+        });
+      }
+
       if (fallbackToHttp) {
-        const errorMessage =
-          error instanceof Error ? error.message : String(error);
         if (onFallback) {
           onFallback(url, `QUIC error: ${errorMessage}`);
         }

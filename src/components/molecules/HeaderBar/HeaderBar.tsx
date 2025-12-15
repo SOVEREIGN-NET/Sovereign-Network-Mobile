@@ -1,22 +1,20 @@
 /**
  * HeaderBar Component
- * Top navigation bar with hamburger menu, BLE button, and connection status
+ * Top navigation bar with hamburger menu, balance text, and connection status
  * Used in Dashboard/Browser screens
  */
 
 import React, { useState, useEffect, useCallback } from 'react';
 import { View, Pressable, StyleSheet } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import LinearGradient from 'react-native-linear-gradient';
 import { Text, Row } from '../../atoms';
-import { colors, spacing, typography, borderRadius, shadows, gradientAccents } from '../../../theme';
+import { colors, spacing, typography, shadows } from '../../../theme';
 import { useTranslation } from '../../../i18n';
 import QuicClient from '../../../services/QuicClient';
 import { DEFAULT_NODE_HOST, DEFAULT_NODE_PORT } from '../../../config';
 
 export interface HeaderBarProps {
   onMenuPress: () => void;
-  onBLEPress: () => void;
   sovAddress?: string;
   isConnected?: boolean;
   onConnectionStatusChange?: (connected: boolean, latencyMs?: number) => void;
@@ -24,8 +22,7 @@ export interface HeaderBarProps {
 
 const HeaderBar: React.FC<HeaderBarProps> = ({
   onMenuPress,
-  onBLEPress,
-  sovAddress = 'SOV:1729.1',
+  sovAddress = 'zhtp://centralhub.sov',
   isConnected: isConnectedProp,
   onConnectionStatusChange,
 }) => {
@@ -35,20 +32,15 @@ const HeaderBar: React.FC<HeaderBarProps> = ({
   // Connection state
   const [connectionStatus, setConnectionStatus] = useState<'checking' | 'connected' | 'disconnected'>('checking');
   const [latencyMs, setLatencyMs] = useState<number | null>(null);
-  const [quicSupported, setQuicSupported] = useState<boolean | null>(null);
 
   // Use prop if provided, otherwise use internal state
-  const isConnected = isConnectedProp !== undefined
-    ? isConnectedProp
-    : connectionStatus === 'connected';
+  const isConnected = isConnectedProp ?? connectionStatus === 'connected';
 
   // Check QUIC node reachability (UDP-based, doesn't require full PQC handshake)
   const checkNodeConnection = useCallback(async () => {
     try {
       // First check if QUIC is supported
       const supported = await QuicClient.isSupported();
-      setQuicSupported(supported);
-
       if (!supported) {
         console.warn('QUIC not supported on this device');
         setConnectionStatus('disconnected');
@@ -140,24 +132,14 @@ const HeaderBar: React.FC<HeaderBarProps> = ({
       flexDirection: 'row',
       gap: spacing.md,
     },
-    bleButton: {
-      backgroundColor: colors.bg_darker,
-      paddingHorizontal: spacing.md,
-      paddingVertical: spacing.xs,
-      borderRadius: borderRadius.base,
-      borderWidth: 1,
-      borderColor: colors.primary,
+    centerJustify: {
       justifyContent: 'center',
-      alignItems: 'center',
-    },
-    bleButtonText: {
-      fontSize: typography.size.xs,
-      fontWeight: typography.weight.semibold,
-      color: colors.primary,
     },
     addressText: {
-      fontSize: typography.size.xs,
-      color: colors.text_secondary,
+      fontSize: typography.size.md,
+      fontWeight: typography.weight.normal,
+      color: colors.text_primary,
+      textAlign: 'center',
     },
     statusIndicator: {
       width: 8,
@@ -181,9 +163,8 @@ const HeaderBar: React.FC<HeaderBarProps> = ({
   });
 
   return (
-    <View>
-      <View style={styles.container}>
-        <Row style={styles.contentRow}>
+    <View style={styles.container}>
+      <Row style={styles.contentRow}>
         {/* Hamburger Menu */}
         <Pressable
           onPress={onMenuPress}
@@ -197,80 +178,26 @@ const HeaderBar: React.FC<HeaderBarProps> = ({
           </View>
         </Pressable>
 
-        {/* Center: BLE Button & Address - Horizontal */}
-        <View style={styles.centerSection}>
-          <Pressable
-            onPress={onBLEPress}
-            style={({ pressed }) => [
-              styles.bleButton,
-              pressed && { opacity: 0.7 },
-            ]}
-          >
-            <Text style={styles.bleButtonText}>{t.headerbar.ble}</Text>
-          </Pressable>
+        {/* Center: Address */}
+        <View style={[styles.centerSection, styles.centerJustify]}>
           <Text style={styles.addressText}>{sovAddress}</Text>
         </View>
 
-        {/* Right: Connection Status - Press to refresh, Long press to test HTTP/3 */}
-        <Pressable
-          onPress={checkNodeConnection}
-          onLongPress={async () => {
-            console.log('[HeaderBar] Testing full QUIC+HTTP/3 request...');
-            setConnectionStatus('checking');
-            const result = await QuicClient.testHealthCheck(DEFAULT_NODE_HOST, DEFAULT_NODE_PORT);
-            if (result.success) {
-              console.log('[HeaderBar] HTTP/3 health check SUCCESS:', result.data);
-              setConnectionStatus('connected');
-              setLatencyMs(result.latencyMs ? Math.round(result.latencyMs) : null);
-            } else {
-              console.log('[HeaderBar] HTTP/3 health check FAILED:', result.error);
-              setConnectionStatus('disconnected');
-            }
-          }}
-          style={({ pressed }) => [
-            styles.rightSection,
-            pressed && { opacity: 0.7 },
-          ]}
-          hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
-        >
-          <Row>
-            <View
-              style={[
-                styles.statusIndicator,
-                connectionStatus === 'checking'
-                  ? styles.statusChecking
-                  : isConnected
-                    ? styles.statusConnected
-                    : styles.statusDisconnected,
-              ]}
-            />
-            <Text
-              style={{
-                fontSize: typography.size.xs,
-                color: connectionStatus === 'checking'
-                  ? colors.warning
-                  : isConnected
-                    ? colors.success
-                    : colors.error,
-                fontWeight: typography.weight.semibold,
-              }}
-            >
-              {getStatusText()}
-            </Text>
-          </Row>
-        </Pressable>
+        {/* Right: Connection Status */}
+        <Row style={styles.rightSection}>
+          <View
+            style={[
+              styles.statusIndicator,
+              connectionStatus === 'checking'
+                ? styles.statusChecking
+                : isConnected
+                  ? styles.statusConnected
+                  : styles.statusDisconnected,
+            ]}
+          />
+          <Text style={{ color: colors.text_secondary }}>{getStatusText()}</Text>
+        </Row>
       </Row>
-      </View>
-      {/* Subtle gradient accent line */}
-      <LinearGradient
-        colors={[gradientAccents.gradient_start, gradientAccents.gradient_end]}
-        start={{ x: 0, y: 0 }}
-        end={{ x: 1, y: 0 }}
-        style={{
-          height: 1,
-          opacity: 0.3,
-        }}
-      />
     </View>
   );
 };

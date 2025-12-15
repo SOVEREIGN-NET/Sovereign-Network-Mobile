@@ -16,7 +16,7 @@ const SendTokensScreen = ({ navigation }: any) => {
   const [recipient, setRecipient] = React.useState('');
   const [amount, setAmount] = React.useState('');
   const [memo, setMemo] = React.useState('');
-  const [selectedCurrency, setSelectedCurrency] = React.useState('ZHTP');
+  const [selectedCurrency, setSelectedCurrency] = React.useState('SOV');
   const [errors, setErrors] = React.useState<ValidationErrors>({});
   const [isLoading, setIsLoading] = React.useState(false);
 
@@ -81,7 +81,7 @@ const SendTokensScreen = ({ navigation }: any) => {
     }, 500);
   };
 
-  const currencies = ['ZHTP', 'USDT', 'ETH', 'BTC'];
+  const currencies = ['SOV', 'USDT', 'ETH', 'BTC'];
 
   return (
     <ScreenLayout paddingTop={spacing.md}>

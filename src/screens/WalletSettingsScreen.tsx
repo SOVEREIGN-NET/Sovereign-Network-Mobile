@@ -102,7 +102,7 @@ const WalletSettingsScreen = ({ navigation }: any) => {
                       color: colors.text_secondary,
                     }}
                   >
-                    {wallet.balance.toLocaleString()} ZHTP
+                    {wallet.balance.toLocaleString()} SOV
                   </Text>
                 </Row>
 

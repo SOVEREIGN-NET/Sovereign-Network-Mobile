@@ -61,16 +61,17 @@ const DAOScreen = ({ navigation }: any) => {
 
   const { data, loading } = useAsyncData(
     async () => {
-      try {
-        if (api && isInitialized) {
-          // Fetch real DAO data from API
-          const proposals = await api.getDaoProposals();
-          const daoStats = await api.getDaoStats();
-          return { proposals, daoStats };
-        }
-      } catch (error) {
-        console.warn('Failed to fetch DAO data, using mock:', error);
-      }
+      // TODO: Re-enable when API is ready
+      // try {
+      //   if (api && isInitialized) {
+      //     // Fetch real DAO data from API
+      //     const proposals = await api.getDaoProposals();
+      //     const daoStats = await api.getDaoStats();
+      //     return { proposals, daoStats };
+      //   }
+      // } catch (error) {
+      //   console.warn('Failed to fetch DAO data, using mock:', error);
+      // }
 
       // Fallback to mock data
       await new Promise<void>(resolve => setTimeout(() => resolve(), 600));
@@ -93,9 +94,6 @@ const DAOScreen = ({ navigation }: any) => {
     <View style={{ flex: 1, backgroundColor: colors.bg_darkest }}>
       <HeaderBar
         onMenuPress={() => setDrawerVisible(true)}
-        onBLEPress={() => {
-          // TODO: Handle BLE connection
-        }}
       />
 
       <SideDrawer
@@ -149,7 +147,7 @@ const DAOScreen = ({ navigation }: any) => {
           <View style={{ paddingHorizontal: spacing.xxs }}>
             <StatBox
               label={t.dao.statistics.treasury}
-              value={`${(daoStats.treasury || 0).toFixed(0)} ZHTP`}
+              value={`${(daoStats.treasury || 0).toFixed(0)} SOV`}
               style={{ width: '100%' }}
             />
           </View>

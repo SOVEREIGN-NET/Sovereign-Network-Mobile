@@ -109,6 +109,27 @@ object NativeQuicBridge {
     }
 
     /**
+     * Make an HTTP request over QUIC returning raw bytes
+     */
+    fun requestBytes(
+        url: String,
+        method: String = "GET",
+        headersJson: String = "{}",
+        body: ByteArray? = null,
+        timeoutSecs: Int = 30,
+        insecure: Boolean = true
+    ): Map<String, Any?>? {
+        ensureInitialized()
+        return try {
+            @Suppress("UNCHECKED_CAST")
+            nativeRequestBytes(url, method, headersJson, body, timeoutSecs, insecure) as? Map<String, Any?>
+        } catch (e: Exception) {
+            Log.e(TAG, "Request (bytes) failed", e)
+            mapOf("ok" to false, "status" to 0, "error" to e.message)
+        }
+    }
+
+    /**
      * Cancel all active requests
      */
     fun cancelAll(): Boolean {
@@ -148,6 +169,14 @@ object NativeQuicBridge {
         method: String,
         headersJson: String,
         body: String,
+        timeoutSecs: Int,
+        insecure: Boolean
+    ): Any?
+    private external fun nativeRequestBytes(
+        url: String,
+        method: String,
+        headersJson: String,
+        body: ByteArray?,
         timeoutSecs: Int,
         insecure: Boolean
     ): Any?

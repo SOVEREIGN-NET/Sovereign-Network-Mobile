@@ -10,7 +10,7 @@ const ReceiveTokensScreen = () => {
   const { currentIdentity } = useAuth();
   const [showQR, setShowQR] = useState(false);
   const [copied, setCopied] = useState(false);
-  const [selectedCurrency, setSelectedCurrency] = useState('ZHTP');
+  const [selectedCurrency, setSelectedCurrency] = useState('SOV');
 
   // Get wallet address from wallet ID
   const primaryWallet = currentIdentity?.wallets?.primary;
@@ -51,7 +51,7 @@ const ReceiveTokensScreen = () => {
     }
   };
 
-  const currencies = ['ZHTP', 'USDT', 'ETH', 'BTC'];
+  const currencies = ['SOV', 'USDT', 'ETH', 'BTC'];
 
   // Mock recent transactions
   const recentTransactions = [
@@ -59,7 +59,7 @@ const ReceiveTokensScreen = () => {
       id: '1',
       sender: '0x1234...5678',
       amount: 100,
-      currency: 'ZHTP',
+      currency: 'SOV',
       date: new Date(Date.now() - 2 * 24 * 60 * 60 * 1000).toLocaleDateString(),
       status: 'Completed',
     },
@@ -67,7 +67,7 @@ const ReceiveTokensScreen = () => {
       id: '2',
       sender: '0x9abc...def0',
       amount: 50,
-      currency: 'ZHTP',
+      currency: 'SOV',
       date: new Date(Date.now() - 5 * 24 * 60 * 60 * 1000).toLocaleDateString(),
       status: 'Completed',
     },

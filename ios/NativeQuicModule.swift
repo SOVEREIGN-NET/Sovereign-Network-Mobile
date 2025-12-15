@@ -18,8 +18,12 @@ class NativeQuic: NSObject {
 
   // Default configuration
   private let defaultTimeout: TimeInterval = 30.0
-  // ALPN for ZHTP protocol
-  private let alpnProtocol = "zhtp/1.0"
+
+  // ALPN profiles
+  enum QuicAlpnProfile {
+    case publicContent   // zhtp-public/1
+    case controlPlane    // zhtp-uhp/1
+  }
 
   // MARK: - React Native Bridge Methods
 
@@ -151,7 +155,7 @@ class NativeQuic: NSObject {
     }
 
     let startTime = Date()
-    let parameters = createQuicParameters(insecure: true)
+    let parameters = createQuicParameters(insecure: true, serverName: nil, profile: .controlPlane)
 
     let endpoint = NWEndpoint.hostPort(
       host: NWEndpoint.Host(host),
@@ -245,8 +249,17 @@ class NativeQuic: NSObject {
     let body = options["body"] as? String
     let timeout = options["timeout"] as? Double ?? defaultTimeout
     let insecure = options["insecure"] as? Bool ?? true
+    let alpnOption = options["alpn"] as? String ?? "authenticated"
 
-    let parameters = createQuicParameters(insecure: insecure)
+    // Select ALPN profile based on option from JS
+    let profile: QuicAlpnProfile = alpnOption == "public" ? .publicContent : .controlPlane
+    print("[NativeQuic] 🔑 ALPN: '\(alpnOption)' -> \(profile == .publicContent ? "zhtp-public/1" : "zhtp-uhp/1")")
+
+    let parameters = createQuicParameters(
+      insecure: insecure,
+      serverName: headers["Host"] ?? parsedUrl.host,
+      profile: profile
+    )
 
     let endpoint = NWEndpoint.hostPort(
       host: NWEndpoint.Host(parsedUrl.host),
@@ -342,6 +355,43 @@ class NativeQuic: NSObject {
   }
 
   /**
+   * Raw-bytes request for internal use (not exported to JS)
+   */
+  @objc
+  func requestBytesBridge(
+    _ url: String,
+    method: String = "GET",
+    headers: NSDictionary = [:],
+    body: Data? = nil,
+    timeout: NSNumber? = nil,
+    insecure: NSNumber? = nil,
+    resolve: @escaping RCTPromiseResolveBlock,
+    reject: @escaping RCTPromiseRejectBlock
+  ) {
+    Task {
+      do {
+        let headersDict = headers as? [String: String] ?? [:]
+        let result = try await requestBytes(
+          url: url,
+          method: method,
+          headers: headersDict,
+          body: body,
+          timeout: timeout?.doubleValue ?? defaultTimeout,
+          insecure: insecure?.boolValue ?? true
+        )
+        resolve([
+          "status": result.status,
+          "statusText": result.statusText,
+          "headers": result.headers,
+          "body": result.body
+        ])
+      } catch {
+        reject("QUIC_ERROR", error.localizedDescription, error)
+      }
+    }
+  }
+
+  /**
    * Cancel all active connections
    */
   @objc
@@ -362,9 +412,18 @@ class NativeQuic: NSObject {
   // MARK: - Private Helpers
 
   @available(iOS 15.0, *)
-  private func createQuicParameters(insecure: Bool) -> NWParameters {
-    // Try multiple ALPNs that the server might accept
-    let alpnList = ["zhtp/1.0", "h3"]
+  private func createQuicParameters(
+    insecure: Bool,
+    serverName: String?,
+    profile: QuicAlpnProfile
+  ) -> NWParameters {
+    let alpnList: [String]
+    switch profile {
+    case .publicContent:
+      alpnList = ["zhtp-public/1"]
+    case .controlPlane:
+      alpnList = ["zhtp-uhp/1", "h3"]
+    }
     print("[NativeQuic] Creating QUIC parameters with ALPNs: \(alpnList)")
 
     let quicOptions = NWProtocolQUIC.Options(alpn: alpnList)
@@ -373,7 +432,14 @@ class NativeQuic: NSObject {
     // Create parameters with QUIC
     let parameters = NWParameters(quic: quicOptions)
 
-    // Always disable certificate verification for now (self-signed certs)
+    if let serverName = serverName, !serverName.isEmpty {
+      sec_protocol_options_set_tls_server_name(
+        quicOptions.securityProtocolOptions,
+        serverName
+      )
+    }
+
+    // Always disable certificate verification for now (self-signed certs / TOFU)
     print("[NativeQuic] Configuring TLS for self-signed certificates")
 
     // Set verify block to accept all certs
@@ -436,12 +502,13 @@ class NativeQuic: NSObject {
     body: String?,
     completion: @escaping (Result<[String: Any], Error>) -> Void
   ) {
+    let hostHeader = headers["Host"] ?? "\(host):\(port)"
     var httpRequest = "\(method) \(path) HTTP/1.1\r\n"
-    httpRequest += "Host: \(host):\(port)\r\n"
+    httpRequest += "Host: \(hostHeader)\r\n"
     httpRequest += "Connection: close\r\n"
     httpRequest += "User-Agent: SovereignNetwork-iOS/1.0 QUIC\r\n"
 
-    for (key, value) in headers {
+    for (key, value) in headers where key.caseInsensitiveCompare("Host") != .orderedSame {
       httpRequest += "\(key): \(value)\r\n"
     }
 
@@ -460,8 +527,8 @@ class NativeQuic: NSObject {
       return
     }
 
-    print("[NativeQuic] Sending HTTP request (\(requestData.count) bytes):")
-    print("[NativeQuic] \(httpRequest)")
+    // Log request without body (may contain sensitive data)
+    print("[NativeQuic] Sending \(method) \(path) (\(requestData.count) bytes)")
 
     // For HTTP/1.1 over QUIC: we need to signal end of request with isComplete: true
     // This tells the server "I'm done sending, now respond"
@@ -578,6 +645,246 @@ class NativeQuic: NSObject {
     completion(.success(response))
   }
 
+  // MARK: - Internal helpers for raw bytes (for Web4 runtime)
+
+  @available(iOS 15.0, *)
+  func requestBytes(
+    url: String,
+    method: String = "GET",
+    headers: [String: String] = [:],
+    body: Data? = nil,
+    timeout: TimeInterval = 30,
+    insecure: Bool = true,
+    alpn: QuicAlpnProfile = .publicContent
+  ) async throws -> (status: Int, headers: [String: String], body: Data, statusText: String) {
+    guard let parsedUrl = parseQuicUrl(url) else {
+      throw NSError(domain: "NativeQuic", code: -1, userInfo: [NSLocalizedDescriptionKey: "Invalid URL"])
+    }
+
+    print("[NativeQuic] requestBytes: \(method) \(url) with ALPN: \(alpn == .publicContent ? "zhtp-public/1" : "zhtp-uhp/1")")
+
+    let parameters = createQuicParameters(
+      insecure: insecure,
+      serverName: headers["Host"] ?? parsedUrl.host,
+      profile: alpn
+    )
+    let endpoint = NWEndpoint.hostPort(
+      host: NWEndpoint.Host(parsedUrl.host),
+      port: NWEndpoint.Port(integerLiteral: UInt16(parsedUrl.port))
+    )
+
+    return try await withCheckedThrowingContinuation { continuation in
+      var didFinish = false
+      let finishLock = NSLock()
+
+      let connection = NWConnection(to: endpoint, using: parameters)
+      let connectionId = UUID().uuidString
+
+      connectionLock.lock()
+      activeConnections[connectionId] = connection
+      connectionLock.unlock()
+
+      @Sendable func finish(_ result: Result<(status: Int, headers: [String: String], body: Data, statusText: String), Error>) {
+        finishLock.lock()
+        if didFinish {
+          finishLock.unlock()
+          return
+        }
+        didFinish = true
+        finishLock.unlock()
+        connectionLock.lock()
+        activeConnections.removeValue(forKey: connectionId)
+        connectionLock.unlock()
+        connection.stateUpdateHandler = nil
+        connection.cancel()
+        continuation.resume(with: result)
+      }
+
+      connection.stateUpdateHandler = { [weak self] state in
+        guard let self = self else { return }
+        print("[NativeQuic] requestBytes connection state: \(state)")
+        switch state {
+        case .ready:
+          print("[NativeQuic] requestBytes: connection READY, sending request...")
+          self.sendHttpRequestBytes(
+            connection: connection,
+            method: method,
+            path: parsedUrl.path,
+            host: parsedUrl.host,
+            port: parsedUrl.port,
+            headers: headers,
+            body: body
+          ) { result in
+            switch result {
+            case .success(let data):
+              do {
+                let parsed = try self.parseHttpResponseBytes(data: data)
+                finish(.success(parsed))
+              } catch {
+                finish(.failure(error))
+              }
+            case .failure(let error):
+              finish(.failure(error))
+            }
+          }
+        case .waiting(let error):
+          print("[NativeQuic] requestBytes: connection WAITING - \(error.localizedDescription)")
+        case .failed(let error):
+          print("[NativeQuic] requestBytes: connection FAILED - \(error.localizedDescription)")
+          finish(.failure(error))
+        case .cancelled:
+          print("[NativeQuic] requestBytes: connection CANCELLED")
+          finish(.failure(NSError(domain: "NativeQuic", code: -2, userInfo: [NSLocalizedDescriptionKey: "Cancelled"])))
+        default:
+          break
+        }
+      }
+
+      connection.start(queue: queue)
+
+      queue.asyncAfter(deadline: .now() + timeout) {
+        finish(.failure(NSError(domain: "NativeQuic", code: -3, userInfo: [NSLocalizedDescriptionKey: "Timeout"])))
+      }
+    }
+  }
+
+  @available(iOS 15.0, *)
+  private func sendHttpRequestBytes(
+    connection: NWConnection,
+    method: String,
+    path: String,
+    host: String,
+    port: Int,
+    headers: [String: String],
+    body: Data?,
+    completion: @escaping (Result<Data, Error>) -> Void
+  ) {
+    var httpRequest = "\(method) \(path) HTTP/1.1\r\n"
+    httpRequest += "Host: \(host):\(port)\r\n"
+    httpRequest += "Connection: close\r\n"
+    httpRequest += "User-Agent: SovereignNetwork-iOS/1.0 QUIC\r\n"
+
+    for (key, value) in headers {
+      httpRequest += "\(key): \(value)\r\n"
+    }
+
+    if let body = body {
+      httpRequest += "Content-Length: \(body.count)\r\n"
+      httpRequest += "Content-Type: application/octet-stream\r\n"
+      httpRequest += "\r\n"
+      // Combine headers and body into single data for atomic send
+      var requestData = httpRequest.data(using: .utf8) ?? Data()
+      requestData.append(body)
+      // Use .finalMessage and isComplete: true to signal end of request
+      connection.send(content: requestData, contentContext: .finalMessage, isComplete: true, completion: .contentProcessed { [weak self] error in
+        if let error = error {
+          print("[NativeQuic] sendHttpRequestBytes: send failed - \(error)")
+          completion(.failure(error))
+          return
+        }
+        print("[NativeQuic] sendHttpRequestBytes: send succeeded, waiting for response...")
+        self?.receiveHttpResponseBytes(connection: connection, completion: completion)
+      })
+    } else {
+      httpRequest += "\r\n"
+      // Use .finalMessage and isComplete: true to signal end of request
+      connection.send(content: httpRequest.data(using: .utf8), contentContext: .finalMessage, isComplete: true, completion: .contentProcessed { [weak self] error in
+        if let error = error {
+          print("[NativeQuic] sendHttpRequestBytes: send failed - \(error)")
+          completion(.failure(error))
+          return
+        }
+        print("[NativeQuic] sendHttpRequestBytes: send succeeded, waiting for response...")
+        self?.receiveHttpResponseBytes(connection: connection, completion: completion)
+      })
+    }
+  }
+
+  @available(iOS 15.0, *)
+  private func receiveHttpResponseBytes(
+    connection: NWConnection,
+    completion: @escaping (Result<Data, Error>) -> Void
+  ) {
+    var responseData = Data()
+    var hasCompleted = false
+    let completionLock = NSLock()
+
+    func safeComplete(_ result: Result<Data, Error>) {
+      completionLock.lock()
+      defer { completionLock.unlock() }
+      guard !hasCompleted else { return }
+      hasCompleted = true
+      print("[NativeQuic] receiveHttpResponseBytes completing with \(responseData.count) bytes")
+      completion(result)
+    }
+
+    func receiveMore() {
+      print("[NativeQuic] receiveHttpResponseBytes: calling receive(), connection state=\(connection.state)")
+      connection.receive(minimumIncompleteLength: 1, maximumLength: 65536) { [weak self] content, context, isComplete, error in
+        print("[NativeQuic] receiveHttpResponseBytes callback: content=\(content?.count ?? 0) bytes, isComplete=\(isComplete), error=\(error?.localizedDescription ?? "nil")")
+
+        if let error = error {
+          print("[NativeQuic] receiveHttpResponseBytes: ERROR - \(error)")
+          safeComplete(.failure(error))
+          return
+        }
+
+        if let content = content {
+          responseData.append(content)
+          print("[NativeQuic] receiveHttpResponseBytes: received \(content.count) bytes, total=\(responseData.count)")
+        }
+
+        if isComplete {
+          print("[NativeQuic] receiveHttpResponseBytes: stream complete")
+          safeComplete(.success(responseData))
+        } else {
+          receiveMore()
+        }
+      }
+    }
+
+    receiveMore()
+  }
+
+  private func parseHttpResponseBytes(data: Data) throws -> (status: Int, headers: [String: String], body: Data, statusText: String) {
+    guard let separatorRange = data.range(of: Data([13, 10, 13, 10])) else { // \r\n\r\n
+      throw NSError(domain: "NativeQuic", code: -4, userInfo: [NSLocalizedDescriptionKey: "Invalid HTTP response"])
+    }
+
+    let headerData = data[..<separatorRange.lowerBound]
+    let body = data[separatorRange.upperBound...]
+
+    guard let headerString = String(data: headerData, encoding: .utf8) else {
+      throw NSError(domain: "NativeQuic", code: -5, userInfo: [NSLocalizedDescriptionKey: "Invalid header encoding"])
+      }
+
+    let headerLines = headerString.components(separatedBy: "\r\n")
+    guard let statusLine = headerLines.first else {
+      throw NSError(domain: "NativeQuic", code: -6, userInfo: [NSLocalizedDescriptionKey: "Missing status line"])
+    }
+
+    let statusParts = statusLine.split(separator: " ", maxSplits: 2)
+    let statusCode = statusParts.count > 1 ? Int(statusParts[1]) ?? 0 : 0
+    let statusText = statusParts.count > 2 ? String(statusParts[2]) : ""
+
+    var responseHeaders: [String: String] = [:]
+    for line in headerLines.dropFirst() {
+      let headerParts = line.split(separator: ":", maxSplits: 1)
+      if headerParts.count == 2 {
+        let key = String(headerParts[0]).trimmingCharacters(in: .whitespaces)
+        let value = String(headerParts[1]).trimmingCharacters(in: .whitespaces)
+        responseHeaders[key] = value
+      }
+    }
+
+    return (
+      status: statusCode,
+      headers: responseHeaders,
+      body: Data(body),
+      statusText: statusText
+    )
+  }
+
   private func cleanupConnection(_ connectionId: String) {
     connectionLock.lock()
     if let connection = activeConnections.removeValue(forKey: connectionId) {
@@ -597,7 +904,7 @@ class NativeQuic: NSObject {
   @objc
   func constantsToExport() -> [AnyHashable: Any]! {
     return [
-      "ALPN_PROTOCOL": alpnProtocol,
+      "ALPN_PROTOCOL": "zhtp-uhp/1",
       "DEFAULT_TIMEOUT": defaultTimeout,
       "MIN_IOS_VERSION": 15.0
     ]

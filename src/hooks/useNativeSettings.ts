@@ -6,7 +6,7 @@
 
 import { useEffect, useState, useCallback } from 'react';
 import { NativeModules } from 'react-native';
-import { DEFAULT_ZHTP_NODE_URL, APP_DEFAULTS } from '../config';
+import { DEFAULT_SOV_NODE_URL, APP_DEFAULTS } from '../config';
 
 const { NativeSettings } = NativeModules;
 
@@ -38,7 +38,7 @@ export function useNativeSettings() {
       if (nativeSettings) {
         setSettings({
           useMockData: nativeSettings.useMockData ?? APP_DEFAULTS.useMockData,
-          nodeUrl: nativeSettings.nodeUrl ?? DEFAULT_ZHTP_NODE_URL,
+          nodeUrl: nativeSettings.nodeUrl ?? DEFAULT_SOV_NODE_URL,
         });
       }
     } catch (err: any) {
@@ -89,7 +89,7 @@ export function useNativeSettings() {
       await NativeSettings.clearSettings();
       setSettings({
         useMockData: APP_DEFAULTS.useMockData,
-        nodeUrl: DEFAULT_ZHTP_NODE_URL,
+        nodeUrl: DEFAULT_SOV_NODE_URL,
       });
       return true;
     } catch (err: any) {

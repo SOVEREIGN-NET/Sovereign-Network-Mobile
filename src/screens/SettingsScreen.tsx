@@ -15,7 +15,7 @@ import { useAuth, useNativeSettings } from '../hooks';
 import { useTranslation } from '../i18n';
 import { colors, spacing, typography, borderRadius } from '../theme';
 import { setUseMockService } from '../context/AuthContext';
-import { DEFAULT_ZHTP_NODE_URL, APP_DEFAULTS } from '../config';
+import { DEFAULT_SOV_NODE_URL, APP_DEFAULTS } from '../config';
 
 type Theme = 'light' | 'dark' | 'system';
 type Language = 'en' | 'es' | 'fr' | 'de';
@@ -39,7 +39,7 @@ const SettingsScreen = ({ navigation }: any) => {
 
   // Developer settings (synced with native phone settings)
   const [useMockData, setUseMockData] = useState(nativeSettings?.useMockData ?? APP_DEFAULTS.useMockData);
-  const [nodeUrl, setNodeUrl] = useState(nativeSettings?.nodeUrl ?? DEFAULT_ZHTP_NODE_URL);
+  const [nodeUrl, setNodeUrl] = useState(nativeSettings?.nodeUrl ?? DEFAULT_SOV_NODE_URL);
 
   // Sync when native settings load
   useEffect(() => {
@@ -157,9 +157,6 @@ const SettingsScreen = ({ navigation }: any) => {
       <HeaderBar
         onMenuPress={() => {
           // Settings doesn't have a drawer menu
-        }}
-        onBLEPress={() => {
-          // TODO: Handle BLE connection
         }}
       />
 
@@ -640,7 +637,7 @@ const SettingsScreen = ({ navigation }: any) => {
                       fontWeight: typography.weight.semibold,
                     }}
                   >
-                    ZHTP Web4
+                    SOV Web4
                   </Text>
                 </Row>
               </View>

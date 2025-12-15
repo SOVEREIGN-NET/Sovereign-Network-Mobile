@@ -14,6 +14,8 @@ export interface QuicRequestOptions {
   body?: string;
   timeout?: number;
   insecure?: boolean; // Allow self-signed certs (dev mode)
+  /** ALPN profile: 'public' for unauthenticated, 'authenticated' for UHP (default) */
+  alpn?: 'public' | 'authenticated';
 }
 
 export interface QuicResponse {
@@ -113,7 +115,15 @@ export async function quicRequest(
     body: options.body,
     timeout: options.timeout || 30,
     insecure: options.insecure ?? __DEV__, // Default to insecure in dev
+    alpn: options.alpn || 'authenticated', // Default to authenticated (zhtp-uhp/1)
   };
+
+  // CRITICAL: Log ALPN being sent to native
+  console.log('[QuicClient] 🔑 ALPN being sent to native:', {
+    url,
+    alpn: requestOptions.alpn,
+    method: requestOptions.method,
+  });
 
   return await NativeQuic.request(url, requestOptions);
 }

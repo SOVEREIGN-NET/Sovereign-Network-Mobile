@@ -5,7 +5,7 @@
 
 export const formatCurrency = (
   amount: number,
-  currency: string = 'ZHTP',
+  currency: string = 'SOV',
   decimals: number = 2,
 ): string => {
   return `${amount.toLocaleString('en-US', {

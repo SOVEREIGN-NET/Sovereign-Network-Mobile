@@ -1,5 +1,5 @@
 /**
- * Mock Data Service for ZHTP Web4 Mobile App
+ * Mock Data Service for SOV Web4 Mobile App
  * Provides test data for UI development without API connectivity
  */
 
@@ -86,7 +86,7 @@ class MockDataService {
         name: 'Primary Wallet',
         address: 'zhtp1acdefghijklmnopqrstuvwxyz',
         balance: 150250.59,
-        currency: 'ZHTP',
+        currency: 'SOV',
         type: 'primary',
       },
       {
@@ -94,7 +94,7 @@ class MockDataService {
         name: 'UBI Wallet',
         address: 'zhtp1bcdefghijklmnopqrstuvwxyz',
         balance: 1250.01,
-        currency: 'ZHTP',
+        currency: 'SOV',
         type: 'ubi',
       },
       {
@@ -102,7 +102,7 @@ class MockDataService {
         name: 'Savings Wallet',
         address: 'zhtp1ccdefghijklmnopqrstuvwxyz',
         balance: 50000.01,
-        currency: 'ZHTP',
+        currency: 'SOV',
         type: 'savings',
       },
     ];
@@ -118,7 +118,7 @@ class MockDataService {
         from: 'zhtp1acdefghijklmnopqrstuvwxyz',
         to: 'zhtp1dcdefghijklmnopqrstuvwxyz',
         amount: 100.09,
-        currency: 'ZHTP',
+        currency: 'SOV',
         timestamp: '2024-10-25T14:30:00Z',
         status: 'confirmed',
         type: 'send',
@@ -128,7 +128,7 @@ class MockDataService {
         from: 'zhtp1ecdefghijklmnopqrstuvwxyz',
         to: 'zhtp1acdefghijklmnopqrstuvwxyz',
         amount: 250.01,
-        currency: 'ZHTP',
+        currency: 'SOV',
         timestamp: '2024-10-24T10:15:00Z',
         status: 'confirmed',
         type: 'receive',
@@ -138,7 +138,7 @@ class MockDataService {
         from: 'zhtp1acdefghijklmnopqrstuvwxyz',
         to: 'dao.zhtp',
         amount: 500.03,
-        currency: 'ZHTP',
+        currency: 'SOV',
         timestamp: '2024-10-23T09:45:00Z',
         status: 'confirmed',
         type: 'stake',
@@ -148,7 +148,7 @@ class MockDataService {
         from: 'ubi.zhtp',
         to: 'zhtp1acdefghijklmnopqrstuvwxyz',
         amount: 50.02,
-        currency: 'ZHTP',
+        currency: 'SOV',
         timestamp: '2024-10-22T00:00:00Z',
         status: 'confirmed',
         type: 'ubi',
@@ -176,7 +176,7 @@ class MockDataService {
       },
       {
         id: 'prop-002',
-        title: 'Allocate 50,000 ZHTP for Infrastructure',
+        title: 'Allocate 50,000 SOV for Infrastructure',
         description: 'Fund development of edge nodes and network infrastructure',
         proposer: 'did:zhtp:foundation001',
         status: 'active',
@@ -190,7 +190,7 @@ class MockDataService {
         id: 'prop-003',
         title: 'Update Protocol to v2.1',
         description:
-          'Upgrade ZHTP protocol with improved mesh routing and faster consensus',
+          'Upgrade SOV protocol with improved mesh routing and faster consensus',
         proposer: 'did:zhtp:core001',
         status: 'passed',
         votesFor: 2100,
@@ -221,7 +221,7 @@ class MockDataService {
   static getNetworkStatus(): NetworkStatus {
     return {
       connected: true,
-      protocol: 'ZHTP v1.0',
+      protocol: 'SOV v1.0',
       version: '1.0.0',
       nodeCount: 42,
       meshHealth: 94,
@@ -244,10 +244,10 @@ class MockDataService {
    * Simulate sending tokens
    */
   static sendTokens(to: string, amount: number) {
-    console.log(`Sending ${amount} ZHTP to ${to}`);
+    console.log(`Sending ${amount} SOV to ${to}`);
     return {
       success: true,
-      message: `Sent ${amount} ZHTP to ${to}`,
+      message: `Sent ${amount} SOV to ${to}`,
       transactionHash: `0x${Math.random().toString(16).slice(2)}`,
       confirmationTime: 5000,
     };

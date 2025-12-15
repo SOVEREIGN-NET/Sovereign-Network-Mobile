@@ -23,7 +23,7 @@ class NativeQuicModule(reactContext: ReactApplicationContext) :
     companion object {
         private const val TAG = "NativeQuic"
         private const val DEFAULT_TIMEOUT = 30
-        private const val ALPN_PROTOCOL = "zhtp/1.0"
+        private const val ALPN_PROTOCOL = "zhtp-public/1"
     }
 
     private val executor: Executor = Executors.newCachedThreadPool()

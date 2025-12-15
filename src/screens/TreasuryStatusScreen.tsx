@@ -196,7 +196,7 @@ const TreasuryStatusScreen = ({ navigation }: any) => {
                       marginTop: spacing.xs,
                     }}
                   >
-                    {item.amount.toLocaleString()} ZHTP
+                    {item.amount.toLocaleString()} SOV
                   </Text>
                 </View>
               ))}
@@ -233,7 +233,7 @@ const TreasuryStatusScreen = ({ navigation }: any) => {
                     color: colors.primary,
                   }}
                 >
-                  {totalBudget.toLocaleString()} ZHTP
+                  {totalBudget.toLocaleString()} SOV
                 </Text>
               </View>
             </View>

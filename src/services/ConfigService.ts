@@ -5,7 +5,7 @@
  */
 
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import { DEFAULT_ZHTP_NODE_URL, DEFAULT_NETWORK_TYPE, APP_DEFAULTS } from '../config';
+import { DEFAULT_SOV_NODE_URL, DEFAULT_NETWORK_TYPE, APP_DEFAULTS } from '../config';
 
 export interface AppConfig {
   zhtpNodeUrl: string;
@@ -18,7 +18,7 @@ const CONFIG_KEY = 'app_config';
 // Default values from centralized config
 // Note: The dev node is pure QUIC - no HTTP/TCP support
 const DEFAULT_CONFIG: AppConfig = {
-  zhtpNodeUrl: DEFAULT_ZHTP_NODE_URL,
+  zhtpNodeUrl: DEFAULT_SOV_NODE_URL,
   networkType: DEFAULT_NETWORK_TYPE,
   useRealAuth: !APP_DEFAULTS.useMockData, // Use mock service by default in dev
 };
@@ -76,12 +76,6 @@ export const resetConfig = async (): Promise<void> => {
 export const initializeConfig = async (): Promise<AppConfig> => {
   try {
     const config = await getConfig();
-
-    // If using development environment and node URL not set, try localhost
-    if (__DEV__ && config.zhtpNodeUrl === DEFAULT_CONFIG.zhtpNodeUrl) {
-      // You can add logic here to auto-discover local nodes
-      console.log('Development mode - using default node URL:', config.zhtpNodeUrl);
-    }
 
     console.log('✅ Config initialized:', config);
     return config;

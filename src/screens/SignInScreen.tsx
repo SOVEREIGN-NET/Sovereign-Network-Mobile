@@ -28,8 +28,8 @@ type SignInScreenProps = NativeStackScreenProps<AuthStackParamList, 'SignIn'>;
 
 const SignInScreen = ({ navigation }: SignInScreenProps) => {
   const { t } = useTranslation();
-  const { signIn, isLoading, error } = useAuth();
-  const { isConnected, isLoading: nodeLoading, checkConnection } = useNodeConnection(true);
+  const { signIn, isLoading, error, setCurrentIdentity } = useAuth();
+  const { isConnected, isLoading: nodeLoading, checkConnection, getProtocol } = useNodeConnection(true);
 
   const [did, setDid] = useState('');
   const [passphrase, setPassphrase] = useState('');
@@ -60,6 +60,20 @@ const SignInScreen = ({ navigation }: SignInScreenProps) => {
     } catch (err: any) {
       setLocalError(err.message || t.auth.signIn.errors.signInFailed);
     }
+  };
+
+  // TEMPORARY: Dev bypass while node identity creation is broken
+  const handleDevBypass = async () => {
+    console.log('[SignIn] 🚧 DEV BYPASS - Skipping authentication');
+    const mockIdentity = {
+      did: 'did:zhtp:dev-bypass-temp',
+      displayName: 'Dev User',
+      identityType: 'human',
+      citizenshipStatus: 'citizen' as const,
+      createdAt: new Date().toISOString(),
+      wallets: [],
+    };
+    await setCurrentIdentity(mockIdentity);
   };
 
   const isSignInDisabled = isLoading || nodeLoading || !isConnected;
@@ -132,8 +146,23 @@ const SignInScreen = ({ navigation }: SignInScreenProps) => {
           </Text>
         </View>
 
-        {/* Node Connection Status - Tap to retry */}
-        <Pressable onPress={() => checkConnection()}>
+        {/* Node Connection Status - Tap to retry, Long press for full protocol check */}
+        <Pressable
+          onPress={() => {
+            console.log('='.repeat(60));
+            console.log('[SignIn] 👆 SHORT PRESS - UDP Reachability Check');
+            console.log('='.repeat(60));
+            checkConnection();
+          }}
+          onLongPress={() => {
+            console.log('='.repeat(60));
+            console.log('[SignIn] 👆👆 LONG PRESS - Full QUIC Protocol Health Check');
+            console.log('='.repeat(60));
+            getProtocol();
+          }}
+          delayLongPress={500}
+          hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+        >
           <Card>
             <Row style={{ justifyContent: 'space-between', alignItems: 'center' }}>
               <Column gap="xs" style={{ flex: 1 }}>
@@ -270,6 +299,43 @@ const SignInScreen = ({ navigation }: SignInScreenProps) => {
             },
           ]}
         />
+
+        {/* TEMPORARY: Dev bypass button - hidden for now */}
+        {false && __DEV__ && (
+          <Pressable
+            onPress={handleDevBypass}
+            style={{
+              marginTop: spacing.lg,
+              padding: spacing.md,
+              backgroundColor: 'rgba(255, 0, 0, 0.1)',
+              borderRadius: 8,
+              borderWidth: 1,
+              borderColor: 'rgba(255, 0, 0, 0.3)',
+              borderStyle: 'dashed',
+            }}
+          >
+            <Text
+              style={{
+                color: '#ff6b6b',
+                textAlign: 'center',
+                fontSize: typography.size.sm,
+                fontWeight: typography.weight.medium,
+              }}
+            >
+              🚧 DEV BYPASS → Browser
+            </Text>
+            <Text
+              style={{
+                color: colors.text_secondary,
+                textAlign: 'center',
+                fontSize: typography.size.xs,
+                marginTop: spacing.xxs,
+              }}
+            >
+              Skip auth (node identity creation broken)
+            </Text>
+          </Pressable>
+        )}
       </Column>
     </ScreenLayout>
   );

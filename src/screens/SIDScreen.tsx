@@ -184,9 +184,6 @@ const SIDScreen = ({ navigation }: any) => {
     <View style={{ flex: 1, backgroundColor: colors.bg_darkest }}>
       <HeaderBar
         onMenuPress={() => setDrawerVisible(true)}
-        onBLEPress={() => {
-          // TODO: Handle BLE connection
-        }}
       />
 
       <SideDrawer
@@ -434,7 +431,7 @@ const SIDScreen = ({ navigation }: any) => {
                                   color: colors.text_tertiary,
                                 }}
                               >
-                                ZHTP
+                                SOV
                               </Text>
                             </Row>
                             {wallet?.id && (
@@ -517,7 +514,7 @@ const SIDScreen = ({ navigation }: any) => {
                         </Text>
                       </Row>
                       <Text style={{ fontSize: typography.size.xs, color: colors.text_secondary, marginTop: spacing.xs }}>
-                        Daily ZHTP income deposited to your UBI wallet
+                        Daily SOV income deposited to your UBI wallet
                       </Text>
                     </Column>
                     <Badge label={ubiData.eligible !== false ? 'Active' : 'Pending'} variant={ubiData.eligible !== false ? 'success' : 'warning'} />
@@ -530,7 +527,7 @@ const SIDScreen = ({ navigation }: any) => {
                           {ubiData.daily_amount || 33}
                         </Text>
                         <Text style={{ fontSize: typography.size.xs, color: colors.text_secondary }}>
-                          ZHTP/day
+                          SOV/day
                         </Text>
                       </Column>
                       <View style={{ width: 1, backgroundColor: colors.border }} />
@@ -539,7 +536,7 @@ const SIDScreen = ({ navigation }: any) => {
                           {ubiData.monthly_amount || 1000}
                         </Text>
                         <Text style={{ fontSize: typography.size.xs, color: colors.text_secondary }}>
-                          ZHTP/month
+                          SOV/month
                         </Text>
                       </Column>
                     </Row>

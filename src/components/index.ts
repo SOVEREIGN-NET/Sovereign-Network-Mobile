@@ -106,3 +106,7 @@ export type {
   ErrorViewProps,
   ErrorBoundaryProps,
 } from './organisms';
+
+// Native
+export { Web4View, isWeb4ViewAvailable } from './Web4View';
+export type { Web4ViewProps } from './Web4View';

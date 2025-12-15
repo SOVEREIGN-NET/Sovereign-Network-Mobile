@@ -1,6 +1,6 @@
 /**
  * Domain Models
- * Core data structures for the ZHTP Web4 Mobile application
+ * Core data structures for the SOV Web4 Mobile application
  */
 
 // Identity

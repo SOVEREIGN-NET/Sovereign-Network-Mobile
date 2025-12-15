@@ -34,12 +34,12 @@ const WALLET_INFO = {
   primary: {
     icon: '💳',
     name: 'Primary Wallet',
-    description: 'Your main spending wallet. Contains your 5,000 ZHTP welcome bonus.',
+    description: 'Your main spending wallet. Contains your 5,000 SOV welcome bonus.',
   },
   ubi: {
     icon: '🌱',
     name: 'UBI Wallet',
-    description: 'Receives 33 ZHTP daily Universal Basic Income automatically.',
+    description: 'Receives 33 SOV daily Universal Basic Income automatically.',
   },
   savings: {
     icon: '🏦',

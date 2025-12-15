@@ -6,7 +6,7 @@
 export const en = {
   // App
   app: {
-    title: 'ZHTP Web4',
+    title: 'SOV Web4',
     loading: 'Loading...',
     error: 'Error: Auth context not available',
     nodeStatus: 'Node Status',
@@ -26,7 +26,7 @@ export const en = {
 
   // Dashboard Screen
   dashboard: {
-    loadingMessage: 'Loading ZHTP Dashboard...',
+    loadingMessage: 'Loading SOV Dashboard...',
     networkStatus: {
       title: 'Network Status',
       label: 'Status:',
@@ -85,7 +85,7 @@ export const en = {
       title: 'Trending Tokens',
       viewAll: 'View All Tokens →',
       items: [
-        { symbol: 'ZHTP', name: 'Sovereign Network Token', price: '$2.34' },
+        { symbol: 'SOV', name: 'Sovereign Network Token', price: '$2.34' },
         { symbol: 'ZGOV', name: 'Governance Token', price: '$5.67' },
         { symbol: 'ZDEFI', name: 'DeFi Protocol Token', price: '$1.89' },
         { symbol: 'ZNFT', name: 'NFT Marketplace Token', price: '$3.12' },
@@ -98,19 +98,19 @@ export const en = {
       items: [
         {
           title: 'Post-Quantum Signature Scheme',
-          reward: '5,000 ZHTP',
+          reward: '5,000 SOV',
           daysLeft: '14',
           contributors: '3',
         },
         {
           title: 'Build DeFi Lending Protocol',
-          reward: '10,000 ZHTP',
+          reward: '10,000 SOV',
           daysLeft: '30',
           contributors: '8',
         },
         {
           title: 'Design Web4 Gaming Engine',
-          reward: '7,500 ZHTP',
+          reward: '7,500 SOV',
           daysLeft: '45',
           contributors: '5',
         },
@@ -125,7 +125,7 @@ export const en = {
       welcome: {
         heading: 'Welcome to the',
         accent: 'Sovereign Network',
-        subtitle: 'The next generation of decentralized internet powered by ZHTP protocol',
+        subtitle: 'The next generation of decentralized internet powered by SOV protocol',
       },
       didLabel: 'ZK-DID Address',
       didPlaceholder: 'did:zhtp:abc123...xyz',
@@ -139,7 +139,7 @@ export const en = {
       },
       demoLabel: 'Demo Credentials',
       demoInfo: 'DID: did:zhtp:demo001\nPassphrase: (any value works)',
-      button: 'Sign In to ZHTP Network',
+      button: 'Sign In to SOV Network',
       buttonLoading: 'Signing in...',
       createNew: 'Create New Identity',
       recover: 'Recover Identity',
@@ -197,7 +197,7 @@ export const en = {
       biometric: 'Biometric Authentication',
       biometricEnabled: 'Enabled (fingerprint/face recognition)',
       biometricDisabled: 'Disabled (optional)',
-      terms: 'I accept the ZHTP Network Terms and',
+      terms: 'I accept the SOV Network Terms and',
       termsPrivacy: 'Privacy Policy',
       termsTitle: 'I accept the Terms & Conditions',
       termsDescription: 'By creating an identity, you agree to our terms',
@@ -546,7 +546,7 @@ export const en = {
   wallet: {
     title: 'Quantum Wallet',
     totalBalance: 'Total Balance',
-    currency: 'ZHTP Tokens',
+    currency: 'SOV Tokens',
     balance: {
       title: 'Balance',
     },
@@ -555,10 +555,10 @@ export const en = {
       send: 'Send',
       receive: 'Receive',
       copy: 'Copy',
-      sendZhtp: 'SEND ZHTP',
-      receiveZhtp: 'RECEIVE ZHTP',
+      sendZhtp: 'SEND SOV',
+      receiveZhtp: 'RECEIVE SOV',
       claimUbi: 'CLAIM UBI',
-      stakeZhtp: 'STAKE ZHTP',
+      stakeZhtp: 'STAKE SOV',
     },
     wallets: {
       title: 'Your Wallets',
@@ -664,8 +664,8 @@ export const en = {
       descriptionCounter: '{current}/500',
       budgetCategory: 'Budget Category',
       budgetCategories: ['Infrastructure', 'Development', 'Marketing', 'Security', 'Research'],
-      fundingAmount: 'Funding Amount (ZHTP)',
-      fundingUnit: 'Amount in ZHTP tokens',
+      fundingAmount: 'Funding Amount (SOV)',
+      fundingUnit: 'Amount in SOV tokens',
       parameterName: 'Parameter Name',
       parameterNamePlaceholder: 'e.g., maxValidators, minStake',
       currentValue: 'Current Value',
@@ -701,7 +701,7 @@ export const en = {
       overview: {
         title: 'Treasury Overview',
         balance: 'Treasury Balance',
-        unit: 'ZHTP Tokens',
+        unit: 'SOV Tokens',
         members: 'Members',
         activeProposals: 'Active',
       },
@@ -829,7 +829,7 @@ export const en = {
       buildDate: 'Build Date',
       termsButton: 'Terms of Service',
       termsTitle: 'Terms of Service',
-      termsText: 'By using ZHTP Web4, you agree to our terms and conditions. These terms govern your use of our services.',
+      termsText: 'By using SOV Web4, you agree to our terms and conditions. These terms govern your use of our services.',
       privacyButton: 'Privacy Policy',
       privacyTitle: 'Privacy Policy',
       privacyText: 'We respect your privacy. Your data is encrypted and never shared with third parties without consent.',
@@ -921,9 +921,9 @@ export const en = {
   // Browser Screen
   browser: {
     title: 'Web4 Browser',
-    urlPlaceholder: 'Enter ZHTP domain...',
+    urlPlaceholder: 'Enter SOV domain...',
     navigateButton: 'NAVIGATE',
-    connectionStatus: '🟢 Connected to ZHTP Network',
+    connectionStatus: '🟢 Connected to SOV Network',
     suggestedSites: 'Suggested Sites',
     features: {
       title: 'Web4 Browser Features',
@@ -935,13 +935,18 @@ export const en = {
     errors: {
       notFound: 'Site Not Found',
       notResolved: '404 - Domain Not Resolved',
-      couldNotResolve: 'The domain "{domain}" could not be resolved on the ZHTP network.',
+      couldNotResolve: 'The domain "{domain}" could not be resolved on the SOV network.',
     },
     websites: {
       'zhtp://network.sovereign': {
         title: 'Sovereign Network Hub',
-        description: 'Welcome to the ZHTP Web4 Network',
+        description: 'Welcome to the SOV Web4 Network',
         content: 'The Sovereign Network is a decentralized internet built on Zero-Knowledge technology. Browse, transact, and govern without intermediaries.',
+      },
+      'zhtp://centralhub.sov': {
+        title: 'Central Hub',
+        description: 'Sovereign Network Central Hub',
+        content: 'The central hub of the Sovereign Network. Access all services, governance, and community resources.',
       },
       'dao://governance': {
         title: 'DAO Governance Portal',
@@ -961,7 +966,7 @@ export const en = {
       'web4://chat.sovereign': {
         title: 'Decentralized Chat',
         description: 'Private Messaging Protocol',
-        content: 'Send encrypted messages across the ZHTP network. End-to-end encrypted with zero-knowledge proofs.',
+        content: 'Send encrypted messages across the SOV network. End-to-end encrypted with zero-knowledge proofs.',
       },
     },
     suggestedSitesList: {

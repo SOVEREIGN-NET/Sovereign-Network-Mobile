@@ -7,7 +7,7 @@ import React, { createContext, useEffect, useState, useMemo } from 'react';
 import { ZhtpApi } from '@sovereign-net/api-client';
 import { ReactNativeConfigProvider } from '@sovereign-net/api-client/react-native';
 import { createQuicFetchAdapterSync } from '../services/QuicFetchAdapter';
-import { DEFAULT_ZHTP_NODE_URL, DEFAULT_NETWORK_TYPE, QUIC_CONFIG, APP_DEFAULTS } from '../config';
+import { DEFAULT_SOV_NODE_URL, DEFAULT_NETWORK_TYPE, QUIC_CONFIG, APP_DEFAULTS } from '../config';
 
 export interface ApiContextType {
   api: ZhtpApi | null;
@@ -37,9 +37,11 @@ interface ConfigProvider {
 class PriorityConfigProvider implements ConfigProvider {
   private readonly innerProvider: ReactNativeConfigProvider;
   private readonly envVars: Record<string, any>;
+  private readonly asyncStorage: any;
 
   constructor(envVars: Record<string, any>, asyncStorage?: any) {
     this.envVars = envVars;
+    this.asyncStorage = asyncStorage;
     this.innerProvider = new ReactNativeConfigProvider(envVars, asyncStorage);
   }
 
@@ -47,20 +49,27 @@ class PriorityConfigProvider implements ConfigProvider {
     // Get config from inner provider (which may be cached)
     const config = await this.innerProvider.getConfig();
 
+    // Force node URL from env/defaults to avoid stale cached localhost values
+    // Check both ZHTP_NODE_URL (library key) and SOV_NODE_URL (our key) for compatibility
+    const resolvedNodeUrl = this.envVars.ZHTP_NODE_URL || this.envVars.SOV_NODE_URL || DEFAULT_SOV_NODE_URL;
+
     // Override with explicitly provided envVars to ensure they take precedence
     const result = {
       ...config,
-      zhtpNodeUrl: this.envVars.ZHTP_NODE_URL ?? config.zhtpNodeUrl,
+      zhtpNodeUrl: resolvedNodeUrl,
       networkType: (this.envVars.NETWORK_TYPE as 'testnet' | 'mainnet') ?? config.networkType,
       debugMode: this.envVars.DEBUG_MODE ?? config.debugMode,
       enableBiometrics: this.envVars.ENABLE_BIOMETRICS ?? config.enableBiometrics,
     };
 
-    console.log('PriorityConfigProvider.getConfig():', {
-      envVarsUrl: this.envVars.ZHTP_NODE_URL,
-      cachedUrl: config.zhtpNodeUrl,
-      finalUrl: result.zhtpNodeUrl,
-    });
+    if (__DEV__) {
+      console.log('[PriorityConfigProvider] getConfig():', {
+        envVarsZhtp: this.envVars.ZHTP_NODE_URL,
+        envVarsSov: this.envVars.SOV_NODE_URL,
+        innerProviderUrl: config.zhtpNodeUrl,
+        resolvedUrl: result.zhtpNodeUrl,
+      });
+    }
 
     return result;
   }
@@ -86,7 +95,7 @@ interface ApiProviderProps {
  */
 export const ApiProvider: React.FC<ApiProviderProps> = ({
   children,
-  zhtpNodeUrl = DEFAULT_ZHTP_NODE_URL,
+  zhtpNodeUrl = DEFAULT_SOV_NODE_URL,
   networkType = DEFAULT_NETWORK_TYPE,
 }) => {
   const [api, setApi] = useState<ZhtpApi | null>(null);
@@ -96,12 +105,18 @@ export const ApiProvider: React.FC<ApiProviderProps> = ({
   useEffect(() => {
     const initializeApi = async () => {
       try {
-        const configProvider = new PriorityConfigProvider({
-          ZHTP_NODE_URL: zhtpNodeUrl,
-          NETWORK_TYPE: networkType,
-          DEBUG_MODE: __DEV__,
-          ENABLE_BIOMETRICS: true,
-        });
+        const configProvider = new PriorityConfigProvider(
+          {
+            ZHTP_NODE_URL: zhtpNodeUrl, // Key must match api-client's expected envVar name
+            SOV_NODE_URL: zhtpNodeUrl,  // Keep for PriorityConfigProvider fallback
+            NETWORK_TYPE: networkType,
+            DEBUG_MODE: __DEV__,
+            ENABLE_BIOMETRICS: true,
+          },
+          // Pass AsyncStorage so the provider honors the supplied SOV_NODE_URL
+          // instead of any stale cached value
+          undefined
+        );
 
         // Create QUIC fetch adapter for native QUIC transport
         const quicFetchAdapter = createQuicFetchAdapterSync({

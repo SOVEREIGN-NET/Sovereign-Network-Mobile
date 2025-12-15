@@ -19,6 +19,7 @@ class MainApplication : Application(), ReactApplication {
           add(NativeStoragePackage())
           add(NativeSettingsPackage())
           add(NativeQuicPackage())
+          add(Web4Package())
         },
     )
   }

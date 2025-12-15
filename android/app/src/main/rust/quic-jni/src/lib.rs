@@ -3,7 +3,7 @@
 //! This library provides QUIC connectivity with support for self-signed certificates
 //! by disabling X.509 validation (appropriate for development/testing with self-signed certs)
 
-use jni::objects::{JClass, JObject, JString, JValue};
+use jni::objects::{JByteArray, JClass, JObject, JString, JValue};
 use jni::sys::{jboolean, jint, jobject, JNI_FALSE, JNI_TRUE};
 use jni::JNIEnv;
 use std::collections::HashMap;
@@ -13,7 +13,7 @@ use tokio::runtime::Runtime;
 use tokio::sync::Mutex;
 
 mod quic_client;
-use quic_client::{QuicClient, QuicResponse};
+use quic_client::{QuicBytesResponse, QuicClient, QuicResponse};
 
 // Global state for the QUIC client
 static mut RUNTIME: Option<Runtime> = None;
@@ -200,6 +200,81 @@ pub extern "system" fn Java_com_sovereignnetworkmobile_NativeQuicBridge_nativeRe
     create_response_map(&mut env, result)
 }
 
+/// Make an HTTP request over QUIC returning raw bytes
+#[no_mangle]
+pub extern "system" fn Java_com_sovereignnetworkmobile_NativeQuicBridge_nativeRequestBytes<'local>(
+    mut env: JNIEnv<'local>,
+    _class: JClass<'local>,
+    url: JString<'local>,
+    method: JString<'local>,
+    headers_json: JString<'local>,
+    body: JByteArray<'local>,
+    timeout_secs: jint,
+    insecure: jboolean,
+) -> jobject {
+    let url_str: String = match env.get_string(&url) {
+        Ok(s) => s.into(),
+        Err(e) => {
+            log::error!("Failed to get URL string: {}", e);
+            return std::ptr::null_mut();
+        }
+    };
+
+    let method_str: String = match env.get_string(&method) {
+        Ok(s) => s.into(),
+        Err(_) => "GET".to_string(),
+    };
+
+    let headers_str: String = match env.get_string(&headers_json) {
+        Ok(s) => s.into(),
+        Err(_) => "{}".to_string(),
+    };
+
+    let headers: HashMap<String, String> = serde_json::from_str(&headers_str).unwrap_or_default();
+
+    let body_vec: Option<Vec<u8>> = match env.convert_byte_array(&body) {
+        Ok(bytes) => {
+            if bytes.is_empty() {
+                None
+            } else {
+                Some(bytes)
+            }
+        }
+        Err(_) => None,
+    };
+
+    let insecure_bool = insecure == JNI_TRUE;
+
+    log::info!(
+        "QUIC bytes request: {} {} (insecure={})",
+        method_str,
+        url_str,
+        insecure_bool
+    );
+
+    let result = unsafe {
+        if let (Some(ref rt), Some(ref client)) = (&RUNTIME, &CLIENT) {
+            rt.block_on(async {
+                let client = client.lock().await;
+                client
+                    .request_bytes(
+                        &url_str,
+                        &method_str,
+                        headers,
+                        body_vec,
+                        Duration::from_secs(timeout_secs as u64),
+                        insecure_bool,
+                    )
+                    .await
+            })
+        } else {
+            Err("Runtime or client not initialized".into())
+        }
+    };
+
+    create_bytes_response_map(&mut env, result)
+}
+
 /// Cancel all active requests
 #[no_mangle]
 pub extern "system" fn Java_com_sovereignnetworkmobile_NativeQuicBridge_nativeCancelAll(
@@ -320,6 +395,53 @@ fn create_response_map<'local>(
             // Convert headers to JSON string
             let headers_json = serde_json::to_string(&response.headers).unwrap_or_default();
             put_string(env, &map, "headersJson", &headers_json);
+        }
+        Err(e) => {
+            put_int(env, &map, "status", 0);
+            put_boolean(env, &map, "ok", false);
+            put_string(env, &map, "error", &e.to_string());
+        }
+    }
+
+    map.into_raw()
+}
+
+/// Helper to create a HashMap result for HTTP response with raw bytes
+fn create_bytes_response_map<'local>(
+    env: &mut JNIEnv<'local>,
+    result: Result<QuicBytesResponse, Box<dyn std::error::Error + Send + Sync>>,
+) -> jobject {
+    let hash_map_class = match env.find_class("java/util/HashMap") {
+        Ok(c) => c,
+        Err(_) => return std::ptr::null_mut(),
+    };
+
+    let map = match env.new_object(&hash_map_class, "()V", &[]) {
+        Ok(m) => m,
+        Err(_) => return std::ptr::null_mut(),
+    };
+
+    match result {
+        Ok(response) => {
+            put_int(env, &map, "status", response.status as i32);
+            put_string(env, &map, "statusText", &response.status_text);
+            put_boolean(env, &map, "ok", response.ok);
+
+            // Convert headers to JSON string
+            let headers_json = serde_json::to_string(&response.headers).unwrap_or_default();
+            put_string(env, &map, "headersJson", &headers_json);
+
+            // Body as byte array
+            if let Ok(byte_array) = env.byte_array_from_slice(&response.body) {
+                if let Ok(key_str) = env.new_string("body") {
+                    let _ = env.call_method(
+                        &map,
+                        "put",
+                        "(Ljava/lang/Object;Ljava/lang/Object;)Ljava/lang/Object;",
+                        &[JValue::Object(&key_str.into()), JValue::Object(&byte_array.into())],
+                    );
+                }
+            }
         }
         Err(e) => {
             put_int(env, &map, "status", 0);

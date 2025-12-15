@@ -108,7 +108,7 @@ const StakeTokensScreen = ({ navigation }: any) => {
     setTimeout(() => {
       Alert.alert(
         t.stakeTokens.success.title,
-        `${unstakeAmount} ZHTP will be unstaked. 7-day unlock period applies.`,
+        `${unstakeAmount} SOV will be unstaked. 7-day unlock period applies.`,
         [
           {
             text: 'OK',
@@ -127,14 +127,14 @@ const StakeTokensScreen = ({ navigation }: any) => {
   return (
     <ScreenLayout>
       <Column gap="lg">
-          <Text variant="h1">{t.stakeTokens.title.replace('{currency}', 'ZHTP')}</Text>
+          <Text variant="h1">{t.stakeTokens.title.replace('{currency}', 'SOV')}</Text>
 
           {/* Current Staking Status */}
           <Card>
             <Column gap="md">
-              <DetailRow label={t.stakeTokens.currentStake} value={`${currentStake} ZHTP`} />
-              <DetailRow label={t.stakeTokens.stakingRewards} value={`${stakingRewards} ZHTP`} />
-              <DetailRow label={t.stakeTokens.availableBalance} value={`${availableBalance} ZHTP`} />
+              <DetailRow label={t.stakeTokens.currentStake} value={`${currentStake} SOV`} />
+              <DetailRow label={t.stakeTokens.stakingRewards} value={`${stakingRewards} SOV`} />
+              <DetailRow label={t.stakeTokens.availableBalance} value={`${availableBalance} SOV`} />
               <DetailRow label={t.stakeTokens.apyRate} value={`${currentAPY}%`} />
             </Column>
           </Card>
@@ -220,7 +220,7 @@ const StakeTokensScreen = ({ navigation }: any) => {
                         color: colors.success,
                       }}
                     >
-                      {stakeAmount ? (Number(stakeAmount) * (currentAPY / 100)).toFixed(2) : '0'} ZHTP
+                      {stakeAmount ? (Number(stakeAmount) * (currentAPY / 100)).toFixed(2) : '0'} SOV
                     </Text>
                   </Column>
                 </Card>

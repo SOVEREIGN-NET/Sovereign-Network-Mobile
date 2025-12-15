@@ -1,6 +1,6 @@
 /**
  * useNodeConnection Hook
- * Custom hook for detecting ZHTP node connectivity and protocol info
+ * Custom hook for detecting SOV node connectivity and protocol info
  */
 
 import { useState, useCallback, useEffect } from 'react';
@@ -50,7 +50,7 @@ export interface UseNodeConnectionReturn extends UseNodeConnectionState {
 }
 
 /**
- * Hook to check ZHTP node connectivity
+ * Hook to check SOV node connectivity
  * Automatically checks on mount, provides manual refresh methods
  *
  * @param autoCheck - Whether to automatically check connection on mount (default: true)
@@ -147,7 +147,7 @@ export function useNodeConnection(
   }, [t]);
 
   /**
-   * Update ZHTP node URL dynamically
+   * Update SOV node URL dynamically
    * Persists to AsyncStorage for app restart
    */
   const updateNodeUrl = useCallback(async (url: string) => {

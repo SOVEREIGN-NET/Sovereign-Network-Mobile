@@ -10,13 +10,23 @@ use std::sync::Arc;
 use std::time::{Duration, Instant};
 use tokio::net::UdpSocket;
 
-/// Response from a QUIC HTTP request
+/// Response from a QUIC HTTP request (UTF-8 body)
 #[derive(Debug)]
 pub struct QuicResponse {
     pub status: u16,
     pub status_text: String,
     pub headers: HashMap<String, String>,
     pub body: String,
+    pub ok: bool,
+}
+
+/// Response with raw bytes (no UTF-8 assumption)
+#[derive(Debug)]
+pub struct QuicBytesResponse {
+    pub status: u16,
+    pub status_text: String,
+    pub headers: HashMap<String, String>,
+    pub body: Vec<u8>,
     pub ok: bool,
 }
 
@@ -59,7 +69,7 @@ impl QuicClient {
         Ok((true, latency_ms, "QUIC".to_string()))
     }
 
-    /// Make an HTTP-like request over QUIC
+    /// Make an HTTP-like request over QUIC (string body)
     pub async fn request(
         &self,
         url: &str,
@@ -129,6 +139,85 @@ impl QuicClient {
         // Parse HTTP response
         let response_str = String::from_utf8_lossy(&response_data);
         let response = parse_http_response(&response_str)?;
+
+        // Close connection
+        connection.close(0u32.into(), b"done");
+        endpoint.wait_idle().await;
+
+        Ok(response)
+    }
+
+    /// Make an HTTP-like request over QUIC returning raw bytes
+    pub async fn request_bytes(
+        &self,
+        url: &str,
+        method: &str,
+        headers: HashMap<String, String>,
+        body: Option<Vec<u8>>,
+        timeout: Duration,
+        insecure: bool,
+    ) -> Result<QuicBytesResponse, Box<dyn std::error::Error + Send + Sync>> {
+        let (host, port, path) = parse_quic_url(url)?;
+        let addr: SocketAddr = format!("{}:{}", host, port).parse()?;
+
+        log::info!("QUIC request (bytes): {} {} to {}", method, path, addr);
+
+        // Create endpoint
+        let client_config = if insecure {
+            create_insecure_client_config()?
+        } else {
+            create_default_client_config()?
+        };
+
+        let mut endpoint = Endpoint::client("0.0.0.0:0".parse()?)?;
+        endpoint.set_default_client_config(client_config);
+
+        // Connect with timeout
+        let connection = tokio::time::timeout(timeout, endpoint.connect(addr, &host)?.into_future())
+            .await
+            .map_err(|_| "Connection timeout")??;
+
+        log::info!("QUIC connection established, opening stream...");
+
+        // Open bidirectional stream
+        let (mut send, mut recv) = connection.open_bi().await?;
+
+        // Build HTTP/1.1 request
+        let mut request = format!("{} {} HTTP/1.1\r\n", method, path);
+        request.push_str(&format!("Host: {}:{}\r\n", host, port));
+        request.push_str("Connection: close\r\n");
+        request.push_str("User-Agent: SovereignNetwork-Android/1.0 QUIC-Quinn\r\n");
+
+        for (key, value) in &headers {
+            request.push_str(&format!("{}: {}\r\n", key, value));
+        }
+
+        if let Some(ref body_content) = body {
+            request.push_str(&format!("Content-Length: {}\r\n", body_content.len()));
+            request.push_str("Content-Type: application/octet-stream\r\n");
+            request.push_str("\r\n");
+        } else {
+            request.push_str("\r\n");
+        }
+
+        log::debug!("Sending request headers (bytes)...");
+
+        // Send request headers and optional body
+        send.write_all(request.as_bytes()).await?;
+        if let Some(body_bytes) = body {
+            send.write_all(&body_bytes).await?;
+        }
+        send.finish()?;
+
+        log::info!("Request sent, waiting for response (bytes)...");
+
+        // Receive response
+        let response_data = recv.read_to_end(1024 * 1024 * 16).await?; // 16MB max for blobs
+
+        log::info!("Received {} bytes", response_data.len());
+
+        // Parse HTTP response
+        let response = parse_http_response_bytes(&response_data)?;
 
         // Close connection
         connection.close(0u32.into(), b"done");
@@ -228,11 +317,10 @@ fn create_insecure_client_config() -> Result<ClientConfig> {
         .with_custom_certificate_verifier(Arc::new(InsecureVerifier))
         .with_no_client_auth();
 
-    // Set ALPN protocols
+    // Set ALPN protocols - use zhtp-public/1 for public content endpoints
     let mut crypto_config = crypto_config;
     crypto_config.alpn_protocols = vec![
-        b"zhtp/1.0".to_vec(),
-        b"h3".to_vec(),
+        b"zhtp-public/1".to_vec(),
     ];
 
     // Create Quinn client config from rustls config
@@ -257,10 +345,10 @@ fn create_default_client_config() -> Result<ClientConfig> {
         .with_root_certificates(roots)
         .with_no_client_auth();
 
+    // Set ALPN protocols - use zhtp-public/1 for public content endpoints
     let mut crypto_config = crypto_config;
     crypto_config.alpn_protocols = vec![
-        b"zhtp/1.0".to_vec(),
-        b"h3".to_vec(),
+        b"zhtp-public/1".to_vec(),
     ];
 
     let mut client_config = ClientConfig::new(Arc::new(
@@ -319,6 +407,48 @@ fn parse_http_response(response: &str) -> Result<QuicResponse> {
     let ok = status >= 200 && status < 300;
 
     Ok(QuicResponse {
+        status,
+        status_text,
+        headers,
+        body,
+        ok,
+    })
+}
+
+/// Parse HTTP response into QuicBytesResponse without assuming UTF-8
+fn parse_http_response_bytes(data: &[u8]) -> Result<QuicBytesResponse> {
+    // Find header/body split
+    let separator = b"\r\n\r\n";
+    let mut headers_end = None;
+    for i in 0..data.len().saturating_sub(3) {
+        if &data[i..i + 4] == separator {
+            headers_end = Some(i);
+            break;
+        }
+    }
+
+    let headers_end = headers_end.context("No headers in response")?;
+    let header_bytes = &data[..headers_end];
+    let body = data[headers_end + 4..].to_vec();
+
+    let header_str = String::from_utf8_lossy(header_bytes);
+    let header_lines: Vec<&str> = header_str.lines().collect();
+    let status_line = header_lines.first().context("No status line")?;
+
+    let status_parts: Vec<&str> = status_line.splitn(3, ' ').collect();
+    let status: u16 = status_parts.get(1).unwrap_or(&"0").parse().unwrap_or(0);
+    let status_text = status_parts.get(2).unwrap_or(&"").to_string();
+
+    let mut headers = HashMap::new();
+    for line in header_lines.iter().skip(1) {
+        if let Some((key, value)) = line.split_once(':') {
+            headers.insert(key.trim().to_string(), value.trim().to_string());
+        }
+    }
+
+    let ok = status >= 200 && status < 300;
+
+    Ok(QuicBytesResponse {
         status,
         status_text,
         headers,
