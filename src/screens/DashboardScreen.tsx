@@ -1,5 +1,5 @@
 import React, { useMemo, useState } from 'react';
-import { View } from 'react-native';
+import { View, TextInput } from 'react-native';
 import {
   Badge,
   Button,
@@ -19,6 +19,7 @@ import SShieldLogo from '../components/atoms/Logo';
 const DashboardScreen: React.FC<any> = ({ navigation }) => {
   const { t } = useTranslation();
   const [drawerVisible, setDrawerVisible] = useState(false);
+  const [urlInput, setUrlInput] = useState('zhtp://centralhub.sov');
 
   const drawerItems: DrawerItem[] = useMemo(
     () => [
@@ -62,8 +63,8 @@ const DashboardScreen: React.FC<any> = ({ navigation }) => {
     [navigation],
   );
 
-  const openBrowser = () => {
-    navigation.navigate('Browser', { url: 'zhtp://centralhub.sov' });
+  const openBrowser = (url?: string) => {
+    navigation.navigate('Browser', { url: url || urlInput });
   };
 
   const { trendingDapps, trendingTokens, bounties } = t.dashboard;
@@ -78,21 +79,65 @@ const DashboardScreen: React.FC<any> = ({ navigation }) => {
           <SShieldLogo size={80} />
         </View>
 
-        <Card>
-          <Row justify="space-between" align="center">
-            <Column gap="xs">
-              <Text variant="h2" style={{ color: colors.text_primary }}>
-                Network Hub
-              </Text>
-              <Text variant="caption" style={{ color: colors.text_secondary }}>
-                zhtp://centralhub.sov
-              </Text>
-            </Column>
-            <Button size="md" variant="primary" onPress={openBrowser}>
-              Open
-            </Button>
-          </Row>
-        </Card>
+        {/* URL Bar */}
+        <View
+          style={{
+            flexDirection: 'row',
+            alignItems: 'center',
+            gap: spacing.xs,
+            height: 44,
+            marginBottom: spacing.md,
+          }}
+        >
+          <View
+            style={{
+              flex: 1,
+              flexDirection: 'row',
+              alignItems: 'center',
+              borderRadius: 12,
+              backgroundColor: colors.bg_dark,
+              borderWidth: 1,
+              borderColor: colors.border,
+              paddingHorizontal: spacing.sm,
+              height: 40,
+            }}
+          >
+            <TextInput
+              placeholder="zhtp://..."
+              placeholderTextColor={colors.text_placeholder}
+              value={urlInput}
+              onChangeText={setUrlInput}
+              onSubmitEditing={() => openBrowser()}
+              autoCapitalize="none"
+              autoCorrect={false}
+              keyboardType="url"
+              returnKeyType="go"
+              style={{
+                flex: 1,
+                color: colors.text_primary,
+                fontSize: 14,
+                paddingVertical: 0,
+                height: '100%',
+              }}
+            />
+          </View>
+          <Button
+            onPress={() => openBrowser()}
+            size="sm"
+            variant="primary"
+            style={{
+              width: 36,
+              height: 36,
+              paddingHorizontal: 0,
+              paddingVertical: 0,
+              justifyContent: 'center',
+              alignItems: 'center',
+              borderRadius: 18,
+            }}
+          >
+            <Text style={{ fontSize: 16, color: colors.text_primary }}>→</Text>
+          </Button>
+        </View>
 
         <Card>
           <Row justify="space-between" align="center" style={{ marginBottom: spacing.sm }}>

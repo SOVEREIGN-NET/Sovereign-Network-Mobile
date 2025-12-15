@@ -57,40 +57,98 @@ class Web4ReactWebView(context: Context) : WebView(context) {
     private fun injectFetchPolyfill() {
         val script = """
             (function() {
-                if (window.__zhtpFetchInstalled) return;
-                window.__zhtpFetchInstalled = true;
+                'use strict';
+                if (window.__web4Runtime) return;
+
+                // Web4 runtime context - explicit marker for Web4 environment
+                window.__web4Runtime = Object.freeze({
+                    version: '1.0',
+                    schemes: ['zhtp'],
+                    installed: Date.now()
+                });
+
                 const originalFetch = window.fetch;
-                window.fetch = function(input, init) {
-                    const url = (typeof input === 'string') ? input : input.url;
-                    if (url && url.startsWith('zhtp://')) {
-                        return new Promise((resolve, reject) => {
-                            const callbackId = 'cb_' + Math.random().toString(36).substr(2, 9);
-                            window[callbackId] = function(success, status, contentType, bodyBase64, error) {
-                                delete window[callbackId];
-                                if (success) {
+                if (typeof originalFetch !== 'function') {
+                    console.error('[Web4] Native fetch not available');
+                    return;
+                }
+
+                // Extract URL from various fetch input types
+                function extractUrl(input) {
+                    if (typeof input === 'string') return input;
+                    if (input instanceof URL) return input.href;
+                    if (input instanceof Request) return input.url;
+                    if (input && typeof input.url === 'string') return input.url;
+                    return null;
+                }
+
+                // Check if URL is a Web4 zhtp:// URL
+                function isZhtpUrl(url) {
+                    return typeof url === 'string' && url.startsWith('zhtp://');
+                }
+
+                // Dedicated Web4 fetch function - explicit API for zhtp:// requests
+                function web4FetchInternal(url) {
+                    if (!isZhtpUrl(url)) {
+                        return Promise.reject(new Error('web4Fetch only supports zhtp:// URLs'));
+                    }
+                    return new Promise((resolve, reject) => {
+                        const callbackId = '__web4_' + Math.random().toString(36).substr(2, 12);
+                        const timeoutId = setTimeout(() => {
+                            delete window[callbackId];
+                            reject(new Error('Web4 fetch timeout'));
+                        }, 30000);
+
+                        window[callbackId] = function(success, status, contentType, bodyBase64, error) {
+                            clearTimeout(timeoutId);
+                            delete window[callbackId];
+                            if (success) {
+                                try {
                                     const binary = atob(bodyBase64);
                                     const bytes = new Uint8Array(binary.length);
                                     for (let i = 0; i < binary.length; i++) {
                                         bytes[i] = binary.charCodeAt(i);
                                     }
-                                    const blob = new Blob([bytes], { type: contentType });
-                                    resolve(new Response(blob, { status: status, headers: { 'Content-Type': contentType } }));
-                                } else {
-                                    reject(new Error(error || 'Fetch failed'));
+                                    const blob = new Blob([bytes], { type: contentType || 'application/octet-stream' });
+                                    resolve(new Response(blob, {
+                                        status: status,
+                                        statusText: status === 200 ? 'OK' : 'Error',
+                                        headers: { 'Content-Type': contentType || 'application/octet-stream' }
+                                    }));
+                                } catch (e) {
+                                    reject(new Error('Failed to decode response: ' + e.message));
                                 }
-                            };
-                            ZhtpBridge.fetch(url, callbackId);
-                        });
+                            } else {
+                                reject(new Error(error || 'Web4 fetch failed'));
+                            }
+                        };
+                        ZhtpBridge.fetch(url, callbackId);
+                    });
+                }
+
+                // Expose explicit Web4 fetch API
+                window.web4Fetch = web4FetchInternal;
+
+                // Minimal fetch override - only intercepts zhtp://, preserves all other behavior
+                window.fetch = function(input, init) {
+                    const url = extractUrl(input);
+                    if (isZhtpUrl(url)) {
+                        return web4FetchInternal(url);
                     }
+                    // Pass through to original fetch unchanged for all non-zhtp URLs
                     return originalFetch.apply(this, arguments);
                 };
-                console.log('[Web4] Fetch polyfill installed');
+
+                console.log('[Web4] Runtime initialized (v1.0)');
             })();
         """.trimIndent()
         evaluateJavascript(script, null)
     }
 
     inner class ZhtpFetchBridge {
+        // Max size for fetch polyfill (1MB) - larger files should use streaming
+        private val maxFetchSize = 1024 * 1024L
+
         @JavascriptInterface
         fun fetch(url: String, callbackId: String) {
             fetchExecutor.execute {
@@ -103,8 +161,21 @@ class Web4ReactWebView(context: Context) : WebView(context) {
                     val resolved = currentRuntime.resolveFile(currentDomain, path)
                         ?: throw Exception("Not found: $path")
 
-                    val bytes = resolved.file.readBytes()
-                    val base64 = Base64.encodeToString(bytes, Base64.NO_WRAP)
+                    val fileSize = resolved.file.length()
+                    if (fileSize > maxFetchSize) {
+                        throw Exception("File too large for fetch ($fileSize bytes). Max: $maxFetchSize")
+                    }
+
+                    // Stream file in chunks to avoid loading all into memory at once
+                    val base64 = FileInputStream(resolved.file).use { input ->
+                        val buffer = ByteArray(minOf(fileSize.toInt(), 8192))
+                        val output = StringBuilder()
+                        var bytesRead: Int
+                        while (input.read(buffer).also { bytesRead = it } != -1) {
+                            output.append(Base64.encodeToString(buffer, 0, bytesRead, Base64.NO_WRAP))
+                        }
+                        output.toString()
+                    }
 
                     post {
                         evaluateJavascript("window['$callbackId'](true, 200, '${resolved.mime}', '$base64', null)", null)
@@ -199,8 +270,94 @@ class Web4ReactWebView(context: Context) : WebView(context) {
     }
 
     private fun errorResponse(message: String, code: Int): WebResourceResponse {
-        return WebResourceResponse("text/plain", "utf-8", null).apply {
-            setStatusCodeAndReasonPhrase(code, message)
+        val title = when (code) {
+            404 -> "Not Found"
+            403 -> "Blocked"
+            else -> "Error"
         }
+        val description = when (code) {
+            404 -> "The requested page could not be found on this domain."
+            403 -> "This request has been blocked by the Web4 runtime."
+            else -> "Something went wrong while loading this page."
+        }
+        val html = errorPageHtml(code, title, description, message)
+        return WebResourceResponse("text/html", "utf-8", html.byteInputStream()).apply {
+            setStatusCodeAndReasonPhrase(code, title)
+        }
+    }
+
+    private fun errorPageHtml(code: Int, title: String, message: String, url: String): String {
+        return """
+            <!DOCTYPE html>
+            <html>
+            <head>
+              <meta charset="utf-8">
+              <meta name="viewport" content="width=device-width, initial-scale=1">
+              <title>$title</title>
+              <style>
+                * { margin: 0; padding: 0; box-sizing: border-box; }
+                body {
+                  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+                  background: #1a1a1a;
+                  color: #fff;
+                  min-height: 100vh;
+                  display: flex;
+                  align-items: center;
+                  justify-content: center;
+                  padding: 20px;
+                }
+                .container {
+                  text-align: center;
+                  max-width: 400px;
+                }
+                .code {
+                  font-size: 72px;
+                  font-weight: 700;
+                  color: #00d4ff;
+                  line-height: 1;
+                  margin-bottom: 16px;
+                }
+                .title {
+                  font-size: 24px;
+                  font-weight: 600;
+                  margin-bottom: 12px;
+                }
+                .message {
+                  color: #888;
+                  font-size: 14px;
+                  line-height: 1.5;
+                  margin-bottom: 24px;
+                }
+                .url {
+                  background: #2a2a2a;
+                  border-radius: 8px;
+                  padding: 12px 16px;
+                  font-family: monospace;
+                  font-size: 12px;
+                  color: #666;
+                  word-break: break-all;
+                }
+                .logo {
+                  width: 48px;
+                  height: 48px;
+                  margin: 0 auto 24px;
+                  opacity: 0.5;
+                }
+              </style>
+            </head>
+            <body>
+              <div class="container">
+                <svg class="logo" viewBox="0 0 100 100" fill="none" xmlns="http://www.w3.org/2000/svg">
+                  <path d="M50 5L90 25V75L50 95L10 75V25L50 5Z" stroke="#00d4ff" stroke-width="2" fill="none"/>
+                  <path d="M50 20L75 35V65L50 80L25 65V35L50 20Z" stroke="#00d4ff" stroke-width="2" fill="none"/>
+                </svg>
+                <div class="code">$code</div>
+                <div class="title">$title</div>
+                <div class="message">$message</div>
+                <div class="url">$url</div>
+              </div>
+            </body>
+            </html>
+        """.trimIndent()
     }
 }

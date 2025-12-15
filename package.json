@@ -1,6 +1,6 @@
 {
   "name": "SovereignNetworkMobile",
-  "version": "0.0.1",
+  "version": "0.0.2",
   "private": true,
   "scripts": {
     "android": "react-native run-android",
@@ -19,6 +19,7 @@
     "@react-native-clipboard/clipboard": "^1.16.3",
     "@react-native-firebase/analytics": "^23.5.0",
     "@react-native-firebase/app": "^23.5.0",
+    "@react-native-firebase/app-distribution": "^23.5.0",
     "@react-native-firebase/crashlytics": "^23.5.0",
     "@react-native-masked-view/masked-view": "^0.3.2",
     "@react-navigation/bottom-tabs": "^7.6.0",

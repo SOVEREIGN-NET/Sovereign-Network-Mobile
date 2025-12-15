@@ -22,7 +22,7 @@ export interface HeaderBarProps {
 
 const HeaderBar: React.FC<HeaderBarProps> = ({
   onMenuPress,
-  sovAddress = 'zhtp://centralhub.sov',
+  sovAddress = 'SOV',
   isConnected: isConnectedProp,
   onConnectionStatusChange,
 }) => {

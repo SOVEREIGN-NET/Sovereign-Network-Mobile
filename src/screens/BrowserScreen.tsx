@@ -1,8 +1,7 @@
 import React, { useState, useMemo, useEffect, useCallback } from 'react';
-import { View, ActivityIndicator } from 'react-native';
+import { View, ActivityIndicator, TextInput } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { Card, Text, Button, Column, Row, ScreenLayout, FormField, Web4View, isWeb4ViewAvailable } from '../components';
-import { Input } from '../components/atoms';
+import { Card, Text, Button, Column, ScreenLayout, FormField, Web4View, isWeb4ViewAvailable } from '../components';
 import { useTranslation } from '../i18n';
 import { colors, spacing } from '../theme';
 import { DEFAULT_NODE_HOST, DEFAULT_NODE_PORT } from '../config';
@@ -75,53 +74,101 @@ const BrowserScreen = ({ route, navigation }: any) => {
 
   const renderZhtp = () => (
       <View style={{ flex: 1, backgroundColor: colors.bg_darkest }}>
-        <View style={{ paddingHorizontal: spacing.xs, paddingTop: spacing.sm, paddingBottom: spacing.xs, backgroundColor: colors.bg_darkest }}>
-        <Row justify="space-between" align="center" style={{ marginBottom: spacing.xs }}>
-          <Button size="sm" variant="secondary" onPress={() => navigation.goBack()}>
-            Close
-          </Button>
-          <Text variant="caption" style={{ color: colors.text_secondary }}>
-            {t.browser.connectionStatus}
-          </Text>
-        </Row>
+        <View style={{ paddingHorizontal: spacing.sm, paddingTop: spacing.sm, paddingBottom: spacing.xs, backgroundColor: colors.bg_darkest }}>
         <View
           style={{
             flexDirection: 'row',
             alignItems: 'center',
-            borderRadius: 12,
-            backgroundColor: colors.bg_card,
-            borderWidth: 1,
-            borderColor: colors.border,
-            paddingHorizontal: spacing.xs,
+            gap: spacing.xs,
             height: 44,
           }}
         >
+          {/* Close button */}
           <Button
-            onPress={() => handleNavigate(urlInput)}
+            onPress={() => navigation.goBack()}
             size="sm"
             variant="secondary"
-            style={{ paddingHorizontal: spacing.xs, paddingVertical: 6, height: '100%', width: 40, justifyContent: 'center' }}
+            style={{
+              width: 36,
+              height: 36,
+              paddingHorizontal: 0,
+              paddingVertical: 0,
+              justifyContent: 'center',
+              alignItems: 'center',
+              borderRadius: 18,
+            }}
           >
-            ↻
+            <Text style={{ fontSize: 18, color: colors.text_secondary }}>✕</Text>
           </Button>
-          <View style={{ flex: 1, marginHorizontal: spacing.sm, justifyContent: 'center', height: '100%' }}>
-            <Input
+
+          {/* URL bar with reload inside */}
+          <View
+            style={{
+              flex: 1,
+              flexDirection: 'row',
+              alignItems: 'center',
+              borderRadius: 12,
+              backgroundColor: colors.bg_dark,
+              borderWidth: 1,
+              borderColor: colors.border,
+              paddingLeft: spacing.sm,
+              paddingRight: spacing.xs,
+              height: 40,
+            }}
+          >
+            <TextInput
               placeholder={t.browser.urlPlaceholder}
+              placeholderTextColor={colors.text_placeholder}
               value={urlInput}
               onChangeText={setUrlInput}
               onSubmitEditing={() => handleNavigate()}
-              containerStyle={{ marginBottom: 0, height: '100%' }}
-              style={{ height: '100%', paddingVertical: 10 }}
-              textInputStyle={{ paddingVertical: 2 }}
+              autoCapitalize="none"
+              autoCorrect={false}
+              keyboardType="url"
+              returnKeyType="go"
+              style={{
+                flex: 1,
+                color: colors.text_primary,
+                fontSize: 14,
+                paddingVertical: 0,
+                height: '100%',
+              }}
             />
+            {/* Reload inside URL bar */}
+            <Button
+              onPress={() => handleNavigate(urlInput)}
+              size="sm"
+              variant="secondary"
+              style={{
+                width: 32,
+                height: 32,
+                paddingHorizontal: 0,
+                paddingVertical: 0,
+                justifyContent: 'center',
+                alignItems: 'center',
+                backgroundColor: 'transparent',
+              }}
+            >
+              <Text style={{ fontSize: 16, color: webLoading ? colors.text_tertiary : colors.text_secondary }}>↻</Text>
+            </Button>
           </View>
+
+          {/* Go button */}
           <Button
             onPress={() => handleNavigate()}
             size="sm"
-            variant="secondary"
-            style={{ paddingHorizontal: spacing.xs, paddingVertical: 6, height: '100%', width: 40, justifyContent: 'center' }}
+            variant="primary"
+            style={{
+              width: 36,
+              height: 36,
+              paddingHorizontal: 0,
+              paddingVertical: 0,
+              justifyContent: 'center',
+              alignItems: 'center',
+              borderRadius: 18,
+            }}
           >
-            →
+            <Text style={{ fontSize: 16, color: colors.text_primary }}>→</Text>
           </Button>
         </View>
       </View>
