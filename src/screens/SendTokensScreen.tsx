@@ -224,16 +224,14 @@ const SendTokensScreen = ({ navigation }: any) => {
           <ActionFooter
             actions={[
               {
-                label: isLoading ? t.sendTokens.buttonLoading : t.sendTokens.button,
-                onPress: handleSend,
-                disabled: !recipient || !amount || isLoading || Object.keys(errors).length > 0,
-                loading: isLoading,
+                label: 'Coming Soon',
+                onPress: () => {},
+                disabled: true,
               },
               {
                 label: t.sendTokens.cancel,
                 onPress: () => navigation.goBack(),
                 variant: 'secondary',
-                disabled: isLoading,
               },
             ]}
           />

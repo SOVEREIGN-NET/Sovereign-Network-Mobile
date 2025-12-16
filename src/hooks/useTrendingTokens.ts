@@ -22,7 +22,7 @@ interface TokenConfig {
 
 const TOKEN_CONFIGS: TokenConfig[] = [
   { symbol: 'SOV', name: 'Sovereign Network Token', basePrice: 2.34, volatility: 0.03, trendBias: 0.6 },
-  { symbol: 'CBE', name: 'Carbon Credit Token', basePrice: 5.67, volatility: 0.025, trendBias: 0.4 },
+  { symbol: 'CBE', name: 'Central Blockchain Entertainment', basePrice: 5.67, volatility: 0.025, trendBias: 0.4 },
   { symbol: 'ZDEFI', name: 'DeFi Protocol Token', basePrice: 1.89, volatility: 0.04, trendBias: -0.2 },
   { symbol: 'ZNFT', name: 'NFT Marketplace Token', basePrice: 3.12, volatility: 0.035, trendBias: 0.3 },
 ];
