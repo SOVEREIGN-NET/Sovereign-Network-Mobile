@@ -13,10 +13,12 @@ interface RewardCounterConfig {
 }
 
 const DEFAULT_CONFIG: RewardCounterConfig = {
-  targetAmount: 0.50,        // Onboarding faucet amount
-  durationMs: 300000,        // 5 minutes to reach full amount
-  tickIntervalMs: 3000,      // Update every 3 seconds - very slow drip
+  targetAmount: 5000,        // Target amount to reach
+  durationMs: 600000,        // 10 minutes to add the increment
+  tickIntervalMs: 4000,      // Update every 4 seconds - very slow drip
 };
+
+const START_BALANCE = 3420;  // Start with ~3.4k SOV
 
 /**
  * Simulates slowly accumulating SOV tokens as routing rewards
@@ -25,7 +27,7 @@ const DEFAULT_CONFIG: RewardCounterConfig = {
 export const useRewardCounter = (config: Partial<RewardCounterConfig> = {}): RewardCounterData => {
   const { targetAmount, durationMs, tickIntervalMs } = { ...DEFAULT_CONFIG, ...config };
 
-  const [balance, setBalance] = useState(0);
+  const [balance, setBalance] = useState(START_BALANCE);
   const [isAccumulating, setIsAccumulating] = useState(true);
   const startTimeRef = useRef(Date.now());
 
@@ -59,8 +61,8 @@ export const useRewardCounter = (config: Partial<RewardCounterConfig> = {}): Rew
     return () => clearInterval(interval);
   }, [isAccumulating, baseIncrement, targetAmount, durationMs, tickIntervalMs]);
 
-  // Format balance for display (2 decimal places)
-  const displayBalance = balance.toFixed(2);
+  // Format balance for display (whole number with commas)
+  const displayBalance = Math.floor(balance).toLocaleString();
 
   return {
     balance,

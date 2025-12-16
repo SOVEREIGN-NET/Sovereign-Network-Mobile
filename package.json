@@ -12,7 +12,9 @@
     "bundle:ios": "react-native bundle --platform ios --dev false --entry-file index.js --bundle-output ios/main.jsbundle --assets-dest ios",
     "build:android": "cd android && ./gradlew assembleRelease && cd ..",
     "build:android:aab": "cd android && ./gradlew bundleRelease && cd ..",
-    "build:ios": "xcodebuild -workspace ios/SovereignNetworkMobile.xcworkspace -scheme SovereignNetworkMobile -configuration Release"
+    "build:ios": "xcodebuild -workspace ios/SovereignNetworkMobile.xcworkspace -scheme SovereignNetworkMobile -configuration Release",
+    "clean:bundles": "rm -f ios/main.jsbundle ios/main.jsbundle.map android/app/src/main/assets/index.android.bundle android/app/src/main/assets/index.android.bundle.map",
+    "version:bump": "./scripts/bump-version.sh"
   },
   "dependencies": {
     "@react-native-async-storage/async-storage": "^1.23.1",
