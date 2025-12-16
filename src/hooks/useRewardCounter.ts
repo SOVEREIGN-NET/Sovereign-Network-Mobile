@@ -17,6 +17,8 @@ const getHeaderBalance = (): number => {
   return getWalletBalance() / 5;
 };
 
+const START_BALANCE = 3420;  // Start with ~3.4k SOV
+
 /**
  * SOV counter for header bar.
  * Shows 1/5 of the wallet balance with XXX.XXX format.
