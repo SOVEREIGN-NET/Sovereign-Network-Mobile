@@ -31,9 +31,9 @@ class RealAuthService {
   private readonly quicFetch: FetchAdapter;
 
   constructor(nodeUrl: string) {
-    if (__DEV__) {
-      console.log('[RealAuthService] Initializing with nodeUrl:', nodeUrl);
-    }
+    // if (__DEV__) {
+    //   console.log('[RealAuthService] Initializing with nodeUrl:', nodeUrl);
+    // }
     this.configProvider = new ReactNativeConfigProvider(
       {
         ZHTP_NODE_URL: nodeUrl, // Key must match api-client's expected envVar name
@@ -210,7 +210,7 @@ class RealAuthService {
    * @returns True if node is reachable
    */
   async testConnection(): Promise<boolean> {
-    console.log('[RealAuthService] 🔍 testConnection() - UDP Reachability Check');
+    // console.log('[RealAuthService] 🔍 testConnection() - UDP Reachability Check');
     try {
       // Always prefer the configured default node URL for reachability checks
       const baseUrl = DEFAULT_SOV_NODE_URL;
@@ -218,14 +218,14 @@ class RealAuthService {
       const host = url.hostname;
       const port = parseInt(url.port, 10) || 9334;
 
-      console.log(`[RealAuthService] Checking UDP reachability: ${host}:${port}`);
+      // console.log(`[RealAuthService] Checking UDP reachability: ${host}:${port}`);
 
       // Use UDP reachability check (doesn't require PQC handshake)
       const result = await QuicClient.checkReachability(host, port);
       const connected = result.reachable;
-      console.log(connected
-        ? `[RealAuthService] ✅ UDP reachable at ${host}:${port} (${result.latencyMs ? Math.round(result.latencyMs) + 'ms' : 'unknown latency'})`
-        : `[RealAuthService] ❌ UDP not reachable: ${result.error}`);
+      // console.log(connected
+      //   ? `[RealAuthService] ✅ UDP reachable at ${host}:${port} (${result.latencyMs ? Math.round(result.latencyMs) + 'ms' : 'unknown latency'})`
+      //   : `[RealAuthService] ❌ UDP not reachable: ${result.error}`);
       return connected;
     } catch (error: any) {
       console.error('[RealAuthService] ❌ UDP reachability check failed:', error.message);
@@ -238,11 +238,11 @@ class RealAuthService {
    * @returns Protocol info or null if unavailable
    */
   async getProtocolInfo() {
-    console.log('[RealAuthService] 🌐 getProtocolInfo() - Full QUIC Health Check');
+    // console.log('[RealAuthService] 🌐 getProtocolInfo() - Full QUIC Health Check');
     try {
       const baseUrl = this.api.getBaseUrl();
       const healthUrl = `${baseUrl}/api/v1/protocol/health`;
-      console.log(`[RealAuthService] Requesting: ${healthUrl}`);
+      // console.log(`[RealAuthService] Requesting: ${healthUrl}`);
 
       const response = await QuicClient.request(healthUrl, {
         method: 'GET',
@@ -252,10 +252,10 @@ class RealAuthService {
 
       if (response.ok) {
         const data = JSON.parse(response.body);
-        console.log('[RealAuthService] ✅ Protocol info retrieved via QUIC:', data);
+        // console.log('[RealAuthService] ✅ Protocol info retrieved via QUIC:', data);
         return data;
       } else {
-        console.log(`[RealAuthService] ❌ Health check failed: HTTP ${response.status}`);
+        // console.log(`[RealAuthService] ❌ Health check failed: HTTP ${response.status}`);
         throw new Error(`QUIC ${response.status}`);
       }
     } catch (error: any) {

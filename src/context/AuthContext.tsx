@@ -34,7 +34,7 @@ export function getUseMockService(): boolean {
  */
 export function setUseMockService(value: boolean): void {
   globalUseMockService = value;
-  console.log(`🔄 Auth data source changed to: ${value ? 'MOCK' : 'REAL'}`);
+  // console.log(`🔄 Auth data source changed to: ${value ? 'MOCK' : 'REAL'}`);
 }
 
 export interface AuthContextType {
@@ -79,7 +79,7 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
         const saved = await storage.getItem('zhtp_identity');
         if (saved) {
           const identity = JSON.parse(saved);
-          console.log('🔐 AuthContext: Restoring identity from storage:', identity.did);
+          // console.log('🔐 AuthContext: Restoring identity from storage:', identity.did);
           setCurrentIdentity(identity);
         }
       } catch (err) {
@@ -334,9 +334,9 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
    */
   const setIdentity = useCallback(async (identity: Identity) => {
     try {
-      console.log('🔐 AuthContext.setIdentity: Setting identity:', identity.did);
+      // console.log('🔐 AuthContext.setIdentity: Setting identity:', identity.did);
       await storage.setItem('zhtp_identity', JSON.stringify(identity));
-      console.log('✅ AuthContext: Identity saved to storage, calling setCurrentIdentity');
+      // console.log('✅ AuthContext: Identity saved to storage, calling setCurrentIdentity');
       setCurrentIdentity(identity);
     } catch (err: any) {
       const message = err.message || 'Failed to set identity';

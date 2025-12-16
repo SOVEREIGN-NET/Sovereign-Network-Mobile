@@ -12,6 +12,7 @@ import { colors, spacing, typography, shadows } from '../../../theme';
 import { useTranslation } from '../../../i18n';
 import QuicClient from '../../../services/QuicClient';
 import { DEFAULT_NODE_HOST, DEFAULT_NODE_PORT } from '../../../config';
+import { useRewardCounter } from '../../../hooks/useRewardCounter';
 
 export interface HeaderBarProps {
   onMenuPress: () => void;
@@ -22,12 +23,15 @@ export interface HeaderBarProps {
 
 const HeaderBar: React.FC<HeaderBarProps> = ({
   onMenuPress,
-  sovAddress = 'SOV',
+  sovAddress,
   isConnected: isConnectedProp,
   onConnectionStatusChange,
 }) => {
   const insets = useSafeAreaInsets();
   const { t } = useTranslation();
+
+  // SOV reward counter - slow drip
+  const { displayBalance } = useRewardCounter();
 
   // Connection state
   const [connectionStatus, setConnectionStatus] = useState<'checking' | 'connected' | 'disconnected'>('checking');
@@ -56,15 +60,15 @@ const HeaderBar: React.FC<HeaderBarProps> = ({
         setConnectionStatus('connected');
         setLatencyMs(result.latencyMs ? Math.round(result.latencyMs) : null);
         onConnectionStatusChange?.(true, result.latencyMs);
-        console.log(`Node reachable at ${DEFAULT_NODE_HOST}:${DEFAULT_NODE_PORT} (${result.latencyMs ? Math.round(result.latencyMs) + 'ms' : 'unknown latency'})`);
+        // console.log(`Node reachable at ${DEFAULT_NODE_HOST}:${DEFAULT_NODE_PORT} (${result.latencyMs ? Math.round(result.latencyMs) + 'ms' : 'unknown latency'})`);
       } else {
         setConnectionStatus('disconnected');
         setLatencyMs(null);
         onConnectionStatusChange?.(false);
-        console.log(`Node not reachable: ${result.error}`);
+        // console.log(`Node not reachable: ${result.error}`);
       }
     } catch (error) {
-      console.warn('Node reachability check failed:', error);
+      // console.warn('Node reachability check failed:', error);
       setConnectionStatus('disconnected');
       setLatencyMs(null);
       onConnectionStatusChange?.(false);
@@ -141,6 +145,11 @@ const HeaderBar: React.FC<HeaderBarProps> = ({
       color: colors.text_primary,
       textAlign: 'center',
     },
+    sovLabel: {
+      fontSize: typography.size.md,
+      fontWeight: typography.weight.medium,
+      color: colors.text_primary,
+    },
     statusIndicator: {
       width: 8,
       height: 8,
@@ -178,9 +187,9 @@ const HeaderBar: React.FC<HeaderBarProps> = ({
           </View>
         </Pressable>
 
-        {/* Center: Address */}
+        {/* Center: SOV Balance Counter */}
         <View style={[styles.centerSection, styles.centerJustify]}>
-          <Text style={styles.addressText}>{sovAddress}</Text>
+          <Text style={styles.sovLabel}>SOV {displayBalance}</Text>
         </View>
 
         {/* Right: Connection Status */}

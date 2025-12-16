@@ -47,9 +47,9 @@ const SIDScreen = ({ navigation }: any) => {
       }
 
       try {
-        console.log('📊 SID: Fetching wallet data for:', currentIdentity.did);
+        // console.log('📊 SID: Fetching wallet data for:', currentIdentity.did);
         const walletList = await api.getWalletList(currentIdentity.did);
-        console.log('💰 SID: Wallet list response:', walletList);
+        // console.log('💰 SID: Wallet list response:', walletList);
 
         // Transform API response to match expected format
         const wallets = (walletList.wallets || []).map((w: any) => ({
@@ -85,8 +85,8 @@ const SIDScreen = ({ navigation }: any) => {
           api.request(`/api/v1/ubi/history/${currentIdentity.did}`).catch(() => null),
         ]);
 
-        console.log('🌱 SID: UBI status:', statusResponse);
-        console.log('🌱 SID: UBI history:', historyResponse);
+        // console.log('🌱 SID: UBI status:', statusResponse);
+        // console.log('🌱 SID: UBI history:', historyResponse);
 
         // Calculate total earned from history
         const totalEarned = historyResponse?.claims?.reduce((sum: number, claim: any) => sum + (claim.amount || 0), 0) || 0;

@@ -33,3 +33,5 @@ export type { SwitchProps } from './Switch';
 
 export { SectionLabel } from './SectionLabel';
 export type { SectionLabelProps } from './SectionLabel';
+
+export { ActivityDot } from './ActivityDot';

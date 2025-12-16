@@ -119,11 +119,11 @@ export async function quicRequest(
   };
 
   // CRITICAL: Log ALPN being sent to native
-  console.log('[QuicClient] 🔑 ALPN being sent to native:', {
-    url,
-    alpn: requestOptions.alpn,
-    method: requestOptions.method,
-  });
+  // console.log('[QuicClient] 🔑 ALPN being sent to native:', {
+  //   url,
+  //   alpn: requestOptions.alpn,
+  //   method: requestOptions.method,
+  // });
 
   return await NativeQuic.request(url, requestOptions);
 }

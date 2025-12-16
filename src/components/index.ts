@@ -12,6 +12,7 @@ export {
   Checkbox,
   Switch,
   SectionLabel,
+  ActivityDot,
 } from './atoms';
 export type {
   CardProps,

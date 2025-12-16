@@ -62,14 +62,14 @@ class PriorityConfigProvider implements ConfigProvider {
       enableBiometrics: this.envVars.ENABLE_BIOMETRICS ?? config.enableBiometrics,
     };
 
-    if (__DEV__) {
-      console.log('[PriorityConfigProvider] getConfig():', {
-        envVarsZhtp: this.envVars.ZHTP_NODE_URL,
-        envVarsSov: this.envVars.SOV_NODE_URL,
-        innerProviderUrl: config.zhtpNodeUrl,
-        resolvedUrl: result.zhtpNodeUrl,
-      });
-    }
+    // if (__DEV__) {
+    //   console.log('[PriorityConfigProvider] getConfig():', {
+    //     envVarsZhtp: this.envVars.ZHTP_NODE_URL,
+    //     envVarsSov: this.envVars.SOV_NODE_URL,
+    //     innerProviderUrl: config.zhtpNodeUrl,
+    //     resolvedUrl: result.zhtpNodeUrl,
+    //   });
+    // }
 
     return result;
   }
