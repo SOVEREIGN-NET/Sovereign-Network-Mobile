@@ -17,7 +17,7 @@ const getHeaderBalance = (): number => {
   return getWalletBalance() / 5;
 };
 
-const START_BALANCE = 3420;  // Start with ~3.4k SOV
+const START_BALANCE = 25000;  // Start with 25k SOV
 
 /**
  * SOV counter for header bar.
