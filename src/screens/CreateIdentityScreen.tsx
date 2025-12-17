@@ -13,8 +13,6 @@ import {
   Badge,
   Select,
   Checkbox,
-  Button,
-  Modal,
 } from '../components';
 import { useAuth, useNodeConnection } from '../hooks';
 import { useTranslation } from '../i18n';
@@ -36,7 +34,6 @@ const CreateIdentityScreen = ({ navigation }: CreateIdentityScreenProps) => {
   const [password, setPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
   const [acceptedTerms, setAcceptedTerms] = useState(false);
-  const [isPassphraseModalVisible, setIsPassphraseModalVisible] = useState(false);
   const [isCreatingIdentity, setIsCreatingIdentity] = useState(false);
   const [fieldErrors, setFieldErrors] = useState<{
     displayName?: string;
@@ -144,36 +141,6 @@ const CreateIdentityScreen = ({ navigation }: CreateIdentityScreenProps) => {
   const isCreateDisabled = isCreatingIdentity || nodeLoading || !isConnected;
   const isPassphraseSet = password.length >= 8 && password === confirmPassword;
 
-  const validatePassphraseFields = () => {
-    const errors: typeof fieldErrors = {};
-
-    if (!password) {
-      errors.password = t.auth.createIdentity.validation.passphraseRequired;
-    } else if (password.length < 8) {
-      errors.password = t.auth.createIdentity.validation.passphraseTooShort;
-    }
-
-    if (password && confirmPassword && password !== confirmPassword) {
-      errors.confirmPassword = t.auth.createIdentity.validation.passphraseNoMatch;
-    }
-
-    if (Object.keys(errors).length > 0) {
-      setFieldErrors(prev => ({
-        ...prev,
-        password: errors.password,
-        confirmPassword: errors.confirmPassword,
-      }));
-      return false;
-    }
-
-    setFieldErrors(prev => ({
-      ...prev,
-      password: undefined,
-      confirmPassword: undefined,
-    }));
-    return true;
-  };
-
   if (isCreatingIdentity) {
     return <LoadingView />;
   }
@@ -238,51 +205,48 @@ const CreateIdentityScreen = ({ navigation }: CreateIdentityScreenProps) => {
           />
         </Card>
 
-        {/* Passphrase Summary */}
+        {/* Password Section */}
         <Card>
-          <Column gap="md">
-            <Row style={{ justifyContent: 'space-between', alignItems: 'center' }}>
-              <Text
-                style={{
-                  fontSize: typography.size.sm,
-                  fontWeight: typography.weight.semibold,
-                  color: colors.text_primary,
-                }}
-              >
-                {t.auth.createIdentity.passphrase}
-              </Text>
-              <Badge
-                label={
-                  isPassphraseSet
-                    ? t.auth.createIdentity.passphraseStatus.secure
-                    : t.auth.createIdentity.passphraseStatus.pending
-                }
-                variant={isPassphraseSet ? 'success' : 'warning'}
-              />
-            </Row>
-            <Text
-              style={{
-                fontSize: typography.size.xs,
-                color: colors.text_secondary,
-              }}
-            >
-              {t.auth.createIdentity.passphraseStatus.description}
-            </Text>
-            {(fieldErrors.password || fieldErrors.confirmPassword) && (
-              <Text style={{ color: colors.error, fontSize: typography.size.xs }}>
-                {fieldErrors.password || fieldErrors.confirmPassword}
-              </Text>
-            )}
-            <Button
-              onPress={() => setIsPassphraseModalVisible(true)}
-              variant="secondary"
-              disabled={isCreateDisabled}
-            >
-              {isPassphraseSet
-                ? t.auth.createIdentity.passphraseStatus.updateButton
-                : t.auth.createIdentity.passphraseStatus.setButton}
-            </Button>
-          </Column>
+          <Text
+            style={{
+              fontSize: typography.size.sm,
+              fontWeight: typography.weight.semibold,
+              color: colors.text_primary,
+              marginBottom: spacing.sm,
+            }}
+          >
+            {t.auth.createIdentity.passphrase}
+          </Text>
+          <PasswordField
+            label=""
+            placeholder={t.auth.createIdentity.passphraseMinHint}
+            value={password}
+            onChangeText={setPassword}
+            error={fieldErrors.password}
+            editable={!isCreateDisabled}
+            containerStyle={{ marginBottom: spacing.xs }}
+            textContentType="none"
+            autoComplete="off"
+            importantForAutofill="no"
+            autoCapitalize="none"
+            autoCorrect={false}
+            spellCheck={false}
+          />
+          <PasswordField
+            label=""
+            placeholder={t.auth.createIdentity.passphraseConfirm}
+            value={confirmPassword}
+            onChangeText={setConfirmPassword}
+            error={fieldErrors.confirmPassword}
+            editable={!isCreateDisabled}
+            containerStyle={{ marginBottom: 0 }}
+            textContentType="none"
+            autoComplete="off"
+            importantForAutofill="no"
+            autoCapitalize="none"
+            autoCorrect={false}
+            spellCheck={false}
+          />
         </Card>
 
         {/* Terms & Conditions */}
@@ -351,75 +315,6 @@ const CreateIdentityScreen = ({ navigation }: CreateIdentityScreenProps) => {
         />
       </Column>
 
-      <Modal
-        visible={isPassphraseModalVisible}
-        onClose={() => setIsPassphraseModalVisible(false)}
-        title={t.auth.createIdentity.passphraseModal.title}
-        closeOnBackdropPress={false}
-      >
-        <Column gap="md">
-          <Text
-            style={{
-              fontSize: typography.size.xs,
-              color: colors.text_secondary,
-            }}
-          >
-            {t.auth.createIdentity.passphraseModal.description}
-          </Text>
-          <PasswordField
-            label={t.auth.createIdentity.passphrase}
-            placeholder={t.auth.createIdentity.passphraseMinHint}
-            value={password}
-            onChangeText={setPassword}
-            helperText={t.auth.createIdentity.passphraseMinHint}
-            error={fieldErrors.password}
-            textContentType="none"
-            autoComplete="off"
-            importantForAutofill="no"
-            autoCapitalize="none"
-            autoCorrect={false}
-            spellCheck={false}
-          />
-          <PasswordField
-            label={t.auth.createIdentity.passphraseConfirm}
-            placeholder={t.auth.createIdentity.passphraseConfirm}
-            value={confirmPassword}
-            onChangeText={setConfirmPassword}
-            error={fieldErrors.confirmPassword}
-            textContentType="none"
-            autoComplete="off"
-            importantForAutofill="no"
-            autoCapitalize="none"
-            autoCorrect={false}
-            spellCheck={false}
-          />
-          <Text
-            style={{
-              fontSize: typography.size.xs,
-              color: colors.text_tertiary,
-            }}
-          >
-            {t.auth.createIdentity.passphraseBlankHint}
-          </Text>
-          <Row gap="md" style={{ justifyContent: 'flex-end' }}>
-            <Button
-              variant="secondary"
-              onPress={() => setIsPassphraseModalVisible(false)}
-            >
-              {t.auth.createIdentity.passphraseModal.cancel}
-            </Button>
-            <Button
-              onPress={() => {
-                if (validatePassphraseFields()) {
-                  setIsPassphraseModalVisible(false);
-                }
-              }}
-            >
-              {t.auth.createIdentity.passphraseModal.save}
-            </Button>
-          </Row>
-        </Column>
-      </Modal>
     </ScreenLayout>
   );
 };

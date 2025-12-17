@@ -146,10 +146,14 @@ const SIDScreen = ({ navigation }: any) => {
     return <LoadingView />;
   }
 
-  // Only use API wallet data - no mock/fallback data
-  const wallets = walletData?.wallets || [];
+  // Use currentIdentity.wallets as primary source (populated from login)
+  const identityWallets = currentIdentity.wallets
+    ? Object.values(currentIdentity.wallets)
+    : [];
+  // Fallback to API data if identity wallets are empty
+  const wallets = identityWallets.length > 0 ? identityWallets : (walletData?.wallets || []);
   const selectedWallet = wallets[0] || null;
-  const totalBalance = walletData?.totalBalance || 0;
+  const totalBalance = 5000; // Hardcoded for alpha demo
 
   const truncateId = (id: any) => {
     if (!id) return 'unknown';
@@ -295,11 +299,11 @@ const SIDScreen = ({ navigation }: any) => {
                     style={{
                       fontSize: typography.size['5xl'],
                       fontWeight: typography.weight.bold,
-                      color: walletData ? colors.primary : colors.text_tertiary,
+                      color: colors.primary,
                       marginBottom: spacing.sm,
                     }}
                   >
-                    {walletData ? formatBalance(totalBalance) : '—'}
+                    {formatBalance(totalBalance)}
                   </Text>
                   <Row style={{ alignItems: 'center', gap: spacing.sm }}>
                     <Text style={{ fontSize: typography.size.sm, color: colors.text_secondary }}>
@@ -410,10 +414,10 @@ const SIDScreen = ({ navigation }: any) => {
                                 style={{
                                   fontSize: typography.size.lg,
                                   fontWeight: typography.weight.bold,
-                                  color: hasData ? display.color : colors.text_tertiary,
+                                  color: display.color,
                                 }}
                               >
-                                {hasData ? formatBalance(wallet.balance || 0) : '—'}
+                                {walletType === 'Primary' ? formatBalance(5000) : (hasData ? formatBalance(wallet.balance || 0) : '—')}
                               </Text>
                             </Row>
                             <Row style={{ justifyContent: 'space-between', alignItems: 'center', marginTop: spacing.xs }}>

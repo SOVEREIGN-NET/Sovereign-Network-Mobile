@@ -18,7 +18,7 @@ const DEFAULT_CONFIG: RewardCounterConfig = {
   tickIntervalMs: 4000,      // Update every 4 seconds - very slow drip
 };
 
-const START_BALANCE = 3420;  // Start with ~3.4k SOV
+const START_BALANCE = 25000;  // Start with 25k SOV
 
 /**
  * Simulates slowly accumulating SOV tokens as routing rewards
@@ -61,8 +61,8 @@ export const useRewardCounter = (config: Partial<RewardCounterConfig> = {}): Rew
     return () => clearInterval(interval);
   }, [isAccumulating, baseIncrement, targetAmount, durationMs, tickIntervalMs]);
 
-  // Format balance for display (whole number with commas)
-  const displayBalance = Math.floor(balance).toLocaleString();
+  // Format balance for display (whole number, no separator for token values)
+  const displayBalance = Math.floor(balance).toString();
 
   return {
     balance,
