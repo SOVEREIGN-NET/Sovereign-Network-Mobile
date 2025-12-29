@@ -136,7 +136,6 @@ final class Web4SchemeHandler: NSObject, WKURLSchemeHandler {
           urlSchemeTask.didFinish()
         }
       } catch {
-        print("[Web4SchemeHandler] Failed to load \(url.absoluteString): \(error)")
         if isTaskActive(taskId) {
           // Serve error page instead of failing
           let errorMessage = error.localizedDescription
