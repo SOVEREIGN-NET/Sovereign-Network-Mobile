@@ -106,13 +106,14 @@ struct Web4Manifest: Decodable {
 
 struct Web4ResolveResponse: Decodable {
   let domain: String
-  let manifest_cid: String
+  let manifest_cid: String?
   let version: String?
   let spa: Bool?
   let spa_fallback: String?
 
   private enum CodingKeys: String, CodingKey {
     case domain
+    case web4_manifest_cid
     case manifest_cid
     case version
     case spa
@@ -122,7 +123,13 @@ struct Web4ResolveResponse: Decodable {
   init(from decoder: Decoder) throws {
     let container = try decoder.container(keyedBy: CodingKeys.self)
     domain = try container.decode(String.self, forKey: .domain)
-    manifest_cid = try container.decode(String.self, forKey: .manifest_cid)
+
+    // Try new field name first (web4_manifest_cid), then fall back to old name (manifest_cid)
+    if let cid = try container.decodeIfPresent(String.self, forKey: .web4_manifest_cid) {
+      manifest_cid = cid
+    } else {
+      manifest_cid = try container.decodeIfPresent(String.self, forKey: .manifest_cid)
+    }
 
     // Handle version as either Int or String
     if let versionInt = try container.decodeIfPresent(Int64.self, forKey: .version) {

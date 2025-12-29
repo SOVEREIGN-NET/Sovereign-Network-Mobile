@@ -16,19 +16,30 @@ final class Web4Runtime {
       return cached
     }
 
-    let resolve = try await client.resolveDomain(domain: domain)
-    let manifest = try await client.fetchManifest(manifestCid: resolve.manifest_cid)
+    do {
+      let resolve = try await client.resolveDomain(domain: domain)
 
-    let hydrated = Web4Manifest(
-      domain: manifest.domain,
-      version: manifest.version,
-      previous_manifest: manifest.previous_manifest,
-      spa: resolve.spa,
-      spa_fallback: resolve.spa_fallback,
-      files: manifest.files
-    )
-    manifestCache.put(domain: domain, manifestCid: resolve.manifest_cid, manifest: hydrated)
-    return hydrated
+      guard let manifestCid = resolve.manifest_cid else {
+        print("[Web4Runtime] resolveManifest ERROR: manifest_cid is missing from resolve response for domain \(domain)")
+        throw NSError(domain: "Web4Runtime", code: -1, userInfo: [NSLocalizedDescriptionKey: "Missing manifest_cid in response"])
+      }
+
+      let manifest = try await client.fetchManifest(manifestCid: manifestCid)
+
+      let hydrated = Web4Manifest(
+        domain: manifest.domain,
+        version: manifest.version,
+        previous_manifest: manifest.previous_manifest,
+        spa: resolve.spa,
+        spa_fallback: resolve.spa_fallback,
+        files: manifest.files
+      )
+      manifestCache.put(domain: domain, manifestCid: manifestCid, manifest: hydrated)
+      return hydrated
+    } catch {
+      print("[Web4Runtime] resolveManifest ERROR for domain \(domain): \(error)")
+      throw error
+    }
   }
 
   func resolveFile(domain: String, path: String) async throws -> (mime: String, url: URL) {
@@ -53,6 +64,7 @@ final class Web4Runtime {
     }
 
     guard let entry = fileEntry else {
+      print("[Web4Runtime] resolveFile ERROR: File not found for path \(path)")
       throw NSError(domain: "Web4Runtime", code: 404, userInfo: [NSLocalizedDescriptionKey: "Not found: \(path)"])
     }
 
@@ -60,10 +72,16 @@ final class Web4Runtime {
       return (entry.mime, cached)
     }
 
-    let data = try await client.fetchBlob(cid: entry.cid)
-    guard let file = blobCache.put(cid: entry.cid, data: data) else {
-      throw NSError(domain: "Web4Runtime", code: -10, userInfo: [NSLocalizedDescriptionKey: "Cache write failed"])
+    do {
+      let data = try await client.fetchBlob(cid: entry.cid)
+      guard let file = blobCache.put(cid: entry.cid, data: data) else {
+        print("[Web4Runtime] resolveFile ERROR: Failed to write blob to cache for cid \(entry.cid)")
+        throw NSError(domain: "Web4Runtime", code: -10, userInfo: [NSLocalizedDescriptionKey: "Cache write failed"])
+      }
+      return (entry.mime, file)
+    } catch {
+      print("[Web4Runtime] resolveFile ERROR: Failed to fetch blob for cid \(entry.cid): \(error)")
+      throw error
     }
-    return (entry.mime, file)
   }
 }

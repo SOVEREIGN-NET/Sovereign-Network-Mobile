@@ -43,10 +43,16 @@ final class Web4Client {
     )
     guard (200..<300).contains(response.status) else {
       let message = String(data: response.body, encoding: .utf8) ?? "resolve_failed"
+      print("[Web4Client] resolveDomain ERROR - HTTP \(response.status): \(message)")
       throw NSError(domain: "Web4Client", code: Int(response.status), userInfo: [NSLocalizedDescriptionKey: message])
     }
-    let decoded = try JSONDecoder().decode(Web4ResolveResponse.self, from: response.body)
-    return decoded
+    do {
+      let decoded = try JSONDecoder().decode(Web4ResolveResponse.self, from: response.body)
+      return decoded
+    } catch {
+      print("[Web4Client] resolveDomain DECODE ERROR: \(error)")
+      throw error
+    }
   }
 
   func fetchManifest(manifestCid: String) async throws -> Web4Manifest {
@@ -70,11 +76,17 @@ final class Web4Client {
     )
     guard (200..<300).contains(response.status) else {
       let message = String(data: response.body, encoding: .utf8) ?? "manifest_failed"
+      print("[Web4Client] fetchManifest ERROR - HTTP \(response.status): \(message)")
       throw NSError(domain: "Web4Client", code: Int(response.status), userInfo: [NSLocalizedDescriptionKey: message])
     }
 
-    let decoded = try JSONDecoder().decode(Web4Manifest.self, from: response.body)
-    return decoded
+    do {
+      let decoded = try JSONDecoder().decode(Web4Manifest.self, from: response.body)
+      return decoded
+    } catch {
+      print("[Web4Client] fetchManifest DECODE ERROR: \(error)")
+      throw error
+    }
   }
 
   func fetchBlob(cid: String) async throws -> Data {
@@ -98,6 +110,7 @@ final class Web4Client {
     )
     guard (200..<300).contains(response.status) else {
       let message = String(data: response.body, encoding: .utf8) ?? "blob_failed"
+      print("[Web4Client] fetchBlob ERROR - HTTP \(response.status): \(message)")
       throw NSError(domain: "Web4Client", code: Int(response.status), userInfo: [NSLocalizedDescriptionKey: message])
     }
     return response.body
