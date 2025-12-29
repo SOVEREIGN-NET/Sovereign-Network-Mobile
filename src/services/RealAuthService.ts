@@ -42,16 +42,34 @@ class RealAuthService {
       undefined,
     );
 
+    // SECURITY: Only accept self-signed certificates in development
+    // Production builds require valid certificates
+    const isDevelopment = __DEV__ || process.env.NODE_ENV === 'development';
+
     // Create QUIC-based fetch adapter for native transport
-    // Falls back to HTTP if QUIC unavailable (e.g., older iOS)
     this.quicFetch = createQuicFetchAdapterSync({
-      insecure: true, // Accept self-signed certs (security in SOV layer)
+      insecure: isDevelopment,  // Only accept self-signed certs in development
       timeout: 30,
-      fallbackToHttp: false, // Server only supports QUIC
+      fallbackToHttp: false, // Server only supports QUIC - no HTTP fallback
       onFallback: (url, reason) => {
-        console.warn(`[RealAuthService] QUIC fallback for ${url}: ${reason}`);
+        // SECURITY: Throw error instead of fallback to HTTP
+        throw new Error(
+          `QUIC connection required but failed: ${reason}. ` +
+          `HTTP fallback is disabled for security.`
+        );
       },
     });
+
+    // SECURITY: Verify insecure mode is not accidentally enabled in production
+    if (!isDevelopment) {
+      const adapterStr = this.quicFetch.toString();
+      if (adapterStr.includes('insecure') && adapterStr.includes('true')) {
+        throw new Error(
+          '🔴 SECURITY CRITICAL: QUIC insecure mode is enabled in production build! ' +
+          'This is a critical security vulnerability.'
+        );
+      }
+    }
 
     // Pass QUIC adapter to ZhtpApi - all requests now go over QUIC/UDP
     this.api = new ZhtpApi(this.configProvider, this.quicFetch);

@@ -62,19 +62,8 @@ const SignInScreen = ({ navigation }: SignInScreenProps) => {
     }
   };
 
-  // TEMPORARY: Dev bypass while node identity creation is broken
-  const handleDevBypass = async () => {
-    console.log('[SignIn] 🚧 DEV BYPASS - Skipping authentication');
-    const mockIdentity = {
-      did: 'did:zhtp:dev-bypass-temp',
-      displayName: 'Dev User',
-      identityType: 'human',
-      citizenshipStatus: 'citizen' as const,
-      createdAt: new Date().toISOString(),
-      wallets: [],
-    };
-    await setCurrentIdentity(mockIdentity);
-  };
+  // SECURITY: Dev bypass removed for security reasons
+  // To test development flows, use the mock identity service in AuthContext instead
 
   const isSignInDisabled = isLoading || nodeLoading || !isConnected;
 
@@ -300,42 +289,6 @@ const SignInScreen = ({ navigation }: SignInScreenProps) => {
           ]}
         />
 
-        {/* TEMPORARY: Dev bypass button - hidden for now */}
-        {false && __DEV__ && (
-          <Pressable
-            onPress={handleDevBypass}
-            style={{
-              marginTop: spacing.lg,
-              padding: spacing.md,
-              backgroundColor: 'rgba(255, 0, 0, 0.1)',
-              borderRadius: 8,
-              borderWidth: 1,
-              borderColor: 'rgba(255, 0, 0, 0.3)',
-              borderStyle: 'dashed',
-            }}
-          >
-            <Text
-              style={{
-                color: '#ff6b6b',
-                textAlign: 'center',
-                fontSize: typography.size.sm,
-                fontWeight: typography.weight.medium,
-              }}
-            >
-              🚧 DEV BYPASS → Browser
-            </Text>
-            <Text
-              style={{
-                color: colors.text_secondary,
-                textAlign: 'center',
-                fontSize: typography.size.xs,
-                marginTop: spacing.xxs,
-              }}
-            >
-              Skip auth (node identity creation broken)
-            </Text>
-          </Pressable>
-        )}
       </Column>
     </ScreenLayout>
   );

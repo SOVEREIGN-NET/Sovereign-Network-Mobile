@@ -94,11 +94,11 @@ const CreateIdentityScreen = ({ navigation }: CreateIdentityScreenProps) => {
       identity_type: backendType,
       recovery_options: [],
     }).then((identity) => {
-      console.log('📦 Identity response:', JSON.stringify(identity, null, 2));
-      console.log('🔑 seedPhrases object:', identity?.seedPhrases);
-      console.log('🔑 primary seeds:', identity?.seedPhrases?.primary);
-      console.log('🔑 ubi seeds:', identity?.seedPhrases?.ubi);
-      console.log('🔑 savings seeds:', identity?.seedPhrases?.savings);
+      // SECURITY: No logging of sensitive data (seed phrases, keys, etc.)
+      // Only log non-sensitive metadata in development mode
+      if (__DEV__) {
+        console.log('✅ Identity created successfully');
+      }
 
       // Check if we have seed phrases for all 3 wallets (citizen identity)
       const hasPrimary = identity?.seedPhrases?.primary?.length > 0;
@@ -106,8 +106,9 @@ const CreateIdentityScreen = ({ navigation }: CreateIdentityScreenProps) => {
       const hasSavings = identity?.seedPhrases?.savings?.length > 0;
 
       if (hasPrimary) {
-        console.log('✅ Identity created, navigating to SeedPhrase flow:', identity.did);
-        console.log(`📊 Wallets: Primary=${hasPrimary}, UBI=${hasUbi}, Savings=${hasSavings}`);
+        if (__DEV__) {
+          console.log(`📊 Identity created with wallets: Primary=${hasPrimary}, UBI=${hasUbi}, Savings=${hasSavings}`);
+        }
 
         // Navigate to seed phrase screen with all wallets
         // For citizens, we have 3 wallets to show
@@ -123,7 +124,7 @@ const CreateIdentityScreen = ({ navigation }: CreateIdentityScreenProps) => {
         });
       } else {
         console.warn('⚠️ Identity created but no seed phrases returned');
-        console.warn('⚠️ Full identity object:', identity);
+        // SECURITY: Do not log full identity object as it contains sensitive data
         setFieldErrors({
           displayName: 'Identity created but no wallet seed phrases were returned. Please contact support.',
         });
