@@ -31,16 +31,6 @@ export const FormField = React.forwardRef<any, FormFieldProps>(
     },
     ref
   ) => {
-    console.log('📝 FormField render - Display Name received:', {
-      label,
-      error,
-      required,
-      helperText,
-      containerStyle,
-      rightIcon: rightIcon ? 'present' : 'none',
-      allInputProps: inputProps,
-    });
-
     return (
       <View style={containerStyle || {}}>
         <Text

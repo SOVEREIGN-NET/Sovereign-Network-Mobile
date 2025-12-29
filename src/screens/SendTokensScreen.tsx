@@ -16,7 +16,7 @@ const SendTokensScreen = ({ navigation }: any) => {
   const [recipient, setRecipient] = React.useState('');
   const [amount, setAmount] = React.useState('');
   const [memo, setMemo] = React.useState('');
-  const [selectedCurrency, setSelectedCurrency] = React.useState('ZHTP');
+  const [selectedCurrency, setSelectedCurrency] = React.useState('SOV');
   const [errors, setErrors] = React.useState<ValidationErrors>({});
   const [isLoading, setIsLoading] = React.useState(false);
 
@@ -81,10 +81,10 @@ const SendTokensScreen = ({ navigation }: any) => {
     }, 500);
   };
 
-  const currencies = ['ZHTP', 'USDT', 'ETH', 'BTC'];
+  const currencies = ['SOV', 'USDT', 'ETH', 'BTC'];
 
   return (
-    <ScreenLayout>
+    <ScreenLayout paddingTop={spacing.md}>
       <Card>
         <Text variant="h2" style={{ marginBottom: spacing.md }}>
           {t.sendTokens.title.replace('{currency}', selectedCurrency)}
@@ -224,16 +224,14 @@ const SendTokensScreen = ({ navigation }: any) => {
           <ActionFooter
             actions={[
               {
-                label: isLoading ? t.sendTokens.buttonLoading : t.sendTokens.button,
-                onPress: handleSend,
-                disabled: !recipient || !amount || isLoading || Object.keys(errors).length > 0,
-                loading: isLoading,
+                label: 'Coming Soon',
+                onPress: () => {},
+                disabled: true,
               },
               {
                 label: t.sendTokens.cancel,
                 onPress: () => navigation.goBack(),
                 variant: 'secondary',
-                disabled: isLoading,
               },
             ]}
           />

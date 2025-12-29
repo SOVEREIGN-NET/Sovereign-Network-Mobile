@@ -114,9 +114,6 @@ const HistoryScreen = ({ navigation }: any) => {
     <View style={{ flex: 1, backgroundColor: colors.bg_darkest }}>
       <HeaderBar
         onMenuPress={() => setDrawerVisible(true)}
-        onBLEPress={() => {
-          // TODO: Handle BLE connection
-        }}
       />
 
       <SideDrawer
@@ -180,7 +177,7 @@ const HistoryScreen = ({ navigation }: any) => {
                                 marginBottom: spacing.xs,
                               }}
                             >
-                              {transaction.type === 'sent' ? '-' : '+'}{transaction.amount} ZHTP
+                              {transaction.type === 'sent' ? '-' : '+'}{transaction.amount} SOV
                             </Text>
                             <Text
                               style={{

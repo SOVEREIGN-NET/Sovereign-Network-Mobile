@@ -7,6 +7,7 @@ import React, { createContext, useState, useCallback, useEffect, useMemo } from 
 import { Platform } from 'react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { NativeStorage } from '../services/NativeStorage';
+import SecureIdentityStorage from '../services/SecureIdentityStorage';
 import MockAuthService, { Identity } from '../services/MockAuthService';
 import type { CreateIdentityData } from '../services/RealAuthService';
 
@@ -19,23 +20,82 @@ const RealAuthService = RealAuthServiceModule;
 // Use native storage on Android, AsyncStorage on iOS
 const storage = Platform.OS === 'android' ? NativeStorage : AsyncStorage;
 
-// Global state for feature flag (will be updated by settings)
-let globalUseMockService = process.env.REACT_APP_USE_MOCK_AUTH === 'true' && __DEV__;
+// Create context for feature flag management
+type UseMockServiceListener = (useMock: boolean) => void;
+const mockServiceListeners = new Set<UseMockServiceListener>();
+
+let cachedUseMockService: boolean | null = null;
 
 /**
  * Get current feature flag state (mock vs real data)
  */
 export function getUseMockService(): boolean {
-  return globalUseMockService;
+  if (cachedUseMockService === null) {
+    // Return default only if not yet loaded
+    return process.env.REACT_APP_USE_MOCK_AUTH === 'true' && __DEV__;
+  }
+  return cachedUseMockService;
 }
 
 /**
  * Set feature flag state (called from Developer Settings)
  */
 export function setUseMockService(value: boolean): void {
-  globalUseMockService = value;
-  console.log(`🔄 Auth data source changed to: ${value ? 'MOCK' : 'REAL'}`);
+  if (cachedUseMockService !== value) {
+    cachedUseMockService = value;
+    // Persist to storage
+    const key = 'zhtp_use_mock_service';
+    if (value === (process.env.REACT_APP_USE_MOCK_AUTH === 'true' && __DEV__)) {
+      // If setting back to default, remove from storage
+      storage.removeItem(key).catch(err => console.warn('Failed to clear mock service setting:', err));
+    } else {
+      // Otherwise persist the override
+      storage.setItem(key, JSON.stringify(value)).catch(err => console.warn('Failed to save mock service setting:', err));
+    }
+    // Notify all listeners
+    notifyMockServiceListeners(value);
+  }
 }
+
+/**
+ * Subscribe to feature flag changes
+ */
+export function onMockServiceChange(listener: UseMockServiceListener): () => void {
+  mockServiceListeners.add(listener);
+  return () => {
+    mockServiceListeners.delete(listener);
+  };
+}
+
+/**
+ * Notify listeners of mock service flag change
+ */
+function notifyMockServiceListeners(value: boolean): void {
+  mockServiceListeners.forEach(listener => {
+    listener(value);
+  });
+}
+
+/**
+ * Initialize the mock service flag from storage
+ */
+async function initializeMockServiceFlag(): Promise<void> {
+  try {
+    const stored = await storage.getItem('zhtp_use_mock_service');
+    if (stored !== null) {
+      const value = JSON.parse(stored);
+      cachedUseMockService = value;
+    } else {
+      cachedUseMockService = process.env.REACT_APP_USE_MOCK_AUTH === 'true' && __DEV__;
+    }
+  } catch (err) {
+    console.warn('Failed to load mock service setting, using default:', err);
+    cachedUseMockService = process.env.REACT_APP_USE_MOCK_AUTH === 'true' && __DEV__;
+  }
+}
+
+// Initialize on module load
+initializeMockServiceFlag();
 
 export interface AuthContextType {
   currentIdentity: Identity | null;
@@ -71,19 +131,22 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
   const [error, setError] = useState<string | null>(null);
 
   /**
-   * Restore identity from AsyncStorage on app load
+   * Restore identity from secure storage on app load
+   * SECURITY: Uses Keychain-backed storage instead of plaintext AsyncStorage
    */
   useEffect(() => {
     const restoreIdentity = async () => {
       try {
-        const saved = await storage.getItem('zhtp_identity');
-        if (saved) {
-          const identity = JSON.parse(saved);
-          console.log('🔐 AuthContext: Restoring identity from storage:', identity.did);
+        // Try to restore from secure storage first
+        const identity = await SecureIdentityStorage.getIdentity();
+        if (identity) {
+          if (__DEV__) {
+            console.log('🔐 AuthContext: Restoring identity from secure storage:', identity.did);
+          }
           setCurrentIdentity(identity);
         }
       } catch (err) {
-        console.error('Failed to restore identity:', err);
+        console.error('Failed to restore identity from secure storage:', err);
         // Continue with no identity if restoration fails
       } finally {
         setIsBootstrapping(false);
@@ -95,6 +158,7 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
 
   /**
    * Sign in with identity_id and password
+   * SECURITY: Uses SecureIdentityStorage for encrypted persistence
    */
   const signIn = useCallback(async (identity_id: string, password: string): Promise<Identity> => {
     setError(null);
@@ -109,8 +173,8 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
         identity = await RealAuthService!.signIn({ identity_id, password });
       }
 
-      // Save to storage
-      await storage.setItem('zhtp_identity', JSON.stringify(identity));
+      // Save to secure storage (Keychain) instead of plaintext AsyncStorage
+      await SecureIdentityStorage.setIdentity(identity, { requireBiometric: true });
 
       setCurrentIdentity(identity);
       return identity;
@@ -197,8 +261,8 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
         throw new Error('Unknown recovery method');
       }
 
-      // Save to storage
-      await storage.setItem('zhtp_identity', JSON.stringify(identity));
+      // Save to secure storage (Keychain) instead of plaintext AsyncStorage
+      await SecureIdentityStorage.setIdentity(identity, { requireBiometric: true });
 
       setCurrentIdentity(identity);
       return identity;
@@ -230,8 +294,8 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
         avatar: avatar || currentIdentity.avatar,
       };
 
-      // Save to storage
-      await storage.setItem('zhtp_identity', JSON.stringify(updatedIdentity));
+      // Save to secure storage (Keychain) instead of plaintext AsyncStorage
+      await SecureIdentityStorage.setIdentity(updatedIdentity);
       setCurrentIdentity(updatedIdentity);
     } catch (err: any) {
       const message = err.message || 'Failed to update profile';
@@ -304,13 +368,15 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
 
   /**
    * Sign out (clear identity)
+   * SECURITY: Clears both Keychain and AsyncStorage
    */
   const signOut = useCallback(async () => {
     setError(null);
     setIsLoading(true);
 
     try {
-      await storage.removeItem('zhtp_identity');
+      // Clear from secure storage (Keychain and AsyncStorage)
+      await SecureIdentityStorage.clearIdentity();
       setCurrentIdentity(null);
     } catch (err: any) {
       const message = err.message || 'Sign out failed';
@@ -331,12 +397,15 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
   /**
    * Manually set the current identity
    * Used after saving identity to storage (e.g., after seed phrase confirmation)
+   * SECURITY: Uses SecureIdentityStorage instead of plaintext AsyncStorage
    */
   const setIdentity = useCallback(async (identity: Identity) => {
     try {
-      console.log('🔐 AuthContext.setIdentity: Setting identity:', identity.did);
-      await storage.setItem('zhtp_identity', JSON.stringify(identity));
-      console.log('✅ AuthContext: Identity saved to storage, calling setCurrentIdentity');
+      if (__DEV__) {
+        console.log('🔐 AuthContext.setIdentity: Saving identity:', identity.did);
+      }
+      // Save to secure storage (Keychain) instead of plaintext AsyncStorage
+      await SecureIdentityStorage.setIdentity(identity);
       setCurrentIdentity(identity);
     } catch (err: any) {
       const message = err.message || 'Failed to set identity';

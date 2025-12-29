@@ -98,9 +98,6 @@ const FavoritesScreen = ({ navigation }: any) => {
     <View style={{ flex: 1, backgroundColor: colors.bg_darkest }}>
       <HeaderBar
         onMenuPress={() => setDrawerVisible(true)}
-        onBLEPress={() => {
-          // TODO: Handle BLE connection
-        }}
       />
 
       <SideDrawer
@@ -160,7 +157,7 @@ const FavoritesScreen = ({ navigation }: any) => {
                             color: colors.primary,
                           }}
                         >
-                          {wallet.balance} ZHTP
+                          {wallet.balance} SOV
                         </Text>
                       </View>
                       <Text

@@ -82,8 +82,8 @@ android {
         applicationId "com.sovereignnetworkmobile"
         minSdkVersion rootProject.ext.minSdkVersion
         targetSdkVersion rootProject.ext.targetSdkVersion
-        versionCode 2
-        versionName "1.0.0-beta.1"
+        versionCode 10
+        versionName "1.0.0-alpha.10"
     }
     signingConfigs {
         debug {
@@ -119,4 +119,6 @@ dependencies {
     } else {
         implementation jscFlavor
     }
+
+    // Native QUIC library is loaded from jniLibs (Rust-based Quinn implementation)
 }

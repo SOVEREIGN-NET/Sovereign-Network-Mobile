@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { View, Alert, Pressable, useColorScheme, ScrollView, TextInput } from 'react-native';
+import { View, Alert, Pressable, useColorScheme, ScrollView } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import {
@@ -15,6 +15,7 @@ import { useAuth, useNativeSettings } from '../hooks';
 import { useTranslation } from '../i18n';
 import { colors, spacing, typography, borderRadius } from '../theme';
 import { setUseMockService } from '../context/AuthContext';
+import { DEFAULT_SOV_NODE_URL, APP_DEFAULTS } from '../config';
 
 type Theme = 'light' | 'dark' | 'system';
 type Language = 'en' | 'es' | 'fr' | 'de';
@@ -37,14 +38,12 @@ const SettingsScreen = ({ navigation }: any) => {
   const [showFontOptions, setShowFontOptions] = useState(false);
 
   // Developer settings (synced with native phone settings)
-  const [useMockData, setUseMockData] = useState(nativeSettings?.useMockData ?? true);
-  const [nodeUrl, setNodeUrl] = useState(nativeSettings?.nodeUrl ?? 'http://192.168.1.31:9333');
+  const [useMockData, setUseMockData] = useState(nativeSettings?.useMockData ?? APP_DEFAULTS.useMockData);
 
   // Sync when native settings load
   useEffect(() => {
     if (nativeSettings) {
       setUseMockData(nativeSettings.useMockData);
-      setNodeUrl(nativeSettings.nodeUrl);
       // Sync global feature flag
       setUseMockService(nativeSettings.useMockData);
     }
@@ -109,20 +108,18 @@ const SettingsScreen = ({ navigation }: any) => {
 
   const handleSaveDeveloperSettings = async () => {
     try {
-      // Save to both AsyncStorage (app) and native settings (phone)
+      // Save useMockData to AsyncStorage
       await AsyncStorage.setItem('useMockData', useMockData.toString());
-      await AsyncStorage.setItem('nodeUrl', nodeUrl);
 
       // Also save to native phone settings
       await saveNativeSettings({
         useMockData,
-        nodeUrl,
       });
 
       // Update the global feature flag
       setUseMockService(useMockData);
 
-      Alert.alert(t.settings.developer.saved, `Mock Data: ${useMockData}\nNode URL: ${nodeUrl}`);
+      Alert.alert(t.settings.developer.saved, `Mock Data: ${useMockData}`);
     } catch (error) {
       Alert.alert('Error', 'Failed to save developer settings');
       console.error('Failed to save developer settings:', error);
@@ -156,9 +153,6 @@ const SettingsScreen = ({ navigation }: any) => {
       <HeaderBar
         onMenuPress={() => {
           // Settings doesn't have a drawer menu
-        }}
-        onBLEPress={() => {
-          // TODO: Handle BLE connection
         }}
       />
 
@@ -376,41 +370,36 @@ const SettingsScreen = ({ navigation }: any) => {
                 </Pressable>
               </Row>
 
-              {/* Node URL Input */}
-              <View>
+              {/* Node URL Configuration Info */}
+              <View
+                style={{
+                  backgroundColor: colors.bg_darker,
+                  padding: spacing.md,
+                  borderRadius: borderRadius.base,
+                  borderWidth: 1,
+                  borderColor: colors.border,
+                }}
+              >
                 <Text
                   style={{
                     fontSize: typography.size.xs,
                     fontWeight: typography.weight.semibold,
                     color: colors.text_primary,
-                    marginBottom: spacing.sm,
+                    marginBottom: spacing.xs,
                   }}
                 >
-                  {t.settings.developer.nodeUrl}
+                  Node URL Configuration
                 </Text>
-                <TextInput
-                  value={nodeUrl}
-                  onChangeText={setNodeUrl}
-                  placeholder={t.settings.developer.nodeUrlPlaceholder}
-                  placeholderTextColor={colors.text_tertiary}
-                  style={{
-                    backgroundColor: colors.bg_darker,
-                    color: colors.text_primary,
-                    padding: spacing.md,
-                    borderRadius: borderRadius.base,
-                    borderWidth: 1,
-                    borderColor: colors.border,
-                    fontSize: typography.size.sm,
-                  }}
-                />
                 <Text
                   style={{
                     fontSize: typography.size.xs,
                     color: colors.text_secondary,
-                    marginTop: spacing.xs,
+                    lineHeight: 18,
                   }}
                 >
-                  {t.settings.developer.nodeUrlHint}
+                  Node URL is configured in .env file only.{'\n'}
+                  Current: {DEFAULT_SOV_NODE_URL}{'\n\n'}
+                  To change: Edit .env file and restart Metro bundler.
                 </Text>
               </View>
 
@@ -639,7 +628,7 @@ const SettingsScreen = ({ navigation }: any) => {
                       fontWeight: typography.weight.semibold,
                     }}
                   >
-                    ZHTP Web4
+                    SOV Web4
                   </Text>
                 </Row>
               </View>

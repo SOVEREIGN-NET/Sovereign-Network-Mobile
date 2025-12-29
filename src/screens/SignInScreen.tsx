@@ -3,7 +3,7 @@
  * Screen for signing in with existing ZK-DID identity
  */
 
-import React, { useState, useEffect } from 'react';
+import React, { useState } from 'react';
 import { View, Pressable, Text as RNText } from 'react-native';
 import LinearGradient from 'react-native-linear-gradient';
 import MaskedView from '@react-native-masked-view/masked-view';
@@ -23,26 +23,18 @@ import { useAuth, useNodeConnection } from '../hooks';
 import { useTranslation } from '../i18n';
 import { colors, spacing, typography } from '../theme';
 import { AuthStackParamList } from '../navigation/AuthNavigator';
-import MockAuthService from '../services/MockAuthService';
 
 type SignInScreenProps = NativeStackScreenProps<AuthStackParamList, 'SignIn'>;
 
 const SignInScreen = ({ navigation }: SignInScreenProps) => {
   const { t } = useTranslation();
-  const { signIn, isLoading, error } = useAuth();
-  const { isConnected, isLoading: nodeLoading, nodeUrl, checkConnection } = useNodeConnection(true);
+  const { signIn, isLoading, error, setCurrentIdentity } = useAuth();
+  const { isConnected, isLoading: nodeLoading, checkConnection, getProtocol } = useNodeConnection(true);
 
   const [did, setDid] = useState('');
   const [passphrase, setPassphrase] = useState('');
   const [showPassword, setShowPassword] = useState(false);
   const [localError, setLocalError] = useState<string | null>(null);
-
-  // Load demo credentials on mount
-  useEffect(() => {
-    const demoCredentials = MockAuthService.getDemoCredentials();
-    setDid(demoCredentials.did);
-    setPassphrase(demoCredentials.passphrase);
-  }, []);
 
   const handleSignIn = async () => {
     setLocalError(null);
@@ -69,6 +61,9 @@ const SignInScreen = ({ navigation }: SignInScreenProps) => {
       setLocalError(err.message || t.auth.signIn.errors.signInFailed);
     }
   };
+
+  // SECURITY: Dev bypass removed for security reasons
+  // To test development flows, use the mock identity service in AuthContext instead
 
   const isSignInDisabled = isLoading || nodeLoading || !isConnected;
 
@@ -140,58 +135,74 @@ const SignInScreen = ({ navigation }: SignInScreenProps) => {
           </Text>
         </View>
 
-        {/* Node Connection Status */}
-        <Card>
-          <Row style={{ justifyContent: 'space-between', alignItems: 'center' }}>
-            <Column gap="xs" style={{ flex: 1 }}>
-              <Text
+        {/* Node Connection Status - Tap to retry, Long press for full protocol check */}
+        <Pressable
+          onPress={() => {
+            console.log('='.repeat(60));
+            console.log('[SignIn] 👆 SHORT PRESS - UDP Reachability Check');
+            console.log('='.repeat(60));
+            checkConnection();
+          }}
+          onLongPress={() => {
+            console.log('='.repeat(60));
+            console.log('[SignIn] 👆👆 LONG PRESS - Full QUIC Protocol Health Check');
+            console.log('='.repeat(60));
+            getProtocol();
+          }}
+          delayLongPress={500}
+          hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+        >
+          <Card>
+            <Row style={{ justifyContent: 'space-between', alignItems: 'center' }}>
+              <Column gap="xs" style={{ flex: 1 }}>
+                <Text
+                  style={{
+                    fontSize: typography.size.xs,
+                    color: colors.text_secondary,
+                    fontWeight: typography.weight.medium,
+                  }}
+                >
+                  {t.app.nodeStatus}
+                </Text>
+                <Text
+                  style={{
+                    fontSize: typography.size.sm,
+                    color: colors.text_primary,
+                    fontWeight: typography.weight.semibold,
+                  }}
+                >
+                  Sovereign Network (QUIC)
+                </Text>
+              </Column>
+              <Badge
+                label={isConnected ? t.app.connected : t.app.disconnected}
+                variant={isConnected ? 'success' : 'error'}
+              />
+            </Row>
+            {!isConnected && !nodeLoading && (
+              <View
                 style={{
-                  fontSize: typography.size.xs,
-                  color: colors.text_secondary,
-                  fontWeight: typography.weight.medium,
+                  marginTop: spacing.sm,
+                  paddingVertical: spacing.xs,
+                  paddingHorizontal: spacing.sm,
+                  backgroundColor: colors.bg_light,
+                  borderRadius: 6,
                 }}
               >
-                {t.app.nodeStatus}
-              </Text>
-              <Text
-                style={{
-                  fontSize: typography.size.sm,
-                  color: colors.text_primary,
-                  fontWeight: typography.weight.semibold,
-                }}
-              >
-                {nodeUrl}
-              </Text>
-            </Column>
-            <Badge
-              label={isConnected ? t.app.connected : t.app.disconnected}
-              variant={isConnected ? 'success' : 'error'}
-            />
-          </Row>
-          {!isConnected && !nodeLoading && (
-            <Pressable
-              onPress={() => checkConnection()}
-              style={{
-                marginTop: spacing.sm,
-                paddingVertical: spacing.xs,
-                paddingHorizontal: spacing.sm,
-                backgroundColor: colors.bg_light,
-                borderRadius: 6,
-              }}
-            >
-              <Text
-                style={{
-                  fontSize: typography.size.xs,
-                  color: colors.primary,
-                  fontWeight: typography.weight.semibold,
-                  textAlign: 'center',
-                }}
-              >
-                {t.app.retryConnection}
-              </Text>
-            </Pressable>
-          )}
-        </Card>
+                <Text
+                  style={{
+                    fontSize: typography.size.xs,
+                    color: colors.primary,
+                    fontWeight: typography.weight.semibold,
+                    textAlign: 'center',
+                  }}
+                >
+                  {t.app.retryConnection}
+                </Text>
+              </View>
+            )}
+          </Card>
+        </Pressable>
 
         {/* Error Message */}
         {displayError && <ErrorAlert message={displayError} icon="❌" />}
@@ -202,11 +213,11 @@ const SignInScreen = ({ navigation }: SignInScreenProps) => {
             {/* DID Input */}
             <FormField
               label={t.auth.signIn.didLabel}
-              placeholder={t.auth.signIn.didPlaceholder}
+              placeholder="Enter DID or Identity ID..."
               value={did}
               onChangeText={setDid}
               editable={!isLoading}
-              helperText=''
+              helperText="Your DID (did:zhtp:...) or hex Identity ID from creation"
             />
 
             {/* Passphrase Input */}
@@ -240,12 +251,12 @@ const SignInScreen = ({ navigation }: SignInScreenProps) => {
               </Row>
               <FormField
                 label=""
-                placeholder={t.auth.signIn.passphrasePlaceholder}
+                placeholder="Enter your password..."
                 value={passphrase}
                 onChangeText={setPassphrase}
                 secureTextEntry={!showPassword}
                 editable={!isLoading}
-                helperText=''
+                helperText="The password you set when creating your identity"
                 containerStyle={{ marginBottom: 0 }}
               />
             </View>
@@ -277,6 +288,7 @@ const SignInScreen = ({ navigation }: SignInScreenProps) => {
             },
           ]}
         />
+
       </Column>
     </ScreenLayout>
   );

@@ -10,13 +10,26 @@ const ReceiveTokensScreen = () => {
   const { currentIdentity } = useAuth();
   const [showQR, setShowQR] = useState(false);
   const [copied, setCopied] = useState(false);
-  const [selectedCurrency, setSelectedCurrency] = useState('ZHTP');
+  const [selectedCurrency, setSelectedCurrency] = useState('SOV');
 
-  // Mock wallet address - generate from wallet ID if available
+  // Get wallet address from wallet ID
   const primaryWallet = currentIdentity?.wallets?.primary;
-  const walletAddress = primaryWallet?.id
-    ? '0x' + primaryWallet.id.substring(0, 40).padEnd(40, '0')
-    : '0x' + Math.random().toString(16).slice(2, 42);
+  const getWalletAddress = () => {
+    if (!primaryWallet?.id) {
+      return '0x' + Math.random().toString(16).slice(2, 42);
+    }
+    // Handle byte array
+    if (Array.isArray(primaryWallet.id)) {
+      const hexString = primaryWallet.id.map((byte: number) => byte.toString(16).padStart(2, '0')).join('');
+      return '0x' + hexString.substring(0, 40).padEnd(40, '0');
+    }
+    // Handle string
+    if (typeof primaryWallet.id === 'string') {
+      return '0x' + primaryWallet.id.substring(0, 40).padEnd(40, '0');
+    }
+    return '0x' + Math.random().toString(16).slice(2, 42);
+  };
+  const walletAddress = getWalletAddress();
 
   const handleCopyAddress = () => {
     setCopied(true);
@@ -25,9 +38,12 @@ const ReceiveTokensScreen = () => {
 
   const handleShare = async () => {
     try {
+      const title = typeof t.receiveTokens.title === 'string'
+        ? t.receiveTokens.title.replace('{currency}', selectedCurrency)
+        : `Receive ${selectedCurrency}`;
       await Share.share({
         message: `${t.receiveTokens.address}: ${walletAddress}`,
-        title: t.receiveTokens.title.replace('{currency}', selectedCurrency),
+        title,
       });
     } catch (error: any) {
       console.error('Share failed:', error);
@@ -35,7 +51,7 @@ const ReceiveTokensScreen = () => {
     }
   };
 
-  const currencies = ['ZHTP', 'USDT', 'ETH', 'BTC'];
+  const currencies = ['SOV', 'USDT', 'ETH', 'BTC'];
 
   // Mock recent transactions
   const recentTransactions = [
@@ -43,7 +59,7 @@ const ReceiveTokensScreen = () => {
       id: '1',
       sender: '0x1234...5678',
       amount: 100,
-      currency: 'ZHTP',
+      currency: 'SOV',
       date: new Date(Date.now() - 2 * 24 * 60 * 60 * 1000).toLocaleDateString(),
       status: 'Completed',
     },
@@ -51,14 +67,14 @@ const ReceiveTokensScreen = () => {
       id: '2',
       sender: '0x9abc...def0',
       amount: 50,
-      currency: 'ZHTP',
+      currency: 'SOV',
       date: new Date(Date.now() - 5 * 24 * 60 * 60 * 1000).toLocaleDateString(),
       status: 'Completed',
     },
   ];
 
   return (
-    <ScreenLayout paddingTop={spacing['2xl']}>
+    <ScreenLayout paddingTop={spacing.md}>
       <Column gap="lg">
 
         {/* Currency Selector */}

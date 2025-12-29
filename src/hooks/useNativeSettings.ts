@@ -6,12 +6,12 @@
 
 import { useEffect, useState, useCallback } from 'react';
 import { NativeModules } from 'react-native';
+import { APP_DEFAULTS } from '../config';
 
 const { NativeSettings } = NativeModules;
 
 export interface DeveloperSettings {
   useMockData: boolean;
-  nodeUrl: string;
 }
 
 export function useNativeSettings() {
@@ -36,8 +36,7 @@ export function useNativeSettings() {
 
       if (nativeSettings) {
         setSettings({
-          useMockData: nativeSettings.useMockData ?? true,
-          nodeUrl: nativeSettings.nodeUrl ?? 'http://192.168.1.31:9333',
+          useMockData: nativeSettings.useMockData ?? APP_DEFAULTS.useMockData,
         });
       }
     } catch (err: any) {
@@ -60,7 +59,6 @@ export function useNativeSettings() {
 
       const settingsToUpdate = {
         ...(newSettings.useMockData !== undefined && { useMockData: newSettings.useMockData }),
-        ...(newSettings.nodeUrl && { nodeUrl: newSettings.nodeUrl }),
       };
 
       await NativeSettings.updateSettings(settingsToUpdate);
@@ -87,8 +85,7 @@ export function useNativeSettings() {
 
       await NativeSettings.clearSettings();
       setSettings({
-        useMockData: true,
-        nodeUrl: 'http://192.168.1.31:9333',
+        useMockData: APP_DEFAULTS.useMockData,
       });
       return true;
     } catch (err: any) {

@@ -1,0 +1,20 @@
+<?xml version="1.0" encoding="utf-8"?>
+<network-security-config>
+    <!-- DEBUG ONLY: Trust all certificates including self-signed -->
+    <base-config cleartextTrafficPermitted="true">
+        <trust-anchors>
+            <!-- Trust user-installed certificates (for dev/self-signed) -->
+            <certificates src="user" />
+            <certificates src="system" />
+        </trust-anchors>
+    </base-config>
+
+    <!-- ZHTP dev server - trust all certs -->
+    <domain-config cleartextTrafficPermitted="true">
+        <domain includeSubdomains="true">77.42.37.161</domain>
+        <trust-anchors>
+            <certificates src="user" />
+            <certificates src="system" />
+        </trust-anchors>
+    </domain-config>
+</network-security-config>

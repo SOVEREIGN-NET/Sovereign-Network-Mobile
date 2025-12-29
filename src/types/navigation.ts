@@ -11,7 +11,6 @@ export type TabParamList = {
   DashboardTab: undefined;
   DAOTab: undefined;
   SIDTab: undefined;
-  IdentityTab: undefined;
 };
 
 // Define individual stack param lists

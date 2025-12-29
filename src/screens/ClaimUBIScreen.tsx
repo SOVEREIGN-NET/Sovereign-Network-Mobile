@@ -14,7 +14,7 @@ const ClaimUBIScreen = ({ navigation }: any) => {
   const handleClaim = () => {
     setClaimed(true);
     setTimeout(() => {
-      alert('UBI claimed successfully! 100 ZHTP has been added to your wallet.');
+      alert('UBI claimed successfully! 100 SOV has been added to your wallet.');
       navigation.goBack();
     }, 1500);
   };
@@ -32,7 +32,7 @@ const ClaimUBIScreen = ({ navigation }: any) => {
               Your Monthly UBI
             </Text>
             <Text variant="h1" style={{ color: colors.primary, marginBottom: spacing.xs }}>
-              {monthlyUBI} ZHTP
+              {monthlyUBI} SOV
             </Text>
             <Text variant="caption" style={{ color: colors.text_secondary }}>
               Distributed automatically every 30 days
@@ -45,7 +45,7 @@ const ClaimUBIScreen = ({ navigation }: any) => {
             </Text>
             <ProgressBar percentage={100} showPercentage />
             <Text variant="caption" style={{ color: colors.success }}>
-              ✓ Fully claimed ({claimedThisMonth} ZHTP)
+              ✓ Fully claimed ({claimedThisMonth} SOV)
             </Text>
           </Column>
 
@@ -59,7 +59,7 @@ const ClaimUBIScreen = ({ navigation }: any) => {
           <Column gap="sm" style={{ marginTop: spacing.lg, padding: spacing.lg, backgroundColor: colors.bg_darker, borderRadius: 8 }}>
             <Text variant="h3">ℹ️ About UBI</Text>
             <Text variant="body" style={{ color: colors.text_secondary }}>
-              Universal Basic Income is automatically distributed to all ZHTP network participants who meet identity verification requirements.
+              Universal Basic Income is automatically distributed to all SOV network participants who meet identity verification requirements.
             </Text>
             <Text variant="body" style={{ color: colors.text_secondary, marginTop: spacing.sm }}>
               • Distribution: Monthly • Verification: Zero-Knowledge DID • Network-wide: All participants

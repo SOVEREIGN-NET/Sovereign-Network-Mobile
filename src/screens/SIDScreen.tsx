@@ -1,45 +1,111 @@
 import React, { useState } from 'react';
-import { View, TouchableOpacity, ScrollView, Clipboard, Alert } from 'react-native';
+import { View, TouchableOpacity, ScrollView, Alert } from 'react-native';
+import Clipboard from '@react-native-clipboard/clipboard';
 import {
   Card,
   Text,
-  Button,
   LoadingView,
   Column,
+  Row,
   ScreenLayout,
   HeaderBar,
   SideDrawer,
   DrawerItem,
-  DetailRow,
-  SectionLabel,
+  Badge,
 } from '../components';
-import SShieldLogo from '../components/atoms/Logo';
-import { useAuth, useApi, useAsyncData } from '../hooks';
+import { useAuth, useApi, useAsyncData, useWalletBalance } from '../hooks';
 import { useTranslation } from '../i18n';
 import { colors, spacing, typography, borderRadius } from '../theme';
 
+// Wallet type info for display
+const WALLET_DISPLAY: Record<string, { icon: string; color: string; description: string }> = {
+  Primary: { icon: '💳', color: colors.primary, description: 'Main spending wallet' },
+  primary: { icon: '💳', color: colors.primary, description: 'Main spending wallet' },
+  UBI: { icon: '🌱', color: colors.success, description: 'Universal Basic Income' },
+  ubi: { icon: '🌱', color: colors.success, description: 'Universal Basic Income' },
+  Savings: { icon: '🏦', color: colors.warning, description: 'Long-term savings' },
+  savings: { icon: '🏦', color: colors.warning, description: 'Long-term savings' },
+};
+
+// Format large numbers with commas
+const formatBalance = (balance: number): string => {
+  return balance.toLocaleString('en-US', { maximumFractionDigits: 2 });
+};
+
 const SIDScreen = ({ navigation }: any) => {
   const { t } = useTranslation();
-  const { currentIdentity, signOut, isLoading } = useAuth();
+  const { currentIdentity, isLoading } = useAuth();
   const { api, isInitialized } = useApi();
-  const [loggingOut, setLoggingOut] = useState(false);
+  const { balance: walletBalance, displayBalance: walletDisplayBalance } = useWalletBalance();
   const [drawerVisible, setDrawerVisible] = useState(false);
   const [activeWalletTab, setActiveWalletTab] = useState('Tokens');
 
-  // Fetch identity details from API when identity changes
-  useAsyncData(
+  // Fetch wallet balances from API
+  const { data: walletData, loading: walletsLoading } = useAsyncData(
     async () => {
-      try {
-        if (api && isInitialized && currentIdentity) {
-          const identity = await api.getIdentity(currentIdentity.did);
-          return identity;
-        }
-      } catch (error) {
-        console.warn('Failed to fetch identity details from API:', error);
+      if (!api || !isInitialized || !currentIdentity?.did) {
+        return null;
       }
-      return null;
+
+      try {
+        // console.log('📊 SID: Fetching wallet data for:', currentIdentity.did);
+        const walletList = await api.getWalletList(currentIdentity.did);
+        // console.log('💰 SID: Wallet list response:', walletList);
+
+        // Transform API response to match expected format
+        const wallets = (walletList.wallets || []).map((w: any) => ({
+          id: w.wallet_id,
+          name: `${w.wallet_type} Wallet`,
+          wallet_type: w.wallet_type,
+          balance: w.total_balance || 0,
+        }));
+
+        return {
+          wallets,
+          totalBalance: wallets.reduce((sum: number, w: any) => sum + (w.balance || 0), 0),
+        };
+      } catch (error) {
+        console.warn('⚠️ SID: Failed to fetch wallet data:', error);
+        return null;
+      }
     },
-    [api, isInitialized, currentIdentity],
+    [api, isInitialized, currentIdentity?.did],
+  );
+
+  // Fetch UBI status and history
+  const { data: ubiData } = useAsyncData(
+    async () => {
+      if (!api || !isInitialized || !currentIdentity?.did) {
+        return null;
+      }
+
+      try {
+        // Fetch both status and history in parallel
+        const [statusResponse, historyResponse] = await Promise.all([
+          api.request(`/api/v1/ubi/status/${currentIdentity.did}`).catch(() => null),
+          api.request(`/api/v1/ubi/history/${currentIdentity.did}`).catch(() => null),
+        ]);
+
+        // console.log('🌱 SID: UBI status:', statusResponse);
+        // console.log('🌱 SID: UBI history:', historyResponse);
+
+        // Calculate total earned from history
+        const totalEarned = historyResponse?.claims?.reduce((sum: number, claim: any) => sum + (claim.amount || 0), 0) || 0;
+
+        return {
+          daily_amount: statusResponse?.daily_amount || 33,
+          monthly_amount: statusResponse?.monthly_amount || 1000,
+          eligible: statusResponse?.eligible !== false,
+          next_claim: statusResponse?.next_claim,
+          total_earned: totalEarned || statusResponse?.total_earned || currentIdentity.ubiEarned || 0,
+          claims_count: historyResponse?.claims?.length || 0,
+        };
+      } catch (error) {
+        console.warn('⚠️ SID: Failed to fetch UBI data:', error);
+        return null;
+      }
+    },
+    [api, isInitialized, currentIdentity?.did],
   );
 
   const drawerItems: DrawerItem[] = [
@@ -77,44 +143,18 @@ const SIDScreen = ({ navigation }: any) => {
     },
   ];
 
-  const handleLogout = () => {
-    Alert.alert(
-      t.identity.logout.confirmTitle,
-      t.identity.logout.confirmMessage,
-      [
-        {
-          text: t.identity.logout.cancel,
-          style: 'cancel',
-        },
-        {
-          text: t.identity.logout.confirm,
-          style: 'destructive',
-          onPress: () => {
-            (async () => {
-              setLoggingOut(true);
-              try {
-                await signOut();
-              } catch (error) {
-                console.error('Logout failed:', error);
-                Alert.alert(t.identity.logout.errorTitle, t.identity.logout.errorMessage);
-              } finally {
-                setLoggingOut(false);
-              }
-            })();
-          },
-        },
-      ]
-    );
-  };
-
   if (!currentIdentity || isLoading) {
     return <LoadingView />;
   }
 
-  const wallets = currentIdentity.wallets
+  // Use currentIdentity.wallets as primary source (populated from login)
+  const identityWallets = currentIdentity.wallets
     ? Object.values(currentIdentity.wallets)
     : [];
+  // Fallback to API data if identity wallets are empty
+  const wallets = identityWallets.length > 0 ? identityWallets : (walletData?.wallets || []);
   const selectedWallet = wallets[0] || null;
+  const totalBalance = walletBalance; // Calculated from useWalletBalance hook
 
   const truncateId = (id: any) => {
     if (!id) return 'unknown';
@@ -145,18 +185,10 @@ const SIDScreen = ({ navigation }: any) => {
     }
   };
 
-  const votingPowerFormatted = currentIdentity.votingPower?.toLocaleString() || '0';
-  const ubiEarnedFormatted = currentIdentity.ubiEarned?.toFixed(2) || '0.00';
-  const walletCount = currentIdentity.wallets ? Object.keys(currentIdentity.wallets).length : 0;
-  const authLoading = isLoading || loggingOut;
-
   return (
     <View style={{ flex: 1, backgroundColor: colors.bg_darkest }}>
       <HeaderBar
         onMenuPress={() => setDrawerVisible(true)}
-        onBLEPress={() => {
-          // TODO: Handle BLE connection
-        }}
       />
 
       <SideDrawer
@@ -168,9 +200,9 @@ const SIDScreen = ({ navigation }: any) => {
 
       <ScreenLayout paddingTop={spacing.md}>
         <ScrollView showsVerticalScrollIndicator={false}>
-          <Column gap="lg" style={{ paddingBottom: spacing.xl }}>
+          <Column gap="sm" style={{ paddingBottom: spacing.xl }}>
             {/* WALLET SECTION */}
-            <View style={{ paddingHorizontal: spacing.md }}>
+            <View style={{ paddingHorizontal: spacing.sm, marginBottom: spacing.sm }}>
               <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-start' }}>
                 <View>
                   <Text
@@ -190,79 +222,103 @@ const SIDScreen = ({ navigation }: any) => {
                     }}
                     numberOfLines={1}
                   >
-                    {truncateId(selectedWallet?.id)} • {t.wallet.details.notSynced}
+                    {truncateId(selectedWallet?.id)}
                   </Text>
                 </View>
-                <TouchableOpacity
-                  style={{
-                    width: 36,
-                    height: 36,
-                    borderRadius: borderRadius.full,
-                    backgroundColor: colors.bg_darker,
-                    justifyContent: 'center',
-                    alignItems: 'center',
-                    borderWidth: 1,
-                    borderColor: colors.border,
-                  }}
-                  onPress={() => navigation?.navigate('WalletSettings')}
-                >
-                  <Text style={{ fontSize: typography.size['3xl'] }}>⚙️</Text>
-                </TouchableOpacity>
+                <Row style={{ gap: spacing.sm }}>
+                  <TouchableOpacity
+                    style={{
+                      width: 36,
+                      height: 36,
+                      borderRadius: borderRadius.full,
+                      backgroundColor: colors.bg_darker,
+                      justifyContent: 'center',
+                      alignItems: 'center',
+                      borderWidth: 1,
+                      borderColor: colors.border,
+                    }}
+                    onPress={() => navigation?.navigate('Profile')}
+                  >
+                    <Text style={{ fontSize: typography.size.xl }}>👤</Text>
+                  </TouchableOpacity>
+                  <TouchableOpacity
+                    style={{
+                      width: 36,
+                      height: 36,
+                      borderRadius: borderRadius.full,
+                      backgroundColor: colors.bg_darker,
+                      justifyContent: 'center',
+                      alignItems: 'center',
+                      borderWidth: 1,
+                      borderColor: colors.border,
+                    }}
+                    onPress={() => navigation?.navigate('WalletSettings')}
+                  >
+                    <Text style={{ fontSize: typography.size.xl }}>⚙️</Text>
+                  </TouchableOpacity>
+                </Row>
               </View>
             </View>
 
-            {/* Wallet Address Card */}
-            {selectedWallet && (
-              <View style={{ paddingHorizontal: spacing.md }}>
-                <Card style={{ marginHorizontal: 0, overflow: 'hidden' }}>
-                  <View
-                    style={{
-                      borderTopWidth: 2,
-                      borderTopColor: colors.primary,
-                      paddingHorizontal: spacing.lg,
-                      paddingVertical: spacing.sm,
-                    }}
-                  >
-                    <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: spacing.md }}>
-                      <Text style={{ fontSize: typography.size.xs, color: colors.text_secondary }}>
-                        {t.wallet.details.address}
-                      </Text>
-                      <TouchableOpacity onPress={() => selectedWallet?.id && copyToClipboard(selectedWallet.id)}>
+            {/* Wallet Address Card - Always show, populate when data arrives */}
+            <View style={{ paddingHorizontal: spacing.sm }}>
+              <Card style={{ marginHorizontal: 0, overflow: 'hidden' }}>
+                <View
+                  style={{
+                    borderTopWidth: 2,
+                    borderTopColor: colors.primary,
+                    paddingHorizontal: spacing.lg,
+                    paddingVertical: spacing.sm,
+                  }}
+                >
+                  <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: spacing.md }}>
+                    <Text style={{ fontSize: typography.size.xs, color: colors.text_secondary }}>
+                      {t.wallet.details.address}
+                    </Text>
+                    {selectedWallet?.id && (
+                      <TouchableOpacity onPress={() => copyToClipboard(selectedWallet.id)}>
                         <Text style={{ fontSize: typography.size.xs, color: colors.primary }}>{t.wallet.actions.copy}</Text>
                       </TouchableOpacity>
-                    </View>
-                    <Text
-                      style={{
-                        fontSize: typography.size.sm,
-                        fontWeight: typography.weight.semibold,
-                        color: colors.text_primary,
-                        letterSpacing: 0.5,
-                      }}
-                      numberOfLines={1}
-                    >
-                      {truncateId(selectedWallet?.id)}
-                    </Text>
+                    )}
                   </View>
+                  <Text
+                    style={{
+                      fontSize: typography.size.sm,
+                      fontWeight: typography.weight.semibold,
+                      color: selectedWallet?.id ? colors.text_primary : colors.text_tertiary,
+                      letterSpacing: 0.5,
+                    }}
+                    numberOfLines={1}
+                  >
+                    {selectedWallet?.id ? truncateId(selectedWallet.id) : '—'}
+                  </Text>
+                </View>
 
-                  {/* Balance Section */}
-                  <View style={{ paddingHorizontal: spacing.lg, paddingVertical: spacing.xs, alignItems: 'center' }}>
-                    <Text
-                      style={{
-                        fontSize: typography.size['5xl'],
-                        fontWeight: typography.weight.bold,
-                        color: colors.primary,
-                        marginBottom: spacing.sm,
-                      }}
-                    >
-                      {selectedWallet.balance.toLocaleString()}
-                    </Text>
+                {/* Balance Section */}
+                <View style={{ paddingHorizontal: spacing.lg, paddingVertical: spacing.xs, alignItems: 'center' }}>
+                  <Text
+                    style={{
+                      fontSize: typography.size['5xl'],
+                      fontWeight: typography.weight.bold,
+                      color: colors.primary,
+                      marginBottom: spacing.sm,
+                    }}
+                  >
+                    {formatBalance(totalBalance)}
+                  </Text>
+                  <Row style={{ alignItems: 'center', gap: spacing.sm }}>
                     <Text style={{ fontSize: typography.size.sm, color: colors.text_secondary }}>
-                      {t.wallet.currency}
+                      {t.wallet.currency} (Total)
                     </Text>
-                  </View>
-                </Card>
-              </View>
-            )}
+                    {walletsLoading && (
+                      <Text style={{ fontSize: typography.size.xs, color: colors.text_tertiary }}>
+                        Syncing...
+                      </Text>
+                    )}
+                  </Row>
+                </View>
+              </Card>
+            </View>
 
             {/* Send & Receive Buttons */}
             <View
@@ -270,6 +326,7 @@ const SIDScreen = ({ navigation }: any) => {
                 paddingHorizontal: spacing.md,
                 flexDirection: 'row',
                 gap: spacing.md,
+                marginBottom: spacing.md,
               }}
             >
               <TouchableOpacity
@@ -321,78 +378,88 @@ const SIDScreen = ({ navigation }: any) => {
               </TouchableOpacity>
             </View>
 
-            {/* Wallet Tokens Tab */}
-            {activeWalletTab === 'Tokens' && wallets.length > 0 && (
-              <View style={{ paddingHorizontal: spacing.md }}>
-                <Column gap="md">
-                  {wallets.map((wallet) => (
-                    <TouchableOpacity
-                      key={wallet.id}
-                      activeOpacity={0.7}
-                    >
-                      <Card style={{ marginHorizontal: 0 }}>
-                        <View
-                          style={{
-                            paddingHorizontal: spacing.md,
-                            paddingVertical: spacing.xs,
-                          }}
-                        >
-                          <View style={{ flexDirection: 'row', alignItems: 'flex-start', gap: spacing.md, marginBottom: spacing.xxs }}>
-                            <View
-                              style={{
-                                width: 48,
-                                height: 48,
-                                borderRadius: borderRadius.full,
-                                backgroundColor: colors.primary,
-                                justifyContent: 'center',
-                                alignItems: 'center',
-                                overflow: 'hidden',
-                              }}
-                            >
-                              <SShieldLogo size={48} />
-                            </View>
-                            <View style={{ flex: 1 }}>
+            {/* Wallet Tokens Tab - Always show skeleton, populate when data arrives */}
+            {activeWalletTab === 'Tokens' && (
+              <View style={{ paddingHorizontal: spacing.sm, marginBottom: spacing.xs }}>
+                <Column gap="xs">
+                  {(['Primary', 'UBI', 'Savings'] as const).map((walletType) => {
+                    const display = WALLET_DISPLAY[walletType];
+                    const wallet = wallets.find((w: any) =>
+                      w.wallet_type === walletType || w.wallet_type?.toLowerCase() === walletType.toLowerCase()
+                    );
+                    const hasData = !!wallet;
+
+                    return (
+                      <TouchableOpacity
+                        key={walletType}
+                        activeOpacity={0.7}
+                      >
+                        <Card style={{ marginHorizontal: 0, opacity: hasData ? 1 : 0.6 }}>
+                          <View
+                            style={{
+                              paddingHorizontal: spacing.md,
+                              paddingVertical: spacing.sm,
+                            }}
+                          >
+                            <Row style={{ justifyContent: 'space-between', alignItems: 'center' }}>
                               <Text
                                 style={{
-                                  fontSize: typography.size.sm,
+                                  fontSize: typography.size.base,
                                   fontWeight: typography.weight.semibold,
                                   color: colors.text_primary,
                                 }}
                               >
-                                {wallet.name}
+                                {walletType} Wallet
                               </Text>
+                              <Text
+                                style={{
+                                  fontSize: typography.size.lg,
+                                  fontWeight: typography.weight.bold,
+                                  color: display.color,
+                                }}
+                              >
+                                {walletType === 'Primary' ? formatBalance(walletBalance) : (hasData ? formatBalance(wallet.balance || 0) : '—')}
+                              </Text>
+                            </Row>
+                            <Row style={{ justifyContent: 'space-between', alignItems: 'center', marginTop: spacing.xs }}>
                               <Text
                                 style={{
                                   fontSize: typography.size.xs,
                                   color: colors.text_secondary,
-                                  marginTop: spacing.xxs,
                                 }}
-                                numberOfLines={1}
                               >
-                                {truncateId((wallet as any).id)}
+                                {display.description}
                               </Text>
-                              <TouchableOpacity onPress={() => (wallet as any).id && copyToClipboard((wallet as any).id)}>
-                                <Text style={{ fontSize: typography.size.xs, color: colors.primary, marginTop: spacing.xxs }}>
-                                  Copy
+                              <Text
+                                style={{
+                                  fontSize: typography.size.xs,
+                                  color: colors.text_tertiary,
+                                }}
+                              >
+                                SOV
+                              </Text>
+                            </Row>
+                            {wallet?.id && (
+                              <TouchableOpacity
+                                onPress={() => copyToClipboard(wallet.id)}
+                                style={{ marginTop: spacing.xs }}
+                              >
+                                <Text
+                                  style={{
+                                    fontSize: typography.size.xs,
+                                    color: colors.text_tertiary,
+                                  }}
+                                  numberOfLines={1}
+                                >
+                                  {truncateId(wallet.id)}
                                 </Text>
                               </TouchableOpacity>
-                            </View>
+                            )}
                           </View>
-                          <View style={{ alignItems: 'flex-end' }}>
-                            <Text
-                              style={{
-                                fontSize: typography.size.lg,
-                                fontWeight: typography.weight.bold,
-                                color: colors.text_primary,
-                              }}
-                            >
-                              {wallet.balance.toLocaleString()} ZHTP
-                            </Text>
-                          </View>
-                        </View>
-                      </Card>
-                    </TouchableOpacity>
-                  ))}
+                        </Card>
+                      </TouchableOpacity>
+                    );
+                  })}
                 </Column>
               </View>
             )}
@@ -400,8 +467,8 @@ const SIDScreen = ({ navigation }: any) => {
             {/* Wallet Bottom Tab Bar */}
             <View
               style={{
-                marginHorizontal: spacing.md,
-                marginTop: spacing.lg,
+                marginHorizontal: spacing.sm,
+                marginTop: 0,
                 flexDirection: 'row',
                 gap: spacing.md,
                 backgroundColor: colors.bg_darker,
@@ -439,134 +506,50 @@ const SIDScreen = ({ navigation }: any) => {
               ))}
             </View>
 
-            {/* IDENTITY SECTION */}
-            <View style={{ borderTopWidth: 1, borderTopColor: colors.border, paddingTop: spacing.lg, marginHorizontal: spacing.md }} />
+            {/* UBI Status Card */}
+            {ubiData && (
+              <View style={{ paddingHorizontal: spacing.sm }}>
+                <Card style={{ marginHorizontal: 0, backgroundColor: colors.success + '15', borderWidth: 1, borderColor: colors.success + '40' }}>
+                  <Row style={{ justifyContent: 'space-between', alignItems: 'flex-start' }}>
+                    <Column gap="xs" style={{ flex: 1 }}>
+                      <Row style={{ alignItems: 'center', gap: spacing.sm }}>
+                        <Text style={{ fontSize: typography.size.xl }}>🌱</Text>
+                        <Text style={{ fontSize: typography.size.base, fontWeight: typography.weight.bold, color: colors.success }}>
+                          Universal Basic Income
+                        </Text>
+                      </Row>
+                      <Text style={{ fontSize: typography.size.xs, color: colors.text_secondary, marginTop: spacing.xs }}>
+                        Daily SOV income deposited to your UBI wallet
+                      </Text>
+                    </Column>
+                    <Badge label={ubiData.eligible !== false ? 'Active' : 'Pending'} variant={ubiData.eligible !== false ? 'success' : 'warning'} />
+                  </Row>
 
-            {/* Identity Card */}
-            <View style={{ paddingHorizontal: spacing.md }}>
-              <Card style={{ marginHorizontal: 0 }}>
-                <View
-                  style={{
-                    alignItems: 'center',
-                    paddingVertical: spacing.lg,
-                    backgroundColor: colors.bg_darker,
-                    borderRadius: borderRadius.base,
-                    marginBottom: spacing.md,
-                  }}
-                >
-                  <Text style={{ fontSize: typography.size['5xl'], marginBottom: spacing.sm }}>
-                    {currentIdentity.avatar || '👤'}
-                  </Text>
-                  <Text variant="h2" style={{ marginBottom: spacing.xs }}>
-                    {currentIdentity.displayName}
-                  </Text>
-                  <Text variant="caption" style={{ color: colors.text_secondary, marginBottom: spacing.md }}>
-                    {currentIdentity.did}
-                  </Text>
-                  <Button
-                    variant="secondary"
-                    onPress={() => navigation?.navigate('ProfileEdit')}
-                    disabled={authLoading}
-                  >
-                    {t.identity.actions.editProfile}
-                  </Button>
-                </View>
+                  <View style={{ marginTop: spacing.md, backgroundColor: colors.bg_dark, padding: spacing.sm, borderRadius: borderRadius.sm }}>
+                    <Row style={{ justifyContent: 'space-around' }}>
+                      <Column style={{ alignItems: 'center' }}>
+                        <Text style={{ fontSize: typography.size.lg, fontWeight: typography.weight.bold, color: colors.success }}>
+                          {ubiData.daily_amount || 33}
+                        </Text>
+                        <Text style={{ fontSize: typography.size.xs, color: colors.text_secondary }}>
+                          SOV/day
+                        </Text>
+                      </Column>
+                      <View style={{ width: 1, backgroundColor: colors.border }} />
+                      <Column style={{ alignItems: 'center' }}>
+                        <Text style={{ fontSize: typography.size.lg, fontWeight: typography.weight.bold, color: colors.success }}>
+                          {ubiData.monthly_amount || 1000}
+                        </Text>
+                        <Text style={{ fontSize: typography.size.xs, color: colors.text_secondary }}>
+                          SOV/month
+                        </Text>
+                      </Column>
+                    </Row>
+                  </View>
+                </Card>
+              </View>
+            )}
 
-                {/* Identity Details */}
-                <Column gap="sm">
-                  <DetailRow
-                    label={t.identity.details.identityType}
-                    value={currentIdentity.identityType || ''}
-                  />
-                  <DetailRow
-                    label={t.identity.details.citizenship}
-                    value={currentIdentity.citizenship ? t.identity.details.verified : t.identity.details.notVerified}
-                  />
-                  <DetailRow
-                    label={t.identity.details.created}
-                    value={new Date(currentIdentity.createdAt || '').toLocaleDateString()}
-                  />
-                </Column>
-              </Card>
-            </View>
-
-            {/* Stats Card */}
-            <View style={{ paddingHorizontal: spacing.md }}>
-              <Card style={{ marginHorizontal: 0 }}>
-                <SectionLabel>{t.identity.stats.title}</SectionLabel>
-                <Column gap="sm">
-                  <DetailRow
-                    label={t.identity.stats.votingPower}
-                    value={votingPowerFormatted}
-                  />
-                  <DetailRow
-                    label={t.identity.stats.ubiEarned}
-                    value={`${ubiEarnedFormatted} ZHTP`}
-                  />
-                  <DetailRow
-                    label={t.identity.stats.wallets}
-                    value={walletCount.toString()}
-                  />
-                </Column>
-              </Card>
-            </View>
-
-            {/* Actions Card */}
-            <View style={{ paddingHorizontal: spacing.md }}>
-              <Card style={{ marginHorizontal: 0 }}>
-                <Column gap="sm">
-                  <Button
-                    variant="secondary"
-                    onPress={() => navigation?.navigate('IdentitySettings')}
-                    disabled={authLoading}
-                  >
-                    {t.identity.actions.settings}
-                  </Button>
-                  <Button
-                    variant="secondary"
-                    onPress={() => navigation?.navigate('AppSettings')}
-                    disabled={authLoading}
-                  >
-                    {t.identity.actions.appSettings}
-                  </Button>
-                  <Button
-                    variant="secondary"
-                    onPress={() => navigation?.navigate('BackupIdentity')}
-                    disabled={authLoading}
-                  >
-                    {t.identity.actions.backupIdentity}
-                  </Button>
-                </Column>
-              </Card>
-            </View>
-
-            {/* Sign Out Card */}
-            <View style={{ paddingHorizontal: spacing.md }}>
-              <Card style={{ marginHorizontal: 0 }}>
-                <Column gap="sm">
-                  <Button
-                    onPress={handleLogout}
-                    disabled={authLoading}
-                    variant="outline"
-                    style={{
-                      borderColor: colors.error,
-                    }}
-                  >
-                    {authLoading ? t.identity.logout.buttonLoading : t.identity.logout.button}
-                  </Button>
-                  <Text
-                    style={{
-                      fontSize: typography.size.xs,
-                      color: colors.text_tertiary,
-                      textAlign: 'center',
-                      marginTop: spacing.xs,
-                    }}
-                  >
-                    {t.identity.logout.hint}
-                  </Text>
-                </Column>
-              </Card>
-            </View>
           </Column>
         </ScrollView>
       </ScreenLayout>

@@ -7,9 +7,12 @@ import { en, type Translation } from './translations/en';
 
 export type LanguageCode = 'en'; // 'es' | 'fr' | 'de' etc. can be added
 
+type LanguageChangeListener = (language: LanguageCode) => void;
+
 interface I18nConfig {
   currentLanguage: LanguageCode;
   translations: Record<LanguageCode, Translation>;
+  listeners: Set<LanguageChangeListener>;
 }
 
 const i18nConfig: I18nConfig = {
@@ -17,6 +20,7 @@ const i18nConfig: I18nConfig = {
   translations: {
     en,
   },
+  listeners: new Set(),
 };
 
 /**
@@ -32,8 +36,35 @@ export function getTranslations(): Translation {
  */
 export function setLanguage(language: LanguageCode): void {
   if (i18nConfig.translations[language]) {
+    const previousLanguage = i18nConfig.currentLanguage;
     i18nConfig.currentLanguage = language;
+
+    // Notify listeners only if language actually changed
+    if (previousLanguage !== language) {
+      notifyListeners(language);
+    }
   }
+}
+
+/**
+ * Subscribe to language changes
+ * @param listener - Callback function invoked when language changes
+ * @returns Unsubscribe function
+ */
+export function onLanguageChange(listener: LanguageChangeListener): () => void {
+  i18nConfig.listeners.add(listener);
+  return () => {
+    i18nConfig.listeners.delete(listener);
+  };
+}
+
+/**
+ * Notify all listeners of language change
+ */
+function notifyListeners(language: LanguageCode): void {
+  i18nConfig.listeners.forEach(listener => {
+    listener(language);
+  });
 }
 
 /**

@@ -10,9 +10,23 @@
 		013FDF50305A839F2A8A1F49 /* libPods-SovereignNetworkMobile.a in Frameworks */ = {isa = PBXBuildFile; fileRef = 8D24FC999DA153288045F4D3 /* libPods-SovereignNetworkMobile.a */; };
 		13B07FBF1A68108700A75B9A /* Images.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = 13B07FB51A68108700A75B9A /* Images.xcassets */; };
 		301BAC732EB4C924003807B5 /* GoogleService-Info.plist in Resources */ = {isa = PBXBuildFile; fileRef = 301BAC722EB4C924003807B5 /* GoogleService-Info.plist */; };
+		30CB596B2EE88A1D00D6B4B7 /* Settings.bundle in Resources */ = {isa = PBXBuildFile; fileRef = 30CB596A2EE88A1D00D6B4B7 /* Settings.bundle */; };
+		30CB596C2EE88A1D00D6B4B7 /* NativeSettings.swift in Sources */ = {isa = PBXBuildFile; fileRef = 30CB59692EE88A1D00D6B4B7 /* NativeSettings.swift */; };
+		30CB596D2EE88A1D00D6B4B7 /* NativeQuicModule.m in Sources */ = {isa = PBXBuildFile; fileRef = 30CB59662EE88A1D00D6B4B7 /* NativeQuicModule.m */; };
+		30CB596E2EE88A1D00D6B4B7 /* NativeSettings.m in Sources */ = {isa = PBXBuildFile; fileRef = 30CB59682EE88A1D00D6B4B7 /* NativeSettings.m */; };
+		30CB596F2EE88A1D00D6B4B7 /* NativeQuicModule.swift in Sources */ = {isa = PBXBuildFile; fileRef = 30CB59672EE88A1D00D6B4B7 /* NativeQuicModule.swift */; };
 		761780ED2CA45674006654EE /* AppDelegate.swift in Sources */ = {isa = PBXBuildFile; fileRef = 761780EC2CA45674006654EE /* AppDelegate.swift */; };
 		7B9CBBBC6C3C0DDFC7CD0808 /* PrivacyInfo.xcprivacy in Resources */ = {isa = PBXBuildFile; fileRef = 13B07FB81A68108700A75B9A /* PrivacyInfo.xcprivacy */; };
 		81AB9BB82411601600AC10FF /* LaunchScreen.storyboard in Resources */ = {isa = PBXBuildFile; fileRef = 81AB9BB72411601600AC10FF /* LaunchScreen.storyboard */; };
+		A1001F1012B4D5A500A1F001 /* Web4BlobCache.swift in Sources */ = {isa = PBXBuildFile; fileRef = A1001F0012B4D5A500A1F001 /* Web4BlobCache.swift */; };
+		A1001F1212B4D5A500A1F001 /* Web4ManifestCache.swift in Sources */ = {isa = PBXBuildFile; fileRef = A1001F0212B4D5A500A1F001 /* Web4ManifestCache.swift */; };
+		A1001F1312B4D5A500A1F001 /* Web4Types.swift in Sources */ = {isa = PBXBuildFile; fileRef = A1001F0312B4D5A500A1F001 /* Web4Types.swift */; };
+		A1001F1412B4D5A500A1F001 /* Web4Client.swift in Sources */ = {isa = PBXBuildFile; fileRef = A1001F0412B4D5A500A1F001 /* Web4Client.swift */; };
+		A1001F1512B4D5A500A1F001 /* Web4Runtime.swift in Sources */ = {isa = PBXBuildFile; fileRef = A1001F0512B4D5A500A1F001 /* Web4Runtime.swift */; };
+		A1001F1612B4D5A500A1F001 /* Web4SchemeHandler.swift in Sources */ = {isa = PBXBuildFile; fileRef = A1001F0612B4D5A500A1F001 /* Web4SchemeHandler.swift */; };
+		A1001F1712B4D5A500A1F001 /* Web4View.swift in Sources */ = {isa = PBXBuildFile; fileRef = A1001F0712B4D5A500A1F001 /* Web4View.swift */; };
+		A1001F1912B4D5A500A1F001 /* Web4ViewManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = A1001F0912B4D5A500A1F001 /* Web4ViewManager.swift */; };
+		A1001F1A12B4D5A500A1F001 /* Web4ViewManager.m in Sources */ = {isa = PBXBuildFile; fileRef = A1001F0A12B4D5A500A1F001 /* Web4ViewManager.m */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXFileReference section */
@@ -21,11 +35,26 @@
 		13B07FB61A68108700A75B9A /* Info.plist */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = text.plist.xml; name = Info.plist; path = SovereignNetworkMobile/Info.plist; sourceTree = "<group>"; };
 		13B07FB81A68108700A75B9A /* PrivacyInfo.xcprivacy */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = text.plist.xml; name = PrivacyInfo.xcprivacy; path = SovereignNetworkMobile/PrivacyInfo.xcprivacy; sourceTree = "<group>"; };
 		301BAC722EB4C924003807B5 /* GoogleService-Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist.xml; path = "GoogleService-Info.plist"; sourceTree = "<group>"; };
+		30CB59662EE88A1D00D6B4B7 /* NativeQuicModule.m */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.objc; path = NativeQuicModule.m; sourceTree = "<group>"; };
+		30CB59672EE88A1D00D6B4B7 /* NativeQuicModule.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = NativeQuicModule.swift; sourceTree = "<group>"; };
+		30CB59682EE88A1D00D6B4B7 /* NativeSettings.m */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.objc; path = NativeSettings.m; sourceTree = "<group>"; };
+		30CB59692EE88A1D00D6B4B7 /* NativeSettings.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = NativeSettings.swift; sourceTree = "<group>"; };
+		30CB596A2EE88A1D00D6B4B7 /* Settings.bundle */ = {isa = PBXFileReference; lastKnownFileType = "wrapper.plug-in"; path = Settings.bundle; sourceTree = "<group>"; };
+		30CB59702EE88A1F00D6B4B7 /* SovereignNetworkMobile-Bridging-Header.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = "SovereignNetworkMobile-Bridging-Header.h"; sourceTree = "<group>"; };
 		761780EC2CA45674006654EE /* AppDelegate.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; name = AppDelegate.swift; path = SovereignNetworkMobile/AppDelegate.swift; sourceTree = "<group>"; };
 		7C1DF059E1FB07F63F66F2B5 /* Pods-SovereignNetworkMobile.debug.xcconfig */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = text.xcconfig; name = "Pods-SovereignNetworkMobile.debug.xcconfig"; path = "Target Support Files/Pods-SovereignNetworkMobile/Pods-SovereignNetworkMobile.debug.xcconfig"; sourceTree = "<group>"; };
 		81AB9BB72411601600AC10FF /* LaunchScreen.storyboard */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = file.storyboard; name = LaunchScreen.storyboard; path = SovereignNetworkMobile/LaunchScreen.storyboard; sourceTree = "<group>"; };
 		8D24FC999DA153288045F4D3 /* libPods-SovereignNetworkMobile.a */ = {isa = PBXFileReference; explicitFileType = archive.ar; includeInIndex = 0; path = "libPods-SovereignNetworkMobile.a"; sourceTree = BUILT_PRODUCTS_DIR; };
 		8E86F6E67F7803368F640904 /* Pods-SovereignNetworkMobile.release.xcconfig */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = text.xcconfig; name = "Pods-SovereignNetworkMobile.release.xcconfig"; path = "Target Support Files/Pods-SovereignNetworkMobile/Pods-SovereignNetworkMobile.release.xcconfig"; sourceTree = "<group>"; };
+		A1001F0012B4D5A500A1F001 /* Web4BlobCache.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Web4BlobCache.swift; sourceTree = "<group>"; };
+		A1001F0212B4D5A500A1F001 /* Web4ManifestCache.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Web4ManifestCache.swift; sourceTree = "<group>"; };
+		A1001F0312B4D5A500A1F001 /* Web4Types.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Web4Types.swift; sourceTree = "<group>"; };
+		A1001F0412B4D5A500A1F001 /* Web4Client.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Web4Client.swift; sourceTree = "<group>"; };
+		A1001F0512B4D5A500A1F001 /* Web4Runtime.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Web4Runtime.swift; sourceTree = "<group>"; };
+		A1001F0612B4D5A500A1F001 /* Web4SchemeHandler.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Web4SchemeHandler.swift; sourceTree = "<group>"; };
+		A1001F0712B4D5A500A1F001 /* Web4View.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Web4View.swift; sourceTree = "<group>"; };
+		A1001F0912B4D5A500A1F001 /* Web4ViewManager.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Web4ViewManager.swift; sourceTree = "<group>"; };
+		A1001F0A12B4D5A500A1F001 /* Web4ViewManager.m */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.objc; path = Web4ViewManager.m; sourceTree = "<group>"; };
 		ED297162215061F000B7C4FE /* JavaScriptCore.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = JavaScriptCore.framework; path = System/Library/Frameworks/JavaScriptCore.framework; sourceTree = SDKROOT; };
 /* End PBXFileReference section */
 
@@ -44,12 +73,27 @@
 		13B07FAE1A68108700A75B9A /* SovereignNetworkMobile */ = {
 			isa = PBXGroup;
 			children = (
+				A1001F0012B4D5A500A1F001 /* Web4BlobCache.swift */,
+				A1001F0212B4D5A500A1F001 /* Web4ManifestCache.swift */,
+				A1001F0312B4D5A500A1F001 /* Web4Types.swift */,
+				A1001F0412B4D5A500A1F001 /* Web4Client.swift */,
+				A1001F0512B4D5A500A1F001 /* Web4Runtime.swift */,
+				A1001F0612B4D5A500A1F001 /* Web4SchemeHandler.swift */,
+				A1001F0712B4D5A500A1F001 /* Web4View.swift */,
+				A1001F0912B4D5A500A1F001 /* Web4ViewManager.swift */,
+				A1001F0A12B4D5A500A1F001 /* Web4ViewManager.m */,
+				30CB59662EE88A1D00D6B4B7 /* NativeQuicModule.m */,
+				30CB59672EE88A1D00D6B4B7 /* NativeQuicModule.swift */,
+				30CB59682EE88A1D00D6B4B7 /* NativeSettings.m */,
+				30CB59692EE88A1D00D6B4B7 /* NativeSettings.swift */,
+				30CB596A2EE88A1D00D6B4B7 /* Settings.bundle */,
 				301BAC722EB4C924003807B5 /* GoogleService-Info.plist */,
 				13B07FB51A68108700A75B9A /* Images.xcassets */,
 				761780EC2CA45674006654EE /* AppDelegate.swift */,
 				13B07FB61A68108700A75B9A /* Info.plist */,
 				81AB9BB72411601600AC10FF /* LaunchScreen.storyboard */,
 				13B07FB81A68108700A75B9A /* PrivacyInfo.xcprivacy */,
+				30CB59702EE88A1F00D6B4B7 /* SovereignNetworkMobile-Bridging-Header.h */,
 			);
 			name = SovereignNetworkMobile;
 			sourceTree = "<group>";
@@ -136,7 +180,7 @@
 				LastUpgradeCheck = 1210;
 				TargetAttributes = {
 					13B07F861A680F5B00A75B9A = {
-						LastSwiftMigration = 1120;
+						LastSwiftMigration = 2600;
 					};
 				};
 			};
@@ -165,6 +209,7 @@
 			files = (
 				81AB9BB82411601600AC10FF /* LaunchScreen.storyboard in Resources */,
 				301BAC732EB4C924003807B5 /* GoogleService-Info.plist in Resources */,
+				30CB596B2EE88A1D00D6B4B7 /* Settings.bundle in Resources */,
 				13B07FBF1A68108700A75B9A /* Images.xcassets in Resources */,
 				7B9CBBBC6C3C0DDFC7CD0808 /* PrivacyInfo.xcprivacy in Resources */,
 			);
@@ -291,6 +336,19 @@
 			isa = PBXSourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+				A1001F1012B4D5A500A1F001 /* Web4BlobCache.swift in Sources */,
+				A1001F1212B4D5A500A1F001 /* Web4ManifestCache.swift in Sources */,
+				A1001F1312B4D5A500A1F001 /* Web4Types.swift in Sources */,
+				A1001F1412B4D5A500A1F001 /* Web4Client.swift in Sources */,
+				A1001F1512B4D5A500A1F001 /* Web4Runtime.swift in Sources */,
+				A1001F1612B4D5A500A1F001 /* Web4SchemeHandler.swift in Sources */,
+				A1001F1712B4D5A500A1F001 /* Web4View.swift in Sources */,
+				A1001F1912B4D5A500A1F001 /* Web4ViewManager.swift in Sources */,
+				A1001F1A12B4D5A500A1F001 /* Web4ViewManager.m in Sources */,
+				30CB596C2EE88A1D00D6B4B7 /* NativeSettings.swift in Sources */,
+				30CB596D2EE88A1D00D6B4B7 /* NativeQuicModule.m in Sources */,
+				30CB596E2EE88A1D00D6B4B7 /* NativeSettings.m in Sources */,
+				30CB596F2EE88A1D00D6B4B7 /* NativeQuicModule.swift in Sources */,
 				761780ED2CA45674006654EE /* AppDelegate.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
@@ -303,12 +361,14 @@
 			baseConfigurationReference = 7C1DF059E1FB07F63F66F2B5 /* Pods-SovereignNetworkMobile.debug.xcconfig */;
 			buildSettings = {
 				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
+				ASSETCATALOG_COMPILER_INCLUDE_ALL_APPICON_ASSETS = YES;
 				CLANG_ENABLE_MODULES = YES;
-				CURRENT_PROJECT_VERSION = 10;
+				CURRENT_PROJECT_VERSION = 22;
 				DEVELOPMENT_TEAM = 7GX9WC4VQY;
 				ENABLE_BITCODE = NO;
 				INFOPLIST_FILE = SovereignNetworkMobile/Info.plist;
 				INFOPLIST_KEY_CFBundleDisplayName = "The Sovreign Network";
+				INFOPLIST_KEY_LSApplicationCategoryType = "public.app-category.business";
 				IPHONEOS_DEPLOYMENT_TARGET = 15.1;
 				LD_RUNPATH_SEARCH_PATHS = (
 					"$(inherited)",
@@ -323,8 +383,14 @@
 				PRODUCT_BUNDLE_IDENTIFIER = "org.reactjs.native.example.$(PRODUCT_NAME:rfc1034identifier)";
 				"PRODUCT_BUNDLE_IDENTIFIER[sdk=iphoneos*]" = kode.zone.SovereignNetworkMobile;
 				PRODUCT_NAME = SovereignNetworkMobile;
+				SUPPORTED_PLATFORMS = "iphoneos iphonesimulator";
+				SUPPORTS_MACCATALYST = NO;
+				SUPPORTS_MAC_DESIGNED_FOR_IPHONE_IPAD = NO;
+				SUPPORTS_XR_DESIGNED_FOR_IPHONE_IPAD = NO;
+				SWIFT_OBJC_BRIDGING_HEADER = "SovereignNetworkMobile-Bridging-Header.h";
 				SWIFT_OPTIMIZATION_LEVEL = "-Onone";
 				SWIFT_VERSION = 5.0;
+				TARGETED_DEVICE_FAMILY = 1;
 				VERSIONING_SYSTEM = "apple-generic";
 			};
 			name = Debug;
@@ -334,11 +400,13 @@
 			baseConfigurationReference = 8E86F6E67F7803368F640904 /* Pods-SovereignNetworkMobile.release.xcconfig */;
 			buildSettings = {
 				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
+				ASSETCATALOG_COMPILER_INCLUDE_ALL_APPICON_ASSETS = YES;
 				CLANG_ENABLE_MODULES = YES;
-				CURRENT_PROJECT_VERSION = 10;
+				CURRENT_PROJECT_VERSION = 22;
 				DEVELOPMENT_TEAM = 7GX9WC4VQY;
 				INFOPLIST_FILE = SovereignNetworkMobile/Info.plist;
 				INFOPLIST_KEY_CFBundleDisplayName = "The Sovreign Network";
+				INFOPLIST_KEY_LSApplicationCategoryType = "public.app-category.business";
 				IPHONEOS_DEPLOYMENT_TARGET = 15.1;
 				LD_RUNPATH_SEARCH_PATHS = (
 					"$(inherited)",
@@ -353,7 +421,13 @@
 				PRODUCT_BUNDLE_IDENTIFIER = "org.reactjs.native.example.$(PRODUCT_NAME:rfc1034identifier)";
 				"PRODUCT_BUNDLE_IDENTIFIER[sdk=iphoneos*]" = kode.zone.SovereignNetworkMobile;
 				PRODUCT_NAME = SovereignNetworkMobile;
+				SUPPORTED_PLATFORMS = "iphoneos iphonesimulator";
+				SUPPORTS_MACCATALYST = NO;
+				SUPPORTS_MAC_DESIGNED_FOR_IPHONE_IPAD = NO;
+				SUPPORTS_XR_DESIGNED_FOR_IPHONE_IPAD = NO;
+				SWIFT_OBJC_BRIDGING_HEADER = "SovereignNetworkMobile-Bridging-Header.h";
 				SWIFT_VERSION = 5.0;
+				TARGETED_DEVICE_FAMILY = 1;
 				VERSIONING_SYSTEM = "apple-generic";
 			};
 			name = Release;

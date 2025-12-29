@@ -1,32 +1,58 @@
 /**
  * HeaderBar Component
- * Top navigation bar with hamburger menu, BLE button, and connection status
+ * Top navigation bar with hamburger menu, balance text, and connection status
  * Used in Dashboard/Browser screens
  */
 
-import React from 'react';
+import React, { useEffect } from 'react';
 import { View, Pressable, StyleSheet } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import LinearGradient from 'react-native-linear-gradient';
 import { Text, Row } from '../../atoms';
-import { colors, spacing, typography, borderRadius, shadows, gradientAccents } from '../../../theme';
+import { colors, spacing, typography, shadows } from '../../../theme';
 import { useTranslation } from '../../../i18n';
+import { useNodeConnectionStatus } from '../../../hooks/useNodeConnectionStatus';
+import { useRewardCounter } from '../../../hooks/useRewardCounter';
 
 export interface HeaderBarProps {
   onMenuPress: () => void;
-  onBLEPress: () => void;
   sovAddress?: string;
   isConnected?: boolean;
+  onConnectionStatusChange?: (connected: boolean, latencyMs?: number) => void;
 }
 
 const HeaderBar: React.FC<HeaderBarProps> = ({
   onMenuPress,
-  onBLEPress,
-  sovAddress = 'SOV:1729.1',
-  isConnected = true,
+  sovAddress,
+  isConnected: isConnectedProp,
+  onConnectionStatusChange,
 }) => {
   const insets = useSafeAreaInsets();
   const { t } = useTranslation();
+
+  // SOV reward counter - slow drip
+  const { displayBalance } = useRewardCounter();
+
+  // Connection status from hook
+  const { connectionStatus, latencyMs } = useNodeConnectionStatus(isConnectedProp === undefined);
+
+  // Use prop if provided, otherwise use hook state
+  const isConnected = isConnectedProp ?? connectionStatus === 'connected';
+
+  // Notify parent of connection status changes
+  useEffect(() => {
+    onConnectionStatusChange?.(isConnected, latencyMs ?? undefined);
+  }, [isConnected, latencyMs, onConnectionStatusChange]);
+
+  // Get status text
+  const getStatusText = () => {
+    if (connectionStatus === 'checking') {
+      return 'Checking...';
+    }
+    if (isConnected && latencyMs !== null) {
+      return `${latencyMs}ms`;
+    }
+    return isConnected ? t.headerbar.connected : t.headerbar.offline;
+  };
 
   const styles = StyleSheet.create({
     container: {
@@ -64,24 +90,19 @@ const HeaderBar: React.FC<HeaderBarProps> = ({
       flexDirection: 'row',
       gap: spacing.md,
     },
-    bleButton: {
-      backgroundColor: colors.bg_darker,
-      paddingHorizontal: spacing.md,
-      paddingVertical: spacing.xs,
-      borderRadius: borderRadius.base,
-      borderWidth: 1,
-      borderColor: colors.primary,
+    centerJustify: {
       justifyContent: 'center',
-      alignItems: 'center',
-    },
-    bleButtonText: {
-      fontSize: typography.size.xs,
-      fontWeight: typography.weight.semibold,
-      color: colors.primary,
     },
     addressText: {
-      fontSize: typography.size.xs,
-      color: colors.text_secondary,
+      fontSize: typography.size.md,
+      fontWeight: typography.weight.normal,
+      color: colors.text_primary,
+      textAlign: 'center',
+    },
+    sovLabel: {
+      fontSize: typography.size.md,
+      fontWeight: typography.weight.medium,
+      color: colors.text_primary,
     },
     statusIndicator: {
       width: 8,
@@ -95,6 +116,9 @@ const HeaderBar: React.FC<HeaderBarProps> = ({
     statusDisconnected: {
       backgroundColor: colors.error,
     },
+    statusChecking: {
+      backgroundColor: colors.warning,
+    },
     rightSection: {
       padding: spacing.sm,
       marginRight: -spacing.sm,
@@ -102,9 +126,8 @@ const HeaderBar: React.FC<HeaderBarProps> = ({
   });
 
   return (
-    <View>
-      <View style={styles.container}>
-        <Row style={styles.contentRow}>
+    <View style={styles.container}>
+      <Row style={styles.contentRow}>
         {/* Hamburger Menu */}
         <Pressable
           onPress={onMenuPress}
@@ -118,58 +141,26 @@ const HeaderBar: React.FC<HeaderBarProps> = ({
           </View>
         </Pressable>
 
-        {/* Center: BLE Button & Address - Horizontal */}
-        <View style={styles.centerSection}>
-          <Pressable
-            onPress={onBLEPress}
-            style={({ pressed }) => [
-              styles.bleButton,
-              pressed && { opacity: 0.7 },
-            ]}
-          >
-            <Text style={styles.bleButtonText}>{t.headerbar.ble}</Text>
-          </Pressable>
-          <Text style={styles.addressText}>{sovAddress}</Text>
+        {/* Center: SOV Balance Counter */}
+        <View style={[styles.centerSection, styles.centerJustify]}>
+          <Text style={styles.sovLabel}>SOV {displayBalance}</Text>
         </View>
 
         {/* Right: Connection Status */}
-        <View
-          style={styles.rightSection}
-        >
-          <Row>
-            <View
-              style={[
-                styles.statusIndicator,
-                isConnected
+        <Row style={styles.rightSection}>
+          <View
+            style={[
+              styles.statusIndicator,
+              connectionStatus === 'checking'
+                ? styles.statusChecking
+                : isConnected
                   ? styles.statusConnected
                   : styles.statusDisconnected,
-              ]}
-            />
-            <Text
-              style={{
-                fontSize: typography.size.xs,
-                color: isConnected
-                  ? colors.success
-                  : colors.error,
-                fontWeight: typography.weight.semibold,
-              }}
-            >
-              {isConnected ? t.headerbar.connected : t.headerbar.offline}
-            </Text>
-          </Row>
-        </View>
+            ]}
+          />
+          <Text style={{ color: colors.text_secondary }}>{getStatusText()}</Text>
+        </Row>
       </Row>
-      </View>
-      {/* Subtle gradient accent line */}
-      <LinearGradient
-        colors={[gradientAccents.gradient_start, gradientAccents.gradient_end]}
-        start={{ x: 0, y: 0 }}
-        end={{ x: 1, y: 0 }}
-        style={{
-          height: 1,
-          opacity: 0.3,
-        }}
-      />
     </View>
   );
 };

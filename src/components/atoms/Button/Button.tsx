@@ -82,7 +82,7 @@ const styles = StyleSheet.create({
   },
   // Variant: Danger
   dangerButton: {
-    backgroundColor: colors.error,
+    backgroundColor: '#cc0000',
   },
   dangerButtonDisabled: {
     backgroundColor: colors.bg_medium,

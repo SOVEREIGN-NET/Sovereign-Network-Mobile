@@ -6,6 +6,8 @@
 import React, { createContext, useEffect, useState, useMemo } from 'react';
 import { ZhtpApi } from '@sovereign-net/api-client';
 import { ReactNativeConfigProvider } from '@sovereign-net/api-client/react-native';
+import { createQuicFetchAdapterSync } from '../services/QuicFetchAdapter';
+import { DEFAULT_SOV_NODE_URL, DEFAULT_NETWORK_TYPE, QUIC_CONFIG, APP_DEFAULTS } from '../config';
 
 export interface ApiContextType {
   api: ZhtpApi | null;
@@ -15,62 +17,6 @@ export interface ApiContextType {
 
 export const ApiContext = createContext<ApiContextType | undefined>(undefined);
 
-interface ApiConfig {
-  zhtpNodeUrl: string;
-  networkType: 'testnet' | 'mainnet';
-  debugMode: boolean;
-  enableBiometrics: boolean;
-}
-
-interface ConfigProvider {
-  getConfig(): Promise<ApiConfig>;
-  updateConfig(config: Partial<ApiConfig>): Promise<void>;
-  clearCache(): Promise<void>;
-}
-
-/**
- * Wrapper for ReactNativeConfigProvider that prioritizes constructor params over cache
- * Fixes issue where cached config takes precedence over passed parameters
- */
-class PriorityConfigProvider implements ConfigProvider {
-  private readonly innerProvider: ReactNativeConfigProvider;
-  private readonly envVars: Record<string, any>;
-
-  constructor(envVars: Record<string, any>, asyncStorage?: any) {
-    this.envVars = envVars;
-    this.innerProvider = new ReactNativeConfigProvider(envVars, asyncStorage);
-  }
-
-  async getConfig(): Promise<ApiConfig> {
-    // Get config from inner provider (which may be cached)
-    const config = await this.innerProvider.getConfig();
-
-    // Override with explicitly provided envVars to ensure they take precedence
-    const result = {
-      ...config,
-      zhtpNodeUrl: this.envVars.ZHTP_NODE_URL ?? config.zhtpNodeUrl,
-      networkType: (this.envVars.NETWORK_TYPE as 'testnet' | 'mainnet') ?? config.networkType,
-      debugMode: this.envVars.DEBUG_MODE ?? config.debugMode,
-      enableBiometrics: this.envVars.ENABLE_BIOMETRICS ?? config.enableBiometrics,
-    };
-
-    console.log('PriorityConfigProvider.getConfig():', {
-      envVarsUrl: this.envVars.ZHTP_NODE_URL,
-      cachedUrl: config.zhtpNodeUrl,
-      finalUrl: result.zhtpNodeUrl,
-    });
-
-    return result;
-  }
-
-  async updateConfig(config: Partial<ApiConfig>): Promise<void> {
-    return this.innerProvider.updateConfig(config);
-  }
-
-  async clearCache(): Promise<void> {
-    return this.innerProvider.clearCache();
-  }
-}
 
 interface ApiProviderProps {
   children: React.ReactNode;
@@ -84,8 +30,8 @@ interface ApiProviderProps {
  */
 export const ApiProvider: React.FC<ApiProviderProps> = ({
   children,
-  zhtpNodeUrl = 'http://192.168.1.31:9333',
-  networkType = 'testnet',
+  zhtpNodeUrl = DEFAULT_SOV_NODE_URL,
+  networkType = DEFAULT_NETWORK_TYPE,
 }) => {
   const [api, setApi] = useState<ZhtpApi | null>(null);
   const [isInitialized, setIsInitialized] = useState(false);
@@ -94,14 +40,26 @@ export const ApiProvider: React.FC<ApiProviderProps> = ({
   useEffect(() => {
     const initializeApi = async () => {
       try {
-        const configProvider = new PriorityConfigProvider({
-          ZHTP_NODE_URL: zhtpNodeUrl,
-          NETWORK_TYPE: networkType,
-          DEBUG_MODE: __DEV__,
-          ENABLE_BIOMETRICS: true,
+        // Use ReactNativeConfigProvider directly - no caching to .env only
+        const configProvider = new ReactNativeConfigProvider(
+          {
+            ZHTP_NODE_URL: zhtpNodeUrl, // Key must match api-client's expected envVar name
+            NETWORK_TYPE: networkType,
+            DEBUG_MODE: __DEV__,
+            ENABLE_BIOMETRICS: true,
+          },
+          // Don't pass AsyncStorage - force read-only config from .env only
+          undefined
+        );
+
+        // Create QUIC fetch adapter for native QUIC transport
+        const quicFetchAdapter = createQuicFetchAdapterSync({
+          insecure: QUIC_CONFIG.insecure,
+          timeout: QUIC_CONFIG.defaultTimeout,
+          fallbackToHttp: QUIC_CONFIG.fallbackToHttp,
         });
 
-        const apiInstance = new ZhtpApi(configProvider);
+        const apiInstance = new ZhtpApi(configProvider, quicFetchAdapter);
         await apiInstance.ensureInitialized();
 
         setApi(apiInstance);

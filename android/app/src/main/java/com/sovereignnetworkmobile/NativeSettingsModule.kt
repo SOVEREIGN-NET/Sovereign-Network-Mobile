@@ -87,11 +87,9 @@ class NativeSettingsModule(reactContext: ReactApplicationContext) :
   fun getAllSettings(promise: Promise) {
     try {
       val useMockData = sharedPreferences.getBoolean("useMockData", true)
-      val nodeUrl = sharedPreferences.getString("nodeUrl", "http://192.168.1.31:9333")
 
       val settings = WritableNativeMap()
       settings.putBoolean("useMockData", useMockData)
-      settings.putString("nodeUrl", nodeUrl ?: "http://192.168.1.31:9333")
 
       promise.resolve(settings)
     } catch (e: Exception) {
@@ -144,7 +142,7 @@ class NativeSettingsModule(reactContext: ReactApplicationContext) :
   @ReactMethod
   fun clearSettings(promise: Promise) {
     try {
-      sharedPreferences.edit().remove("useMockData").remove("nodeUrl").apply()
+      sharedPreferences.edit().remove("useMockData").apply()
       promise.resolve(true)
     } catch (e: Exception) {
       promise.reject("CLEAR_SETTINGS_ERROR", e.message)

@@ -118,9 +118,6 @@ const IdentityScreen = ({ navigation }: any) => {
     <View style={{ flex: 1, backgroundColor: colors.bg_darkest }}>
       <HeaderBar
         onMenuPress={() => setDrawerVisible(true)}
-        onBLEPress={() => {
-          // TODO: Handle BLE connection
-        }}
       />
 
       <SideDrawer
@@ -188,7 +185,7 @@ const IdentityScreen = ({ navigation }: any) => {
               />
               <DetailRow
                 label={t.identity.stats.ubiEarned}
-                value={`${ubiEarnedFormatted} ZHTP`}
+                value={`${ubiEarnedFormatted} SOV`}
               />
               <DetailRow
                 label={t.identity.stats.wallets}

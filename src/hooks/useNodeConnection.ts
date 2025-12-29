@@ -1,6 +1,6 @@
 /**
  * useNodeConnection Hook
- * Custom hook for detecting ZHTP node connectivity and protocol info
+ * Custom hook for detecting SOV node connectivity and protocol info
  */
 
 import { useState, useCallback, useEffect } from 'react';
@@ -46,11 +46,10 @@ export interface UseNodeConnectionReturn extends UseNodeConnectionState {
   checkConnection: () => Promise<void>;
   getProtocol: () => Promise<void>;
   ensureConnection: () => Promise<boolean>;
-  updateNodeUrl: (url: string) => Promise<void>;
 }
 
 /**
- * Hook to check ZHTP node connectivity
+ * Hook to check SOV node connectivity
  * Automatically checks on mount, provides manual refresh methods
  *
  * @param autoCheck - Whether to automatically check connection on mount (default: true)
@@ -147,32 +146,6 @@ export function useNodeConnection(
   }, [t]);
 
   /**
-   * Update ZHTP node URL dynamically
-   * Persists to AsyncStorage for app restart
-   */
-  const updateNodeUrl = useCallback(async (url: string) => {
-    try {
-      setState(prev => ({ ...prev, isLoading: true, error: null }));
-      await RealAuthService.updateNodeUrl(url);
-      setState(prev => ({
-        ...prev,
-        nodeUrl: url,
-        isLoading: false,
-      }));
-      // Verify connection after URL update
-      await checkConnection();
-    } catch (err: unknown) {
-      const message = err instanceof Error ? err.message : 'Unknown error';
-      setState(prev => ({
-        ...prev,
-        isLoading: false,
-        error: message || t.app.errors.updateNodeUrlFailed,
-      }));
-      throw err;
-    }
-  }, [checkConnection, t]);
-
-  /**
    * Initial check on mount
    */
   useEffect(() => {
@@ -199,7 +172,6 @@ export function useNodeConnection(
     checkConnection,
     getProtocol,
     ensureConnection,
-    updateNodeUrl,
   };
 }
 

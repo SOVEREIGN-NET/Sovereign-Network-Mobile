@@ -30,6 +30,8 @@ import ClaimUBIScreen from '../screens/ClaimUBIScreen';
 import StakeTokensScreen from '../screens/StakeTokensScreen';
 import BackupIdentityScreen from '../screens/BackupIdentityScreen';
 import BiometricVerificationScreen from '../screens/BiometricVerificationScreen';
+import BrowserScreen from '../screens/BrowserScreen';
+import ProfileScreen from '../screens/ProfileScreen';
 
 const Stack = createNativeStackNavigator();
 const Tab = createBottomTabNavigator();
@@ -46,6 +48,15 @@ const DashboardStack = () => {
         component={DashboardScreen}
         options={{
           headerShown: false,
+        }}
+      />
+      <Stack.Screen
+        name="Browser"
+        component={BrowserScreen}
+        options={{
+          headerShown: false,
+          presentation: 'modal',
+          animation: 'slide_from_bottom',
         }}
       />
       <Stack.Screen
@@ -91,27 +102,57 @@ const SIDStack = () => {
       <Stack.Screen
         name="SendTokens"
         component={SendTokensScreen}
-        options={{ title: 'Send ZHTP', headerBackTitle: 'Back' }}
+        options={{
+          headerShown: true,
+          title: 'Send SOV',
+          headerBackTitle: '',
+          headerStyle: { backgroundColor: colors.bg_dark },
+          headerTintColor: colors.text_primary,
+        }}
       />
       <Stack.Screen
         name="ReceiveTokens"
         component={ReceiveTokensScreen}
-        options={{ title: 'Receive ZHTP', headerBackTitle: 'Back' }}
+        options={{
+          headerShown: true,
+          title: 'Receive SOV',
+          headerBackTitle: '',
+          headerStyle: { backgroundColor: colors.bg_dark },
+          headerTintColor: colors.text_primary,
+        }}
       />
       <Stack.Screen
         name="StakeTokens"
         component={StakeTokensScreen}
-        options={{ title: 'Stake ZHTP', headerBackTitle: 'Back' }}
+        options={{
+          headerShown: true,
+          title: 'Stake SOV',
+          headerBackTitle: '',
+          headerStyle: { backgroundColor: colors.bg_dark },
+          headerTintColor: colors.text_primary,
+        }}
       />
       <Stack.Screen
         name="ConfirmTransaction"
         component={ConfirmTransactionScreen}
-        options={{ title: 'Confirm Transaction', headerBackTitle: 'Back' }}
+        options={{
+          headerShown: true,
+          title: 'Confirm Transaction',
+          headerBackTitle: '',
+          headerStyle: { backgroundColor: colors.bg_dark },
+          headerTintColor: colors.text_primary,
+        }}
       />
       <Stack.Screen
         name="WalletSettings"
         component={WalletSettingsScreen}
-        options={{ title: 'Wallet Settings', headerBackTitle: 'Back' }}
+        options={{
+          headerShown: true,
+          title: 'Wallet Settings',
+          headerBackTitle: '',
+          headerStyle: { backgroundColor: colors.bg_dark },
+          headerTintColor: colors.text_primary,
+        }}
       />
       <Stack.Screen
         name="ProfileEdit"
@@ -137,6 +178,17 @@ const SIDStack = () => {
         name="BiometricVerification"
         component={BiometricVerificationScreen as any}
         options={{ title: 'Biometric Authentication', headerBackTitle: 'Back' }}
+      />
+      <Stack.Screen
+        name="Profile"
+        component={ProfileScreen}
+        options={{
+          headerShown: true,
+          title: 'Profile',
+          headerBackTitle: '',
+          headerStyle: { backgroundColor: colors.bg_dark },
+          headerTintColor: colors.text_primary,
+        }}
       />
     </Stack.Navigator>
   );
@@ -232,14 +284,15 @@ const RootNavigator = () => {
           } as any}
         />
         <Tab.Screen
-          name="SIDTab"
-          component={SIDStack}
-          options={{
-            title: 'SID',
-            tabBarLabel: 'SID',
-            tabBarIcon: BriefcaseIcon,
-          } as any}
-        />
+        name="SIDTab"
+        component={SIDStack}
+        options={{
+          title: 'SID',
+          tabBarLabel: 'SID',
+          tabBarIcon: BriefcaseIcon,
+          unmountOnBlur: true,
+        } as any}
+      />
       </Tab.Navigator>
     </NavigationContainer>
   );

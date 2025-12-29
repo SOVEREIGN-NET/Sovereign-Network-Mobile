@@ -1,10 +1,13 @@
 /**
  * Real Authentication Service
- * Integrates with ZHTP API backend for actual identity operations
+ * Integrates with SOV API backend for actual identity operations
+ * Uses native QUIC transport via QuicFetchAdapter
  */
 
 import { ZhtpApi, ReactNativeConfigProvider, Identity, SignupRequest, LoginRequest } from '@sovereign-net/api-client/react-native';
-import AsyncStorage from '@react-native-async-storage/async-storage';
+import type { FetchAdapter } from '@sovereign-net/api-client/react-native';
+import QuicClient from './QuicClient';
+import { createQuicFetchAdapterSync } from './QuicFetchAdapter';
 
 export interface SignInCredentials {
   identity_id: string;
@@ -19,23 +22,57 @@ export interface CreateIdentityData {
 }
 
 /**
- * Real auth service using ZHTP API
+ * Real auth service using SOV API over native QUIC transport
  */
 class RealAuthService {
   private readonly api: ZhtpApi;
   private readonly configProvider: ReactNativeConfigProvider;
+  private readonly quicFetch: FetchAdapter;
 
   constructor(nodeUrl: string) {
+    // Node URL comes from .env only - no runtime changes
     this.configProvider = new ReactNativeConfigProvider(
       {
-        ZHTP_NODE_URL: nodeUrl,
+        ZHTP_NODE_URL: nodeUrl, // Key must match api-client's expected envVar name
         NETWORK_TYPE: 'testnet',
         DEBUG_MODE: __DEV__,
         ENABLE_BIOMETRICS: true,
       },
-      AsyncStorage,
+      // Don't pass AsyncStorage - config is read-only from .env
+      undefined,
     );
-    this.api = new ZhtpApi(this.configProvider);
+
+    // SECURITY: Only accept self-signed certificates in development
+    // Production builds require valid certificates
+    const isDevelopment = __DEV__ || process.env.NODE_ENV === 'development';
+
+    // Create QUIC-based fetch adapter for native transport
+    this.quicFetch = createQuicFetchAdapterSync({
+      insecure: isDevelopment,  // Only accept self-signed certs in development
+      timeout: 30,
+      fallbackToHttp: false, // Server only supports QUIC - no HTTP fallback
+      onFallback: (url, reason) => {
+        // SECURITY: Throw error instead of fallback to HTTP
+        throw new Error(
+          `QUIC connection required but failed: ${reason}. ` +
+          `HTTP fallback is disabled for security.`
+        );
+      },
+    });
+
+    // SECURITY: Verify insecure mode is not accidentally enabled in production
+    if (!isDevelopment) {
+      const adapterStr = this.quicFetch.toString();
+      if (adapterStr.includes('insecure') && adapterStr.includes('true')) {
+        throw new Error(
+          '🔴 SECURITY CRITICAL: QUIC insecure mode is enabled in production build! ' +
+          'This is a critical security vulnerability.'
+        );
+      }
+    }
+
+    // Pass QUIC adapter to ZhtpApi - all requests now go over QUIC/UDP
+    this.api = new ZhtpApi(this.configProvider, this.quicFetch);
   }
 
   /**
@@ -44,8 +81,16 @@ class RealAuthService {
    * @returns Identity with wallets
    */
   async signIn(credentials: SignInCredentials): Promise<Identity> {
+    // Extract the hex identity ID from full DID if needed
+    // e.g., "did:zhtp:abc123..." -> "abc123..."
+    let identityId = credentials.identity_id;
+    if (identityId.startsWith('did:zhtp:')) {
+      identityId = identityId.substring('did:zhtp:'.length);
+      console.log('📝 Extracted identity ID from DID:', identityId);
+    }
+
     const request: LoginRequest = {
-      identity_id: credentials.identity_id,
+      identity_id: identityId,
       password: credentials.password,
     };
 
@@ -174,62 +219,61 @@ class RealAuthService {
   }
 
   /**
-   * Test connection to ZHTP node
-   * Tries /api/v1/protocol/health endpoint (no authentication required)
+   * Test connection to SOV node via UDP reachability check
+   * Uses simple UDP probe instead of full QUIC+PQC handshake
    * @returns True if node is reachable
    */
   async testConnection(): Promise<boolean> {
+    // console.log('[RealAuthService] 🔍 testConnection() - UDP Reachability Check');
     try {
-      const baseUrl = this.api.getBaseUrl();
+      // Always prefer the configured default node URL for reachability checks
+      const baseUrl = DEFAULT_SOV_NODE_URL;
+      const url = new URL(baseUrl);
+      const host = url.hostname;
+      const port = parseInt(url.port, 10) || 9334;
 
-      const timeoutPromise = new Promise((_, reject) =>
-        setTimeout(() => reject(new Error('Timeout')), 5000)
-      );
+      // console.log(`[RealAuthService] Checking UDP reachability: ${host}:${port}`);
 
-      const fetchPromise = fetch(`${baseUrl}/api/v1/protocol/health`, {
-        method: 'GET',
-      });
-
-      const response = await Promise.race([fetchPromise, timeoutPromise]) as Response;
-
-      // 401/403 means node is reachable but auth required - that's fine
-      const connected = response.ok || response.status === 401 || response.status === 403;
-      console.log(connected ? '✅ Connected to ZHTP node' : `❌ Failed to connect to ZHTP node (${response.status})`);
+      // Use UDP reachability check (doesn't require PQC handshake)
+      const result = await QuicClient.checkReachability(host, port);
+      const connected = result.reachable;
+      // console.log(connected
+      //   ? `[RealAuthService] ✅ UDP reachable at ${host}:${port} (${result.latencyMs ? Math.round(result.latencyMs) + 'ms' : 'unknown latency'})`
+      //   : `[RealAuthService] ❌ UDP not reachable: ${result.error}`);
       return connected;
     } catch (error: any) {
-      console.error('❌ Connection test failed:', error.message);
+      console.error('[RealAuthService] ❌ UDP reachability check failed:', error.message);
       return false;
     }
   }
 
   /**
-   * Get comprehensive protocol and node information
-   * Fetches node status directly from /api/v1/protocol/health endpoint
+   * Get comprehensive protocol and node information via QUIC
    * @returns Protocol info or null if unavailable
    */
   async getProtocolInfo() {
+    // console.log('[RealAuthService] 🌐 getProtocolInfo() - Full QUIC Health Check');
     try {
       const baseUrl = this.api.getBaseUrl();
+      const healthUrl = `${baseUrl}/api/v1/protocol/health`;
+      // console.log(`[RealAuthService] Requesting: ${healthUrl}`);
 
-      const timeoutPromise = new Promise((_, reject) =>
-        setTimeout(() => reject(new Error('Timeout')), 5000)
-      );
-
-      const fetchPromise = fetch(`${baseUrl}/api/v1/protocol/health`, {
+      const response = await QuicClient.request(healthUrl, {
         method: 'GET',
+        timeout: 10,
+        alpn: 'public', // Health check is unauthenticated
       });
 
-      const response = await Promise.race([fetchPromise, timeoutPromise]) as Response;
-
-      if (response.ok || response.status === 401 || response.status === 403) {
-        const data = await response.json();
-        console.log('✅ Protocol info retrieved');
+      if (response.ok) {
+        const data = JSON.parse(response.body);
+        // console.log('[RealAuthService] ✅ Protocol info retrieved via QUIC:', data);
         return data;
       } else {
-        throw new Error(`HTTP ${response.status}`);
+        // console.log(`[RealAuthService] ❌ Health check failed: HTTP ${response.status}`);
+        throw new Error(`QUIC ${response.status}`);
       }
     } catch (error: any) {
-      console.error('❌ Failed to get protocol info:', error.message);
+      console.error('[RealAuthService] ❌ Failed to get protocol info:', error.message);
       return null;
     }
   }
@@ -251,21 +295,6 @@ class RealAuthService {
   }
 
   /**
-   * Update the ZHTP node URL dynamically
-   * Persists to AsyncStorage for app restart
-   * @param nodeUrl - New ZHTP node URL
-   */
-  async updateNodeUrl(nodeUrl: string): Promise<void> {
-    try {
-      await this.configProvider.updateConfig({ zhtpNodeUrl: nodeUrl });
-      console.log('✅ Node URL updated to:', nodeUrl);
-    } catch (error) {
-      console.error('❌ Failed to update node URL:', error);
-      throw error;
-    }
-  }
-
-  /**
    * Get API instance for direct access
    * @returns ZhtpApi instance
    */
@@ -275,7 +304,7 @@ class RealAuthService {
 
   /**
    * Get current node URL
-   * @returns Configured ZHTP node URL
+   * @returns Configured SOV node URL
    */
   getNodeUrl(): string {
     return this.api.getBaseUrl();
@@ -629,12 +658,10 @@ class RealAuthService {
   }
 }
 
-// Node URL - hardcoded to your ZHTP node
-// Can be updated at runtime using updateNodeUrl() method
-const DEFAULT_NODE_URL = 'http://192.168.1.31:9333';
+import { DEFAULT_SOV_NODE_URL } from '../config';
 
-// Export singleton instance
-const authServiceInstance = new RealAuthService(DEFAULT_NODE_URL);
+// Export singleton instance - uses centralized config
+const authServiceInstance = new RealAuthService(DEFAULT_SOV_NODE_URL);
 export default authServiceInstance;
 
 // Also export the class for creating custom instances

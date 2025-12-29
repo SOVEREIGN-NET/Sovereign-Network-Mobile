@@ -5,13 +5,15 @@
 
 import React, { useState } from 'react';
 import { Modal, Pressable, ScrollView, View } from 'react-native';
-import { Text } from '../../atoms';
+import { Text, Badge } from '../../atoms';
 import { colors, spacing, typography, borderRadius } from '../../../theme';
 
 export interface SelectOption {
   id: string | number;
   label: string;
   description?: string;
+  disabled?: boolean;
+  badge?: string;
 }
 
 export interface SelectProps {
@@ -121,10 +123,12 @@ export const Select: React.FC<SelectProps> = ({
             >
               {validOptions.map((option) => {
                 const isSelected = option.id === selectedId;
+                const isDisabled = option.disabled === true;
                 return (
                   <Pressable
                     key={option.id}
-                    onPress={() => handleSelect(option.id)}
+                    onPress={() => !isDisabled && handleSelect(option.id)}
+                    disabled={isDisabled}
                     style={{
                       paddingVertical: spacing.sm,
                       paddingHorizontal: spacing.lg,
@@ -133,17 +137,23 @@ export const Select: React.FC<SelectProps> = ({
                       borderLeftColor: isSelected ? colors.primary : 'transparent',
                       minHeight: 48,
                       justifyContent: 'center',
+                      opacity: isDisabled ? 0.5 : 1,
                     }}
                   >
-                    <Text
-                      style={{
-                        fontSize: typography.size.sm,
-                        fontWeight: isSelected ? typography.weight.semibold : typography.weight.normal,
-                        color: isSelected ? colors.primary : colors.text_primary,
-                      }}
-                    >
-                      {option.label}
-                    </Text>
+                    <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }}>
+                      <Text
+                        style={{
+                          fontSize: typography.size.sm,
+                          fontWeight: isSelected ? typography.weight.semibold : typography.weight.normal,
+                          color: isDisabled ? colors.text_tertiary : (isSelected ? colors.primary : colors.text_primary),
+                        }}
+                      >
+                        {option.label}
+                      </Text>
+                      {option.badge && (
+                        <Badge label={option.badge} variant="warning" />
+                      )}
+                    </View>
                     {option.description && (
                       <Text
                         style={{

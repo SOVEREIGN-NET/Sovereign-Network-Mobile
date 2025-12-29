@@ -1,0 +1,20 @@
+<?xml version="1.0" encoding="utf-8"?>
+<network-security-config>
+    <!-- Allow cleartext (HTTP) for QUIC connections to any domain -->
+    <!-- Node IP is configured via .env - no hardcoding here -->
+    <domain-config cleartextTrafficPermitted="true">
+        <domain includeSubdomains="true">*</domain>
+        <trust-anchors>
+            <!-- Trust user-added CAs (for dev/self-signed certs) -->
+            <certificates src="user" />
+            <certificates src="system" />
+        </trust-anchors>
+    </domain-config>
+
+    <!-- Default: Use system trust anchors -->
+    <base-config cleartextTrafficPermitted="false">
+        <trust-anchors>
+            <certificates src="system" />
+        </trust-anchors>
+    </base-config>
+</network-security-config>

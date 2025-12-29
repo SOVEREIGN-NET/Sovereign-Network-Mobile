@@ -18,6 +18,8 @@ class MainApplication : Application(), ReactApplication {
           // add(MyReactNativePackage())
           add(NativeStoragePackage())
           add(NativeSettingsPackage())
+          add(NativeQuicPackage())
+          add(Web4Package())
         },
     )
   }

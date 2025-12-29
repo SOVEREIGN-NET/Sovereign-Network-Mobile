@@ -69,7 +69,7 @@ The `Settings.bundle` is an Xcode bundle that creates settings pages in iOS Sett
         <key>Key</key>
         <string>nodeUrl</string>
         <key>DefaultValue</key>
-        <string>http://192.168.1.31:9333</string>
+        <string>http://192.168.1.31:9334</string>
       </dict>
     </array>
   </dict>
@@ -156,7 +156,7 @@ const handleSaveDeveloperSettings = async () => {
 3. Tap it
 4. Go to "Developer Settings"
 5. Toggle "Use Mock Data" ON/OFF
-6. Enter "Node URL" (default: http://192.168.1.31:9333)
+6. Enter "Node URL" (default: http://192.168.1.31:9334)
 7. Return to app - settings load automatically
 
 **Android:**
@@ -242,7 +242,7 @@ src/screens/
 If native settings are not available:
 - App uses AsyncStorage fallback
 - Settings still work within app
-- Default values: mock=true, nodeUrl=http://192.168.1.31:9333
+- Default values: mock=true, nodeUrl=http://192.168.1.31:9334
 
 ```typescript
 // In useNativeSettings hook

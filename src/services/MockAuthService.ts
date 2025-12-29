@@ -1,7 +1,7 @@
 /**
  * Mock Authentication Service
- * Simulates ZHTP authentication without backend integration
- * TODO: Replace with real ZHTP API calls when backend is ready
+ * Simulates SOV authentication without backend integration
+ * TODO: Replace with real SOV API calls when backend is ready
  */
 
 export interface WalletInfo {
@@ -193,7 +193,7 @@ class MockAuthService {
     // Mock lookup
     const identity = MOCK_IDENTITIES[credentials.did];
     if (!identity) {
-      throw new Error('Identity not found on ZHTP network');
+      throw new Error('Identity not found on SOV network');
     }
 
     // Mock successful signin

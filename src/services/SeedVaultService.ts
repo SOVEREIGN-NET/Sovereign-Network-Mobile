@@ -2,7 +2,12 @@ import { Platform } from 'react-native';
 import * as Keychain from 'react-native-keychain';
 
 const VAULT_SERVICE = 'SeedVault';
-const VAULT_USERNAME = 'seed_phrase';
+const VAULT_USERNAME_PREFIX = 'seed_phrase'; // Will append wallet type: seed_phrase_primary, seed_phrase_ubi, etc.
+
+type WalletType = 'primary' | 'ubi' | 'savings';
+
+const getVaultUsername = (walletType?: WalletType) =>
+  walletType ? `${VAULT_USERNAME_PREFIX}_${walletType}` : VAULT_USERNAME_PREFIX;
 
 const BASE_SECURE_OPTIONS: Keychain.Options = {
   service: VAULT_SERVICE,
@@ -47,14 +52,15 @@ async function isSecureStorageAvailable() {
   }
 }
 
-async function saveSeedPhrase(seedPhrase: string[]): Promise<void> {
+async function saveSeedPhrase(seedPhrase: string[], walletType?: WalletType): Promise<void> {
   if (!Array.isArray(seedPhrase) || seedPhrase.length === 0) {
     throw new Error('Seed phrase is empty');
   }
 
   const payload = serialize(seedPhrase);
+  const username = getVaultUsername(walletType);
 
-  await Keychain.setGenericPassword(VAULT_USERNAME, payload, BASE_SECURE_OPTIONS);
+  await Keychain.setGenericPassword(username, payload, BASE_SECURE_OPTIONS);
 }
 
 async function getSeedPhrase(): Promise<string[] | null> {

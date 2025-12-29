@@ -6,12 +6,16 @@ import {
   Button,
   LoadingView,
   Column,
-  StatBox, ScreenLayout,
+  StatBox,
+  ScreenLayout,
   HeaderBar,
   SideDrawer,
-  DrawerItem
+  DrawerItem,
+  Badge,
+  Row,
 } from '../components';
 import { useAsyncData, useApi } from '../hooks';
+import { useDAOStats, formatTreasury } from '../hooks/useDAOStats';
 import { useTranslation } from '../i18n';
 import MockDataService from '../services/MockDataService';
 import { colors, spacing, typography } from '../theme';
@@ -20,6 +24,7 @@ const DAOScreen = ({ navigation }: any) => {
   const { t } = useTranslation();
   const { api, isInitialized } = useApi();
   const [drawerVisible, setDrawerVisible] = useState(false);
+  const daoStats = useDAOStats();
 
   const drawerItems: DrawerItem[] = [
     {
@@ -58,16 +63,17 @@ const DAOScreen = ({ navigation }: any) => {
 
   const { data, loading } = useAsyncData(
     async () => {
-      try {
-        if (api && isInitialized) {
-          // Fetch real DAO data from API
-          const proposals = await api.getDaoProposals();
-          const daoStats = await api.getDaoStats();
-          return { proposals, daoStats };
-        }
-      } catch (error) {
-        console.warn('Failed to fetch DAO data, using mock:', error);
-      }
+      // TODO: Re-enable when API is ready
+      // try {
+      //   if (api && isInitialized) {
+      //     // Fetch real DAO data from API
+      //     const proposals = await api.getDaoProposals();
+      //     const daoStats = await api.getDaoStats();
+      //     return { proposals, daoStats };
+      //   }
+      // } catch (error) {
+      //   console.warn('Failed to fetch DAO data, using mock:', error);
+      // }
 
       // Fallback to mock data
       await new Promise<void>(resolve => setTimeout(() => resolve(), 600));
@@ -84,15 +90,11 @@ const DAOScreen = ({ navigation }: any) => {
   }
 
   const proposals = data?.proposals || [];
-  const daoStats = data?.daoStats;
 
   return (
     <View style={{ flex: 1, backgroundColor: colors.bg_darkest }}>
       <HeaderBar
         onMenuPress={() => setDrawerVisible(true)}
-        onBLEPress={() => {
-          // TODO: Handle BLE connection
-        }}
       />
 
       <SideDrawer
@@ -103,38 +105,53 @@ const DAOScreen = ({ navigation }: any) => {
       />
 
       <ScreenLayout testID="dao-screen">
+      {/* Coming Soon Banner */}
+      <View style={{ paddingHorizontal: spacing.md, marginBottom: spacing.lg }}>
+        <Row style={{ justifyContent: 'center', alignItems: 'center' }}>
+          <Badge label="Coming Soon" variant="warning" />
+        </Row>
+        <Text
+          style={{
+            fontSize: typography.size.xs,
+            color: colors.text_secondary,
+            textAlign: 'center',
+            marginTop: spacing.sm,
+          }}
+        >
+          DAO governance features are under development
+        </Text>
+      </View>
+
       {/* DAO Statistics */}
-      {daoStats && (
-        <View style={{ gap: spacing.lg, marginBottom: spacing.lg }}>
-          <Text variant="h3" style={{ paddingHorizontal: spacing.md }}>
-            {t.dao.statistics.title}
-          </Text>
-          <View style={{ flexDirection: 'row', gap: spacing.md, paddingHorizontal: spacing.xxs }}>
-            <StatBox
-              label={t.dao.statistics.members}
-              value={daoStats.delegates?.toString() || '0'}
-              style={{ flex: 1 }}
-            />
-            <StatBox
-              label={t.dao.statistics.active}
-              value={daoStats.activeProposals?.toString() || '0'}
-              style={{ flex: 1 }}
-            />
-            <StatBox
-              label={t.dao.statistics.total}
-              value={daoStats.totalProposals?.toString() || '0'}
-              style={{ flex: 1 }}
-            />
-          </View>
-          <View style={{ paddingHorizontal: spacing.xxs }}>
-            <StatBox
-              label={t.dao.statistics.treasury}
-              value={`${(daoStats.treasury || 0).toFixed(0)} ZHTP`}
-              style={{ width: '100%' }}
-            />
-          </View>
+      <View style={{ gap: spacing.lg, marginBottom: spacing.lg }}>
+        <Text variant="h3" style={{ paddingHorizontal: spacing.md }}>
+          {t.dao.statistics.title}
+        </Text>
+        <View style={{ flexDirection: 'row', gap: spacing.md, paddingHorizontal: spacing.xxs }}>
+          <StatBox
+            label={t.dao.statistics.members}
+            value={daoStats.members.toString()}
+            style={{ flex: 1 }}
+          />
+          <StatBox
+            label={t.dao.statistics.active}
+            value={daoStats.activeProposals.toString()}
+            style={{ flex: 1 }}
+          />
+          <StatBox
+            label={t.dao.statistics.total}
+            value={daoStats.totalProposals.toString()}
+            style={{ flex: 1 }}
+          />
         </View>
-      )}
+        <View style={{ paddingHorizontal: spacing.xxs }}>
+          <StatBox
+            label={t.dao.statistics.treasury}
+            value={formatTreasury(daoStats.treasury)}
+            style={{ width: '100%' }}
+          />
+        </View>
+      </View>
 
       {/* Governance & Native dApps */}
       <Card>
@@ -188,7 +205,7 @@ const DAOScreen = ({ navigation }: any) => {
             </Card>
           </View>
 
-          {/* Native dApps Section */}
+          {/* Welfare DAOs Section */}
           <View style={{ gap: spacing.md }}>
             <Text
               style={{
@@ -197,132 +214,57 @@ const DAOScreen = ({ navigation }: any) => {
                 color: colors.text_secondary,
               }}
             >
-              {t.dao.dapps.title}
+              Welfare DAOs
             </Text>
-            <Card
-              style={{
-                backgroundColor: colors.bg_darker,
-                padding: spacing.lg,
-              }}
-            >
-              <Text
+            {[
+              { name: 'Food Hub', desc: 'Community food security network', url: 'food.dao.sov' },
+              { name: 'Health Hub', desc: 'Decentralized healthcare access', url: 'health.dao.sov' },
+              { name: 'Education Hub', desc: 'Open learning resources', url: 'edu.dao.sov' },
+              { name: 'Housing Hub', desc: 'Affordable housing collective', url: 'housing.dao.sov' },
+              { name: 'Energy Hub', desc: 'Renewable energy sharing', url: 'energy.dao.sov' },
+            ].map((dao) => (
+              <Card
+                key={dao.url}
                 style={{
-                  color: colors.text_primary,
-                  fontWeight: typography.weight.semibold,
-                  marginBottom: spacing.sm,
+                  backgroundColor: colors.bg_darker,
+                  padding: spacing.lg,
                 }}
               >
-                {t.dao.dapps.defiHub}
-              </Text>
-              <Text
-                style={{
-                  color: colors.text_secondary,
-                  fontSize: typography.size.xs,
-                  marginBottom: spacing.md,
-                }}
-              >
-                {t.dao.dapps.defiHubDesc}
-              </Text>
-              <Button
-                variant="secondary"
-                onPress={() => {}}
-              >
-                {t.dao.dapps.defiHubAction}
-              </Button>
-            </Card>
-            <Card
-              style={{
-                backgroundColor: colors.bg_darker,
-                padding: spacing.lg,
-              }}
-            >
-              <Text
-                style={{
-                  color: colors.text_primary,
-                  fontWeight: typography.weight.semibold,
-                  marginBottom: spacing.sm,
-                }}
-              >
-                {t.dao.dapps.gameFi}
-              </Text>
-              <Text
-                style={{
-                  color: colors.text_secondary,
-                  fontSize: typography.size.xs,
-                  marginBottom: spacing.md,
-                }}
-              >
-                {t.dao.dapps.gamefiDesc}
-              </Text>
-              <Button
-                variant="secondary"
-                onPress={() => {}}
-              >
-                {t.dao.dapps.gamefiAction}
-              </Button>
-            </Card>
-            <Card
-              style={{
-                backgroundColor: colors.bg_darker,
-                padding: spacing.lg,
-              }}
-            >
-              <Text
-                style={{
-                  color: colors.text_primary,
-                  fontWeight: typography.weight.semibold,
-                  marginBottom: spacing.sm,
-                }}
-              >
-                {t.dao.dapps.nftMarketplace}
-              </Text>
-              <Text
-                style={{
-                  color: colors.text_secondary,
-                  fontSize: typography.size.xs,
-                  marginBottom: spacing.md,
-                }}
-              >
-                {t.dao.dapps.nftDesc}
-              </Text>
-              <Button
-                variant="secondary"
-                onPress={() => {}}
-              >
-                {t.dao.dapps.nftAction}
-              </Button>
-            </Card>
-            <Card
-              style={{
-                backgroundColor: colors.bg_darker,
-                padding: spacing.lg,
-              }}
-            >
-              <Text
-                style={{
-                  color: colors.text_primary,
-                  fontWeight: typography.weight.semibold,
-                  marginBottom: spacing.sm,
-                }}
-              >
-                {t.dao.dapps.socialGraph}
-              </Text>
-              <Text
-                style={{
-                  color: colors.text_secondary,
-                  fontSize: typography.size.xs,
-                  marginBottom: spacing.md,
-                }}
-              >
-                {t.dao.dapps.socialDesc}
-              </Text>
-              <Button
-                variant="secondary"
-                onPress={() => {}}
-              >
-                {t.dao.dapps.socialAction}
-              </Button>
-            </Card>
+                <Text
+                  style={{
+                    color: colors.text_primary,
+                    fontWeight: typography.weight.semibold,
+                    marginBottom: spacing.sm,
+                  }}
+                >
+                  {dao.name}
+                </Text>
+                <Text
+                  style={{
+                    color: colors.text_secondary,
+                    fontSize: typography.size.xs,
+                    marginBottom: spacing.md,
+                  }}
+                >
+                  {dao.desc}
+                </Text>
+                <Button
+                  variant="secondary"
+                  onPress={() => navigation.navigate('Browser', { url: `zhtp://${dao.url}` })}
+                >
+                  Launch {dao.name}
+                </Button>
+                <Text
+                  style={{
+                    color: colors.text_tertiary,
+                    fontSize: typography.size.xs,
+                    marginTop: spacing.sm,
+                  }}
+                >
+                  {dao.url}
+                </Text>
+              </Card>
+            ))}
           </View>
         </Column>
       </Card>

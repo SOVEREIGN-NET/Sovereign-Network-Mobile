@@ -8,7 +8,7 @@ import {
   TextStyle,
   TextInputProps,
 } from 'react-native';
-import { colors, spacing, typography, borderRadius } from '../../../theme';
+import { colors, spacing, typography } from '../../../theme';
 
 export interface InputProps extends Omit<TextInputProps, 'style'> {
   label?: string;
@@ -75,8 +75,8 @@ export const Input = React.forwardRef<TextInput | null, InputProps>(
       leftIcon,
       rightIcon,
       containerStyle,
-      style,
-      textInputStyle,
+      style: _style,
+      textInputStyle: _textInputStyle,
       onFocus,
       onBlur,
       ...props
@@ -85,32 +85,12 @@ export const Input = React.forwardRef<TextInput | null, InputProps>(
   ) => {
       const [isFocused, setIsFocused] = useState(false);
 
-      console.log('📥 Input component received props:', {
-        label,
-        error,
-        hint,
-        leftIcon,
-        rightIcon: rightIcon ? 'present' : 'none',
-        containerStyle,
-        style,
-        textInputStyle,
-        ...Object.fromEntries(
-          Object.entries(props).filter(([_, v]) => v !== undefined && v !== null)
-        ),
-      });
-
       const handleFocus = (e: any) => {
-        console.log('🔥 Input.onFocus TRIGGERED - Field becoming active:', {
-          label,
-          error,
-          allProps: props,
-        });
         setIsFocused(true);
         onFocus?.(e);
       };
 
       const handleBlur = (e: any) => {
-        console.log('🔍 Input.onBlur triggered', { label });
         setIsFocused(false);
         onBlur?.(e);
       };
