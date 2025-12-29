@@ -3,6 +3,7 @@ import { View } from 'react-native';
 import { Card, Text, Button, Column, ScreenLayout, FormField, ActionFooter } from '../components';
 import { useTranslation } from '../i18n';
 import { colors, spacing } from '../theme';
+import { validateAndNormalizeDid } from '../utils/didValidator';
 
 interface ValidationErrors {
   recipient?: string;
@@ -19,18 +20,24 @@ const SendTokensScreen = ({ navigation }: any) => {
   const [selectedCurrency, setSelectedCurrency] = React.useState('SOV');
   const [errors, setErrors] = React.useState<ValidationErrors>({});
   const [isLoading, setIsLoading] = React.useState(false);
+  const [normalizedRecipient, setNormalizedRecipient] = React.useState('');
 
   // Form validation
   const validateForm = (): boolean => {
     const newErrors: ValidationErrors = {};
 
-    // Validate recipient address (basic: must be non-empty, at least 32 chars, hex format)
+    // SECURITY: Validate recipient DID format and normalize
     if (!recipient.trim()) {
       newErrors.recipient = t.sendTokens.validation.recipientRequired;
-    } else if (recipient.length < 32) {
-      newErrors.recipient = t.sendTokens.validation.recipientTooShort;
-    } else if (!/^[a-zA-Z0-9]+$/.test(recipient)) {
-      newErrors.recipient = t.sendTokens.validation.recipientInvalid;
+    } else {
+      const validation = validateAndNormalizeDid(recipient);
+
+      if (!validation.valid) {
+        newErrors.recipient = validation.error || 'Invalid recipient DID';
+      } else if (validation.normalized) {
+        // Store the normalized DID for transaction
+        setNormalizedRecipient(validation.normalized);
+      }
     }
 
     // Validate amount (must be non-empty, valid number, > 0)
@@ -70,8 +77,9 @@ const SendTokensScreen = ({ navigation }: any) => {
     setTimeout(() => {
       setIsLoading(false);
       // Navigate to confirmation with transaction details
+      // Use normalized recipient DID to ensure valid format
       navigation.navigate('ConfirmTransaction', {
-        recipient,
+        recipient: normalizedRecipient || recipient,
         amount: amountNum,
         currency: selectedCurrency,
         fee: estimatedFee,

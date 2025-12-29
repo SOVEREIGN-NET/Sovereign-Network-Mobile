@@ -198,7 +198,7 @@ export async function createQuicFetchAdapter(
   const {
     insecure = __DEV__,
     timeout = 30,
-    fallbackToHttp = true,
+    fallbackToHttp = false,
     onFallback,
   } = options;
 
@@ -220,13 +220,17 @@ export async function createQuicFetchAdapter(
     quicOptions.insecure = insecure;
     quicOptions.timeout = timeout;
 
-    // If QUIC not supported, fall back to standard fetch
+    // SECURITY: QUIC is required - do not fall back to HTTP
+    // HTTP would expose the protocol to downgrade attacks
     if (!quicSupported) {
+      const error = new Error(
+        'QUIC_UNSUPPORTED: QUIC protocol is required but not available on this device. ' +
+        'HTTP fallback is disabled for security reasons.'
+      );
       if (onFallback) {
-        onFallback(url, 'QUIC not supported on this device');
+        onFallback(url, error.message);
       }
-      console.warn('[🌐 Web4] QuicFetchAdapter: QUIC not supported, falling back to HTTP');
-      return fetch(url, init);
+      throw error;
     }
 
     try {
@@ -246,13 +250,10 @@ export async function createQuicFetchAdapter(
       console.error('[🌐 Web4] QuicFetchAdapter:   URL:', quicUrl);
       console.error('[🌐 Web4] QuicFetchAdapter:   ALPN:', quicOptions.alpn);
 
-      // If QUIC fails and fallback is enabled, try standard fetch
-      if (fallbackToHttp) {
-        if (onFallback) {
-          onFallback(url, `QUIC failed: ${errorMessage}`);
-        }
-        console.warn(`QUIC request failed, falling back to HTTP: ${errorMessage}`);
-        return fetch(url, init);
+      // SECURITY: QUIC is required - no HTTP fallback on error
+      // Failing securely is better than exposing to downgrade attacks
+      if (onFallback) {
+        onFallback(url, `QUIC failed: ${errorMessage}`);
       }
       throw error;
     }
@@ -269,7 +270,7 @@ export function createQuicFetchAdapterSync(
   const {
     insecure = __DEV__,
     timeout = 30,
-    fallbackToHttp = true,
+    fallbackToHttp = false,
     onFallback,
   } = options;
 
@@ -301,15 +302,17 @@ export function createQuicFetchAdapterSync(
     //   });
     // }
 
-    // Fallback if not supported
+    // SECURITY: QUIC is required - do not fall back to HTTP
+    // HTTP would expose the protocol to downgrade attacks
     if (!quicSupported) {
-      if (fallbackToHttp) {
-        if (onFallback) {
-          onFallback(url, 'QUIC not supported');
-        }
-        return fetch(url, init);
+      const error = new Error(
+        'QUIC_UNSUPPORTED: QUIC protocol is required but not available on this device. ' +
+        'HTTP fallback is disabled for security reasons.'
+      );
+      if (onFallback) {
+        onFallback(url, error.message);
       }
-      throw new Error('QUIC not supported and fallback disabled');
+      throw error;
     }
 
     try {
@@ -341,11 +344,10 @@ export function createQuicFetchAdapterSync(
       //   });
       // }
 
-      if (fallbackToHttp) {
-        if (onFallback) {
-          onFallback(url, `QUIC error: ${errorMessage}`);
-        }
-        return fetch(url, init);
+      // SECURITY: QUIC is required - no HTTP fallback on error
+      // Failing securely is better than exposing to downgrade attacks
+      if (onFallback) {
+        onFallback(url, `QUIC error: ${errorMessage}`);
       }
       throw error;
     }
