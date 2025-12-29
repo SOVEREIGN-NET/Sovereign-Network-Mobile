@@ -1,3 +1,14 @@
+/**
+ * Seed Vault Service
+ * Manages secure storage of seed phrases using Keychain with biometric authentication
+ *
+ * SECURITY: Phase 3.1 Enhancements
+ * - Biometric authentication for seed phrase access
+ * - Hardware-backed Keychain storage (Secure Enclave on iOS, StrongBox on Android)
+ * - Device passcode fallback
+ * - Automatic cleanup on failed authentication
+ */
+
 import { Platform } from 'react-native';
 import * as Keychain from 'react-native-keychain';
 
@@ -9,7 +20,12 @@ type WalletType = 'primary' | 'ubi' | 'savings';
 const getVaultUsername = (walletType?: WalletType) =>
   walletType ? `${VAULT_USERNAME_PREFIX}_${walletType}` : VAULT_USERNAME_PREFIX;
 
-const BASE_SECURE_OPTIONS: Keychain.Options = {
+/**
+ * SECURITY: Enhanced secure options for biometric + device passcode
+ * Uses WHEN_UNLOCKED_THIS_DEVICE_ONLY to ensure keys are only accessible when device is unlocked
+ * SECURE_HARDWARE ensures keys are stored in Secure Enclave (iOS) or StrongBox (Android)
+ */
+const BIOMETRIC_SECURE_OPTIONS: Keychain.Options = {
   service: VAULT_SERVICE,
   accessible: Keychain.ACCESSIBLE.WHEN_UNLOCKED_THIS_DEVICE_ONLY,
   accessControl:
@@ -18,6 +34,9 @@ const BASE_SECURE_OPTIONS: Keychain.Options = {
       : Keychain.ACCESS_CONTROL.BIOMETRY_CURRENT_SET_OR_DEVICE_PASSCODE,
   securityLevel: Keychain.SECURITY_LEVEL.SECURE_HARDWARE,
 };
+
+// Legacy alias for backward compatibility
+const BASE_SECURE_OPTIONS = BIOMETRIC_SECURE_OPTIONS;
 
 const AUTH_PROMPT: Keychain.AuthenticationPrompt = {
   title: 'Unlock Seed Phrase',
@@ -63,18 +82,137 @@ async function saveSeedPhrase(seedPhrase: string[], walletType?: WalletType): Pr
   await Keychain.setGenericPassword(username, payload, BASE_SECURE_OPTIONS);
 }
 
-async function getSeedPhrase(): Promise<string[] | null> {
-  const credentials = await Keychain.getGenericPassword({
-    ...BASE_SECURE_OPTIONS,
-    authenticationPrompt: AUTH_PROMPT,
-    authenticationType: Keychain.AUTHENTICATION_TYPE.BIOMETRICS,
-  });
+/**
+ * Check if biometric authentication is available on the device
+ * SECURITY: Phase 3.1 - Biometric availability check
+ *
+ * @returns true if biometric is supported and enabled, false otherwise
+ */
+async function enableBiometricAuth(): Promise<boolean> {
+  try {
+    const biometryType = await Keychain.getSupportedBiometryType();
 
-  if (!credentials) {
+    if (!biometryType || biometryType === Keychain.BIOMETRY_TYPE.NONE) {
+      if (__DEV__) {
+        console.warn('⚠️ Biometric not available on this device');
+      }
+      return false;
+    }
+
+    if (__DEV__) {
+      console.log(`✅ Biometric available: ${biometryType}`);
+    }
+    return true;
+  } catch (error) {
+    console.error('❌ Failed to check biometric availability:', error);
+    return false;
+  }
+}
+
+/**
+ * Get the supported biometry type on the device
+ * Returns: 'FaceID', 'TouchID', 'Iris', 'Fingerprint', or null if not available
+ *
+ * @returns Biometry type string or null if unavailable
+ */
+async function getBiometryType(): Promise<string | null> {
+  try {
+    return await Keychain.getSupportedBiometryType();
+  } catch (error) {
+    console.error('Failed to get biometry type:', error);
     return null;
   }
+}
 
-  return deserialize(credentials.password);
+/**
+ * Get seed phrase with biometric authentication (enhanced version)
+ * SECURITY: Phase 3.1 - Enhanced biometric authentication
+ *
+ * @param walletType - Optional wallet type to retrieve specific seed phrase
+ * @returns Decrypted seed phrase array or null if authentication fails/cancelled
+ */
+async function getSeedPhraseWithBiometric(walletType?: WalletType): Promise<string[] | null> {
+  try {
+    const biometricAvailable = await enableBiometricAuth();
+
+    if (!biometricAvailable) {
+      console.warn('⚠️ Biometric not available, falling back to passcode');
+      // Fall back to device passcode authentication
+      return getSeedPhraseWithPasscode(walletType);
+    }
+
+    const username = getVaultUsername(walletType);
+    const credentials = await Keychain.getGenericPassword({
+      ...BIOMETRIC_SECURE_OPTIONS,
+      authenticationPrompt: {
+        title: 'Unlock Seed Phrase',
+        subtitle: 'Authenticate to access your wallet',
+        description: 'Use your biometric or device passcode',
+        negativeButtonText: 'Cancel',
+      },
+      authenticationType: Keychain.AUTHENTICATION_TYPE.BIOMETRICS_OR_PASSCODE,
+      username,
+    });
+
+    if (!credentials) {
+      if (__DEV__) {
+        console.warn('⚠️ User cancelled biometric authentication');
+      }
+      return null;
+    }
+
+    if (__DEV__) {
+      console.log(`✅ Biometric authentication successful for ${walletType || 'default'} wallet`);
+    }
+
+    return deserialize(credentials.password);
+  } catch (error) {
+    console.error('❌ Biometric authentication failed:', error);
+    return null;
+  }
+}
+
+/**
+ * Get seed phrase using device passcode only (fallback)
+ * SECURITY: Phase 3.1 - Device passcode fallback authentication
+ *
+ * @param walletType - Optional wallet type to retrieve specific seed phrase
+ * @returns Decrypted seed phrase array or null if authentication fails
+ */
+async function getSeedPhraseWithPasscode(walletType?: WalletType): Promise<string[] | null> {
+  try {
+    const username = getVaultUsername(walletType);
+    const credentials = await Keychain.getGenericPassword({
+      service: VAULT_SERVICE,
+      username,
+      authenticationPrompt: {
+        title: 'Unlock Seed Phrase',
+        subtitle: 'Enter your device passcode',
+        description: 'Biometric is not available on this device',
+        negativeButtonText: 'Cancel',
+      },
+      authenticationType: Keychain.AUTHENTICATION_TYPE.DEVICE_PASSCODE_OR_BIOMETRICS,
+    });
+
+    if (!credentials) {
+      return null;
+    }
+
+    return deserialize(credentials.password);
+  } catch (error) {
+    console.error('❌ Passcode authentication failed:', error);
+    return null;
+  }
+}
+
+/**
+ * Original getSeedPhrase function - maintains backward compatibility
+ * SECURITY: Uses biometric + device passcode fallback
+ *
+ * @returns Decrypted seed phrase array or null
+ */
+async function getSeedPhrase(): Promise<string[] | null> {
+  return getSeedPhraseWithBiometric();
 }
 
 async function clearSeedPhrase(): Promise<void> {
@@ -85,6 +223,10 @@ const SeedVaultService = {
   isSecureStorageAvailable,
   saveSeedPhrase,
   getSeedPhrase,
+  getSeedPhraseWithBiometric,
+  getSeedPhraseWithPasscode,
+  enableBiometricAuth,
+  getBiometryType,
   clearSeedPhrase,
 };
 

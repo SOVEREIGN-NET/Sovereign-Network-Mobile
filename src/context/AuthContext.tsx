@@ -8,6 +8,7 @@ import { Platform } from 'react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { NativeStorage } from '../services/NativeStorage';
 import SecureIdentityStorage from '../services/SecureIdentityStorage';
+import SeedVaultService from '../services/SeedVaultService';
 import { rateLimiter } from '../services/RateLimiter';
 import MockAuthService, { Identity } from '../services/MockAuthService';
 import type { CreateIdentityData } from '../services/RealAuthService';
@@ -113,6 +114,9 @@ export interface AuthContextType {
   updatePassphrase: (newPassphrase: string) => Promise<void>;
   updateBiometric: (enabled: boolean) => Promise<void>;
   setCurrentIdentity: (identity: Identity) => Promise<void>;
+  // SECURITY: Phase 3.1 - Biometric authentication methods
+  isBiometricAvailable: () => Promise<boolean>;
+  getBiometryType: () => Promise<string | null>;
 }
 
 export const AuthContext = createContext<AuthContextType | undefined>(undefined);
@@ -429,6 +433,22 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
     }
   }, []);
 
+  /**
+   * SECURITY: Phase 3.1 - Check if biometric authentication is available
+   * Returns true if device supports biometric (Face ID, Touch ID, Fingerprint, Iris, etc.)
+   */
+  const isBiometricAvailable = useCallback(async (): Promise<boolean> => {
+    return SeedVaultService.enableBiometricAuth();
+  }, []);
+
+  /**
+   * SECURITY: Phase 3.1 - Get the type of biometry available on device
+   * Returns: 'FaceID', 'TouchID', 'Iris', 'Fingerprint', or null if unavailable
+   */
+  const getBiometryType = useCallback(async (): Promise<string | null> => {
+    return SeedVaultService.getBiometryType();
+  }, []);
+
   const value = useMemo<AuthContextType>(() => ({
     currentIdentity,
     isAuthenticated: currentIdentity !== null,
@@ -444,7 +464,9 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
     updatePassphrase,
     updateBiometric,
     setCurrentIdentity: setIdentity,
-  }), [currentIdentity, isLoading, isBootstrapping, error, signIn, createIdentity, recoverIdentity, signOut, clearError, updateProfile, updatePassphrase, updateBiometric, setIdentity]);
+    isBiometricAvailable,
+    getBiometryType,
+  }), [currentIdentity, isLoading, isBootstrapping, error, signIn, createIdentity, recoverIdentity, signOut, clearError, updateProfile, updatePassphrase, updateBiometric, setIdentity, isBiometricAvailable, getBiometryType]);
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
 };
