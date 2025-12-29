@@ -105,12 +105,10 @@ ios/Podfile.lock
 
 # Documentation
 /docs/
-CLAUDE.md
 android/app/src/main/res/drawable-mdpi/node_modules_reactnavigation_elements_lib_module_assets_backicon.png
 .github/workflows/build-and-distribute-ios.yml
 .github/workflows/build-and-distribute-android.yml
 .github/CI_CD_SETUP.md
-NATIVE_SETTINGS_GUIDE.md
 
 # Rust build artifacts
 android/app/src/main/rust/**/target/
