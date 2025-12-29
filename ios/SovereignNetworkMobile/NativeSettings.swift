@@ -64,12 +64,11 @@ class NativeSettings: NSObject {
   func getAllSettings(_ resolve: @escaping RCTPromiseResolveBlock, reject: @escaping RCTPromiseRejectBlock) {
     let defaults = UserDefaults.standard
     let useMockData = defaults.bool(forKey: "useMockData") // Default is false if not set
-    let nodeUrl = defaults.string(forKey: "nodeUrl") ?? "http://77.42.37.161:9334"
 
     let settings: [String: Any] = [
-      "useMockData": useMockData,
-      "nodeUrl": nodeUrl
+      "useMockData": useMockData
     ]
+
     resolve(settings)
   }
 
@@ -99,7 +98,6 @@ class NativeSettings: NSObject {
   func clearSettings(_ resolve: @escaping RCTPromiseResolveBlock, reject: @escaping RCTPromiseRejectBlock) {
     let defaults = UserDefaults.standard
     defaults.removeObject(forKey: "useMockData")
-    defaults.removeObject(forKey: "nodeUrl")
     defaults.synchronize()
     resolve(true)
   }

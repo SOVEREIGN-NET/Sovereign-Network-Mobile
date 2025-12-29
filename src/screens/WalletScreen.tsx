@@ -10,13 +10,14 @@ import {
   DrawerItem,
 } from '../components';
 import SShieldLogo from '../components/atoms/Logo';
-import { useAuth } from '../hooks';
+import { useAuth, useWalletBalance } from '../hooks';
 import { useTranslation } from '../i18n';
 import { colors, spacing, typography, borderRadius } from '../theme';
 
 const WalletScreen = ({ navigation }: any) => {
   const { t } = useTranslation();
   const { currentIdentity, isLoading } = useAuth();
+  const { balance: primaryBalance } = useWalletBalance();
   const [activeTab, setActiveTab] = useState('Tokens');
   const [drawerVisible, setDrawerVisible] = useState(false);
 
@@ -196,7 +197,7 @@ const WalletScreen = ({ navigation }: any) => {
                       marginBottom: spacing.sm,
                     }}
                   >
-                    {selectedWallet.balance.toLocaleString()}
+                    {Math.floor(primaryBalance).toLocaleString()}
                   </Text>
                   <Text style={{ fontSize: typography.size.sm, color: colors.text_secondary }}>
                     {t.wallet.currency}
@@ -328,7 +329,7 @@ const WalletScreen = ({ navigation }: any) => {
                               color: colors.text_primary,
                             }}
                           >
-                            {wallet.balance.toLocaleString()} SOV
+                            {(wallet.wallet_type === 'primary' || wallet.wallet_type === 'Primary') ? Math.floor(primaryBalance).toLocaleString() : wallet.balance.toLocaleString()} SOV
                           </Text>
                         </View>
                       </View>

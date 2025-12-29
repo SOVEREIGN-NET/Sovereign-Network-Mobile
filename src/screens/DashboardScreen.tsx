@@ -81,7 +81,11 @@ const DashboardScreen: React.FC<any> = ({ navigation }) => {
   );
 
   const openBrowser = (url?: string) => {
-    navigation.navigate('Browser', { url: url || urlInput });
+    const targetUrl = url || urlInput;
+    if (__DEV__) {
+      console.log('[🌐 Web4] Dashboard: Navigating to URL:', targetUrl);
+    }
+    navigation.navigate('Browser', { url: targetUrl });
   };
 
   const { trendingDapps, trendingTokens, bounties } = t.dashboard;

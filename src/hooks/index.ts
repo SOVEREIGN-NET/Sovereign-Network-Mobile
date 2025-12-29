@@ -14,3 +14,6 @@ export type { ProtocolInfo, UseNodeConnectionState, UseNodeConnectionReturn } fr
 
 export { useNativeSettings } from './useNativeSettings';
 export type { DeveloperSettings } from './useNativeSettings';
+
+export { useWalletBalance, getWalletBalance, formatBalance } from './useWalletBalance';
+export type { WalletBalanceData } from './useWalletBalance';

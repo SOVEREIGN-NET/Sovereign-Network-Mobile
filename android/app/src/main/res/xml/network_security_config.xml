@@ -1,20 +1,14 @@
 <?xml version="1.0" encoding="utf-8"?>
 <network-security-config>
-    <!-- Development: Trust all certificates for ZHTP dev server -->
+    <!-- Allow cleartext (HTTP) for QUIC connections to any domain -->
+    <!-- Node IP is configured via .env - no hardcoding here -->
     <domain-config cleartextTrafficPermitted="true">
-        <domain includeSubdomains="true">77.42.37.161</domain>
+        <domain includeSubdomains="true">*</domain>
         <trust-anchors>
             <!-- Trust user-added CAs (for dev/self-signed certs) -->
             <certificates src="user" />
             <certificates src="system" />
         </trust-anchors>
-    </domain-config>
-
-    <!-- Allow localhost for React Native debugging -->
-    <domain-config cleartextTrafficPermitted="true">
-        <domain includeSubdomains="true">localhost</domain>
-        <domain includeSubdomains="true">10.0.2.2</domain>
-        <domain includeSubdomains="true">10.0.3.2</domain>
     </domain-config>
 
     <!-- Default: Use system trust anchors -->

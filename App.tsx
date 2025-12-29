@@ -85,6 +85,7 @@ function AppWithTheme() {
  * Root App component with providers
  */
 function App() {
+
   // Initialize Firebase App Distribution for tester feedback (shake to send feedback)
   useEffect(() => {
     if (__DEV__) return; // Only enable in release builds

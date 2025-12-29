@@ -1,6 +1,13 @@
 /**
  * Application Configuration
  * Single source of truth for all URLs, endpoints, and network settings
+ * NOTE: Node URL MUST be set in .env file - change nowhere else
+ *
+ * The .env file is read by a build script (scripts/generate-config.js) that
+ * sets these values. This ensures:
+ * 1. Single source of truth in .env
+ * 2. No hardcoded IPs in multiple files
+ * 3. Clean build-time configuration injection
  */
 
 // =============================================================================
@@ -9,21 +16,43 @@
 
 /**
  * Default SOV Node URL
- * The development node at this address only supports pure QUIC/UDP - no HTTP fallback
+ * Set in .env file: ZHTP_NODE_URL=http://your-node-ip:9334
+ * The development node only supports pure QUIC/UDP - no HTTP fallback
  * Port 9334 is the standard SOV port
- * Note: Use http:// scheme - the QUIC adapter converts to quic:// internally
  *
  * ⚠️  SINGLE POINT TO CHANGE NODE URL:
- *     - Local testing:  'http://192.168.1.30:9334'
- *     - Remote server:  'http://77.42.37.161:9334'
+ *     Edit .env file only:
+ *     - Local testing:  ZHTP_NODE_URL=http://192.168.1.30:9334
+ *     - Remote server:  ZHTP_NODE_URL=http://77.42.37.161:9334
+ *
+ * This value is injected at build time via scripts/generate-config.js
  */
-export const DEFAULT_SOV_NODE_URL = 'http://77.42.37.161:9334';
+// eslint-disable-next-line @typescript-eslint/no-var-requires
+const { ZHTP_NODE_URL: envNodeUrl } = require('../.env.generated.json');
+
+export const DEFAULT_SOV_NODE_URL = envNodeUrl || 'http://77.42.37.161:9334';
+
+/**
+ * Parse host and port from the node URL
+ */
+function parseNodeUrl(url: string): { host: string; port: number } {
+  try {
+    const urlObj = new URL(url.replace('http://', 'http://').replace('quic://', 'http://'));
+    const host = urlObj.hostname;
+    const port = parseInt(urlObj.port || '9334', 10);
+    return { host, port };
+  } catch {
+    return { host: '77.42.37.161', port: 9334 };
+  }
+}
+
+const { host: parsedHost, port: parsedPort } = parseNodeUrl(DEFAULT_SOV_NODE_URL);
 
 /**
  * Default node host and port (parsed from URL)
  */
-export const DEFAULT_NODE_HOST = '77.42.37.161';
-export const DEFAULT_NODE_PORT = 9334;
+export const DEFAULT_NODE_HOST = parsedHost;
+export const DEFAULT_NODE_PORT = parsedPort;
 
 /**
  * Network type - testnet or mainnet

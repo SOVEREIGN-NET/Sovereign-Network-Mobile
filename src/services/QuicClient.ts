@@ -118,14 +118,25 @@ export async function quicRequest(
     alpn: options.alpn || 'authenticated', // Default to authenticated (zhtp-uhp/1)
   };
 
-  // CRITICAL: Log ALPN being sent to native
-  // console.log('[QuicClient] 🔑 ALPN being sent to native:', {
-  //   url,
-  //   alpn: requestOptions.alpn,
-  //   method: requestOptions.method,
-  // });
+  console.log('[🌐 Web4] QuicClient: Making QUIC request:');
+  console.log('[🌐 Web4] QuicClient:   URL:', url);
+  console.log('[🌐 Web4] QuicClient:   Method:', requestOptions.method);
+  console.log('[🌐 Web4] QuicClient:   ALPN:', requestOptions.alpn);
+  console.log('[🌐 Web4] QuicClient:   Timeout:', requestOptions.timeout, 'seconds');
+  if (options.body) {
+    console.log('[🌐 Web4] QuicClient:   Body:', options.body);
+  }
 
-  return await NativeQuic.request(url, requestOptions);
+  try {
+    const response = await NativeQuic.request(url, requestOptions);
+    console.log('[🌐 Web4] QuicClient: Response received:');
+    console.log('[🌐 Web4] QuicClient:   Status:', response.status, response.statusText);
+    console.log('[🌐 Web4] QuicClient:   Body length:', response.body?.length || 0, 'bytes');
+    return response;
+  } catch (error) {
+    console.error('[🌐 Web4] QuicClient: Request failed:', error);
+    throw error;
+  }
 }
 
 /**

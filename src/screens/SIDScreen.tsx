@@ -13,7 +13,7 @@ import {
   DrawerItem,
   Badge,
 } from '../components';
-import { useAuth, useApi, useAsyncData } from '../hooks';
+import { useAuth, useApi, useAsyncData, useWalletBalance } from '../hooks';
 import { useTranslation } from '../i18n';
 import { colors, spacing, typography, borderRadius } from '../theme';
 
@@ -36,6 +36,7 @@ const SIDScreen = ({ navigation }: any) => {
   const { t } = useTranslation();
   const { currentIdentity, isLoading } = useAuth();
   const { api, isInitialized } = useApi();
+  const { balance: walletBalance, displayBalance: walletDisplayBalance } = useWalletBalance();
   const [drawerVisible, setDrawerVisible] = useState(false);
   const [activeWalletTab, setActiveWalletTab] = useState('Tokens');
 
@@ -153,7 +154,7 @@ const SIDScreen = ({ navigation }: any) => {
   // Fallback to API data if identity wallets are empty
   const wallets = identityWallets.length > 0 ? identityWallets : (walletData?.wallets || []);
   const selectedWallet = wallets[0] || null;
-  const totalBalance = 5000; // Hardcoded for alpha demo
+  const totalBalance = walletBalance; // Calculated from useWalletBalance hook
 
   const truncateId = (id: any) => {
     if (!id) return 'unknown';
@@ -417,7 +418,7 @@ const SIDScreen = ({ navigation }: any) => {
                                   color: display.color,
                                 }}
                               >
-                                {walletType === 'Primary' ? formatBalance(5000) : (hasData ? formatBalance(wallet.balance || 0) : '—')}
+                                {walletType === 'Primary' ? formatBalance(walletBalance) : (hasData ? formatBalance(wallet.balance || 0) : '—')}
                               </Text>
                             </Row>
                             <Row style={{ justifyContent: 'space-between', alignItems: 'center', marginTop: spacing.xs }}>

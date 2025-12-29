@@ -6,7 +6,6 @@
 
 import { ZhtpApi, ReactNativeConfigProvider, Identity, SignupRequest, LoginRequest } from '@sovereign-net/api-client/react-native';
 import type { FetchAdapter } from '@sovereign-net/api-client/react-native';
-import AsyncStorage from '@react-native-async-storage/async-storage';
 import QuicClient from './QuicClient';
 import { createQuicFetchAdapterSync } from './QuicFetchAdapter';
 
@@ -31,9 +30,7 @@ class RealAuthService {
   private readonly quicFetch: FetchAdapter;
 
   constructor(nodeUrl: string) {
-    // if (__DEV__) {
-    //   console.log('[RealAuthService] Initializing with nodeUrl:', nodeUrl);
-    // }
+    // Node URL comes from .env only - no runtime changes
     this.configProvider = new ReactNativeConfigProvider(
       {
         ZHTP_NODE_URL: nodeUrl, // Key must match api-client's expected envVar name
@@ -41,10 +38,9 @@ class RealAuthService {
         DEBUG_MODE: __DEV__,
         ENABLE_BIOMETRICS: true,
       },
-      AsyncStorage,
+      // Don't pass AsyncStorage - config is read-only from .env
+      undefined,
     );
-    // Ensure the preferred node URL overrides any cached value
-    this.configProvider.updateConfig({ zhtpNodeUrl: nodeUrl }).catch(() => {});
 
     // Create QUIC-based fetch adapter for native transport
     // Falls back to HTTP if QUIC unavailable (e.g., older iOS)
@@ -277,21 +273,6 @@ class RealAuthService {
     } catch (error) {
       console.error('❌ Failed to ensure connection:', error);
       return false;
-    }
-  }
-
-  /**
-   * Update the SOV node URL dynamically
-   * Persists to AsyncStorage for app restart
-   * @param nodeUrl - New SOV node URL
-   */
-  async updateNodeUrl(nodeUrl: string): Promise<void> {
-    try {
-      await this.configProvider.updateConfig({ zhtpNodeUrl: nodeUrl });
-      console.log('✅ Node URL updated to:', nodeUrl);
-    } catch (error) {
-      console.error('❌ Failed to update node URL:', error);
-      throw error;
     }
   }
 

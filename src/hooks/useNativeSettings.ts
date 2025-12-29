@@ -6,13 +6,12 @@
 
 import { useEffect, useState, useCallback } from 'react';
 import { NativeModules } from 'react-native';
-import { DEFAULT_SOV_NODE_URL, APP_DEFAULTS } from '../config';
+import { APP_DEFAULTS } from '../config';
 
 const { NativeSettings } = NativeModules;
 
 export interface DeveloperSettings {
   useMockData: boolean;
-  nodeUrl: string;
 }
 
 export function useNativeSettings() {
@@ -38,7 +37,6 @@ export function useNativeSettings() {
       if (nativeSettings) {
         setSettings({
           useMockData: nativeSettings.useMockData ?? APP_DEFAULTS.useMockData,
-          nodeUrl: nativeSettings.nodeUrl ?? DEFAULT_SOV_NODE_URL,
         });
       }
     } catch (err: any) {
@@ -61,7 +59,6 @@ export function useNativeSettings() {
 
       const settingsToUpdate = {
         ...(newSettings.useMockData !== undefined && { useMockData: newSettings.useMockData }),
-        ...(newSettings.nodeUrl && { nodeUrl: newSettings.nodeUrl }),
       };
 
       await NativeSettings.updateSettings(settingsToUpdate);
@@ -89,7 +86,6 @@ export function useNativeSettings() {
       await NativeSettings.clearSettings();
       setSettings({
         useMockData: APP_DEFAULTS.useMockData,
-        nodeUrl: DEFAULT_SOV_NODE_URL,
       });
       return true;
     } catch (err: any) {

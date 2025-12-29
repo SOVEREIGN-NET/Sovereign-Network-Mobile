@@ -72,10 +72,8 @@ final class Web4Client {
       let message = String(data: response.body, encoding: .utf8) ?? "manifest_failed"
       throw NSError(domain: "Web4Client", code: Int(response.status), userInfo: [NSLocalizedDescriptionKey: message])
     }
-    let rawJson = String(data: response.body, encoding: .utf8) ?? "<invalid utf8>"
-    print("[Web4Client] fetchManifest raw response (\(response.body.count) bytes): \(rawJson)")
+
     let decoded = try JSONDecoder().decode(Web4Manifest.self, from: response.body)
-    print("[Web4Client] fetchManifest decoded: \(decoded.files.count) files")
     return decoded
   }
 
@@ -99,7 +97,7 @@ final class Web4Client {
       alpn: NativeQuic.QuicAlpnProfile.publicContent
     )
     guard (200..<300).contains(response.status) else {
-      let message = "blob_failed"
+      let message = String(data: response.body, encoding: .utf8) ?? "blob_failed"
       throw NSError(domain: "Web4Client", code: Int(response.status), userInfo: [NSLocalizedDescriptionKey: message])
     }
     return response.body

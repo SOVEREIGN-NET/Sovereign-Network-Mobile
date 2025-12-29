@@ -1,4 +1,5 @@
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useState, useRef } from 'react';
+import { getWalletBalance } from './useWalletBalance';
 
 export interface RewardCounterData {
   balance: number;
@@ -6,63 +7,45 @@ export interface RewardCounterData {
   isAccumulating: boolean;
 }
 
-interface RewardCounterConfig {
-  targetAmount: number;      // Final amount to reach (e.g., 0.50 SOV)
-  durationMs: number;        // Total time to reach target
-  tickIntervalMs: number;    // How often to update display
-}
-
-const DEFAULT_CONFIG: RewardCounterConfig = {
-  targetAmount: 5000,        // Target amount to reach
-  durationMs: 600000,        // 10 minutes to add the increment
-  tickIntervalMs: 4000,      // Update every 4 seconds - very slow drip
-};
-
-const START_BALANCE = 25000;  // Start with 25k SOV
+const UPDATE_INTERVAL_MS = 3000; // Update every 3 seconds
+const INCREMENT_PER_TICK = 0.001; // Small increment per tick
 
 /**
- * Simulates slowly accumulating SOV tokens as routing rewards
- * Creates a slow "faucet drip" effect for onboarding demo
+ * Get header balance (1/5 of wallet balance)
  */
-export const useRewardCounter = (config: Partial<RewardCounterConfig> = {}): RewardCounterData => {
-  const { targetAmount, durationMs, tickIntervalMs } = { ...DEFAULT_CONFIG, ...config };
+const getHeaderBalance = (): number => {
+  return getWalletBalance() / 5;
+};
 
-  const [balance, setBalance] = useState(START_BALANCE);
-  const [isAccumulating, setIsAccumulating] = useState(true);
-  const startTimeRef = useRef(Date.now());
-
-  // Calculate increment per tick
-  const totalTicks = durationMs / tickIntervalMs;
-  const baseIncrement = targetAmount / totalTicks;
+/**
+ * SOV counter for header bar.
+ * Shows 1/5 of the wallet balance with XXX.XXX format.
+ * Decimals increment smoothly for visual movement.
+ */
+export const useRewardCounter = (): RewardCounterData => {
+  const baseBalance = useRef(getHeaderBalance());
+  const [balance, setBalance] = useState(() => baseBalance.current);
+  const [isAccumulating] = useState(true);
 
   useEffect(() => {
-    if (!isAccumulating) return;
+    // Sync base balance periodically (every minute)
+    const syncInterval = setInterval(() => {
+      baseBalance.current = getHeaderBalance();
+    }, 60000);
 
-    const interval = setInterval(() => {
-      const elapsed = Date.now() - startTimeRef.current;
-      const progress = Math.min(elapsed / durationMs, 1);
+    // Increment decimals for visual movement
+    const tickInterval = setInterval(() => {
+      setBalance((prev) => prev + INCREMENT_PER_TICK);
+    }, UPDATE_INTERVAL_MS);
 
-      // Small randomness for organic feel
-      const randomFactor = 0.8 + Math.random() * 0.4;
-      const increment = baseIncrement * randomFactor;
+    return () => {
+      clearInterval(syncInterval);
+      clearInterval(tickInterval);
+    };
+  }, []);
 
-      setBalance((prev) => {
-        const newBalance = prev + increment;
-
-        if (newBalance >= targetAmount || progress >= 1) {
-          setIsAccumulating(false);
-          return targetAmount;
-        }
-
-        return newBalance;
-      });
-    }, tickIntervalMs);
-
-    return () => clearInterval(interval);
-  }, [isAccumulating, baseIncrement, targetAmount, durationMs, tickIntervalMs]);
-
-  // Format balance for display (whole number, no separator for token values)
-  const displayBalance = Math.floor(balance).toString();
+  // Format balance for display: XXX.XXX
+  const displayBalance = balance.toFixed(3);
 
   return {
     balance,

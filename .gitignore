@@ -114,3 +114,4 @@ NATIVE_SETTINGS_GUIDE.md
 
 # Rust build artifacts
 android/app/src/main/rust/**/target/
+.env.generated.json

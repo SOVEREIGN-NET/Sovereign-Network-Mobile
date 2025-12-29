@@ -75,7 +75,14 @@ struct Web4Manifest: Decodable {
   init(from decoder: Decoder) throws {
     let container = try decoder.container(keyedBy: CodingKeys.self)
     domain = try container.decodeIfPresent(String.self, forKey: .domain)
-    version = try container.decodeIfPresent(String.self, forKey: .version)
+
+    // Handle version as either String or Int64
+    if let versionInt = try container.decodeIfPresent(Int64.self, forKey: .version) {
+      version = String(versionInt)
+    } else {
+      version = try container.decodeIfPresent(String.self, forKey: .version)
+    }
+
     previous_manifest = try container.decodeIfPresent(String.self, forKey: .previous_manifest)
     spa = try container.decodeIfPresent(Bool.self, forKey: .spa)
     spa_fallback = try container.decodeIfPresent(String.self, forKey: .spa_fallback)
@@ -100,7 +107,31 @@ struct Web4Manifest: Decodable {
 struct Web4ResolveResponse: Decodable {
   let domain: String
   let manifest_cid: String
-  let version: Int64?
+  let version: String?
   let spa: Bool?
   let spa_fallback: String?
+
+  private enum CodingKeys: String, CodingKey {
+    case domain
+    case manifest_cid
+    case version
+    case spa
+    case spa_fallback
+  }
+
+  init(from decoder: Decoder) throws {
+    let container = try decoder.container(keyedBy: CodingKeys.self)
+    domain = try container.decode(String.self, forKey: .domain)
+    manifest_cid = try container.decode(String.self, forKey: .manifest_cid)
+
+    // Handle version as either Int or String
+    if let versionInt = try container.decodeIfPresent(Int64.self, forKey: .version) {
+      version = String(versionInt)
+    } else {
+      version = try container.decodeIfPresent(String.self, forKey: .version)
+    }
+
+    spa = try container.decodeIfPresent(Bool.self, forKey: .spa)
+    spa_fallback = try container.decodeIfPresent(String.self, forKey: .spa_fallback)
+  }
 }

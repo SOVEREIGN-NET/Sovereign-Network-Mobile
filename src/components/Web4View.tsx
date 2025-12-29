@@ -45,6 +45,12 @@ export const Web4View: React.FC<Web4ViewProps> = props => {
     }
   }, []);
 
+  useEffect(() => {
+    if (__DEV__) {
+      console.log('[🌐 Web4] Web4View: Mounted -', props.domain);
+    }
+  }, [props.domain, props.nodeHost, props.nodePort, props.cacheLimitMb]);
+
   if (!isWeb4ViewAvailable || !NativeWeb4View) {
     return null;
   }

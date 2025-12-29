@@ -33,8 +33,15 @@ const BrowserScreen = ({ route, navigation }: any) => {
     try {
       const normalized = (urlInput ?? '').toString().replace(/^zhtp:\/\//i, 'https://');
       const parsed = new URL(normalized);
-      return parsed.hostname;
-    } catch {
+      const domain = parsed.hostname;
+      if (__DEV__) {
+        console.log('[🌐 Web4] BrowserScreen: Domain extracted:', domain);
+      }
+      return domain;
+    } catch (error) {
+      if (__DEV__) {
+        console.error('[🌐 Web4] BrowserScreen: Failed to extract domain:', error);
+      }
       return '';
     }
   }, [isZhtp, urlInput]);

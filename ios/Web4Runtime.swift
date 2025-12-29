@@ -13,16 +13,12 @@ final class Web4Runtime {
 
   func resolveManifest(domain: String) async throws -> Web4Manifest {
     if let cached = manifestCache.get(domain: domain)?.1 {
-      print("[Web4Runtime] Using cached manifest for \(domain), files: \(cached.files.count)")
       return cached
     }
+
     let resolve = try await client.resolveDomain(domain: domain)
-    print("[Web4Runtime] Resolved domain \(domain) -> manifest_cid: \(resolve.manifest_cid)")
     let manifest = try await client.fetchManifest(manifestCid: resolve.manifest_cid)
-    print("[Web4Runtime] Fetched manifest, files count: \(manifest.files.count)")
-    for file in manifest.files {
-      print("[Web4Runtime]   file: path=\(file.path), cid=\(file.cid), mime=\(file.mime)")
-    }
+
     let hydrated = Web4Manifest(
       domain: manifest.domain,
       version: manifest.version,
@@ -39,19 +35,26 @@ final class Web4Runtime {
     let manifest = try await resolveManifest(domain: domain)
 
     // Normalize path: "/" -> "/index.html"
-    let normalizedPath = (path == "/" || path.isEmpty) ? "/index.html" : path
-    print("[Web4Runtime] resolveFile: path=\(path) -> normalizedPath=\(normalizedPath)")
-    print("[Web4Runtime] resolveFile: manifest has \(manifest.files.count) files")
+    var normalizedPath = (path == "/" || path.isEmpty) ? "/index.html" : path
 
-    // Try exact match first, then fallback to /index.html for SPA behavior
-    let fileEntry = manifest.files.first { $0.path == normalizedPath }
-      ?? manifest.files.first { $0.path == "/index.html" }
+    // Try exact match first
+    var fileEntry = manifest.files.first { $0.path == normalizedPath }
+
+    // If not found and path starts with /, try without leading slash (manifest may not include it)
+    if fileEntry == nil && normalizedPath.hasPrefix("/") {
+      let pathWithoutSlash = String(normalizedPath.dropFirst())
+      fileEntry = manifest.files.first { $0.path == pathWithoutSlash }
+    }
+
+    // Fallback to /index.html or index.html for SPA behavior
+    if fileEntry == nil {
+      fileEntry = manifest.files.first { $0.path == "/index.html" }
+        ?? manifest.files.first { $0.path == "index.html" }
+    }
 
     guard let entry = fileEntry else {
-      print("[Web4Runtime] resolveFile: no file found for \(normalizedPath) or /index.html")
       throw NSError(domain: "Web4Runtime", code: 404, userInfo: [NSLocalizedDescriptionKey: "Not found: \(path)"])
     }
-    print("[Web4Runtime] resolveFile: found entry cid=\(entry.cid), mime=\(entry.mime)")
 
     if let cached = blobCache.get(cid: entry.cid) {
       return (entry.mime, cached)

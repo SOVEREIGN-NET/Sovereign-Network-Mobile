@@ -122,10 +122,14 @@ function isPublicEndpoint(url: string): boolean {
     const urlObj = new URL(url.replace(/^quic:\/\//, 'https://'));
     const path = urlObj.pathname;
     const isPublic = PUBLIC_ENDPOINT_PATTERNS.some(pattern => path.startsWith(pattern));
-    // console.log('[QuicFetchAdapter] 🔍 isPublicEndpoint check:', { url, path, isPublic });
+    if (isPublic) {
+      console.log('[🌐 Web4] QuicFetchAdapter: Public endpoint detected');
+      console.log('[🌐 Web4] QuicFetchAdapter:   URL:', url);
+      console.log('[🌐 Web4] QuicFetchAdapter:   Path:', path);
+    }
     return isPublic;
   } catch (e) {
-    // console.log('[QuicFetchAdapter] ⚠️ isPublicEndpoint parse error:', { url, error: e });
+    console.warn('[🌐 Web4] QuicFetchAdapter: Error checking public endpoint:', url, e);
     return false;
   }
 }
@@ -164,7 +168,9 @@ function convertOptions(init?: RequestInit, url?: string): QuicRequestOptions {
   // Determine ALPN based on endpoint
   const alpn: 'public' | 'authenticated' = url && isPublicEndpoint(url) ? 'public' : 'authenticated';
 
-  // console.log('[QuicFetchAdapter] 🔑 convertOptions ALPN result:', { url, alpn });
+  console.log('[🌐 Web4] QuicFetchAdapter: ALPN selection:');
+  console.log('[🌐 Web4] QuicFetchAdapter:   URL:', url);
+  console.log('[🌐 Web4] QuicFetchAdapter:   ALPN:', alpn);
 
   return {
     method: (init?.method as QuicRequestOptions['method']) || 'GET',
@@ -214,21 +220,12 @@ export async function createQuicFetchAdapter(
     quicOptions.insecure = insecure;
     quicOptions.timeout = timeout;
 
-    // if (__DEV__) {
-    //   console.log('[QuicFetchAdapter] ▶️ REQUEST:', {
-    //     url: quicUrl,
-    //     method: quicOptions.method,
-    //     alpn: quicOptions.alpn,
-    //     headers: quicOptions.headers,
-    //     bodyLength: quicOptions.body?.length || 0,
-    //   });
-    // }
-
     // If QUIC not supported, fall back to standard fetch
     if (!quicSupported) {
       if (onFallback) {
         onFallback(url, 'QUIC not supported on this device');
       }
+      console.warn('[🌐 Web4] QuicFetchAdapter: QUIC not supported, falling back to HTTP');
       return fetch(url, init);
     }
 
@@ -237,29 +234,17 @@ export async function createQuicFetchAdapter(
       const quicResponse = await quicRequest(quicUrl, quicOptions);
       const elapsed = Date.now() - startTime;
 
-      // if (__DEV__) {
-      //   console.log('[QuicFetchAdapter] ✅ RESPONSE:', {
-      //     url: quicUrl,
-      //     status: quicResponse.status,
-      //     statusText: quicResponse.statusText,
-      //     ok: quicResponse.ok,
-      //     elapsed: `${elapsed}ms`,
-      //     bodyLength: quicResponse.body?.length || 0,
-      //     bodyPreview: quicResponse.body?.substring(0, 200),
-      //   });
-      // }
+      console.log('[🌐 Web4] QuicFetchAdapter: Request completed');
+      console.log('[🌐 Web4] QuicFetchAdapter:   Time taken:', `${elapsed}ms`);
+      console.log('[🌐 Web4] QuicFetchAdapter:   Response body length:', `${quicResponse.body?.length || 0} bytes`);
 
       return createResponseFromQuic(quicResponse);
     } catch (error) {
       const errorMessage = error instanceof Error ? error.message : String(error);
 
-      // if (__DEV__) {
-      //   console.log('[QuicFetchAdapter] ❌ ERROR:', {
-      //     url: quicUrl,
-      //     error: errorMessage,
-      //     alpn: quicOptions.alpn,
-      //   });
-      // }
+      console.error('[🌐 Web4] QuicFetchAdapter: Request failed:', errorMessage);
+      console.error('[🌐 Web4] QuicFetchAdapter:   URL:', quicUrl);
+      console.error('[🌐 Web4] QuicFetchAdapter:   ALPN:', quicOptions.alpn);
 
       // If QUIC fails and fallback is enabled, try standard fetch
       if (fallbackToHttp) {

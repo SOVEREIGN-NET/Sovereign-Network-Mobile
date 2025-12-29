@@ -20,7 +20,6 @@ export const en = {
       protocolInfoFailed: 'Failed to get protocol info',
       failedToEstablishConnection: 'Failed to establish connection',
       ensureConnectionFailed: 'Failed to ensure connection',
-      updateNodeUrlFailed: 'Failed to update node URL',
     },
   },
 
@@ -734,9 +733,6 @@ export const en = {
       title: 'Developer Settings',
       mockData: 'Use Mock Data',
       mockDataDescription: 'Toggle between mock data and real network',
-      nodeUrl: 'Node URL',
-      nodeUrlPlaceholder: 'http://77.42.37.161:9334',
-      nodeUrlHint: 'Enter test node URL with port',
       save: 'Save Configuration',
       saved: 'Configuration saved',
     },

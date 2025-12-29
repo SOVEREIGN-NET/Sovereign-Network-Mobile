@@ -10,13 +10,14 @@ import {
   LoadingView,
   ScreenLayout,
 } from '../components';
-import { useAuth } from '../hooks';
+import { useAuth, useWalletBalance } from '../hooks';
 import { useTranslation } from '../i18n';
 import { colors, spacing, typography, borderRadius } from '../theme';
 
 const WalletSettingsScreen = ({ navigation }: any) => {
   const { t } = useTranslation();
   const { currentIdentity, isLoading } = useAuth();
+  const { balance: primaryBalance } = useWalletBalance();
   const [activeWallet] = useState<string>('primary');
 
   if (!currentIdentity || isLoading) {
@@ -102,7 +103,7 @@ const WalletSettingsScreen = ({ navigation }: any) => {
                       color: colors.text_secondary,
                     }}
                   >
-                    {wallet.balance.toLocaleString()} SOV
+                    {walletType === 'primary' ? Math.floor(primaryBalance).toLocaleString() : wallet.balance.toLocaleString()} SOV
                   </Text>
                 </Row>
 
