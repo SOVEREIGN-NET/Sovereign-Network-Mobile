@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import { NativeStackScreenProps } from '@react-navigation/native-stack';
+import { View } from 'react-native';
 import {
   Card,
   Text,
@@ -17,6 +18,7 @@ import {
 import { useAuth, useNodeConnection } from '../hooks';
 import { useTranslation } from '../i18n';
 import { colors, spacing, typography } from '../theme';
+import { validatePassword, getStrengthDescription, getStrengthColor } from '../utils/passwordValidator';
 import { AuthStackParamList } from '../navigation/AuthNavigator';
 
 type CreateIdentityScreenProps = NativeStackScreenProps<AuthStackParamList, 'CreateIdentity'>;
@@ -35,6 +37,12 @@ const CreateIdentityScreen = ({ navigation }: CreateIdentityScreenProps) => {
   const [confirmPassword, setConfirmPassword] = useState('');
   const [acceptedTerms, setAcceptedTerms] = useState(false);
   const [isCreatingIdentity, setIsCreatingIdentity] = useState(false);
+  const [passwordStrength, setPasswordStrength] = useState<ReturnType<typeof validatePassword>>({
+    valid: false,
+    errors: [],
+    strength: 'weak',
+    score: 0,
+  });
   const [fieldErrors, setFieldErrors] = useState<{
     displayName?: string;
     password?: string;
@@ -50,6 +58,22 @@ const CreateIdentityScreen = ({ navigation }: CreateIdentityScreenProps) => {
     { id: 'contract' as const, label: 'Contract', disabled: true, badge: 'Soon' },
   ];
 
+  // SECURITY: Real-time password validation
+  const handlePasswordChange = (newPassword: string) => {
+    setPassword(newPassword);
+    if (newPassword) {
+      const validation = validatePassword(newPassword);
+      setPasswordStrength(validation);
+    } else {
+      setPasswordStrength({
+        valid: false,
+        errors: [],
+        strength: 'weak',
+        score: 0,
+      });
+    }
+  };
+
   const handleCreateIdentity = async () => {
     setFieldErrors({});
     const errors: typeof fieldErrors = {};
@@ -61,14 +85,12 @@ const CreateIdentityScreen = ({ navigation }: CreateIdentityScreenProps) => {
       errors.displayName = t.auth.createIdentity.validation.displayNameTooShort;
     }
 
-    // Password validation - must have 8+ chars and at least one special character
-    const specialCharRegex = /[!@#$%^&*()_+\-=\[\]{};':\"\\|,.<>\/?]/;
+    // Password validation - SECURITY: Use strong policy
     if (!password) {
       errors.password = t.auth.createIdentity.validation.passphraseRequired;
-    } else if (password.length < 8) {
-      errors.password = t.auth.createIdentity.validation.passphraseTooShort;
-    } else if (!specialCharRegex.test(password)) {
-      errors.password = 'Password must contain at least one special character (!@#$%^&*()_+-=[]{};\':"|,.<>/?)';
+    } else if (!passwordStrength.valid) {
+      // Use first error from validation
+      errors.password = passwordStrength.errors[0] || 'Password does not meet security requirements';
     }
 
     if (password && password !== confirmPassword) {
@@ -140,7 +162,8 @@ const CreateIdentityScreen = ({ navigation }: CreateIdentityScreenProps) => {
   };
 
   const isCreateDisabled = isCreatingIdentity || nodeLoading || !isConnected;
-  const isPassphraseSet = password.length >= 8 && password === confirmPassword;
+  // SECURITY: Password must be valid AND confirmed to enable create button
+  const isPassphraseSet = passwordStrength.valid && password === confirmPassword;
 
   if (isCreatingIdentity) {
     return <LoadingView />;
@@ -222,7 +245,7 @@ const CreateIdentityScreen = ({ navigation }: CreateIdentityScreenProps) => {
             label=""
             placeholder={t.auth.createIdentity.passphraseMinHint}
             value={password}
-            onChangeText={setPassword}
+            onChangeText={handlePasswordChange}
             error={fieldErrors.password}
             editable={!isCreateDisabled}
             containerStyle={{ marginBottom: spacing.xs }}
@@ -233,6 +256,42 @@ const CreateIdentityScreen = ({ navigation }: CreateIdentityScreenProps) => {
             autoCorrect={false}
             spellCheck={false}
           />
+          {/* Password Strength Indicator */}
+          {password && (
+            <Column gap="xs" style={{ marginTop: spacing.xs }}>
+              <Row style={{ justifyContent: 'space-between', alignItems: 'center' }}>
+                <Text style={{ fontSize: typography.size.xs, color: colors.text_secondary }}>
+                  Strength:
+                </Text>
+                <Text
+                  style={{
+                    fontSize: typography.size.xs,
+                    color: getStrengthColor(passwordStrength.strength),
+                    fontWeight: typography.weight.semibold,
+                  }}
+                >
+                  {getStrengthDescription(passwordStrength.strength)}
+                </Text>
+              </Row>
+              {/* Progress bar for strength */}
+              <View
+                style={{
+                  height: 4,
+                  backgroundColor: colors.border,
+                  borderRadius: 2,
+                  overflow: 'hidden',
+                }}
+              >
+                <View
+                  style={{
+                    height: '100%',
+                    width: `${passwordStrength.score}%`,
+                    backgroundColor: getStrengthColor(passwordStrength.strength),
+                  }}
+                />
+              </View>
+            </Column>
+          )}
           <PasswordField
             label=""
             placeholder={t.auth.createIdentity.passphraseConfirm}

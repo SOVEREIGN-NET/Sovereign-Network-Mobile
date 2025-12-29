@@ -8,6 +8,7 @@ import { Platform } from 'react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { NativeStorage } from '../services/NativeStorage';
 import SecureIdentityStorage from '../services/SecureIdentityStorage';
+import { rateLimiter } from '../services/RateLimiter';
 import MockAuthService, { Identity } from '../services/MockAuthService';
 import type { CreateIdentityData } from '../services/RealAuthService';
 
@@ -158,13 +159,21 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
 
   /**
    * Sign in with identity_id and password
-   * SECURITY: Uses SecureIdentityStorage for encrypted persistence
+   * SECURITY: Uses SecureIdentityStorage + rate limiting to prevent brute force
    */
   const signIn = useCallback(async (identity_id: string, password: string): Promise<Identity> => {
     setError(null);
     setIsLoading(true);
 
     try {
+      // SECURITY: Check rate limiting before attempting login
+      const rateLimitStatus = rateLimiter.isBlocked(identity_id);
+      if (rateLimitStatus.blocked) {
+        const errorMessage = rateLimitStatus.reason || 'Too many login attempts. Please try again later.';
+        setError(errorMessage);
+        throw new Error(errorMessage);
+      }
+
       let identity: Identity;
 
       if (getUseMockService()) {
@@ -173,12 +182,18 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
         identity = await RealAuthService!.signIn({ identity_id, password });
       }
 
+      // Success: Clear rate limit attempts
+      rateLimiter.clearAttempts(identity_id);
+
       // Save to secure storage (Keychain) instead of plaintext AsyncStorage
       await SecureIdentityStorage.setIdentity(identity, { requireBiometric: true });
 
       setCurrentIdentity(identity);
       return identity;
     } catch (err: any) {
+      // SECURITY: Record failed attempt for rate limiting
+      rateLimiter.recordAttempt(identity_id);
+
       const message = err.message || 'Sign in failed';
       setError(message);
       throw err;
