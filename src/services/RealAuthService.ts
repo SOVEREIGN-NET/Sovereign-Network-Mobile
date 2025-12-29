@@ -2,12 +2,17 @@
  * Real Authentication Service
  * Integrates with SOV API backend for actual identity operations
  * Uses native QUIC transport via QuicFetchAdapter
+ *
+ * SECURITY: Phase 3.2 - Certificate Pinning Integration
+ * Certificate pinning is configured via CertificatePinning service
+ * Validated at the QUIC transport level to prevent MITM attacks
  */
 
 import { ZhtpApi, ReactNativeConfigProvider, Identity, SignupRequest, LoginRequest } from '@sovereign-net/api-client/react-native';
 import type { FetchAdapter } from '@sovereign-net/api-client/react-native';
 import QuicClient from './QuicClient';
 import { createQuicFetchAdapterSync } from './QuicFetchAdapter';
+import CertificatePinning from './CertificatePinning';
 
 export interface SignInCredentials {
   identity_id: string;
@@ -68,6 +73,16 @@ class RealAuthService {
           '🔴 SECURITY CRITICAL: QUIC insecure mode is enabled in production build! ' +
           'This is a critical security vulnerability.'
         );
+      }
+    }
+
+    // SECURITY: Phase 3.2 - Verify certificate pinning is configured for production
+    if (!isDevelopment && CertificatePinning.PINNING_CONFIG.enabled) {
+      const pinnedHosts = CertificatePinning.getPinnedHosts();
+      if (pinnedHosts.length === 0) {
+        console.warn('⚠️ Certificate pinning enabled but no hosts are configured');
+      } else if (__DEV__) {
+        console.log(`✅ Certificate pinning enabled for hosts: ${pinnedHosts.join(', ')}`);
       }
     }
 
