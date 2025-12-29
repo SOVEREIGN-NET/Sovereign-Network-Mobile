@@ -4,14 +4,13 @@
  * Used in Dashboard/Browser screens
  */
 
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useEffect } from 'react';
 import { View, Pressable, StyleSheet } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Text, Row } from '../../atoms';
 import { colors, spacing, typography, shadows } from '../../../theme';
 import { useTranslation } from '../../../i18n';
-import QuicClient from '../../../services/QuicClient';
-import { DEFAULT_NODE_HOST, DEFAULT_NODE_PORT } from '../../../config';
+import { useNodeConnectionStatus } from '../../../hooks/useNodeConnectionStatus';
 import { useRewardCounter } from '../../../hooks/useRewardCounter';
 
 export interface HeaderBarProps {
@@ -33,61 +32,16 @@ const HeaderBar: React.FC<HeaderBarProps> = ({
   // SOV reward counter - slow drip
   const { displayBalance } = useRewardCounter();
 
-  // Connection state
-  const [connectionStatus, setConnectionStatus] = useState<'checking' | 'connected' | 'disconnected'>('checking');
-  const [latencyMs, setLatencyMs] = useState<number | null>(null);
+  // Connection status from hook
+  const { connectionStatus, latencyMs } = useNodeConnectionStatus(isConnectedProp === undefined);
 
-  // Use prop if provided, otherwise use internal state
+  // Use prop if provided, otherwise use hook state
   const isConnected = isConnectedProp ?? connectionStatus === 'connected';
 
-  // Check QUIC node reachability (UDP-based, doesn't require full PQC handshake)
-  const checkNodeConnection = useCallback(async () => {
-    try {
-      // First check if QUIC is supported
-      const supported = await QuicClient.isSupported();
-      if (!supported) {
-        console.warn('QUIC not supported on this device');
-        setConnectionStatus('disconnected');
-        onConnectionStatusChange?.(false);
-        return;
-      }
-
-      // Check node reachability via UDP (simpler than full QUIC handshake)
-      setConnectionStatus('checking');
-      const result = await QuicClient.checkReachability(DEFAULT_NODE_HOST, DEFAULT_NODE_PORT);
-
-      if (result.reachable) {
-        setConnectionStatus('connected');
-        setLatencyMs(result.latencyMs ? Math.round(result.latencyMs) : null);
-        onConnectionStatusChange?.(true, result.latencyMs);
-        // console.log(`Node reachable at ${DEFAULT_NODE_HOST}:${DEFAULT_NODE_PORT} (${result.latencyMs ? Math.round(result.latencyMs) + 'ms' : 'unknown latency'})`);
-      } else {
-        setConnectionStatus('disconnected');
-        setLatencyMs(null);
-        onConnectionStatusChange?.(false);
-        // console.log(`Node not reachable: ${result.error}`);
-      }
-    } catch (error) {
-      // console.warn('Node reachability check failed:', error);
-      setConnectionStatus('disconnected');
-      setLatencyMs(null);
-      onConnectionStatusChange?.(false);
-    }
-  }, [onConnectionStatusChange]);
-
-  // Check connection on mount and periodically
+  // Notify parent of connection status changes
   useEffect(() => {
-    // Skip auto-check if isConnected is controlled externally
-    if (isConnectedProp !== undefined) {
-      return;
-    }
-
-    checkNodeConnection();
-
-    // Re-check every 30 seconds
-    const interval = setInterval(checkNodeConnection, 30000);
-    return () => clearInterval(interval);
-  }, [checkNodeConnection, isConnectedProp]);
+    onConnectionStatusChange?.(isConnected, latencyMs ?? undefined);
+  }, [isConnected, latencyMs, onConnectionStatusChange]);
 
   // Get status text
   const getStatusText = () => {

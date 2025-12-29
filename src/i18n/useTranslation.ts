@@ -4,12 +4,12 @@
  */
 
 import { useState, useEffect } from 'react';
-import { getTranslations, getCurrentLanguage, type LanguageCode } from './i18n';
+import { getTranslations, getCurrentLanguage, onLanguageChange, type LanguageCode } from './i18n';
 import type { Translation } from './translations/en';
 
 /**
  * Custom hook to access translations in components
- * Automatically updates when language changes
+ * Automatically updates when language changes via subscription pattern
  *
  * @returns Translation object and current language
  *
@@ -22,17 +22,14 @@ export function useTranslation() {
   const [language, setLanguageState] = useState<LanguageCode>(getCurrentLanguage());
 
   useEffect(() => {
-    // Update when translations change (simulated by periodic check)
-    const checkLanguageChange = setInterval(() => {
-      const currentLanguage = getCurrentLanguage();
-      if (currentLanguage !== language) {
-        setTranslations(getTranslations());
-        setLanguageState(currentLanguage);
-      }
-    }, 100);
+    // Subscribe to language changes (no polling)
+    const unsubscribe = onLanguageChange((newLanguage: LanguageCode) => {
+      setTranslations(getTranslations());
+      setLanguageState(newLanguage);
+    });
 
-    return () => clearInterval(checkLanguageChange);
-  }, [language]);
+    return unsubscribe;
+  }, []);
 
   return {
     t: translations,

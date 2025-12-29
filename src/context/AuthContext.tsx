@@ -19,23 +19,82 @@ const RealAuthService = RealAuthServiceModule;
 // Use native storage on Android, AsyncStorage on iOS
 const storage = Platform.OS === 'android' ? NativeStorage : AsyncStorage;
 
-// Global state for feature flag (will be updated by settings)
-let globalUseMockService = process.env.REACT_APP_USE_MOCK_AUTH === 'true' && __DEV__;
+// Create context for feature flag management
+type UseMockServiceListener = (useMock: boolean) => void;
+const mockServiceListeners = new Set<UseMockServiceListener>();
+
+let cachedUseMockService: boolean | null = null;
 
 /**
  * Get current feature flag state (mock vs real data)
  */
 export function getUseMockService(): boolean {
-  return globalUseMockService;
+  if (cachedUseMockService === null) {
+    // Return default only if not yet loaded
+    return process.env.REACT_APP_USE_MOCK_AUTH === 'true' && __DEV__;
+  }
+  return cachedUseMockService;
 }
 
 /**
  * Set feature flag state (called from Developer Settings)
  */
 export function setUseMockService(value: boolean): void {
-  globalUseMockService = value;
-  // console.log(`🔄 Auth data source changed to: ${value ? 'MOCK' : 'REAL'}`);
+  if (cachedUseMockService !== value) {
+    cachedUseMockService = value;
+    // Persist to storage
+    const key = 'zhtp_use_mock_service';
+    if (value === (process.env.REACT_APP_USE_MOCK_AUTH === 'true' && __DEV__)) {
+      // If setting back to default, remove from storage
+      storage.removeItem(key).catch(err => console.warn('Failed to clear mock service setting:', err));
+    } else {
+      // Otherwise persist the override
+      storage.setItem(key, JSON.stringify(value)).catch(err => console.warn('Failed to save mock service setting:', err));
+    }
+    // Notify all listeners
+    notifyMockServiceListeners(value);
+  }
 }
+
+/**
+ * Subscribe to feature flag changes
+ */
+export function onMockServiceChange(listener: UseMockServiceListener): () => void {
+  mockServiceListeners.add(listener);
+  return () => {
+    mockServiceListeners.delete(listener);
+  };
+}
+
+/**
+ * Notify listeners of mock service flag change
+ */
+function notifyMockServiceListeners(value: boolean): void {
+  mockServiceListeners.forEach(listener => {
+    listener(value);
+  });
+}
+
+/**
+ * Initialize the mock service flag from storage
+ */
+async function initializeMockServiceFlag(): Promise<void> {
+  try {
+    const stored = await storage.getItem('zhtp_use_mock_service');
+    if (stored !== null) {
+      const value = JSON.parse(stored);
+      cachedUseMockService = value;
+    } else {
+      cachedUseMockService = process.env.REACT_APP_USE_MOCK_AUTH === 'true' && __DEV__;
+    }
+  } catch (err) {
+    console.warn('Failed to load mock service setting, using default:', err);
+    cachedUseMockService = process.env.REACT_APP_USE_MOCK_AUTH === 'true' && __DEV__;
+  }
+}
+
+// Initialize on module load
+initializeMockServiceFlag();
 
 export interface AuthContextType {
   currentIdentity: Identity | null;

@@ -3,63 +3,7 @@
  * Provides test data for UI development without API connectivity
  */
 
-export interface Identity {
-  did: string;
-  displayName: string;
-  identityType: 'human' | 'organization' | 'developer';
-  createdAt: string;
-  citizenship: boolean;
-  avatar?: string;
-}
-
-export interface Wallet {
-  id: string;
-  name: string;
-  address: string;
-  balance: number;
-  currency: string;
-  type: 'primary' | 'ubi' | 'savings';
-}
-
-export interface Transaction {
-  id: string;
-  from: string;
-  to: string;
-  amount: number;
-  currency: string;
-  timestamp: string;
-  status: 'confirmed' | 'pending' | 'failed';
-  type: 'send' | 'receive' | 'stake' | 'ubi';
-}
-
-export interface Proposal {
-  id: string;
-  title: string;
-  description: string;
-  proposer: string;
-  status: 'active' | 'passed' | 'failed' | 'executed';
-  votesFor: number;
-  votesAgainst: number;
-  votesAbstain: number;
-  endTime: string;
-  category: 'governance' | 'funding' | 'technical';
-}
-
-export interface DAOStats {
-  totalProposals: number;
-  activeProposals: number;
-  treasury: number;
-  delegates: number;
-  participationRate: number;
-}
-
-export interface NetworkStatus {
-  connected: boolean;
-  protocol: string;
-  version: string;
-  nodeCount: number;
-  meshHealth: number;
-}
+import type { Identity, Wallet, Transaction, Proposal, DAOStats, NetworkStatus } from '../types/models';
 
 class MockDataService {
   /**
