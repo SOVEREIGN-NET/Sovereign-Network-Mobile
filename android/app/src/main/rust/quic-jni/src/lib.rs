@@ -16,15 +16,15 @@ use tokio::sync::Mutex;
 mod quic_client;
 use quic_client::{QuicBytesResponse, QuicClient, QuicResponse};
 
-// ZHTP Protocol (Public Mode Only)
+// ZHTP Protocol (Public + Authenticated Modes)
 mod zhtp_types;
 mod zhtp_framing;
 mod zhtp_codec;
 mod zhtp_request;
-use zhtp_types::{ZhtpMethod, ZhtpRequestWire};
-use zhtp_codec::{encode_request, decode_response};
-use zhtp_framing::{frame_encode, frame_decode_message};
+mod zhtp_auth;
+mod zhtp_auth_request;
 use zhtp_request::send_zhtp_request;
+use zhtp_auth_request::send_authenticated_zhtp_request;
 
 // Global state for the QUIC client
 static mut RUNTIME: Option<Runtime> = None;

@@ -2,10 +2,11 @@
 //!
 //! Sends ZHTP-formatted requests over QUIC instead of HTTP/1.1
 
-use crate::zhtp_types::{ZhtpMethod, ZhtpRequestWire};
+use crate::zhtp_types::ZhtpMethod;
 use crate::zhtp_codec::{encode_request, decode_response};
 use crate::zhtp_framing::{frame_encode, frame_decode_message};
-use quinn::{Connection, SendStream, RecvStream};
+use crate::zhtp_types::ZhtpRequestWire;
+use quinn::Connection;
 use anyhow::Result;
 use std::collections::HashMap;
 

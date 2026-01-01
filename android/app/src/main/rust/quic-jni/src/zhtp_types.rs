@@ -56,11 +56,13 @@ impl ZhtpMethod {
     }
 }
 
-/// ZHTP Headers - required fields for all requests
+/// ZHTP Headers - required and optional fields
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct ZhtpHeaders {
-    pub content_type: String,
-    pub content_length: u64,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub content_type: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub content_length: Option<u64>,
     pub dao_fee: u64,
     pub total_fees: u64,
     #[serde(skip_serializing_if = "Option::is_none")]
@@ -138,8 +140,8 @@ impl ZhtpRequestWire {
                 uri,
                 version: "1.0".to_string(),
                 headers: ZhtpHeaders {
-                    content_type,
-                    content_length,
+                    content_type: Some(content_type),
+                    content_length: Some(content_length),
                     dao_fee: 0,
                     total_fees: 0,
                     content_encoding: None,
