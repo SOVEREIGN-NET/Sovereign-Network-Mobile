@@ -256,7 +256,7 @@ pub async fn check_udp_reachability(
 }
 
 /// Create client config that accepts any certificate (for self-signed)
-fn create_insecure_client_config() -> Result<ClientConfig> {
+pub fn create_insecure_client_config() -> Result<ClientConfig> {
     use rustls::client::danger::{HandshakeSignatureValid, ServerCertVerified, ServerCertVerifier};
     use rustls::{DigitallySignedStruct, SignatureScheme};
 
@@ -337,7 +337,7 @@ fn create_insecure_client_config() -> Result<ClientConfig> {
 }
 
 /// Create default client config with system certificates
-fn create_default_client_config() -> Result<ClientConfig> {
+pub fn create_default_client_config() -> Result<ClientConfig> {
     let mut roots = rustls::RootCertStore::empty();
     roots.extend(webpki_roots::TLS_SERVER_ROOTS.iter().cloned());
 
@@ -363,7 +363,7 @@ fn create_default_client_config() -> Result<ClientConfig> {
 }
 
 /// Parse a QUIC URL into host, port, and path
-fn parse_quic_url(url_str: &str) -> Result<(String, u16, String)> {
+pub fn parse_quic_url(url_str: &str) -> Result<(String, u16, String)> {
     // Handle quic:// or https:// schemes
     let url_str = url_str.replace("quic://", "https://");
     let parsed = url::Url::parse(&url_str).context("Failed to parse URL")?;

@@ -7,6 +7,7 @@ use jni::objects::{JByteArray, JClass, JObject, JString, JValue};
 use jni::sys::{jboolean, jint, jobject, JNI_FALSE, JNI_TRUE};
 use jni::JNIEnv;
 use std::collections::HashMap;
+use std::future::IntoFuture;
 use std::sync::Arc;
 use std::time::Duration;
 use tokio::runtime::Runtime;
@@ -14,6 +15,16 @@ use tokio::sync::Mutex;
 
 mod quic_client;
 use quic_client::{QuicBytesResponse, QuicClient, QuicResponse};
+
+// ZHTP Protocol (Public Mode Only)
+mod zhtp_types;
+mod zhtp_framing;
+mod zhtp_codec;
+mod zhtp_request;
+use zhtp_types::{ZhtpMethod, ZhtpRequestWire};
+use zhtp_codec::{encode_request, decode_response};
+use zhtp_framing::{frame_encode, frame_decode_message};
+use zhtp_request::send_zhtp_request;
 
 // Global state for the QUIC client
 static mut RUNTIME: Option<Runtime> = None;
@@ -178,26 +189,60 @@ pub extern "system" fn Java_com_sovereignnetworkmobile_NativeQuicBridge_nativeRe
     );
 
     let result = unsafe {
-        if let (Some(ref rt), Some(ref client)) = (&RUNTIME, &CLIENT) {
+        if let Some(ref rt) = RUNTIME {
             rt.block_on(async {
-                let client = client.lock().await;
-                client
-                    .request(
-                        &url_str,
-                        &method_str,
-                        headers,
-                        body_str,
-                        Duration::from_secs(timeout_secs as u64),
-                        insecure_bool,
-                    )
+                // Create QUIC connection and send ZHTP request
+                use std::net::SocketAddr;
+                let addr: SocketAddr = match format!("localhost:443").parse() {
+                    Ok(a) => a,
+                    Err(e) => return Err(format!("Invalid address: {}", e).into()),
+                };
+
+                // Parse URL to get host and port
+                use crate::quic_client::parse_quic_url;
+                let (host, port, path) = parse_quic_url(&url_str)?;
+                let addr: SocketAddr = format!("{}:{}", host, port).parse()?;
+
+                let client_config = if insecure_bool {
+                    crate::quic_client::create_insecure_client_config()?
+                } else {
+                    crate::quic_client::create_default_client_config()?
+                };
+
+                let mut endpoint = quinn::Endpoint::client("0.0.0.0:0".parse()?)?;
+                endpoint.set_default_client_config(client_config);
+
+                let connection = tokio::time::timeout(
+                    Duration::from_secs(timeout_secs as u64),
+                    endpoint.connect(addr, &host)?.into_future(),
+                )
                     .await
+                    .map_err(|_| "Connection timeout")??;
+
+                // Send ZHTP request
+                let (status, body) = send_zhtp_request(&connection, &method_str, &path, headers, body_str.map(|s| s.into_bytes())).await?;
+
+                connection.close(0u32.into(), b"done");
+                endpoint.wait_idle().await;
+
+                Ok((status, body))
             })
         } else {
-            Err("Runtime or client not initialized".into())
+            Err("Runtime not initialized".into())
         }
     };
 
-    create_response_map(&mut env, result)
+    // Convert result to response map
+    let response_result = result.map(|(status, body)| {
+        (
+            status as i32,
+            "",
+            String::from_utf8_lossy(&body).to_string(),
+            true,
+        )
+    });
+
+    create_zhtp_response_map(&mut env, response_result)
 }
 
 /// Make an HTTP request over QUIC returning raw bytes
@@ -253,26 +298,48 @@ pub extern "system" fn Java_com_sovereignnetworkmobile_NativeQuicBridge_nativeRe
     );
 
     let result = unsafe {
-        if let (Some(ref rt), Some(ref client)) = (&RUNTIME, &CLIENT) {
+        if let Some(ref rt) = RUNTIME {
             rt.block_on(async {
-                let client = client.lock().await;
-                client
-                    .request_bytes(
-                        &url_str,
-                        &method_str,
-                        headers,
-                        body_vec,
-                        Duration::from_secs(timeout_secs as u64),
-                        insecure_bool,
-                    )
+                // Create QUIC connection and send ZHTP request
+                use crate::quic_client::parse_quic_url;
+                let (host, port, path) = parse_quic_url(&url_str)?;
+                let addr: std::net::SocketAddr = format!("{}:{}", host, port).parse()?;
+
+                let client_config = if insecure_bool {
+                    crate::quic_client::create_insecure_client_config()?
+                } else {
+                    crate::quic_client::create_default_client_config()?
+                };
+
+                let mut endpoint = quinn::Endpoint::client("0.0.0.0:0".parse()?)?;
+                endpoint.set_default_client_config(client_config);
+
+                let connection = tokio::time::timeout(
+                    Duration::from_secs(timeout_secs as u64),
+                    endpoint.connect(addr, &host)?.into_future(),
+                )
                     .await
+                    .map_err(|_| "Connection timeout")??;
+
+                // Send ZHTP request
+                let (status, body) = send_zhtp_request(&connection, &method_str, &path, headers, body_vec).await?;
+
+                connection.close(0u32.into(), b"done");
+                endpoint.wait_idle().await;
+
+                Ok((status, body))
             })
         } else {
-            Err("Runtime or client not initialized".into())
+            Err("Runtime not initialized".into())
         }
     };
 
-    create_bytes_response_map(&mut env, result)
+    // Convert result to bytes response map
+    let bytes_result = result.map(|(status, body)| {
+        (status as i32, "", body, true)
+    });
+
+    create_zhtp_bytes_response_map(&mut env, bytes_result)
 }
 
 /// Cancel all active requests
@@ -433,6 +500,81 @@ fn create_bytes_response_map<'local>(
 
             // Body as byte array
             if let Ok(byte_array) = env.byte_array_from_slice(&response.body) {
+                if let Ok(key_str) = env.new_string("body") {
+                    let _ = env.call_method(
+                        &map,
+                        "put",
+                        "(Ljava/lang/Object;Ljava/lang/Object;)Ljava/lang/Object;",
+                        &[JValue::Object(&key_str.into()), JValue::Object(&byte_array.into())],
+                    );
+                }
+            }
+        }
+        Err(e) => {
+            put_int(env, &map, "status", 0);
+            put_boolean(env, &map, "ok", false);
+            put_string(env, &map, "error", &e.to_string());
+        }
+    }
+
+    map.into_raw()
+}
+
+// Helper to create a HashMap result for ZHTP response
+fn create_zhtp_response_map<'local>(
+    env: &mut JNIEnv<'local>,
+    result: Result<(i32, &str, String, bool), Box<dyn std::error::Error + Send + Sync>>,
+) -> jobject {
+    let hash_map_class = match env.find_class("java/util/HashMap") {
+        Ok(c) => c,
+        Err(_) => return std::ptr::null_mut(),
+    };
+
+    let map = match env.new_object(&hash_map_class, "()V", &[]) {
+        Ok(m) => m,
+        Err(_) => return std::ptr::null_mut(),
+    };
+
+    match result {
+        Ok((status, _status_text, body, ok)) => {
+            put_int(env, &map, "status", status);
+            put_string(env, &map, "statusText", if ok { "OK" } else { "Error" });
+            put_string(env, &map, "body", &body);
+            put_boolean(env, &map, "ok", ok);
+        }
+        Err(e) => {
+            put_int(env, &map, "status", 0);
+            put_boolean(env, &map, "ok", false);
+            put_string(env, &map, "error", &e.to_string());
+        }
+    }
+
+    map.into_raw()
+}
+
+// Helper to create a HashMap result for ZHTP bytes response
+fn create_zhtp_bytes_response_map<'local>(
+    env: &mut JNIEnv<'local>,
+    result: Result<(i32, &str, Vec<u8>, bool), Box<dyn std::error::Error + Send + Sync>>,
+) -> jobject {
+    let hash_map_class = match env.find_class("java/util/HashMap") {
+        Ok(c) => c,
+        Err(_) => return std::ptr::null_mut(),
+    };
+
+    let map = match env.new_object(&hash_map_class, "()V", &[]) {
+        Ok(m) => m,
+        Err(_) => return std::ptr::null_mut(),
+    };
+
+    match result {
+        Ok((status, _status_text, body, ok)) => {
+            put_int(env, &map, "status", status);
+            put_string(env, &map, "statusText", if ok { "OK" } else { "Error" });
+            put_boolean(env, &map, "ok", ok);
+
+            // Body as byte array
+            if let Ok(byte_array) = env.byte_array_from_slice(&body) {
                 if let Ok(key_str) = env.new_string("body") {
                     let _ = env.call_method(
                         &map,

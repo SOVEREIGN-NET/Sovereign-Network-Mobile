@@ -2754,6 +2754,7 @@ PODS:
     - SocketRocket
     - Yoga
   - SocketRocket (0.7.1)
+  - SwiftCBOR (0.6.0)
   - Yoga (0.0.0)
 
 DEPENDENCIES:
@@ -2853,6 +2854,7 @@ DEPENDENCIES:
   - RNScreens (from `../node_modules/react-native-screens`)
   - RNVectorIcons (from `../node_modules/react-native-vector-icons`)
   - SocketRocket (~> 0.7.1)
+  - SwiftCBOR (~> 0.6.0)
   - Yoga (from `../node_modules/react-native/ReactCommon/yoga`)
 
 SPEC REPOS:
@@ -2874,6 +2876,7 @@ SPEC REPOS:
     - PromisesObjC
     - PromisesSwift
     - SocketRocket
+    - SwiftCBOR
 
 EXTERNAL SOURCES:
   boost:
@@ -3150,8 +3153,9 @@ SPEC CHECKSUMS:
   RNScreens: d821082c6dd1cb397cc0c98b026eeafaa68be479
   RNVectorIcons: 791f13226ec4a3fd13062eda9e892159f0981fae
   SocketRocket: d4aabe649be1e368d1318fdf28a022d714d65748
+  SwiftCBOR: b873af28a9cc66003852fdc79a41852a7e54009a
   Yoga: 689c8e04277f3ad631e60fe2a08e41d411daf8eb
 
-PODFILE CHECKSUM: 2e89991c4b15f57386bfe0f4bb7466beba59d58e
+PODFILE CHECKSUM: 290f5d523d1f1661a50d6226b842dea27fcdb7ae
 
 COCOAPODS: 1.16.2

@@ -411,6 +411,22 @@ class NativeQuic: NSObject {
 
   // MARK: - Private Helpers
 
+  private func httpMethodToZhtpMethod(_ method: String) -> ZhtpMethod {
+    switch method.uppercased() {
+    case "GET": return .get
+    case "POST": return .post
+    case "PUT": return .put
+    case "DELETE": return .delete
+    case "OPTIONS": return .options
+    case "HEAD": return .head
+    case "PATCH": return .patch
+    case "VERIFY": return .verify
+    case "CONNECT": return .connect
+    case "TRACE": return .trace
+    default: return .get
+    }
+  }
+
   @available(iOS 15.0, *)
   private func createQuicParameters(
     insecure: Bool,
@@ -705,24 +721,19 @@ class NativeQuic: NSObject {
         print("[NativeQuic] requestBytes connection state: \(state)")
         switch state {
         case .ready:
-          print("[NativeQuic] requestBytes: connection READY, sending request...")
-          self.sendHttpRequestBytes(
+          print("[NativeQuic] requestBytes: connection READY, sending ZHTP request...")
+          // Convert HTTP method string to ZhtpMethod
+          let zhtpMethod = self.httpMethodToZhtpMethod(method)
+          sendZhtpRequest(
             connection: connection,
-            method: method,
+            method: zhtpMethod,
             path: parsedUrl.path,
-            host: parsedUrl.host,
-            port: parsedUrl.port,
             headers: headers,
             body: body
           ) { result in
             switch result {
-            case .success(let data):
-              do {
-                let parsed = try self.parseHttpResponseBytes(data: data)
-                finish(.success(parsed))
-              } catch {
-                finish(.failure(error))
-              }
+            case .success(let (status, body)):
+              finish(.success((status: Int(status), headers: [:], body: body, statusText: "")))
             case .failure(let error):
               finish(.failure(error))
             }

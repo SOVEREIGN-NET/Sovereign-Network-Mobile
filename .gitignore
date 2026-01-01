@@ -103,12 +103,18 @@ ios/Podfile.lock
 # Watchman
 .watchman-cookie_
 
-# Documentation
-/docs/
-android/app/src/main/res/drawable-mdpi/node_modules_reactnavigation_elements_lib_module_assets_backicon.png
+# liboqs build artifacts (can be regenerated with build script)
+ios/vendor/install/
+ios/vendor/liboqs/
+ios/vendor/ios-cmake/
+ios/vendor/*.a
+ios/vendor/liboqs.xcframework/**/*.a
+
+# Documentation (excluding security/liboqs docs)
 .github/workflows/build-and-distribute-ios.yml
 .github/workflows/build-and-distribute-android.yml
 .github/CI_CD_SETUP.md
+android/app/src/main/res/drawable-mdpi/node_modules_reactnavigation_elements_lib_module_assets_backicon.png
 
 # Rust build artifacts
 android/app/src/main/rust/**/target/
