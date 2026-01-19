@@ -409,19 +409,34 @@ enum UhpKeystore {
         let identityPath = identityDir.appendingPathComponent("user_identity.json")
 
         do {
-            return try Data(contentsOf: identityPath)
+            let data = try Data(contentsOf: identityPath)
+            print("[UhpKeystore] ✓ Successfully loaded identity from: \(identityPath)")
+            return data
         } catch {
             print("[UhpKeystore] ⚠️ Identity file missing at: \(identityPath)")
-            print("[UhpKeystore] This identity needs to be synced from the server or created.")
+            print("[UhpKeystore] Requested identity ID: \(identityId)")
+
+            // List all available identities in keystore directory
+            do {
+                let keystoreContents = try FileManager.default.contentsOfDirectory(at: keystoreDir, includingPropertiesForKeys: nil)
+                let identityFolders = keystoreContents.filter { $0.hasDirectoryPath }.map { $0.lastPathComponent }
+                print("[UhpKeystore] Available identities in keystore: \(identityFolders.isEmpty ? "NONE" : identityFolders.joined(separator: ", "))")
+            } catch {
+                print("[UhpKeystore] Could not list keystore directory: \(error)")
+            }
+
+            print("[UhpKeystore] This identity needs to be provisioned:")
             print("[UhpKeystore] Expected identity materials:")
             print("[UhpKeystore]   - Dilithium5 signing keypair (for UHP v2 ClientHello signature)")
             print("[UhpKeystore]   - Kyber1024 KEM keypair (for post-quantum key exchange)")
             print("[UhpKeystore]   - Identity DID, public keys, node ID, device ID, timestamp")
             print("[UhpKeystore]")
-            print("[UhpKeystore] Next steps:")
-            print("[UhpKeystore]   1. Fetch identity from server: GET /api/v1/identities/\(identityId)")
-            print("[UhpKeystore]   2. Store response at: \(identityPath)")
-            print("[UhpKeystore]   3. Also store key materials in Keychain with account: private_key_\(identityId)")
+            print("[UhpKeystore] Identity provisioning flow:")
+            print("[UhpKeystore]   1. Call NativeIdentityProvisioning.provisionIdentity(displayName, serverUrl)")
+            print("[UhpKeystore]   2. This generates keys locally and registers with server")
+            print("[UhpKeystore]   3. Server returns identity_id which is used for authenticated requests")
+            print("[UhpKeystore]   4. Identity stored at: \(identityPath)")
+            print("[UhpKeystore]   5. Private keys stored in Keychain: private_key_\(identityId)")
             return nil
         }
     }

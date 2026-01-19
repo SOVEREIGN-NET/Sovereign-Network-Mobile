@@ -10,6 +10,7 @@ import QuicClient, {
   type QuicRequestOptions,
   type QuicResponse,
 } from './QuicClient';
+import SecureIdentityStorage from './SecureIdentityStorage';
 
 /**
  * FetchAdapter type from @sovereign-net/api-client
@@ -318,6 +319,22 @@ export function createQuicFetchAdapterSync(
     const quicOptions = convertOptions(init, quicUrl);
     quicOptions.insecure = insecure;
     quicOptions.timeout = timeout;
+
+    // For authenticated requests, add X-Zhtp-Identity header
+    if (quicOptions.alpn === 'authenticated') {
+      try {
+        const identityId = await SecureIdentityStorage.getIdentityId();
+        if (identityId) {
+          quicOptions.headers = quicOptions.headers || {};
+          quicOptions.headers['X-Zhtp-Identity'] = identityId;
+          console.log('[🌐 Web4] QuicFetchAdapter: Added X-Zhtp-Identity header for authenticated request');
+        } else {
+          console.warn('[🌐 Web4] QuicFetchAdapter: ⚠️ No identity_id found for authenticated request');
+        }
+      } catch (error) {
+        console.warn('[🌐 Web4] QuicFetchAdapter: Failed to retrieve identity_id:', error);
+      }
+    }
 
     // if (__DEV__) {
     //   console.log('[QuicFetchAdapterSync] ▶️ REQUEST:', {

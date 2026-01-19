@@ -61,13 +61,7 @@ class NativeIdentityProvisioningBridge {
       throw new Error('NativeIdentityProvisioning not available on this platform');
     }
 
-    return new Promise((resolve, reject) => {
-      this.nativeModule.generateLocalIdentity(
-        displayName,
-        (result: GeneratedIdentityData) => resolve(result),
-        (error: string) => reject(new Error(error))
-      );
-    });
+    return await this.nativeModule.generateLocalIdentity(displayName);
   }
 
   /**
@@ -83,15 +77,11 @@ class NativeIdentityProvisioningBridge {
       throw new Error('NativeIdentityProvisioning not available on this platform');
     }
 
-    return new Promise((resolve, reject) => {
-      this.nativeModule.registerWithServer(
-        identityData,
-        displayName,
-        serverUrl,
-        (result: ServerRegistrationResponse) => resolve(result),
-        (error: string) => reject(new Error(error))
-      );
-    });
+    return await this.nativeModule.registerWithServer(
+      identityData,
+      displayName,
+      serverUrl
+    );
   }
 
   /**
@@ -103,14 +93,7 @@ class NativeIdentityProvisioningBridge {
       throw new Error('NativeIdentityProvisioning not available on this platform');
     }
 
-    return new Promise((resolve, reject) => {
-      this.nativeModule.provisionIdentity(
-        displayName,
-        serverUrl,
-        (result: ProvisioningResult) => resolve(result),
-        (error: string) => reject(new Error(error))
-      );
-    });
+    return await this.nativeModule.provisionIdentity(displayName, serverUrl);
   }
 }
 

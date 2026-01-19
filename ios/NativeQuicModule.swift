@@ -24,6 +24,7 @@ class NativeQuic: NSObject {
     case publicContent   // zhtp-public/1
     case controlPlane    // zhtp-uhp/2
   }
+  private typealias SafeComplete = (Bool, Any?, String?, Error?) -> Void
 
   // MARK: - React Native Bridge Methods
 
@@ -277,8 +278,7 @@ class NativeQuic: NSObject {
     var hasResolved = false
     let resolveLock = NSLock()
 
-    // Helper to safely resolve/reject only once and cleanup
-    func safeComplete(success: Bool, result: Any?, error: String? = nil, nativeError: Error? = nil) {
+    let doSafeComplete: SafeComplete = { success, result, error, nativeError in
       resolveLock.lock()
       defer { resolveLock.unlock() }
       guard !hasResolved else { return }
@@ -296,118 +296,142 @@ class NativeQuic: NSObject {
     }
 
     connection.stateUpdateHandler = { [weak self] state in
-      guard let self = self else {
-        safeComplete(success: false, result: nil, error: "Module deallocated")
-        return
-      }
-
-      print("[NativeQuic] Request connection state: \(state)")
-
-      switch state {
-      case .setup:
-        print("[NativeQuic] Request: Connection setup...")
-
-      case .preparing:
-        print("[NativeQuic] Request: Connection preparing (QUIC/TLS handshake)...")
-
-      case .waiting(let error):
-        print("[NativeQuic] Request: Connection waiting - \(error.localizedDescription)")
-        // Check for specific QUIC errors
-        if let nwError = error as? NWError {
-          print("[NativeQuic] Request: NWError details - \(nwError)")
-        }
-
-      case .ready:
-        if profile == .controlPlane {
-          guard let identityId = self.extractIdentityId(path: parsedUrl.path, body: body, headers: headers) else {
-            safeComplete(success: false, result: nil, error: "Missing identity_id for authenticated request")
-            return
-          }
-
-          switch performUhpHandshake(connection: connection, identityId: identityId) {
-          case .failure(let error):
-            safeComplete(success: false, result: nil, error: "UHP handshake failed: \(error.localizedDescription)", nativeError: error)
-          case .success(let sessionInfo):
-            do {
-              // Session ID is now enforced to be exactly 32 bytes in UhpHandshake.swift
-              print("[NativeQuic] ✓ Session ID: \(sessionInfo.sessionId.count) bytes (UHP v2 compliant)")
-              let macKey = try deriveMacKey(sessionKey: sessionInfo.sessionKey, handshakeHash: sessionInfo.handshakeHash)
-              var session = AuthSession(
-                sessionId: sessionInfo.sessionId,
-                macKey: macKey,
-                sequence: 0,
-                clientDid: sessionInfo.clientDid,
-                serverDid: sessionInfo.peerDid,
-                createdAt: Date(),
-                lastActivity: Date()
-              )
-
-              let requestBody = body?.data(using: .utf8) ?? Data()
-              let zhtpMethod = self.httpMethodToZhtpMethod(method)
-
-              sendAuthenticatedZhtpRequest(
-                connection: connection,
-                session: &session,
-                method: zhtpMethod,
-                path: parsedUrl.path,
-                headers: headers,
-                body: requestBody,
-                requester: sessionInfo.clientDid
-              ) { result in
-                switch result {
-                case .success(let (status, responseBody)):
-                  let bodyString = String(data: responseBody, encoding: .utf8) ?? ""
-                  let response: [String: Any] = [
-                    "status": Int(status),
-                    "statusText": status >= 200 && status < 300 ? "OK" : "Error",
-                    "headers": [:],
-                    "body": bodyString,
-                    "ok": status >= 200 && status < 300
-                  ]
-                  safeComplete(success: true, result: response)
-                case .failure(let error):
-                  safeComplete(success: false, result: nil, error: error.localizedDescription, nativeError: error)
-                }
-              }
-            } catch {
-              safeComplete(success: false, result: nil, error: "MAC key derivation failed: \(error.localizedDescription)", nativeError: error)
-            }
-          }
-        } else {
-          self.sendHttpRequest(
-            connection: connection,
-            method: method,
-            path: parsedUrl.path,
-            host: parsedUrl.host,
-            port: parsedUrl.port,
-            headers: headers,
-            body: body
-          ) { result in
-            switch result {
-            case .success(let response):
-              safeComplete(success: true, result: response)
-            case .failure(let error):
-              safeComplete(success: false, result: nil, error: error.localizedDescription, nativeError: error)
-            }
-          }
-        }
-
-      case .failed(let error):
-        safeComplete(success: false, result: nil, error: "Connection failed: \(error.localizedDescription)", nativeError: error)
-
-      case .cancelled:
-        safeComplete(success: false, result: nil, error: "Connection was cancelled")
-
-      default:
-        break
-      }
+      self?.handleRequestState(
+        state,
+        connection: connection,
+        connectionId: connectionId,
+        profile: profile,
+        parsedUrl: parsedUrl,
+        method: method,
+        headers: headers,
+        body: body,
+        doSafeComplete: doSafeComplete
+      )
     }
 
     connection.start(queue: queue)
 
     // Timeout handler
     queue.asyncAfter(deadline: .now() + timeout) {
-      safeComplete(success: false, result: nil, error: "Request timed out after \(timeout) seconds")
+      doSafeComplete(false, nil, "Request timed out after \(timeout) seconds", nil)
+    }
+  }
+
+  private func handleRequestState(
+    _ state: NWConnection.State,
+    connection: NWConnection,
+    connectionId: String,
+    profile: QuicAlpnProfile,
+    parsedUrl: (host: String, port: Int, path: String),
+    method: String,
+    headers: [String: String],
+    body: String?,
+    doSafeComplete: @escaping SafeComplete
+  ) {
+    // Placeholder - state handler
+    switch state {
+    case .setup:
+      print("[NativeQuic] Request: Connection setup...")
+
+    case .preparing:
+      print("[NativeQuic] Request: Connection preparing (QUIC/TLS handshake)...")
+
+    case .waiting(let error):
+      print("[NativeQuic] Request: Connection waiting - \(error.localizedDescription)")
+      // Check for specific QUIC errors
+      print("[NativeQuic] Request: NWError details - \(error)")
+
+    case .ready:
+      if profile == .controlPlane {
+        guard let identityId = extractIdentityId(path: parsedUrl.path, body: body, headers: headers) else {
+          doSafeComplete(false, nil, "Missing identity_id for authenticated request", nil)
+          return
+        }
+
+        switch performUhpHandshake(connection: connection, identityId: identityId) {
+        case .failure(let error):
+          doSafeComplete(false, nil, "UHP handshake failed: \(error.localizedDescription)", error)
+        case .success(let sessionInfo):
+          do {
+            // Session ID is now enforced to be exactly 32 bytes in UhpHandshake.swift
+            print("[NativeQuic] ✓ Session ID: \(sessionInfo.sessionId.count) bytes (UHP v2 compliant)")
+            let macKey = try deriveMacKey(sessionKey: sessionInfo.sessionKey, handshakeHash: sessionInfo.handshakeHash)
+            var session = AuthSession(
+              sessionId: sessionInfo.sessionId,
+              macKey: macKey,
+              sequence: 0,
+              clientDid: sessionInfo.clientDid,
+              serverDid: sessionInfo.peerDid,
+              createdAt: Date(),
+              lastActivity: Date()
+            )
+
+            let requestBody = body?.data(using: .utf8) ?? Data()
+            let zhtpMethod = httpMethodToZhtpMethod(method)
+
+            sendAuthenticatedZhtpRequest(
+              connection: connection,
+              session: &session,
+              method: zhtpMethod,
+              path: parsedUrl.path,
+              headers: headers,
+              body: requestBody,
+              requester: sessionInfo.clientDid
+            ) { result in
+              switch result {
+              case .success(let (status, responseBody)):
+                let bodyString = String(data: responseBody, encoding: .utf8) ?? ""
+                let response: [String: Any] = [
+                  "status": Int(status),
+                  "statusText": status >= 200 && status < 300 ? "OK" : "Error",
+                  "headers": [:],
+                  "body": bodyString,
+                  "ok": status >= 200 && status < 300
+                ]
+                doSafeComplete(true, response, nil, nil)
+              case .failure(let error):
+                doSafeComplete(false, nil, error.localizedDescription, error)
+              }
+            }
+          } catch {
+            doSafeComplete(false, nil, "MAC key derivation failed: \(error.localizedDescription)", error)
+          }
+        }
+      } else {
+        // Public mode: use native ZHTP format
+        let requestBody = body?.data(using: .utf8)
+        sendZhtpRequest(
+          connection: connection,
+          method: method,
+          path: parsedUrl.path,
+          headers: headers,
+          body: requestBody
+        ) { result in
+          switch result {
+          case .success(let (status, body)):
+            let bodyString = String(data: body, encoding: .utf8) ?? ""
+            let response: [String: Any] = [
+              "status": Int(status),
+              "statusText": status >= 200 && status < 300 ? "OK" : "Error",
+              "headers": [:],
+              "body": bodyString,
+              "ok": status >= 200 && status < 300
+            ]
+            doSafeComplete(true, response, nil, nil)
+          case .failure(let error):
+            doSafeComplete(false, nil, error.localizedDescription, error)
+          }
+        }
+      }
+
+    case .failed(let error):
+      doSafeComplete(false, nil, "Connection failed: \(error.localizedDescription)", error)
+
+    case .cancelled:
+      doSafeComplete(false, nil, "Connection was cancelled", nil)
+
+    @unknown default:
+      break
     }
   }
 
@@ -573,26 +597,42 @@ class NativeQuic: NSObject {
   }
 
   private func extractIdentityId(path: String, body: String?, headers: [String: String]) -> String? {
+    print("[NativeQuic] 🔍 Extracting identity_id from authenticated request:")
+    print("[NativeQuic]    Path: \(path)")
+    print("[NativeQuic]    Body: \(body?.prefix(100) ?? "nil")")
+    print("[NativeQuic]    Headers: \(headers.keys.joined(separator: ", "))")
+
+    // Try X-Zhtp-Identity header first
     if let headerValue = headers["X-Zhtp-Identity"] ?? headers["x-zhtp-identity"] {
       let normalized = normalizeIdentityId(headerValue)
+      print("[NativeQuic]    ✓ Found in X-Zhtp-Identity header: \(headerValue)")
+      print("[NativeQuic]    ✓ Normalized: \(normalized)")
       return normalized.isEmpty ? nil : normalized
     }
 
+    // Try request body
     if let body = body,
        let bodyData = body.data(using: .utf8),
        let json = try? JSONSerialization.jsonObject(with: bodyData) as? [String: Any],
        let identityId = json["identity_id"] as? String {
       let normalized = normalizeIdentityId(identityId)
+      print("[NativeQuic]    ✓ Found in request body identity_id: \(identityId)")
+      print("[NativeQuic]    ✓ Normalized: \(normalized)")
       return normalized.isEmpty ? nil : normalized
     }
 
+    // Try URL path patterns
     let components = path.split(separator: "/").map(String.init)
+    print("[NativeQuic]    Path components: \(components)")
+
     if components.count >= 5,
        components[0] == "api",
        components[1] == "v1",
        components[2] == "wallet",
        components[3] == "list" {
       let normalized = normalizeIdentityId(components[4])
+      print("[NativeQuic]    ✓ Found in path /api/v1/wallet/list/{id}: \(components[4])")
+      print("[NativeQuic]    ✓ Normalized: \(normalized)")
       return normalized.isEmpty ? nil : normalized
     }
 
@@ -602,9 +642,12 @@ class NativeQuic: NSObject {
        components[2] == "wallet",
        components[3] == "balance" {
       let normalized = normalizeIdentityId(components[5])
+      print("[NativeQuic]    ✓ Found in path /api/v1/wallet/balance/{id}: \(components[5])")
+      print("[NativeQuic]    ✓ Normalized: \(normalized)")
       return normalized.isEmpty ? nil : normalized
     }
 
+    print("[NativeQuic]    ❌ No identity_id found in request")
     return nil
   }
 
@@ -711,8 +754,9 @@ class NativeQuic: NSObject {
     data: Data,
     completion: @escaping (Result<[String: Any], Error>) -> Void
   ) {
+    // First, try to parse as CBOR ZHTP response
     do {
-      // Decode CBOR response to ZhtpResponseWire
+      print("[NativeQuic] Attempting to parse response as CBOR ZHTP...")
       let zhtpResponse = try zhtp_decode_response(data)
 
       // Extract body as string
@@ -731,11 +775,48 @@ class NativeQuic: NSObject {
         "ok": zhtpResponse.status >= 200 && zhtpResponse.status < 300
       ]
 
-      print("[NativeQuic] Parsed ZHTP response: status=\(zhtpResponse.status)")
+      print("[NativeQuic] ✅ Parsed as CBOR ZHTP response: status=\(zhtpResponse.status)")
       completion(.success(response))
     } catch {
-      print("[NativeQuic] Failed to decode ZHTP response: \(error)")
-      completion(.failure(NSError(domain: "NativeQuic", code: -2, userInfo: [NSLocalizedDescriptionKey: "Failed to decode CBOR response: \(error.localizedDescription)"])))
+      // Fall back to parsing as plain HTTP response
+      print("[NativeQuic] ⚠️ CBOR parsing failed, attempting HTTP fallback...")
+      if let httpText = String(data: data, encoding: .utf8), httpText.contains("HTTP/1.1") {
+        print("[NativeQuic] Parsed as HTTP response")
+        // Parse HTTP response
+        let lines = httpText.components(separatedBy: "\r\n")
+        if let statusLine = lines.first {
+          let statusParts = statusLine.split(separator: " ", maxSplits: 2)
+          if statusParts.count >= 2, let statusCode = Int(statusParts[1]) {
+            var responseHeaders: [String: String] = [:]
+            var bodyStartIndex = 0
+            for (index, line) in lines.enumerated() {
+              if line.isEmpty {
+                bodyStartIndex = index + 1
+                break
+              }
+              let headerParts = line.split(separator: ":", maxSplits: 1)
+              if headerParts.count == 2 {
+                let key = String(headerParts[0]).trimmingCharacters(in: .whitespaces)
+                let value = String(headerParts[1]).trimmingCharacters(in: .whitespaces)
+                responseHeaders[key] = value
+              }
+            }
+            let body = lines[bodyStartIndex...].joined(separator: "\r\n")
+            let response: [String: Any] = [
+              "status": statusCode,
+              "statusText": String(statusParts[statusParts.count - 1]),
+              "headers": responseHeaders,
+              "body": body,
+              "ok": statusCode >= 200 && statusCode < 300
+            ]
+            completion(.success(response))
+            return
+          }
+        }
+      }
+
+      print("[NativeQuic] ❌ Failed to decode response: \(error)")
+      completion(.failure(NSError(domain: "NativeQuic", code: -2, userInfo: [NSLocalizedDescriptionKey: "Failed to decode response: \(error.localizedDescription)"])))
     }
   }
 
@@ -778,7 +859,7 @@ class NativeQuic: NSObject {
       activeConnections[connectionId] = connection
       connectionLock.unlock()
 
-      @Sendable func finish(_ result: Result<(status: Int, headers: [String: String], body: Data, statusText: String), Error>) {
+      func finish(_ result: Result<(status: Int, headers: [String: String], body: Data, statusText: String), Error>) {
         finishLock.lock()
         if didFinish {
           finishLock.unlock()
@@ -794,8 +875,7 @@ class NativeQuic: NSObject {
         continuation.resume(with: result)
       }
 
-      connection.stateUpdateHandler = { [weak self] state in
-        guard let self = self else { return }
+      connection.stateUpdateHandler = { state in
         print("[NativeQuic] requestBytes connection state: \(state)")
         switch state {
         case .ready:
@@ -908,7 +988,7 @@ class NativeQuic: NSObject {
 
     func receiveMore() {
       print("[NativeQuic] receiveHttpResponseBytes: calling receive(), connection state=\(connection.state)")
-      connection.receive(minimumIncompleteLength: 1, maximumLength: 65536) { [weak self] content, context, isComplete, error in
+      connection.receive(minimumIncompleteLength: 1, maximumLength: 65536) { content, context, isComplete, error in
         print("[NativeQuic] receiveHttpResponseBytes callback: content=\(content?.count ?? 0) bytes, isComplete=\(isComplete), error=\(error?.localizedDescription ?? "nil")")
 
         if let error = error {

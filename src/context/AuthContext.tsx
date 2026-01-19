@@ -114,6 +114,8 @@ export interface AuthContextType {
   updatePassphrase: (newPassphrase: string) => Promise<void>;
   updateBiometric: (enabled: boolean) => Promise<void>;
   setCurrentIdentity: (identity: Identity) => Promise<void>;
+  // On-demand identity loading (with biometric prompt when accessing protected features)
+  loadIdentityOnDemand: () => Promise<Identity | null>;
   // SECURITY: Phase 3.1 - Biometric authentication methods
   isBiometricAvailable: () => Promise<boolean>;
   getBiometryType: () => Promise<string | null>;
@@ -138,21 +140,24 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
   /**
    * Restore identity from secure storage on app load
    * SECURITY: Uses Keychain-backed storage instead of plaintext AsyncStorage
+   * Note: Does not require biometric on startup - user can unlock Keychain later when needed
    */
   useEffect(() => {
     const restoreIdentity = async () => {
       try {
-        // Try to restore from secure storage first
-        const identity = await SecureIdentityStorage.getIdentity();
-        if (identity) {
+        // Check if identity exists in cache (non-blocking, no biometric prompt)
+        const hasCachedIdentity = await SecureIdentityStorage.hasIdentity();
+
+        if (hasCachedIdentity) {
           if (__DEV__) {
-            console.log('🔐 AuthContext: Restoring identity from secure storage:', identity.did);
+            console.log('🔐 AuthContext: Cached identity found, will load when needed');
           }
-          setCurrentIdentity(identity);
+          // Identity exists but don't fetch it yet - avoid biometric prompt on startup
+          // User will authenticate when they try to access protected features
         }
       } catch (err) {
-        console.error('Failed to restore identity from secure storage:', err);
-        // Continue with no identity if restoration fails
+        console.error('Failed to check for cached identity:', err);
+        // Continue with no identity if check fails
       } finally {
         setIsBootstrapping(false);
       }
@@ -359,6 +364,8 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
 
   /**
    * Update biometric setting
+   * When enabled: Requires biometric (Face ID, Touch ID, etc.) to access private keys
+   * When disabled: Only requires device unlock to access private keys
    */
   const updateBiometric = useCallback(async (enabled: boolean) => {
     if (!currentIdentity) {
@@ -370,13 +377,18 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
     setIsLoading(true);
 
     try {
-      const updatedIdentity = {
-        ...currentIdentity,
-        biometricHash: enabled ? 'mock_biometric_hash' : undefined,
-      };
+      console.log(`[AuthContext] ${enabled ? 'Enabling' : 'Disabling'} biometric protection`);
 
-      await storage.setItem('zhtp_identity', JSON.stringify(updatedIdentity));
-      setCurrentIdentity(updatedIdentity);
+      // Re-save identity with new biometric setting
+      // This triggers SecureIdentityStorage to update Keychain access control
+      await SecureIdentityStorage.setIdentity(currentIdentity, {
+        requireBiometric: enabled,
+        accessibleAfterFirstUnlock: true,
+      });
+
+      console.log(`[AuthContext] ✅ Biometric ${enabled ? 'enabled' : 'disabled'}`);
+      // Identity doesn't change, just storage settings
+      setCurrentIdentity(currentIdentity);
     } catch (err: any) {
       const message = err.message || 'Failed to update biometric setting';
       setError(message);
@@ -435,6 +447,39 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
   }, []);
 
   /**
+   * Load identity on-demand when user needs to access protected features
+   * This shows biometric prompt at the time of access, not on app startup
+   * If user denies biometric or Keychain access, returns null (user can retry)
+   */
+  const loadIdentityOnDemand = useCallback(async (): Promise<Identity | null> => {
+    try {
+      if (currentIdentity) {
+        // Already loaded
+        return currentIdentity;
+      }
+
+      console.log('[AuthContext] Loading identity on-demand (may prompt for biometric)...');
+      const identity = await SecureIdentityStorage.getIdentity();
+      if (identity) {
+        console.log('[AuthContext] ✅ Identity loaded on-demand');
+        setCurrentIdentity(identity);
+        return identity;
+      }
+      console.log('[AuthContext] ⚠️ No identity found');
+      return null;
+    } catch (err: any) {
+      // User may have cancelled biometric prompt - this is not an error
+      const errorMsg = err.message || String(err);
+      if (errorMsg.includes('cancelled') || errorMsg.includes('denied') || errorMsg.includes('unavailable')) {
+        console.log('[AuthContext] User cancelled biometric authentication:', errorMsg);
+        return null;
+      }
+      console.error('[AuthContext] Failed to load identity on-demand:', err);
+      return null;
+    }
+  }, [currentIdentity]);
+
+  /**
    * SECURITY: Phase 3.1 - Check if biometric authentication is available
    * Returns true if device supports biometric (Face ID, Touch ID, Fingerprint, Iris, etc.)
    */
@@ -465,9 +510,10 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
     updatePassphrase,
     updateBiometric,
     setCurrentIdentity: setIdentity,
+    loadIdentityOnDemand,
     isBiometricAvailable,
     getBiometryType,
-  }), [currentIdentity, isLoading, isBootstrapping, error, signIn, createIdentity, recoverIdentity, signOut, clearError, updateProfile, updatePassphrase, updateBiometric, setIdentity, isBiometricAvailable, getBiometryType]);
+  }), [currentIdentity, isLoading, isBootstrapping, error, signIn, createIdentity, recoverIdentity, signOut, clearError, updateProfile, updatePassphrase, updateBiometric, setIdentity, loadIdentityOnDemand, isBiometricAvailable, getBiometryType]);
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
 };

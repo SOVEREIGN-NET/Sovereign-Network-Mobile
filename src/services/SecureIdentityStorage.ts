@@ -56,6 +56,7 @@ export const SecureIdentityStorage = {
         avatar: identity.avatar,
         createdAt: identity.createdAt,
         citizenship: identity.citizenship,
+        identityId: identity.identityId, // Server-returned identity ID for authenticated requests
       });
 
       // 2. Configure Keychain access control
@@ -183,6 +184,53 @@ export const SecureIdentityStorage = {
       return await AsyncStorage.getItem(IDENTITY_ID_ASYNC_STORAGE);
     } catch (error) {
       console.error('❌ Failed to get cached DID:', error);
+      return null;
+    }
+  },
+
+  /**
+   * Get identity ID for use in authenticated request headers
+   * Requires device unlock and may prompt for biometric authentication
+   * Used to add X-Zhtp-Identity header to UHP authenticated requests
+   *
+   * @returns identity_id string or null if not found
+   */
+  async getIdentityId(): Promise<string | null> {
+    try {
+      const identity = await this.getIdentity();
+      if (!identity) {
+        console.warn('⚠️ No identity found for getIdentityId()');
+        return null;
+      }
+      if (!identity.identityId) {
+        console.warn('⚠️ Identity loaded but identityId is missing');
+        return null;
+      }
+      console.log('[SecureIdentityStorage] ✓ Retrieved identity_id for authenticated request');
+      return identity.identityId;
+    } catch (error) {
+      console.error('❌ Failed to get identity ID:', error);
+      return null;
+    }
+  },
+
+  /**
+   * Get identity with optional biometric prompt suppression
+   * Used for background operations that should not interrupt user
+   * @param suppressBiometric If true, attempts to get identity without prompting
+   * @returns Identity or null if not available
+   */
+  async getIdentityIfAvailable(suppressBiometric?: boolean): Promise<Identity | null> {
+    try {
+      if (suppressBiometric) {
+        // Just check if it exists in cache without prompting
+        return await this.getCachedDidOnly() ? await this.getIdentity().catch(() => null) : null;
+      }
+      return await this.getIdentity();
+    } catch (error) {
+      if (__DEV__) {
+        console.log('[SecureIdentityStorage] Identity not available (may require authentication):', error);
+      }
       return null;
     }
   },

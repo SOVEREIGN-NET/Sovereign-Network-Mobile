@@ -69,8 +69,9 @@ func zhtp_encode_request(_ request: ZhtpRequestWire) throws -> Data {
     return wireData
 }
 
-/// Encode public SDK request (simple CBOR map, no length prefix)
+/// Encode public SDK request with ZHTP wire format
 /// Format A: { method, path, sessionId?, sequence?, timestamp?, body?, requestMac? }
+/// Returns: [magic: 0x5A485450] + [version: 0x01] + [length: 4 BE] + [CBOR]
 func zhtp_encode_sdk_request(
     method: String,
     path: String,
@@ -122,7 +123,22 @@ func zhtp_encode_sdk_request(
         try appendCborBytes(&cborData, requestMac)
     }
 
-    return cborData
+    // Add ZHTP wire format: [magic: 0x5A485450] + [version: 0x01] + [length: 4 BE] + [CBOR]
+    var wireData = Data()
+    // ZHTP magic bytes
+    wireData.append(contentsOf: [0x5A, 0x48, 0x54, 0x50])  // "ZHTP"
+    // Version
+    wireData.append(0x01)
+    // Length (big-endian)
+    var length = UInt32(cborData.count).bigEndian
+    withUnsafeBytes(of: &length) { buffer in
+        wireData.append(contentsOf: buffer)
+    }
+    // CBOR payload
+    wireData.append(cborData)
+    print("[ZhtpCodec] SDK request wire format: \(wireData.count) bytes (magic + version + length + \(cborData.count) CBOR)")
+
+    return wireData
 }
 
 private func appendCborBytes(_ data: inout Data, _ bytes: Data) throws {

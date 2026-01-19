@@ -163,18 +163,29 @@ class RealAuthService {
       // Get node URL from environment
       const nodeUrl = this.configProvider.nodeUrl || 'https://localhost:9002';
 
-      console.log('[RealAuthService] Starting iOS identity provisioning...');
+      console.log('[RealAuthService] 🔑 Starting iOS identity provisioning...');
+      console.log('[RealAuthService]    Display name: ' + data.display_name);
+      console.log('[RealAuthService]    Server URL: ' + nodeUrl);
 
       // Step 1: Generate keys locally + register with server + provision locally
-      const provisioningResult = await nativeIdentityProvisioning.provisionIdentity(
-        data.display_name,
-        nodeUrl
-      );
+      let provisioningResult;
+      try {
+        provisioningResult = await nativeIdentityProvisioning.provisionIdentity(
+          data.display_name,
+          nodeUrl
+        );
+      } catch (nativeError: any) {
+        console.error('[RealAuthService] ❌ Native provisioning failed:', nativeError);
+        throw new Error('Device-based provisioning failed: ' + (nativeError.message || nativeError.toString()));
+      }
 
       console.log(
-        '✅ Identity provisioned successfully:',
-        provisioningResult.identity_id
+        '[RealAuthService] ✅ Identity provisioned successfully:'
       );
+      console.log('[RealAuthService]    identity_id: ' + provisioningResult.identity_id);
+      console.log('[RealAuthService]    DID: ' + provisioningResult.did);
+      console.log('[RealAuthService]    Device: ' + provisioningResult.device_id);
+      console.log('[RealAuthService]    PQC enabled: ' + provisioningResult.pqc_enabled);
 
       // Step 2: Fetch the created identity from server
       // (Server should return identity info after registration)
