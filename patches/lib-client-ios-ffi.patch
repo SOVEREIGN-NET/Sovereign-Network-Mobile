@@ -1,0 +1,125 @@
+diff --git a/lib-client/Cargo.toml b/lib-client/Cargo.toml
+index 829d2208..87ab990e 100644
+--- a/lib-client/Cargo.toml
++++ b/lib-client/Cargo.toml
+@@ -12,8 +12,8 @@ name = "zhtp_client"
+ 
+ [features]
+ default = []
+-uniffi = ["dep:uniffi"]
+ wasm = ["dep:wasm-bindgen", "dep:js-sys", "dep:console_error_panic_hook", "getrandom/js"]
++uniffi = ["dep:uniffi"]
+ 
+ [dependencies]
+ # Core
+@@ -35,6 +35,9 @@ chacha20poly1305 = "0.10"
+ rand = "0.8"
+ getrandom = "0.2"
+ 
++# UniFFI (for mobile bindings)
++uniffi = { version = "0.25", optional = true }
++
+ # Native: C-based PQC (faster but not WASM-compatible)
+ [target.'cfg(not(target_arch = "wasm32"))'.dependencies]
+ pqcrypto-dilithium = "0.5"
+@@ -46,16 +49,13 @@ pqcrypto-traits = "0.3"
+ crystals-dilithium = "1.0"
+ pqc_kyber = "0.7"
+ 
+-# UniFFI (optional, for mobile bindings)
+-uniffi = { version = "0.25", optional = true }
+-
+ # WASM (optional, for web)
+ wasm-bindgen = { version = "0.2", optional = true }
+ js-sys = { version = "0.3", optional = true }
+ console_error_panic_hook = { version = "0.1", optional = true }
+ 
+ [build-dependencies]
+-uniffi = { version = "0.25", features = ["build"], optional = true }
++uniffi = { version = "0.25", features = ["build"], default-features = false }
+ 
+ [dev-dependencies]
+ tokio = { version = "1", features = ["rt-multi-thread", "macros"] }
+diff --git a/lib-client/build.rs b/lib-client/build.rs
+index d6aaef98..ef056468 100644
+--- a/lib-client/build.rs
++++ b/lib-client/build.rs
+@@ -6,8 +6,9 @@
+ // - Kotlin bindings for Android
+ 
+ fn main() {
+-    #[cfg(feature = "uniffi")]
+-    {
++    println!("cargo:rerun-if-changed=uniffi/zhtp_client.udl");
++
++    if std::env::var_os("CARGO_FEATURE_UNIFFI").is_some() {
+         uniffi::generate_scaffolding("uniffi/zhtp_client.udl")
+             .expect("Failed to generate UniFFI scaffolding");
+     }
+diff --git a/lib-client/src/lib.rs b/lib-client/src/lib.rs
+index ad5e1702..4ebabfcc 100644
+--- a/lib-client/src/lib.rs
++++ b/lib-client/src/lib.rs
+@@ -72,6 +72,10 @@ pub const ZHTP_WIRE_VERSION: u8 = 1;
+ #[cfg(feature = "uniffi")]
+ uniffi::setup_scaffolding!();
+ 
++// iOS compatibility: provide stub for ___chkstk_darwin (PQC assembly references this)
++#[no_mangle]
++pub extern "C" fn ___chkstk_darwin() {}
++
+ // =============================================================================
+ // C FFI Exports for iOS (manual FFI without uniffi-bindgen)
+ // =============================================================================
+@@ -162,6 +166,18 @@ pub extern "C" fn zhtp_client_buffer_free(buf: ByteBuffer) {
+     }
+ }
+ 
++/// Alias for zhtp_client_string_free (alternative naming convention)
++#[no_mangle]
++pub extern "C" fn zhtp_client_free_string(s: *mut std::ffi::c_char) {
++    zhtp_client_string_free(s);
++}
++
++/// Alias for zhtp_client_buffer_free (alternative naming convention)
++#[no_mangle]
++pub extern "C" fn zhtp_client_free_bytes(buf: ByteBuffer) {
++    zhtp_client_buffer_free(buf);
++}
++
+ /// Get public key from identity
+ #[no_mangle]
+ pub extern "C" fn zhtp_client_identity_get_public_key(handle: *const IdentityHandle) -> ByteBuffer {
+@@ -194,6 +210,32 @@ pub extern "C" fn zhtp_client_identity_get_node_id(handle: *const IdentityHandle
+     buf
+ }
+ 
++/// Get Kyber public key from identity
++#[no_mangle]
++pub extern "C" fn zhtp_client_identity_get_kyber_public_key(handle: *const IdentityHandle) -> ByteBuffer {
++    if handle.is_null() {
++        return ByteBuffer { data: std::ptr::null_mut(), len: 0 };
++    }
++    let identity = unsafe { &(*handle).inner };
++    let mut bytes = identity.kyber_public_key.clone();
++    let buf = ByteBuffer {
++        data: bytes.as_mut_ptr(),
++        len: bytes.len(),
++    };
++    std::mem::forget(bytes);
++    buf
++}
++
++/// Get created_at timestamp from identity
++#[no_mangle]
++pub extern "C" fn zhtp_client_identity_get_created_at(handle: *const IdentityHandle) -> u64 {
++    if handle.is_null() {
++        return 0;
++    }
++    let identity = unsafe { &(*handle).inner };
++    identity.created_at
++}
++
+ /// Sign registration proof. Returns signature bytes.
+ #[no_mangle]
+ pub extern "C" fn zhtp_client_sign_registration_proof(
