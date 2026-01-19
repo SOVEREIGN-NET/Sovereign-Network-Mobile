@@ -52,17 +52,17 @@ The Web4 runtime enables the app to load decentralized websites hosted on the So
 
 ## Content Resolution Flow
 
-When a user navigates to `zhtp://centralhub.sov/`, the following sequence occurs:
+When a user navigates to `zhtp://central.sov/`, the following sequence occurs:
 
 ### Step 1: Domain Resolution
 
 ```
 POST /api/v1/web4/domains/resolve
-Body: {"domain": "centralhub.sov", "version": null}
+Body: {"domain": "central.sov", "version": null}
 ALPN: zhtp-public/1
 
 Response: {
-  "domain": "centralhub.sov",
+  "domain": "central.sov",
   "manifest_cid": "bafk843db2bbf40ff4280d084ec7c1dc0253",
   "version": 1,
   "spa": false,
@@ -78,7 +78,7 @@ Body: {"cid": "bafk843db2bbf40ff4280d084ec7c1dc0253"}
 ALPN: zhtp-public/1
 
 Response: {
-  "domain": "centralhub.sov",
+  "domain": "central.sov",
   "version": "1.0",
   "files": [
     {"path": "/index.html", "cid": "bafk...", "mime": "text/html", "size": 26827},
@@ -133,7 +133,7 @@ iOS uses `WKURLSchemeHandler` to intercept `zhtp://` URLs:
 ```swift
 // Web4SchemeHandler.swift
 func webView(_ webView: WKWebView, start urlSchemeTask: WKURLSchemeTask) {
-    let url = urlSchemeTask.request.url  // zhtp://centralhub.sov/page
+    let url = urlSchemeTask.request.url  // zhtp://central.sov/page
     let path = url.path                   // /page
 
     Task {
@@ -423,7 +423,7 @@ return try {
 import { Web4View, isWeb4ViewAvailable } from '../components';
 
 <Web4View
-  domain="centralhub.sov"
+  domain="central.sov"
   nodeHost="77.42.37.161"
   nodePort={9334}
   cacheLimitMb={150}

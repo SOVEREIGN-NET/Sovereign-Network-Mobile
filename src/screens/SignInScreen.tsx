@@ -52,7 +52,7 @@ const SignInScreen = ({ navigation }: SignInScreenProps) => {
 
     try {
       // signIn expects identity_id and password
-      await signIn(did, passphrase);
+      await signIn(did.trim(), passphrase);
       // Reset form on success
       setDid('');
       setPassphrase('');

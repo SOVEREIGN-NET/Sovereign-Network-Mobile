@@ -34,7 +34,7 @@ const getTrendArrow = (trend: TokenData['trend']) => {
 const DashboardScreen: React.FC<any> = ({ navigation }) => {
   const { t } = useTranslation();
   const [drawerVisible, setDrawerVisible] = useState(false);
-  const [urlInput, setUrlInput] = useState('zhtp://centralhub.sov');
+  const [urlInput, setUrlInput] = useState('zhtp://central.sov');
   const trendingTokensData = useTrendingTokens();
   const trendingDappsData = useTrendingDapps();
 

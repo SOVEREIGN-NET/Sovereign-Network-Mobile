@@ -90,13 +90,15 @@ function createResponseFromQuic(quicResponse: QuicResponse): Response {
 
 /**
  * Public endpoints that don't require authentication
- * These use zhtp-public/1 ALPN instead of zhtp-uhp/1
+ * These use zhtp-public/1 ALPN instead of zhtp-uhp/2
  * Note: Server must whitelist POST endpoints on public ALPN
  */
 const PUBLIC_ENDPOINT_PATTERNS = [
-  // Identity endpoints (read-only or whitelisted POST)
+  // Identity endpoints (public - no UHP authentication required)
   '/api/v1/identity/create',
   '/api/v1/identity/signup',
+  '/api/v1/identity/login',
+  '/api/v1/identity/signin',
   '/api/v1/identity/exists',
   // Protocol health
   '/api/v1/protocol/health',
@@ -106,10 +108,12 @@ const PUBLIC_ENDPOINT_PATTERNS = [
   // DAO endpoints (read-only GET)
   '/api/v1/dao/proposals',
   '/api/v1/dao/vote/history',
-  // Wallet endpoints (read-only GET)
-  '/api/v1/wallet/list',
-  '/api/v1/wallet/balance',
-  '/api/v1/wallet/transactions',
+  // Wallet endpoints require authentication (UHP)
+  // Web4 browsing endpoints (read-only GET)
+  '/api/v1/web4/resolve',
+  '/api/v1/web4/content',
+  '/api/v1/web4/cid',
+  '/api/v1/web4/domains',
   // Web4 public content
   '/web4/',
 ];
@@ -132,6 +136,26 @@ function isPublicEndpoint(url: string): boolean {
     console.warn('[🌐 Web4] QuicFetchAdapter: Error checking public endpoint:', url, e);
     return false;
   }
+}
+
+function normalizeIdentityBody(body: string, url?: string): string {
+  if (!url) return body;
+  try {
+    const urlObj = new URL(url.replace(/^quic:\/\//, 'https://'));
+    const path = urlObj.pathname.replace(/\/+$/, '');
+    if (!path.startsWith('/api/v1/identity/')) {
+      return body;
+    }
+
+    const parsed = JSON.parse(body);
+    if (parsed && typeof parsed.identity_id === 'string') {
+      parsed.identity_id = parsed.identity_id.trim();
+      return JSON.stringify(parsed);
+    }
+  } catch {
+    return body;
+  }
+  return body;
 }
 
 /**
@@ -163,6 +187,9 @@ function convertOptions(init?: RequestInit, url?: string): QuicRequestOptions {
     } else if (typeof init.body === 'object') {
       body = JSON.stringify(init.body);
     }
+  }
+  if (body) {
+    body = normalizeIdentityBody(body, url);
   }
 
   // Determine ALPN based on endpoint

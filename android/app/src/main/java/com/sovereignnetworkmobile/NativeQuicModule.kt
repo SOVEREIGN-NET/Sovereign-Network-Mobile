@@ -150,6 +150,7 @@ class NativeQuicModule(reactContext: ReactApplicationContext) :
                 val timeout = if (options.hasKey("timeout")) options.getInt("timeout") else DEFAULT_TIMEOUT
                 val body = if (options.hasKey("body")) options.getString("body") else ""
                 val insecure = if (options.hasKey("insecure")) options.getBoolean("insecure") else true
+                val alpn = if (options.hasKey("alpn")) options.getString("alpn") else "authenticated"
 
                 // Convert headers to JSON
                 val headersJson = if (options.hasKey("headers")) {
@@ -167,7 +168,7 @@ class NativeQuicModule(reactContext: ReactApplicationContext) :
                     "{}"
                 }
 
-                Log.d(TAG, "QUIC request: $method $url")
+                Log.d(TAG, "QUIC request: $method $url (ALPN: $alpn)")
 
                 val result = NativeQuicBridge.request(
                     url = url,
@@ -175,7 +176,8 @@ class NativeQuicModule(reactContext: ReactApplicationContext) :
                     headersJson = headersJson,
                     body = body ?: "",
                     timeoutSecs = timeout,
-                    insecure = insecure
+                    insecure = insecure,
+                    alpn = alpn ?: "authenticated"
                 )
 
                 val status = (result?.get("status") as? Number)?.toInt() ?: 0

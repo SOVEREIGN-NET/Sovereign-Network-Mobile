@@ -10,23 +10,21 @@ import {
   LoadingView,
   ScreenLayout,
 } from '../components';
-import { useAuth, useWalletBalance } from '../hooks';
+import { useAuth, useWalletList } from '../hooks';
 import { useTranslation } from '../i18n';
 import { colors, spacing, typography, borderRadius } from '../theme';
 
 const WalletSettingsScreen = ({ navigation }: any) => {
   const { t } = useTranslation();
   const { currentIdentity, isLoading } = useAuth();
-  const { balance: primaryBalance } = useWalletBalance();
+  const { wallets } = useWalletList();
   const [activeWallet] = useState<string>('primary');
 
   if (!currentIdentity || isLoading) {
     return <LoadingView />;
   }
 
-  const wallets = currentIdentity.wallets
-    ? Object.entries(currentIdentity.wallets)
-    : [];
+  const walletEntries = wallets.map((wallet) => [wallet.wallet_type, wallet] as const);
 
   const truncateId = (id: any) => {
     if (!id) return 'unknown';
@@ -76,14 +74,16 @@ const WalletSettingsScreen = ({ navigation }: any) => {
           </Text>
 
           <Column gap="md">
-            {wallets.map(([walletType, wallet]: any) => (
+            {walletEntries.map(([walletType, wallet]) => {
+              const normalizedType = walletType.toLowerCase();
+              return (
               <View
                 key={walletType}
                 style={{
-                  backgroundColor: activeWallet === walletType ? colors.bg_darker : 'transparent',
+                  backgroundColor: activeWallet === normalizedType ? colors.bg_darker : 'transparent',
                   padding: spacing.md,
                   borderRadius: borderRadius.base,
-                  borderWidth: activeWallet === walletType ? 1 : 0,
+                  borderWidth: activeWallet === normalizedType ? 1 : 0,
                   borderColor: colors.primary,
                 }}
               >
@@ -103,7 +103,7 @@ const WalletSettingsScreen = ({ navigation }: any) => {
                       color: colors.text_secondary,
                     }}
                   >
-                    {walletType === 'primary' ? Math.floor(primaryBalance).toLocaleString() : wallet.balance.toLocaleString()} SOV
+                    {Math.floor(wallet.total_balance).toLocaleString()} SOV
                   </Text>
                 </Row>
 
@@ -114,18 +114,19 @@ const WalletSettingsScreen = ({ navigation }: any) => {
                     marginBottom: spacing.xs,
                   }}
                 >
-                  ID: {truncateId((wallet as any).id)}
+                  ID: {truncateId(wallet.id)}
                 </Text>
 
                 <Button
                   variant="secondary"
                   size="sm"
-                  onPress={() => copyToClipboard((wallet as any).id)}
+                  onPress={() => copyToClipboard(wallet.id)}
                 >
                   {t.wallet.settings.copyId}
                 </Button>
               </View>
-            ))}
+            );
+            })}
           </Column>
         </Card>
 

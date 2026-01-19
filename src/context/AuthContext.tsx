@@ -170,8 +170,9 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
     setIsLoading(true);
 
     try {
+      const normalizedIdentityId = identity_id.trim();
       // SECURITY: Check rate limiting before attempting login
-      const rateLimitStatus = rateLimiter.isBlocked(identity_id);
+      const rateLimitStatus = rateLimiter.isBlocked(normalizedIdentityId);
       if (rateLimitStatus.blocked) {
         const errorMessage = rateLimitStatus.reason || 'Too many login attempts. Please try again later.';
         setError(errorMessage);
@@ -181,13 +182,13 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
       let identity: Identity;
 
       if (getUseMockService()) {
-        identity = await MockAuthService.signIn({ did: identity_id, passphrase: password });
+        identity = await MockAuthService.signIn({ did: normalizedIdentityId, passphrase: password });
       } else {
-        identity = await RealAuthService!.signIn({ identity_id, password });
+        identity = await RealAuthService!.signIn({ identity_id: normalizedIdentityId, password });
       }
 
       // Success: Clear rate limit attempts
-      rateLimiter.clearAttempts(identity_id);
+      rateLimiter.clearAttempts(normalizedIdentityId);
 
       // Save to secure storage (Keychain) instead of plaintext AsyncStorage
       await SecureIdentityStorage.setIdentity(identity, { requireBiometric: true });
@@ -196,7 +197,7 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
       return identity;
     } catch (err: any) {
       // SECURITY: Record failed attempt for rate limiting
-      rateLimiter.recordAttempt(identity_id);
+      rateLimiter.recordAttempt(identity_id.trim());
 
       const message = err.message || 'Sign in failed';
       setError(message);

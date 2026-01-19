@@ -9,7 +9,7 @@ import SShieldLogo from '../components/atoms/Logo';
 
 const BrowserScreen = ({ route, navigation }: any) => {
   const { t } = useTranslation();
-  const [urlInput, setUrlInput] = useState(route?.params?.url || 'zhtp://centralhub.sov');
+  const [urlInput, setUrlInput] = useState(route?.params?.url || 'zhtp://central.sov');
   const [loading, setLoading] = useState(false);
   const [webLoading, setWebLoading] = useState(true);
 
@@ -23,7 +23,7 @@ const BrowserScreen = ({ route, navigation }: any) => {
     { url: 'zhtp://chat.sovereign', ...t.browser.suggestedSitesList.chat },
   ];
 
-  const [browserContent, setBrowserContent] = useState(mockWebsites['zhtp://centralhub.sov']);
+  const [browserContent, setBrowserContent] = useState(mockWebsites['zhtp://central.sov']);
   const isZhtp = useMemo(() => {
     const normalized = (urlInput ?? '').toString().trim().toLowerCase();
     return normalized.startsWith('zhtp://');

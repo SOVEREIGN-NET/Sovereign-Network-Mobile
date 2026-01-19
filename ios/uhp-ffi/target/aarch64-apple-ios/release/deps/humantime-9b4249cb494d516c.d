@@ -1,0 +1,10 @@
+/Users/supertramp/Dev/SovereignNetworkMobile/ios/uhp-ffi/target/aarch64-apple-ios/release/deps/humantime-9b4249cb494d516c.d: /Users/supertramp/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/humantime-2.3.0/src/lib.rs /Users/supertramp/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/humantime-2.3.0/src/date.rs /Users/supertramp/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/humantime-2.3.0/src/duration.rs /Users/supertramp/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/humantime-2.3.0/src/wrapper.rs
+
+/Users/supertramp/Dev/SovereignNetworkMobile/ios/uhp-ffi/target/aarch64-apple-ios/release/deps/libhumantime-9b4249cb494d516c.rlib: /Users/supertramp/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/humantime-2.3.0/src/lib.rs /Users/supertramp/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/humantime-2.3.0/src/date.rs /Users/supertramp/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/humantime-2.3.0/src/duration.rs /Users/supertramp/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/humantime-2.3.0/src/wrapper.rs
+
+/Users/supertramp/Dev/SovereignNetworkMobile/ios/uhp-ffi/target/aarch64-apple-ios/release/deps/libhumantime-9b4249cb494d516c.rmeta: /Users/supertramp/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/humantime-2.3.0/src/lib.rs /Users/supertramp/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/humantime-2.3.0/src/date.rs /Users/supertramp/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/humantime-2.3.0/src/duration.rs /Users/supertramp/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/humantime-2.3.0/src/wrapper.rs
+
+/Users/supertramp/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/humantime-2.3.0/src/lib.rs:
+/Users/supertramp/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/humantime-2.3.0/src/date.rs:
+/Users/supertramp/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/humantime-2.3.0/src/duration.rs:
+/Users/supertramp/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/humantime-2.3.0/src/wrapper.rs:

@@ -147,6 +147,7 @@ pub extern "system" fn Java_com_sovereignnetworkmobile_NativeQuicBridge_nativeRe
     body: JString<'local>,
     timeout_secs: jint,
     insecure: jboolean,
+    alpn: JString<'local>,
 ) -> jobject {
     let url_str: String = match env.get_string(&url) {
         Ok(s) => s.into(),
@@ -181,11 +182,17 @@ pub extern "system" fn Java_com_sovereignnetworkmobile_NativeQuicBridge_nativeRe
     let headers: HashMap<String, String> = serde_json::from_str(&headers_str).unwrap_or_default();
     let insecure_bool = insecure == JNI_TRUE;
 
+    let alpn_str: String = match env.get_string(&alpn) {
+        Ok(s) => s.into(),
+        Err(_) => "authenticated".to_string(),
+    };
+
     log::info!(
-        "QUIC request: {} {} (insecure={})",
+        "QUIC request: {} {} (insecure={}, alpn={})",
         method_str,
         url_str,
-        insecure_bool
+        insecure_bool,
+        alpn_str
     );
 
     let result = unsafe {
@@ -219,8 +226,11 @@ pub extern "system" fn Java_com_sovereignnetworkmobile_NativeQuicBridge_nativeRe
                     .await
                     .map_err(|_| "Connection timeout")??;
 
-                // Send ZHTP request
-                let (status, body) = send_zhtp_request(&connection, &method_str, &path, headers, body_str.map(|s| s.into_bytes())).await?;
+                // Send ZHTP request (select handler based on ALPN mode)
+                let (status, body) = match alpn_str.as_str() {
+                    "public" => send_zhtp_request(&connection, &method_str, &path, headers, body_str.map(|s| s.into_bytes())).await?,
+                    _ => send_authenticated_zhtp_request(&connection, &method_str, &path, headers, body_str.map(|s| s.into_bytes())).await?,
+                };
 
                 connection.close(0u32.into(), b"done");
                 endpoint.wait_idle().await;
@@ -256,6 +266,7 @@ pub extern "system" fn Java_com_sovereignnetworkmobile_NativeQuicBridge_nativeRe
     body: JByteArray<'local>,
     timeout_secs: jint,
     insecure: jboolean,
+    alpn: JString<'local>,
 ) -> jobject {
     let url_str: String = match env.get_string(&url) {
         Ok(s) => s.into(),
@@ -290,11 +301,17 @@ pub extern "system" fn Java_com_sovereignnetworkmobile_NativeQuicBridge_nativeRe
 
     let insecure_bool = insecure == JNI_TRUE;
 
+    let alpn_str: String = match env.get_string(&alpn) {
+        Ok(s) => s.into(),
+        Err(_) => "authenticated".to_string(),
+    };
+
     log::info!(
-        "QUIC bytes request: {} {} (insecure={})",
+        "QUIC bytes request: {} {} (insecure={}, alpn={})",
         method_str,
         url_str,
-        insecure_bool
+        insecure_bool,
+        alpn_str
     );
 
     let result = unsafe {
@@ -321,8 +338,11 @@ pub extern "system" fn Java_com_sovereignnetworkmobile_NativeQuicBridge_nativeRe
                     .await
                     .map_err(|_| "Connection timeout")??;
 
-                // Send ZHTP request
-                let (status, body) = send_zhtp_request(&connection, &method_str, &path, headers, body_vec).await?;
+                // Send ZHTP request (select handler based on ALPN mode)
+                let (status, body) = match alpn_str.as_str() {
+                    "public" => send_zhtp_request(&connection, &method_str, &path, headers, body_vec).await?,
+                    _ => send_authenticated_zhtp_request(&connection, &method_str, &path, headers, body_vec).await?,
+                };
 
                 connection.close(0u32.into(), b"done");
                 endpoint.wait_idle().await;

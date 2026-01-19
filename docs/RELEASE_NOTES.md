@@ -17,7 +17,7 @@ First alpha release of the Sovereign Network Mobile app - a decentralized Web4 b
 
 ### Web4 Browser
 - Native ZHTP protocol support via QUIC/UDP transport
-- Browse `.sov` domains directly (e.g., `zhtp://centralhub.sov`)
+- Browse `.sov` domains directly (e.g., `zhtp://central.sov`)
 - URL bar with protocol auto-detection
 - Error pages for unreachable sites
 - Fallback handling for network issues
@@ -195,5 +195,5 @@ https://github.com/SOVEREIGN-NET/Sovereign-Network-Mobile/issues
 ## Connect
 
 - **Node**: `zhtp://77.42.37.161:9334`
-- **Central Hub**: `zhtp://centralhub.sov`
+- **Central Hub**: `zhtp://central.sov`
 - **GitHub**: https://github.com/SOVEREIGN-NET

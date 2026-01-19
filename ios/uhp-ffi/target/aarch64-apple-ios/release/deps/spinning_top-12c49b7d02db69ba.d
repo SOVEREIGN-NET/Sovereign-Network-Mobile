@@ -1,0 +1,10 @@
+/Users/supertramp/Dev/SovereignNetworkMobile/ios/uhp-ffi/target/aarch64-apple-ios/release/deps/spinning_top-12c49b7d02db69ba.d: /Users/supertramp/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/spinning_top-0.3.0/src/lib.rs /Users/supertramp/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/spinning_top-0.3.0/src/relax.rs /Users/supertramp/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/spinning_top-0.3.0/src/rw_spinlock.rs /Users/supertramp/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/spinning_top-0.3.0/src/spinlock.rs
+
+/Users/supertramp/Dev/SovereignNetworkMobile/ios/uhp-ffi/target/aarch64-apple-ios/release/deps/libspinning_top-12c49b7d02db69ba.rlib: /Users/supertramp/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/spinning_top-0.3.0/src/lib.rs /Users/supertramp/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/spinning_top-0.3.0/src/relax.rs /Users/supertramp/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/spinning_top-0.3.0/src/rw_spinlock.rs /Users/supertramp/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/spinning_top-0.3.0/src/spinlock.rs
+
+/Users/supertramp/Dev/SovereignNetworkMobile/ios/uhp-ffi/target/aarch64-apple-ios/release/deps/libspinning_top-12c49b7d02db69ba.rmeta: /Users/supertramp/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/spinning_top-0.3.0/src/lib.rs /Users/supertramp/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/spinning_top-0.3.0/src/relax.rs /Users/supertramp/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/spinning_top-0.3.0/src/rw_spinlock.rs /Users/supertramp/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/spinning_top-0.3.0/src/spinlock.rs
+
+/Users/supertramp/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/spinning_top-0.3.0/src/lib.rs:
+/Users/supertramp/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/spinning_top-0.3.0/src/relax.rs:
+/Users/supertramp/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/spinning_top-0.3.0/src/rw_spinlock.rs:
+/Users/supertramp/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/spinning_top-0.3.0/src/spinlock.rs:

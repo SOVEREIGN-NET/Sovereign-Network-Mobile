@@ -88,6 +88,7 @@ object NativeQuicBridge {
      * @param body Request body (for POST/PUT/PATCH)
      * @param timeoutSecs Timeout in seconds
      * @param insecure If true, accepts self-signed certificates
+     * @param alpn ALPN protocol: 'public' for zhtp-public/1, 'authenticated' for zhtp-uhp/1
      * @return Map with: status (Int), statusText (String), body (String), headersJson (String), ok (Boolean), error (String?)
      */
     fun request(
@@ -96,12 +97,13 @@ object NativeQuicBridge {
         headersJson: String = "{}",
         body: String = "",
         timeoutSecs: Int = 30,
-        insecure: Boolean = true
+        insecure: Boolean = true,
+        alpn: String = "authenticated"
     ): Map<String, Any?>? {
         ensureInitialized()
         return try {
             @Suppress("UNCHECKED_CAST")
-            nativeRequest(url, method, headersJson, body, timeoutSecs, insecure) as? Map<String, Any?>
+            nativeRequest(url, method, headersJson, body, timeoutSecs, insecure, alpn) as? Map<String, Any?>
         } catch (e: Exception) {
             Log.e(TAG, "Request failed", e)
             mapOf("ok" to false, "status" to 0, "error" to e.message)
@@ -110,6 +112,7 @@ object NativeQuicBridge {
 
     /**
      * Make an HTTP request over QUIC returning raw bytes
+     * @param alpn ALPN protocol: 'public' for zhtp-public/1, 'authenticated' for zhtp-uhp/1
      */
     fun requestBytes(
         url: String,
@@ -117,12 +120,13 @@ object NativeQuicBridge {
         headersJson: String = "{}",
         body: ByteArray? = null,
         timeoutSecs: Int = 30,
-        insecure: Boolean = true
+        insecure: Boolean = true,
+        alpn: String = "authenticated"
     ): Map<String, Any?>? {
         ensureInitialized()
         return try {
             @Suppress("UNCHECKED_CAST")
-            nativeRequestBytes(url, method, headersJson, body, timeoutSecs, insecure) as? Map<String, Any?>
+            nativeRequestBytes(url, method, headersJson, body, timeoutSecs, insecure, alpn) as? Map<String, Any?>
         } catch (e: Exception) {
             Log.e(TAG, "Request (bytes) failed", e)
             mapOf("ok" to false, "status" to 0, "error" to e.message)
@@ -170,7 +174,8 @@ object NativeQuicBridge {
         headersJson: String,
         body: String,
         timeoutSecs: Int,
-        insecure: Boolean
+        insecure: Boolean,
+        alpn: String
     ): Any?
     private external fun nativeRequestBytes(
         url: String,
@@ -178,7 +183,8 @@ object NativeQuicBridge {
         headersJson: String,
         body: ByteArray?,
         timeoutSecs: Int,
-        insecure: Boolean
+        insecure: Boolean,
+        alpn: String
     ): Any?
     private external fun nativeCancelAll(): Boolean
     private external fun nativeShutdown()

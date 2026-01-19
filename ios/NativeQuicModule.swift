@@ -22,7 +22,7 @@ class NativeQuic: NSObject {
   // ALPN profiles
   enum QuicAlpnProfile {
     case publicContent   // zhtp-public/1
-    case controlPlane    // zhtp-uhp/1
+    case controlPlane    // zhtp-uhp/2
   }
 
   // MARK: - React Native Bridge Methods
@@ -253,7 +253,7 @@ class NativeQuic: NSObject {
 
     // Select ALPN profile based on option from JS
     let profile: QuicAlpnProfile = alpnOption == "public" ? .publicContent : .controlPlane
-    print("[NativeQuic] 🔑 ALPN: '\(alpnOption)' -> \(profile == .publicContent ? "zhtp-public/1" : "zhtp-uhp/1")")
+    print("[NativeQuic] 🔑 ALPN: '\(alpnOption)' -> \(profile == .publicContent ? "zhtp-public/1" : "zhtp-uhp/2")")
 
     let parameters = createQuicParameters(
       insecure: insecure,
@@ -318,20 +318,77 @@ class NativeQuic: NSObject {
         }
 
       case .ready:
-        self.sendHttpRequest(
-          connection: connection,
-          method: method,
-          path: parsedUrl.path,
-          host: parsedUrl.host,
-          port: parsedUrl.port,
-          headers: headers,
-          body: body
-        ) { result in
-          switch result {
-          case .success(let response):
-            safeComplete(success: true, result: response)
+        if profile == .controlPlane {
+          guard let identityId = self.extractIdentityId(path: parsedUrl.path, body: body, headers: headers) else {
+            safeComplete(success: false, result: nil, error: "Missing identity_id for authenticated request")
+            return
+          }
+
+          switch performUhpHandshake(connection: connection, identityId: identityId) {
           case .failure(let error):
-            safeComplete(success: false, result: nil, error: error.localizedDescription, nativeError: error)
+            safeComplete(success: false, result: nil, error: "UHP handshake failed: \(error.localizedDescription)", nativeError: error)
+          case .success(let sessionInfo):
+            do {
+              // Session ID is now enforced to be exactly 32 bytes in UhpHandshake.swift
+              print("[NativeQuic] ✓ Session ID: \(sessionInfo.sessionId.count) bytes (UHP v2 compliant)")
+              let macKey = try deriveMacKey(sessionKey: sessionInfo.sessionKey, handshakeHash: sessionInfo.handshakeHash)
+              var session = AuthSession(
+                sessionId: sessionInfo.sessionId,
+                macKey: macKey,
+                sequence: 0,
+                clientDid: sessionInfo.clientDid,
+                serverDid: sessionInfo.peerDid,
+                createdAt: Date(),
+                lastActivity: Date()
+              )
+
+              let requestBody = body?.data(using: .utf8) ?? Data()
+              let zhtpMethod = self.httpMethodToZhtpMethod(method)
+
+              sendAuthenticatedZhtpRequest(
+                connection: connection,
+                session: &session,
+                method: zhtpMethod,
+                path: parsedUrl.path,
+                headers: headers,
+                body: requestBody,
+                requester: sessionInfo.clientDid
+              ) { result in
+                switch result {
+                case .success(let (status, responseBody)):
+                  let bodyString = String(data: responseBody, encoding: .utf8) ?? ""
+                  let response: [String: Any] = [
+                    "status": Int(status),
+                    "statusText": status >= 200 && status < 300 ? "OK" : "Error",
+                    "headers": [:],
+                    "body": bodyString,
+                    "ok": status >= 200 && status < 300
+                  ]
+                  safeComplete(success: true, result: response)
+                case .failure(let error):
+                  safeComplete(success: false, result: nil, error: error.localizedDescription, nativeError: error)
+                }
+              }
+            } catch {
+              safeComplete(success: false, result: nil, error: "MAC key derivation failed: \(error.localizedDescription)", nativeError: error)
+            }
+          }
+        } else {
+          self.sendHttpRequest(
+            connection: connection,
+            method: method,
+            path: parsedUrl.path,
+            host: parsedUrl.host,
+            port: parsedUrl.port,
+            headers: headers,
+            body: body
+          ) { result in
+            switch result {
+            case .success(let response):
+              safeComplete(success: true, result: response)
+            case .failure(let error):
+              safeComplete(success: false, result: nil, error: error.localizedDescription, nativeError: error)
+            }
           }
         }
 
@@ -438,7 +495,7 @@ class NativeQuic: NSObject {
     case .publicContent:
       alpnList = ["zhtp-public/1"]
     case .controlPlane:
-      alpnList = ["zhtp-uhp/1", "h3"]
+      alpnList = ["zhtp-uhp/2"]
     }
     print("[NativeQuic] Creating QUIC parameters with ALPNs: \(alpnList)")
 
@@ -507,6 +564,50 @@ class NativeQuic: NSObject {
     return (host: host, port: port, path: path)
   }
 
+  private func normalizeIdentityId(_ identityId: String) -> String {
+    let trimmed = identityId.trimmingCharacters(in: .whitespacesAndNewlines)
+    if trimmed.hasPrefix("did:zhtp:") {
+      return String(trimmed.dropFirst("did:zhtp:".count))
+    }
+    return trimmed
+  }
+
+  private func extractIdentityId(path: String, body: String?, headers: [String: String]) -> String? {
+    if let headerValue = headers["X-Zhtp-Identity"] ?? headers["x-zhtp-identity"] {
+      let normalized = normalizeIdentityId(headerValue)
+      return normalized.isEmpty ? nil : normalized
+    }
+
+    if let body = body,
+       let bodyData = body.data(using: .utf8),
+       let json = try? JSONSerialization.jsonObject(with: bodyData) as? [String: Any],
+       let identityId = json["identity_id"] as? String {
+      let normalized = normalizeIdentityId(identityId)
+      return normalized.isEmpty ? nil : normalized
+    }
+
+    let components = path.split(separator: "/").map(String.init)
+    if components.count >= 5,
+       components[0] == "api",
+       components[1] == "v1",
+       components[2] == "wallet",
+       components[3] == "list" {
+      let normalized = normalizeIdentityId(components[4])
+      return normalized.isEmpty ? nil : normalized
+    }
+
+    if components.count >= 6,
+       components[0] == "api",
+       components[1] == "v1",
+       components[2] == "wallet",
+       components[3] == "balance" {
+      let normalized = normalizeIdentityId(components[5])
+      return normalized.isEmpty ? nil : normalized
+    }
+
+    return nil
+  }
+
   @available(iOS 15.0, *)
   private func sendHttpRequest(
     connection: NWConnection,
@@ -518,48 +619,37 @@ class NativeQuic: NSObject {
     body: String?,
     completion: @escaping (Result<[String: Any], Error>) -> Void
   ) {
-    let hostHeader = headers["Host"] ?? "\(host):\(port)"
-    var httpRequest = "\(method) \(path) HTTP/1.1\r\n"
-    httpRequest += "Host: \(hostHeader)\r\n"
-    httpRequest += "Connection: close\r\n"
-    httpRequest += "User-Agent: SovereignNetwork-iOS/1.0 QUIC\r\n"
+    do {
+      // Encode body as Data
+      let bodyData = body?.data(using: .utf8) ?? Data()
+      let timestamp = UInt64(Date().timeIntervalSince1970)
 
-    for (key, value) in headers where key.caseInsensitiveCompare("Host") != .orderedSame {
-      httpRequest += "\(key): \(value)\r\n"
+      // Build SDK CBOR request (public mode - no authentication, no length prefix)
+      let requestData = try zhtp_encode_sdk_request(
+        method: method,
+        path: path,
+        timestamp: timestamp,
+        body: bodyData
+      )
+
+      print("[NativeQuic] Sending \(method) \(path) (\(requestData.count) bytes CBOR)")
+      let hexPreview = requestData.prefix(100).map({ String(format: "%02x", $0) }).joined(separator: " ")
+      print("[NativeQuic] Request hex (first 100 bytes): \(hexPreview)")
+
+      // Send CBOR-encoded ZHTP request over QUIC
+      connection.send(content: requestData, contentContext: .finalMessage, isComplete: true, completion: .contentProcessed { [weak self] error in
+        if let error = error {
+          print("[NativeQuic] Send failed: \(error.localizedDescription)")
+          completion(.failure(error))
+          return
+        }
+        print("[NativeQuic] Send succeeded (stream write closed), waiting for response...")
+        self?.receiveHttpResponse(connection: connection, completion: completion)
+      })
+    } catch {
+      print("[NativeQuic] Failed to encode ZHTP request: \(error)")
+      completion(.failure(error))
     }
-
-    if let body = body {
-      let bodyData = body.data(using: .utf8) ?? Data()
-      httpRequest += "Content-Length: \(bodyData.count)\r\n"
-      httpRequest += "Content-Type: application/json\r\n"
-      httpRequest += "\r\n"
-      httpRequest += body
-    } else {
-      httpRequest += "\r\n"
-    }
-
-    guard let requestData = httpRequest.data(using: .utf8) else {
-      completion(.failure(NSError(domain: "NativeQuic", code: -1, userInfo: [NSLocalizedDescriptionKey: "Failed to encode request"])))
-      return
-    }
-
-    // Log request without body (may contain sensitive data)
-    print("[NativeQuic] Sending \(method) \(path) (\(requestData.count) bytes)")
-
-    // For HTTP/1.1 over QUIC: we need to signal end of request with isComplete: true
-    // This tells the server "I'm done sending, now respond"
-    // The server uses this to know the full request has been received
-    // We then read the response on the same bidirectional stream
-    // Use .finalMessage context to ensure data is flushed immediately
-    connection.send(content: requestData, contentContext: .finalMessage, isComplete: true, completion: .contentProcessed { [weak self] error in
-      if let error = error {
-        print("[NativeQuic] Send failed: \(error.localizedDescription)")
-        completion(.failure(error))
-        return
-      }
-      print("[NativeQuic] Send succeeded (stream write closed), waiting for response...")
-      self?.receiveHttpResponse(connection: connection, completion: completion)
-    })
   }
 
   @available(iOS 15.0, *)
@@ -621,44 +711,32 @@ class NativeQuic: NSObject {
     data: Data,
     completion: @escaping (Result<[String: Any], Error>) -> Void
   ) {
-    guard let responseString = String(data: data, encoding: .utf8) else {
-      completion(.failure(NSError(domain: "NativeQuic", code: -2, userInfo: [NSLocalizedDescriptionKey: "Failed to decode response"])))
-      return
+    do {
+      // Decode CBOR response to ZhtpResponseWire
+      let zhtpResponse = try zhtp_decode_response(data)
+
+      // Extract body as string
+      let bodyString = String(data: zhtpResponse.response.body, encoding: .utf8) ?? ""
+
+      // Extract headers as [String: String]
+      var responseHeaders: [String: String] = [:]
+      // Headers are in the ZHTP response structure (if available)
+      responseHeaders["content-type"] = zhtpResponse.response.headers.content_type
+
+      let response: [String: Any] = [
+        "status": zhtpResponse.status,
+        "statusText": zhtpResponse.error_message ?? "OK",
+        "headers": responseHeaders,
+        "body": bodyString,
+        "ok": zhtpResponse.status >= 200 && zhtpResponse.status < 300
+      ]
+
+      print("[NativeQuic] Parsed ZHTP response: status=\(zhtpResponse.status)")
+      completion(.success(response))
+    } catch {
+      print("[NativeQuic] Failed to decode ZHTP response: \(error)")
+      completion(.failure(NSError(domain: "NativeQuic", code: -2, userInfo: [NSLocalizedDescriptionKey: "Failed to decode CBOR response: \(error.localizedDescription)"])))
     }
-
-    let parts = responseString.components(separatedBy: "\r\n\r\n")
-    let headerPart = parts.first ?? ""
-    let bodyPart = parts.count > 1 ? parts.dropFirst().joined(separator: "\r\n\r\n") : ""
-
-    let headerLines = headerPart.components(separatedBy: "\r\n")
-    guard let statusLine = headerLines.first else {
-      completion(.failure(NSError(domain: "NativeQuic", code: -3, userInfo: [NSLocalizedDescriptionKey: "Invalid HTTP response"])))
-      return
-    }
-
-    let statusParts = statusLine.split(separator: " ", maxSplits: 2)
-    let statusCode = statusParts.count > 1 ? Int(statusParts[1]) ?? 0 : 0
-    let statusText = statusParts.count > 2 ? String(statusParts[2]) : ""
-
-    var responseHeaders: [String: String] = [:]
-    for line in headerLines.dropFirst() {
-      let headerParts = line.split(separator: ":", maxSplits: 1)
-      if headerParts.count == 2 {
-        let key = String(headerParts[0]).trimmingCharacters(in: .whitespaces)
-        let value = String(headerParts[1]).trimmingCharacters(in: .whitespaces)
-        responseHeaders[key] = value
-      }
-    }
-
-    let response: [String: Any] = [
-      "status": statusCode,
-      "statusText": statusText,
-      "headers": responseHeaders,
-      "body": bodyPart,
-      "ok": statusCode >= 200 && statusCode < 300
-    ]
-
-    completion(.success(response))
   }
 
   // MARK: - Internal helpers for raw bytes (for Web4 runtime)
@@ -677,7 +755,7 @@ class NativeQuic: NSObject {
       throw NSError(domain: "NativeQuic", code: -1, userInfo: [NSLocalizedDescriptionKey: "Invalid URL"])
     }
 
-    print("[NativeQuic] requestBytes: \(method) \(url) with ALPN: \(alpn == .publicContent ? "zhtp-public/1" : "zhtp-uhp/1")")
+    print("[NativeQuic] requestBytes: \(method) \(url) with ALPN: \(alpn == .publicContent ? "zhtp-public/1" : "zhtp-uhp/2")")
 
     let parameters = createQuicParameters(
       insecure: insecure,
@@ -723,10 +801,9 @@ class NativeQuic: NSObject {
         case .ready:
           print("[NativeQuic] requestBytes: connection READY, sending ZHTP request...")
           // Convert HTTP method string to ZhtpMethod
-          let zhtpMethod = self.httpMethodToZhtpMethod(method)
           sendZhtpRequest(
             connection: connection,
-            method: zhtpMethod,
+            method: method,
             path: parsedUrl.path,
             headers: headers,
             body: body
@@ -915,7 +992,7 @@ class NativeQuic: NSObject {
   @objc
   func constantsToExport() -> [AnyHashable: Any]! {
     return [
-      "ALPN_PROTOCOL": "zhtp-uhp/1",
+      "ALPN_PROTOCOL": "zhtp-uhp/2",
       "DEFAULT_TIMEOUT": defaultTimeout,
       "MIN_IOS_VERSION": 15.0
     ]

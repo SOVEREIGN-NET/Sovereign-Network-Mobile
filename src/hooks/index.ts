@@ -18,8 +18,11 @@ export type { UseNodeConnectionStatusReturn } from './useNodeConnectionStatus';
 export { useNativeSettings } from './useNativeSettings';
 export type { DeveloperSettings } from './useNativeSettings';
 
-export { useWalletBalance, getWalletBalance, formatBalance } from './useWalletBalance';
+export { useWalletBalance } from './useWalletBalance';
 export type { WalletBalanceData } from './useWalletBalance';
+
+export { useWalletList } from './useWalletList';
+export type { WalletListData, WalletDisplay } from './useWalletList';
 
 export { useTrendingTokens, formatTokenPrice, formatChange } from './useTrendingTokens';
 export type { TokenData } from './useTrendingTokens';

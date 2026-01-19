@@ -1,4 +1,5 @@
 import Foundation
+import Network
 
 // MARK: - ZHTP Authenticated Request Handler
 
@@ -45,19 +46,14 @@ func sendAuthenticatedZhtpRequest(
         priority: headers["priority"].flatMap(UInt8.init)
     )
 
-    // Compute canonical request hash
-    let canonicalHash = computeCanonicalRequestHash(
-        requestId: requestId,
-        timestampMs: timestampMs,
-        method: method,
-        uri: path,
-        headers: requestHeaders,
-        body: requestBody
-    )
-
     // Build auth context
     do {
-        let authContext = try buildAuthContext(session: session, canonicalHash: canonicalHash)
+        let authContext = try buildAuthContext(
+            session: &session,
+            method: method,
+            path: path,
+            body: requestBody
+        )
         print("[ZHTP Auth] Sequence: \(authContext.sequence), MAC computed")
 
         // Update session's last activity
@@ -145,7 +141,7 @@ func sendAuthenticatedZhtpRequest(
             content: framedData,
             contentContext: .finalMessage,
             isComplete: true,
-            completion: .contentProcessed { error in
+            completion: NWConnection.SendCompletion.contentProcessed { error in
                 if let error = error {
                     print("[ZHTP Auth] Send failed: \(error.localizedDescription)")
                     completion(.failure(error))
@@ -174,7 +170,7 @@ private func receiveAuthenticatedZhtpResponse(
     var hasCompleted = false
     let completionLock = NSLock()
 
-    func safeComplete(_ result: Result<(UInt16, Data), Error>) {
+    func safeComplete(_ result: Result<(status: UInt16, body: Data), Error>) {
         completionLock.lock()
         defer { completionLock.unlock() }
         guard !hasCompleted else { return }
@@ -215,7 +211,7 @@ private func receiveAuthenticatedZhtpResponse(
 
                     print("[ZHTP Auth] Response: status \(responseWire.status), nested body \(responseWire.response.body.count) bytes")
                     // Extract nested response body
-                    safeComplete(.success((responseWire.status, responseWire.response.body)))
+                    safeComplete(.success((status: responseWire.status, body: responseWire.response.body)))
                 } catch {
                     print("[ZHTP Auth] Decode error: \(error)")
                     safeComplete(.failure(error))
@@ -246,47 +242,128 @@ private func zhtp_encode_authenticated_request(
     requester: String,
     authContext: AuthContext
 ) throws -> Data {
-    // Build wire structure manually for authenticated requests
-    // This ensures proper CBOR encoding with auth_context
-
     var data = Data()
 
-    // Version
-    let encoder = JSONEncoder()
-    encoder.outputFormatting = [.sortedKeys]
+    // Outer map: version, request_id, timestamp_ms, auth_context, request
+    try appendCborMapHeader(&data, count: 5)
 
-    let requestDict: [String: Any] = [
-        "method": method.stringValue,
-        "uri": uri,
-        "version": "1.0",
-        "headers": [
-            "content_type": contentType,
-            "content_length": requestBody.count,
-            "dao_fee": 0,
-            "total_fees": 0
-        ] as [String: Any],
-        "body": requestBody,
-        "timestamp": timestamp,
-        "requester": requester
-    ]
+    try appendCborString(&data, "version")
+    try appendCborUInt(&data, 1)
 
-    let authContextEncoded = try encoder.encode(authContext)
-    let authContextDict = try JSONSerialization.jsonObject(with: authContextEncoded) as? [String: Any]
+    try appendCborString(&data, "request_id")
+    try appendCborBytes(&data, requestId)
 
-    let wireDict: [String: Any] = [
-        "version": 1,
-        "request_id": requestId,
-        "timestamp_ms": timestampMs,
-        "auth_context": authContextDict as Any,
-        "request": requestDict
-    ]
+    try appendCborString(&data, "timestamp_ms")
+    try appendCborUInt(&data, timestampMs)
 
-    let jsonData = try JSONSerialization.data(withJSONObject: wireDict)
+    try appendCborString(&data, "auth_context")
+    try appendCborMapHeader(&data, count: 4)
+    try appendCborString(&data, "session_id")
+    try appendCborBytes(&data, authContext.session_id)
+    try appendCborString(&data, "client_did")
+    try appendCborString(&data, authContext.client_did)
+    try appendCborString(&data, "sequence")
+    try appendCborUInt(&data, authContext.sequence)
+    try appendCborString(&data, "request_mac")
+    try appendCborBytes(&data, authContext.request_mac)
 
-    // Convert JSON to CBOR (reuse existing function)
-    guard let jsonObject = try JSONSerialization.jsonObject(with: jsonData) else {
-        throw NSError(domain: "ZhtpCodec", code: 1, userInfo: [NSLocalizedDescriptionKey: "Failed to parse JSON"])
+    try appendCborString(&data, "request")
+    try appendCborMapHeader(&data, count: 7)
+    try appendCborString(&data, "method")
+    try appendCborString(&data, method.stringValue)
+    try appendCborString(&data, "uri")
+    try appendCborString(&data, uri)
+    try appendCborString(&data, "version")
+    try appendCborString(&data, "1.0")
+    try appendCborString(&data, "headers")
+    try appendCborMapHeader(&data, count: 4)
+    try appendCborString(&data, "content_type")
+    try appendCborString(&data, contentType)
+    try appendCborString(&data, "content_length")
+    try appendCborUInt(&data, UInt64(requestBody.count))
+    try appendCborString(&data, "dao_fee")
+    try appendCborUInt(&data, 0)
+    try appendCborString(&data, "total_fees")
+    try appendCborUInt(&data, 0)
+    try appendCborString(&data, "body")
+    try appendCborBytes(&data, requestBody)
+    try appendCborString(&data, "timestamp")
+    try appendCborUInt(&data, timestamp)
+    try appendCborString(&data, "requester")
+    try appendCborString(&data, requester)
+
+    return data
+}
+
+private func appendCborMapHeader(_ data: inout Data, count: Int) throws {
+    guard count >= 0 && count < 24 else {
+        throw NSError(domain: "ZhtpCodec", code: 1, userInfo: [NSLocalizedDescriptionKey: "CBOR map size too large"])
+    }
+    data.append(0xa0 | UInt8(count))
+}
+
+private func appendCborUInt(_ data: inout Data, _ value: UInt64) throws {
+    switch value {
+    case 0...23:
+        data.append(UInt8(value))
+    case 24...UInt64(UInt8.max):
+        data.append(0x18)
+        data.append(UInt8(value))
+    case 0...UInt64(UInt16.max):
+        data.append(0x19)
+        var be = UInt16(value).bigEndian
+        data.append(Data(bytes: &be, count: 2))
+    case 0...UInt64(UInt32.max):
+        data.append(0x1a)
+        var be = UInt32(value).bigEndian
+        data.append(Data(bytes: &be, count: 4))
+    default:
+        data.append(0x1b)
+        var be = value.bigEndian
+        data.append(Data(bytes: &be, count: 8))
+    }
+}
+
+private func appendCborString(_ data: inout Data, _ string: String) throws {
+    let bytes = string.data(using: .utf8) ?? Data()
+    try appendCborTextHeader(&data, length: bytes.count)
+    data.append(bytes)
+}
+
+private func appendCborBytes(_ data: inout Data, _ bytes: Data) throws {
+    try appendCborBytesHeader(&data, length: bytes.count)
+    data.append(bytes)
+}
+
+private func appendCborTextHeader(_ data: inout Data, length: Int) throws {
+    try appendCborLength(&data, majorType: 3, length: length)
+}
+
+private func appendCborBytesHeader(_ data: inout Data, length: Int) throws {
+    try appendCborLength(&data, majorType: 2, length: length)
+}
+
+private func appendCborLength(_ data: inout Data, majorType: UInt8, length: Int) throws {
+    guard length >= 0 else {
+        throw NSError(domain: "ZhtpCodec", code: 2, userInfo: [NSLocalizedDescriptionKey: "Invalid CBOR length"])
     }
 
-    return try encodeCborValue(jsonObject)
+    if length < 24 {
+        data.append((majorType << 5) | UInt8(length))
+    } else if length <= UInt8.max {
+        data.append((majorType << 5) | 24)
+        data.append(UInt8(length))
+    } else if length <= UInt16.max {
+        data.append((majorType << 5) | 25)
+        var be = UInt16(length).bigEndian
+        data.append(Data(bytes: &be, count: 2))
+    } else if length <= UInt32.max {
+        data.append((majorType << 5) | 26)
+        var be = UInt32(length).bigEndian
+        data.append(Data(bytes: &be, count: 4))
+    } else {
+        data.append((majorType << 5) | 27)
+        var be = UInt64(length).bigEndian
+        data.append(Data(bytes: &be, count: 8))
+    }
 }

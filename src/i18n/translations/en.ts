@@ -939,7 +939,7 @@ export const en = {
         description: 'Welcome to the SOV Web4 Network',
         content: 'The Sovereign Network is a decentralized internet built on Zero-Knowledge technology. Browse, transact, and govern without intermediaries.',
       },
-      'zhtp://centralhub.sov': {
+      'zhtp://central.sov': {
         title: 'Central Hub',
         description: 'Sovereign Network Central Hub',
         content: 'The central hub of the Sovereign Network. Access all services, governance, and community resources.',

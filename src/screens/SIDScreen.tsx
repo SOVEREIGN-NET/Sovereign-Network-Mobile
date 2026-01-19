@@ -13,7 +13,7 @@ import {
   DrawerItem,
   Badge,
 } from '../components';
-import { useAuth, useApi, useAsyncData, useWalletBalance } from '../hooks';
+import { useAuth, useApi, useAsyncData, useWalletList } from '../hooks';
 import { useTranslation } from '../i18n';
 import { colors, spacing, typography, borderRadius } from '../theme';
 
@@ -36,41 +36,9 @@ const SIDScreen = ({ navigation }: any) => {
   const { t } = useTranslation();
   const { currentIdentity, isLoading } = useAuth();
   const { api, isInitialized } = useApi();
-  const { balance: walletBalance, displayBalance: walletDisplayBalance } = useWalletBalance();
+  const { wallets, walletByType, totalBalance, loading: walletsLoading } = useWalletList();
   const [drawerVisible, setDrawerVisible] = useState(false);
   const [activeWalletTab, setActiveWalletTab] = useState('Tokens');
-
-  // Fetch wallet balances from API
-  const { data: walletData, loading: walletsLoading } = useAsyncData(
-    async () => {
-      if (!api || !isInitialized || !currentIdentity?.did) {
-        return null;
-      }
-
-      try {
-        // console.log('📊 SID: Fetching wallet data for:', currentIdentity.did);
-        const walletList = await api.getWalletList(currentIdentity.did);
-        // console.log('💰 SID: Wallet list response:', walletList);
-
-        // Transform API response to match expected format
-        const wallets = (walletList.wallets || []).map((w: any) => ({
-          id: w.wallet_id,
-          name: `${w.wallet_type} Wallet`,
-          wallet_type: w.wallet_type,
-          balance: w.total_balance || 0,
-        }));
-
-        return {
-          wallets,
-          totalBalance: wallets.reduce((sum: number, w: any) => sum + (w.balance || 0), 0),
-        };
-      } catch (error) {
-        console.warn('⚠️ SID: Failed to fetch wallet data:', error);
-        return null;
-      }
-    },
-    [api, isInitialized, currentIdentity?.did],
-  );
 
   // Fetch UBI status and history
   const { data: ubiData } = useAsyncData(
@@ -147,14 +115,7 @@ const SIDScreen = ({ navigation }: any) => {
     return <LoadingView />;
   }
 
-  // Use currentIdentity.wallets as primary source (populated from login)
-  const identityWallets = currentIdentity.wallets
-    ? Object.values(currentIdentity.wallets)
-    : [];
-  // Fallback to API data if identity wallets are empty
-  const wallets = identityWallets.length > 0 ? identityWallets : (walletData?.wallets || []);
-  const selectedWallet = wallets[0] || null;
-  const totalBalance = walletBalance; // Calculated from useWalletBalance hook
+  const selectedWallet = walletByType.primary ?? wallets[0] ?? null;
 
   const truncateId = (id: any) => {
     if (!id) return 'unknown';
@@ -418,7 +379,7 @@ const SIDScreen = ({ navigation }: any) => {
                                   color: display.color,
                                 }}
                               >
-                                {walletType === 'Primary' ? formatBalance(walletBalance) : (hasData ? formatBalance(wallet.balance || 0) : '—')}
+                    {hasData ? formatBalance(wallet.total_balance || 0) : '—'}
                               </Text>
                             </Row>
                             <Row style={{ justifyContent: 'space-between', alignItems: 'center', marginTop: spacing.xs }}>

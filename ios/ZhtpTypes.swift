@@ -1,4 +1,5 @@
 import Foundation
+import Security
 
 // MARK: - ZHTP Types (Public Mode Only)
 
@@ -27,6 +28,22 @@ enum ZhtpMethod: Int, Codable {
         case .verify: return "Verify"
         case .connect: return "Connect"
         case .trace: return "Trace"
+        }
+    }
+
+    static func from(string: String) -> ZhtpMethod {
+        switch string.uppercased() {
+        case "GET": return .get
+        case "POST": return .post
+        case "PUT": return .put
+        case "DELETE": return .delete
+        case "OPTIONS": return .options
+        case "HEAD": return .head
+        case "PATCH": return .patch
+        case "VERIFY": return .verify
+        case "CONNECT": return .connect
+        case "TRACE": return .trace
+        default: return .get
         }
     }
 
@@ -131,16 +148,55 @@ struct ZhtpRequest: Codable {
         case auth_proof
     }
 
+    init(method: ZhtpMethod, uri: String, version: String, headers: ZhtpHeaders, body: Data, timestamp: UInt64, requester: String? = nil, auth_proof: Data? = nil) {
+        self.method = method
+        self.uri = uri
+        self.version = version
+        self.headers = headers
+        self.body = body
+        self.timestamp = timestamp
+        self.requester = requester
+        self.auth_proof = auth_proof
+    }
+
     func encode(to encoder: Encoder) throws {
         var container = encoder.container(keyedBy: CodingKeys.self)
         try container.encode(method, forKey: .method)
         try container.encode(uri, forKey: .uri)
         try container.encode(version, forKey: .version)
         try container.encode(headers, forKey: .headers)
-        try container.encode(body, forKey: .body)
+        // Encode body as base64 string for JSON compatibility
+        try container.encode(body.base64EncodedString(), forKey: .body)
         try container.encode(timestamp, forKey: .timestamp)
         try container.encodeIfPresent(requester, forKey: .requester)
-        try container.encodeIfPresent(auth_proof, forKey: .auth_proof)
+        // Encode auth_proof as base64 string if present
+        if let authProof = auth_proof {
+            try container.encode(authProof.base64EncodedString(), forKey: .auth_proof)
+        } else {
+            try container.encodeNil(forKey: .auth_proof)
+        }
+    }
+
+    init(from decoder: Decoder) throws {
+        let container = try decoder.container(keyedBy: CodingKeys.self)
+        method = try container.decode(ZhtpMethod.self, forKey: .method)
+        uri = try container.decode(String.self, forKey: .uri)
+        version = try container.decode(String.self, forKey: .version)
+        headers = try container.decode(ZhtpHeaders.self, forKey: .headers)
+
+        // Decode body from base64 string
+        let bodyStr = try container.decode(String.self, forKey: .body)
+        body = Data(base64Encoded: bodyStr) ?? Data()
+
+        timestamp = try container.decode(UInt64.self, forKey: .timestamp)
+        requester = try container.decodeIfPresent(String.self, forKey: .requester)
+
+        // Decode auth_proof from base64 string if present
+        if let authProofStr = try container.decodeIfPresent(String.self, forKey: .auth_proof) {
+            auth_proof = Data(base64Encoded: authProofStr)
+        } else {
+            auth_proof = nil
+        }
     }
 }
 
@@ -149,7 +205,7 @@ struct ZhtpRequestWire: Codable {
     let version: UInt16 // 1
     let request_id: Data // [u8; 16]
     let timestamp_ms: UInt64
-    let auth_context: [String: AnyCodable]? // null for public mode
+    let auth_context: [String: String]? // null for public mode
     let request: ZhtpRequest
 
     enum CodingKeys: String, CodingKey {
@@ -158,6 +214,14 @@ struct ZhtpRequestWire: Codable {
         case timestamp_ms
         case auth_context
         case request
+    }
+
+    init(version: UInt16, request_id: Data, timestamp_ms: UInt64, auth_context: [String: String]?, request: ZhtpRequest) {
+        self.version = version
+        self.request_id = request_id
+        self.timestamp_ms = timestamp_ms
+        self.auth_context = auth_context
+        self.request = request
     }
 
     /// Create a new public request (no authentication)
@@ -207,10 +271,24 @@ struct ZhtpRequestWire: Codable {
     func encode(to encoder: Encoder) throws {
         var container = encoder.container(keyedBy: CodingKeys.self)
         try container.encode(version, forKey: .version)
-        try container.encode(request_id, forKey: .request_id)
+        // Encode request_id as base64 string
+        try container.encode(request_id.base64EncodedString(), forKey: .request_id)
         try container.encode(timestamp_ms, forKey: .timestamp_ms)
         try container.encodeIfPresent(auth_context, forKey: .auth_context)
         try container.encode(request, forKey: .request)
+    }
+
+    init(from decoder: Decoder) throws {
+        let container = try decoder.container(keyedBy: CodingKeys.self)
+        version = try container.decode(UInt16.self, forKey: .version)
+
+        // Decode request_id from base64 string
+        let requestIdStr = try container.decode(String.self, forKey: .request_id)
+        request_id = Data(base64Encoded: requestIdStr) ?? Data()
+
+        timestamp_ms = try container.decode(UInt64.self, forKey: .timestamp_ms)
+        auth_context = try container.decodeIfPresent([String: String].self, forKey: .auth_context)
+        request = try container.decode(ZhtpRequest.self, forKey: .request)
     }
 }
 
@@ -233,6 +311,54 @@ struct ZhtpResponse: Codable {
         case server
         case validity_proof
     }
+
+    init(version: String, status_message: String, headers: ZhtpHeaders, body: Data, timestamp: UInt64, server: String? = nil, validity_proof: Data? = nil) {
+        self.version = version
+        self.status_message = status_message
+        self.headers = headers
+        self.body = body
+        self.timestamp = timestamp
+        self.server = server
+        self.validity_proof = validity_proof
+    }
+
+    func encode(to encoder: Encoder) throws {
+        var container = encoder.container(keyedBy: CodingKeys.self)
+        try container.encode(version, forKey: .version)
+        try container.encode(status_message, forKey: .status_message)
+        try container.encode(headers, forKey: .headers)
+        // Encode body as base64 string
+        try container.encode(body.base64EncodedString(), forKey: .body)
+        try container.encode(timestamp, forKey: .timestamp)
+        try container.encodeIfPresent(server, forKey: .server)
+        // Encode validity_proof as base64 string if present
+        if let proof = validity_proof {
+            try container.encode(proof.base64EncodedString(), forKey: .validity_proof)
+        } else {
+            try container.encodeNil(forKey: .validity_proof)
+        }
+    }
+
+    init(from decoder: Decoder) throws {
+        let container = try decoder.container(keyedBy: CodingKeys.self)
+        version = try container.decode(String.self, forKey: .version)
+        status_message = try container.decode(String.self, forKey: .status_message)
+        headers = try container.decode(ZhtpHeaders.self, forKey: .headers)
+
+        // Decode body from base64 string
+        let bodyStr = try container.decode(String.self, forKey: .body)
+        body = Data(base64Encoded: bodyStr) ?? Data()
+
+        timestamp = try container.decode(UInt64.self, forKey: .timestamp)
+        server = try container.decodeIfPresent(String.self, forKey: .server)
+
+        // Decode validity_proof from base64 string if present
+        if let proofStr = try container.decodeIfPresent(String.self, forKey: .validity_proof) {
+            validity_proof = Data(base64Encoded: proofStr)
+        } else {
+            validity_proof = nil
+        }
+    }
 }
 
 /// ZHTP Response Wire - transport envelope for responses (NESTED structure)
@@ -251,13 +377,35 @@ struct ZhtpResponseWire: Codable {
         case error_message
     }
 
+    init(request_id: Data, status: UInt16, response: ZhtpResponse, error_code: UInt16? = nil, error_message: String? = nil) {
+        self.request_id = request_id
+        self.status = status
+        self.response = response
+        self.error_code = error_code
+        self.error_message = error_message
+    }
+
     func encode(to encoder: Encoder) throws {
         var container = encoder.container(keyedBy: CodingKeys.self)
-        try container.encode(request_id, forKey: .request_id)
+        // Encode request_id as base64 string
+        try container.encode(request_id.base64EncodedString(), forKey: .request_id)
         try container.encode(status, forKey: .status)
         try container.encode(response, forKey: .response)
         try container.encodeIfPresent(error_code, forKey: .error_code)
         try container.encodeIfPresent(error_message, forKey: .error_message)
+    }
+
+    init(from decoder: Decoder) throws {
+        let container = try decoder.container(keyedBy: CodingKeys.self)
+
+        // Decode request_id from base64 string
+        let requestIdStr = try container.decode(String.self, forKey: .request_id)
+        request_id = Data(base64Encoded: requestIdStr) ?? Data()
+
+        status = try container.decode(UInt16.self, forKey: .status)
+        response = try container.decode(ZhtpResponse.self, forKey: .response)
+        error_code = try container.decodeIfPresent(UInt16.self, forKey: .error_code)
+        error_message = try container.decodeIfPresent(String.self, forKey: .error_message)
     }
 }
 

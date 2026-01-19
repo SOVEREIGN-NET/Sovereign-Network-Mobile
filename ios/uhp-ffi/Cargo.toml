@@ -1,0 +1,19 @@
+[package]
+name = "uhp-ffi"
+version = "0.1.0"
+edition = "2021"
+
+[lib]
+crate-type = ["staticlib"]
+
+[dependencies]
+anyhow = "1.0"
+libc = "0.2"
+tokio = { version = "1.0", features = ["rt-multi-thread", "sync"] }
+hmac = "0.12"
+hkdf = "0.12"
+sha3 = "0.10"
+
+lib-network = { path = "../../../The-Sovereign-Network/lib-network", default-features = false, features = ["handshake-only"] }
+lib-identity = { path = "../../../The-Sovereign-Network/lib-identity" }
+lib-crypto = { path = "../../../The-Sovereign-Network/lib-crypto" }

@@ -115,7 +115,7 @@ export async function quicRequest(
     body: options.body,
     timeout: options.timeout || 30,
     insecure: options.insecure ?? __DEV__, // Default to insecure in dev
-    alpn: options.alpn || 'authenticated', // Default to authenticated (zhtp-uhp/1)
+    alpn: options.alpn || 'authenticated', // Default to authenticated (zhtp-uhp/2)
   };
 
   console.log('[🌐 Web4] QuicClient: Making QUIC request:');
@@ -212,6 +212,7 @@ export async function testQuicHealthCheck(
       method: 'GET',
       timeout: 10,
       insecure: true,
+      alpn: 'public',
     });
 
     const latencyMs = Date.now() - startTime;

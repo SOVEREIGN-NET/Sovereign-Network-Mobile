@@ -10,14 +10,14 @@ import {
   DrawerItem,
 } from '../components';
 import SShieldLogo from '../components/atoms/Logo';
-import { useAuth, useWalletBalance } from '../hooks';
+import { useAuth, useWalletList } from '../hooks';
 import { useTranslation } from '../i18n';
 import { colors, spacing, typography, borderRadius } from '../theme';
 
 const WalletScreen = ({ navigation }: any) => {
   const { t } = useTranslation();
   const { currentIdentity, isLoading } = useAuth();
-  const { balance: primaryBalance } = useWalletBalance();
+  const { wallets, walletByType, loading: walletsLoading } = useWalletList();
   const [activeTab, setActiveTab] = useState('Tokens');
   const [drawerVisible, setDrawerVisible] = useState(false);
 
@@ -60,10 +60,8 @@ const WalletScreen = ({ navigation }: any) => {
     return <LoadingView />;
   }
 
-  const wallets = currentIdentity.wallets
-    ? Object.values(currentIdentity.wallets)
-    : [];
-  const selectedWallet = wallets[0] || null;
+  const selectedWallet = walletByType.primary ?? wallets[0] ?? null;
+  const selectedWalletBalance = selectedWallet?.total_balance ?? 0;
 
   const truncateId = (id: any) => {
     if (!id) return 'unknown';
@@ -133,7 +131,7 @@ const WalletScreen = ({ navigation }: any) => {
                   }}
                   numberOfLines={1}
                 >
-                  {truncateId(selectedWallet?.id)} • {t.wallet.details.notSynced}
+                  {truncateId(selectedWallet?.id)} • {walletsLoading ? 'Syncing...' : t.wallet.details.notSynced}
                 </Text>
               </View>
               <TouchableOpacity
@@ -197,7 +195,7 @@ const WalletScreen = ({ navigation }: any) => {
                       marginBottom: spacing.sm,
                     }}
                   >
-                    {Math.floor(primaryBalance).toLocaleString()}
+                    {Math.floor(selectedWalletBalance).toLocaleString()}
                   </Text>
                   <Text style={{ fontSize: typography.size.sm, color: colors.text_secondary }}>
                     {t.wallet.currency}
@@ -312,9 +310,9 @@ const WalletScreen = ({ navigation }: any) => {
                               }}
                               numberOfLines={1}
                             >
-                              {truncateId((wallet as any).id)}
+                              {truncateId(wallet.id)}
                             </Text>
-                            <TouchableOpacity onPress={() => (wallet as any).id && copyToClipboard((wallet as any).id)}>
+                            <TouchableOpacity onPress={() => wallet.id && copyToClipboard(wallet.id)}>
                               <Text style={{ fontSize: typography.size.xs, color: colors.primary, marginTop: spacing.xxs }}>
                                 Copy
                               </Text>
@@ -329,7 +327,7 @@ const WalletScreen = ({ navigation }: any) => {
                               color: colors.text_primary,
                             }}
                           >
-                            {(wallet.wallet_type === 'primary' || wallet.wallet_type === 'Primary') ? Math.floor(primaryBalance).toLocaleString() : wallet.balance.toLocaleString()} SOV
+                            {Math.floor(wallet.total_balance).toLocaleString()} SOV
                           </Text>
                         </View>
                       </View>

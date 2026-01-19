@@ -12,7 +12,7 @@ assignees: umwelt
 
   **Platform**
   Where does this bug occur?
-  - [ ] Website (centralhub.sov)
+  - [ ] Website (central.sov)
   - [ ] iOS App
   - [ ] Android App
   - [ ] Node/Backend
