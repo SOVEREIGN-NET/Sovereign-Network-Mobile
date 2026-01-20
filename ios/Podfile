@@ -35,6 +35,12 @@ target 'SovereignNetworkMobile' do
   # CBOR serialization for ZHTP protocol
   pod 'SwiftCBOR', '~> 0.6.0'
 
+  # Rust FFI library for UHP handshake and Blake3
+  pod 'uhp_ffi', :path => './uhp-ffi'
+
+  # Rust lib-client for ZHTP identity and registration (uses same crypto as server)
+  pod 'lib_client', :path => './lib-client'
+
   use_react_native!(
     :path => config[:reactNativePath],
     # An absolute path to your application root.

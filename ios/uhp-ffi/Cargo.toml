@@ -13,6 +13,7 @@ tokio = { version = "1.0", features = ["rt-multi-thread", "sync"] }
 hmac = "0.12"
 hkdf = "0.12"
 sha3 = "0.10"
+blake3 = "1.5"
 
 lib-network = { path = "../../../The-Sovereign-Network/lib-network", default-features = false, features = ["handshake-only"] }
 lib-identity = { path = "../../../The-Sovereign-Network/lib-identity" }

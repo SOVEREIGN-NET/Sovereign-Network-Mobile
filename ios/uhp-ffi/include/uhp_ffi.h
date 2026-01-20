@@ -68,6 +68,13 @@ int uhp_hmac_sha3_256(
     size_t out_len
 );
 
+int uhp_blake3(
+    const uint8_t *input_ptr,
+    size_t input_len,
+    uint8_t *out_ptr,
+    size_t out_len
+);
+
 #ifdef __cplusplus
 }
 #endif

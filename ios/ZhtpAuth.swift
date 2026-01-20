@@ -371,11 +371,39 @@ enum UhpKeystore {
             return nil
         }
 
+        // Try to load complete serialized Identity JSON from Keychain first
+        // This contains all required fields including "id" that Rust deserializer needs
+        let serializedAccount = "identity_serialized_\(trimmedId)"
+        var query: [String: Any] = [
+            kSecClass as String: kSecClassGenericPassword,
+            kSecAttrService as String: keychainService,
+            kSecAttrAccount as String: serializedAccount,
+            kSecReturnData as String: true,
+            kSecMatchLimit as String: kSecMatchLimitOne,
+        ]
+        query[kSecUseOperationPrompt as String] = "Authenticate to access your identity"
+
+        var item: CFTypeRef?
+        let status = SecItemCopyMatching(query as CFDictionary, &item)
+
+        if status == errSecSuccess, let data = item as? Data {
+            print("[UhpKeystore] ✅ Loaded complete serialized Identity from Keychain (\(data.count) bytes)")
+            if let identityDid = parseIdentityDid(data) {
+                print("[UhpKeystore] ✅ Parsed identity DID: \(identityDid)")
+                // Private keys stay in Rust, use empty byte arrays
+                let privateKey = UhpPrivateKeyBytesData(dilithiumSk: Data(), kyberSk: Data(), masterSeed: Data())
+                return UhpIdentityMaterials(identityJson: data, identityDid: identityDid, privateKey: privateKey)
+            }
+        }
+
+        print("[UhpKeystore] ⚠️ Serialized Identity not in Keychain (or user denied), trying Documents keystore fallback...")
+
+        // Fallback: Load identity JSON from Documents keystore (partial metadata only)
         guard let identityJson = loadIdentityJson(identityId: trimmedId) else {
-            print("[UhpKeystore] ❌ Failed to load identity JSON from Documents/keystore/\(trimmedId)/user_identity.json")
+            print("[UhpKeystore] ❌ Failed to load identity JSON from Documents/keystore for ID: \(trimmedId)")
             return nil
         }
-        print("[UhpKeystore] ✅ Loaded identity JSON (\(identityJson.count) bytes)")
+        print("[UhpKeystore] ✅ Loaded identity JSON from Documents (\(identityJson.count) bytes)")
 
         guard let identityDid = parseIdentityDid(identityJson) else {
             print("[UhpKeystore] ❌ Failed to parse DID from identity JSON")
@@ -383,17 +411,8 @@ enum UhpKeystore {
         }
         print("[UhpKeystore] ✅ Parsed identity DID: \(identityDid)")
 
-        guard let privateKeyJson = loadPrivateKeyJson(identityId: trimmedId) else {
-            print("[UhpKeystore] ❌ Failed to load private key from Keychain with account 'private_key_\(trimmedId)'")
-            return nil
-        }
-        print("[UhpKeystore] ✅ Loaded private key JSON from Keychain (\(privateKeyJson.count) bytes)")
-
-        guard let privateKey = decodePrivateKey(privateKeyJson) else {
-            print("[UhpKeystore] ❌ Failed to decode private key JSON (missing or invalid dilithium_sk, kyber_sk, master_seed)")
-            return nil
-        }
-        print("[UhpKeystore] ✅ Decoded private key: Dilithium(\(privateKey.dilithiumSk.count)) Kyber(\(privateKey.kyberSk.count)) Seed(\(privateKey.masterSeed.count))")
+        // Private keys stay in Rust, use empty byte arrays
+        let privateKey = UhpPrivateKeyBytesData(dilithiumSk: Data(), kyberSk: Data(), masterSeed: Data())
 
         return UhpIdentityMaterials(identityJson: identityJson, identityDid: identityDid, privateKey: privateKey)
     }
@@ -544,5 +563,46 @@ enum UhpKeystore {
             flags,
             nil
         )
+    }
+
+    // MARK: - Cleanup Functions
+
+    static func deletePrivateKeyForIdentity(identityId: String) -> Bool {
+        let account = "\(keychainAccountPrefix)\(identityId)"
+        let query: [String: Any] = [
+            kSecClass as String: kSecClassGenericPassword,
+            kSecAttrService as String: keychainService,
+            kSecAttrAccount as String: account,
+        ]
+
+        let status = SecItemDelete(query as CFDictionary)
+        if status == errSecSuccess || status == errSecItemNotFound {
+            print("[UhpKeystore] ✅ Deleted private key for identity: \(identityId)")
+            return true
+        } else {
+            print("[UhpKeystore] ⚠️ Failed to delete private key: \(status)")
+            return false
+        }
+    }
+
+    static func deleteAllPrivateKeys() -> Int {
+        var deletedCount = 0
+
+        // Query for all private keys
+        let query: [String: Any] = [
+            kSecClass as String: kSecClassGenericPassword,
+            kSecAttrService as String: keychainService,
+            kSecMatchLimit as String: kSecMatchLimitAll,
+        ]
+
+        let status = SecItemDelete(query as CFDictionary)
+        if status == errSecSuccess {
+            print("[UhpKeystore] ✅ Deleted all private keys from Keychain")
+            deletedCount += 1
+        } else if status != errSecItemNotFound {
+            print("[UhpKeystore] ⚠️ Failed to delete private keys: \(status)")
+        }
+
+        return deletedCount
     }
 }

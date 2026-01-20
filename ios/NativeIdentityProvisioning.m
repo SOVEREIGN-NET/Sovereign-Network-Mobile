@@ -6,15 +6,25 @@ RCT_EXTERN_METHOD(generateLocalIdentity:(NSString *)displayName
                   resolve:(RCTPromiseResolveBlock)resolve
                   reject:(RCTPromiseRejectBlock)reject)
 
-RCT_EXTERN_METHOD(registerWithServer:(NSDictionary *)identityData
-                  displayName:(NSString *)displayName
-                  serverUrl:(NSString *)serverUrl
-                  resolve:(RCTPromiseResolveBlock)resolve
-                  reject:(RCTPromiseRejectBlock)reject)
-
 RCT_EXTERN_METHOD(provisionIdentity:(NSString *)displayName
                   serverUrl:(NSString *)serverUrl
                   resolve:(RCTPromiseResolveBlock)resolve
                   reject:(RCTPromiseRejectBlock)reject)
+
+RCT_EXTERN_METHOD(createRegistrationProof:(NSString *)displayName
+                  didData:(NSDictionary *)didData
+                  resolve:(RCTPromiseResolveBlock)resolve
+                  reject:(RCTPromiseRejectBlock)reject)
+
+RCT_EXTERN_METHOD(storeProvisionedIdentity:(NSString *)identityId
+                  didData:(NSDictionary *)didData
+                  resolve:(RCTPromiseResolveBlock)resolve
+                  reject:(RCTPromiseRejectBlock)reject)
+
+RCT_EXTERN_METHOD(restoreIdentityToHandleStore:(NSString *)identityId
+                  resolve:(RCTPromiseResolveBlock)resolve
+                  reject:(RCTPromiseRejectBlock)reject)
+
+RCT_EXTERN_METHOD(cleanKeystoreDirectory)
 
 @end

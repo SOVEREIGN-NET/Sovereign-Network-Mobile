@@ -469,3 +469,25 @@ pub extern "C" fn uhp_hmac_sha3_256(
     }
     0
 }
+
+#[no_mangle]
+pub extern "C" fn uhp_blake3(
+    input_ptr: *const u8,
+    input_len: usize,
+    out_ptr: *mut u8,
+    out_len: usize,
+) -> c_int {
+    if input_ptr.is_null() || out_ptr.is_null() || out_len < 32 {
+        set_last_error("invalid blake3 parameters");
+        return -1;
+    }
+
+    let input = unsafe { std::slice::from_raw_parts(input_ptr, input_len) };
+    let hash = blake3::hash(input);
+    let digest = hash.as_bytes();
+
+    unsafe {
+        std::ptr::copy_nonoverlapping(digest.as_ptr(), out_ptr, 32);
+    }
+    0
+}

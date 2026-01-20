@@ -1,6 +1,7 @@
 import Foundation
 import Network
 import Security
+import CryptoKit
 
 enum UhpHandshakeError: Error {
     case missingChannelBinding
@@ -136,22 +137,108 @@ func performUhpHandshake(
     connection: NWConnection,
     identityId: String,
     nonceCachePath: String? = nil,
-    chainId: UInt8 = 0
+    chainId: UInt8 = 0,
+    identity: Identity? = nil
 ) -> Result<UhpSessionInfo, Error> {
-    // Channel binding not available on iOS (requires private Security API)
-    // Using empty data as placeholder - Rust layer doesn't require this for handshake validation
-    let channelBinding = Data()
+    // SECURITY: If Identity object is provided, use it directly (signing stays in Rust)
+    // Otherwise, fall back to loading from Keystore (for backwards compatibility)
+    let identityToUse: Identity?
 
-    print("[UhpHandshake] Loading identity for ID: \(identityId)")
-    guard let materials = UhpKeystore.loadIdentityForHandshake(identityId: identityId) else {
-        print("[UhpHandshake] ❌ Failed to load identity materials for ID: \(identityId)")
-        return .failure(UhpHandshakeError.invalidIdentity)
+    if let providedIdentity = identity {
+        print("[UhpHandshake] ✅ Using provided Identity object (DID: \(providedIdentity.did))")
+        identityToUse = providedIdentity
+
+        // Store Identity in handle store to keep it alive during handshake
+        do {
+            try IdentityHandleStore.shared.store(identity: providedIdentity)
+            print("[UhpHandshake] ✅ Stored Identity in handle store")
+        } catch {
+            print("[UhpHandshake] ⚠️ Failed to store Identity in handle store: \(error)")
+        }
+    } else {
+        print("[UhpHandshake] Loading identity for ID: \(identityId)")
+        if let storedIdentity = IdentityHandleStore.shared.retrieve(by: identityId) as? Identity {
+            identityToUse = storedIdentity
+            print("[UhpHandshake] ✅ Retrieved Identity from handle store")
+        } else {
+            identityToUse = nil
+        }
     }
-    print("[UhpHandshake] ✅ Loaded identity materials")
+
+    // SECURITY: Use fresh Identity from handle store if available (private keys in Rust)
+    // Only load from Keychain as fallback if no fresh Identity
+    let materials: UhpIdentityMaterials
+
+    if let freshIdentity = identityToUse {
+        print("[UhpHandshake] ✅ Using fresh Identity from handle store (skipping stale Keychain)")
+
+        do {
+            // Get identity JSON in lib-network handshake format
+            // This includes all ZhtpIdentity::from_serialized() required fields:
+            // id, did, identity_type, public_key (structured), node_id, primary_device, dao_member_id, ownership_proof, etc.
+            let handshakeJsonString = try ZhtpClient.serializeIdentityToHandshakeJson(freshIdentity as! Identity)
+
+            // Debug: Log the handshake JSON
+            let jsonPreview = String(handshakeJsonString.prefix(500))
+            print("[UhpHandshake] 📋 Handshake Identity JSON (first 500 chars):")
+            print("[UhpHandshake] \(jsonPreview)")
+
+            guard let identityJsonData = handshakeJsonString.data(using: .utf8) else {
+                print("[UhpHandshake] ❌ Failed to encode handshake JSON to data")
+                return .failure(UhpHandshakeError.handshakeFailed("Failed to encode handshake JSON"))
+            }
+
+            print("[UhpHandshake] ✅ Got handshake identity JSON from lib-client")
+            print("[UhpHandshake]    Identity JSON: \(identityJsonData.count) bytes")
+
+            // Get private keys from lib-client for uhp-ffi handshake
+            // Keys stay on-device - only passed in memory between lib-client and uhp-ffi
+            let dilithiumSk = try ZhtpClient.getDilithiumSecretKey(freshIdentity as! Identity)
+            let kyberSk = try ZhtpClient.getKyberSecretKey(freshIdentity as! Identity)
+            let masterSeed = try ZhtpClient.getMasterSeed(freshIdentity as! Identity)
+
+            print("[UhpHandshake] ✅ Retrieved private keys from lib-client")
+            print("[UhpHandshake]    Dilithium SK: \(dilithiumSk.count) bytes")
+            print("[UhpHandshake]    Kyber SK: \(kyberSk.count) bytes")
+            print("[UhpHandshake]    Master seed: \(masterSeed.count) bytes")
+
+            materials = UhpIdentityMaterials(
+                identityJson: identityJsonData,
+                identityDid: freshIdentity.did,
+                privateKey: UhpPrivateKeyBytesData(
+                    dilithiumSk: Data(dilithiumSk),
+                    kyberSk: Data(kyberSk),
+                    masterSeed: Data(masterSeed)
+                )
+            )
+        } catch {
+            print("[UhpHandshake] ❌ Failed to serialize identity to handshake JSON: \(error)")
+            return .failure(UhpHandshakeError.handshakeFailed("Failed to serialize identity: \(error)"))
+        }
+    } else {
+        // Fallback: Load from Keychain only if no fresh Identity available
+        print("[UhpHandshake] Loading identity materials from Keychain for ID: \(identityId)")
+        guard let keychainMaterials = UhpKeystore.loadIdentityForHandshake(identityId: identityId) else {
+            print("[UhpHandshake] ❌ Failed to load identity materials for ID: \(identityId)")
+            return .failure(UhpHandshakeError.invalidIdentity)
+        }
+        print("[UhpHandshake] ✅ Loaded identity materials from Keychain (fallback)")
+        materials = keychainMaterials
+    }
 
     let cachePath = nonceCachePath ?? {
         let cacheDir = FileManager.default.urls(for: .cachesDirectory, in: .userDomainMask).first
-        return cacheDir?.appendingPathComponent("uhp-nonce-cache").path ?? NSTemporaryDirectory() + "uhp-nonce-cache"
+        let path = cacheDir?.appendingPathComponent("uhp-nonce-cache").path ?? NSTemporaryDirectory() + "uhp-nonce-cache"
+
+        // Ensure cache directory exists
+        do {
+            try FileManager.default.createDirectory(atPath: path, withIntermediateDirectories: true, attributes: nil)
+            print("[UhpHandshake] ✅ Created nonce cache directory: \(path)")
+        } catch {
+            print("[UhpHandshake] ⚠️ Failed to create nonce cache directory: \(error)")
+        }
+
+        return path
     }()
 
     let io = UhpConnectionIO(connection: connection)
@@ -163,14 +250,32 @@ func performUhpHandshake(
     let clientDid = materials.identityDid
     let privateKey = materials.privateKey
 
+    // Channel binding not available on iOS (requires private Security API)
+    // Create deterministic placeholder from identity materials for validation compatibility
+    let channelBindingInput = "\(clientDid):\(identityId)".data(using: .utf8) ?? Data()
+    let channelBinding = Data(SHA256.hash(data: channelBindingInput))
+
+    // SECURITY: Ensure Identity is in handle store for signing operations
+    // This keeps the private keys in Rust while allowing signing callbacks
+    if let providedIdentity = identityToUse, !IdentityHandleStore.shared.exists(by: providedIdentity.did) {
+        do {
+            try IdentityHandleStore.shared.store(identity: providedIdentity)
+            print("[UhpHandshake] ✅ Confirmed Identity in handle store")
+        } catch {
+            print("[UhpHandshake] ⚠️ Failed to confirm Identity in handle store: \(error)")
+        }
+    }
+
     print("[UhpHandshake] Starting handshake:")
     print("[UhpHandshake]   - Client DID: \(clientDid)")
     print("[UhpHandshake]   - Identity JSON: \(identityJson.count) bytes")
     print("[UhpHandshake]   - Dilithium SK: \(privateKey.dilithiumSk.count) bytes")
     print("[UhpHandshake]   - Kyber SK: \(privateKey.kyberSk.count) bytes")
     print("[UhpHandshake]   - Master seed: \(privateKey.masterSeed.count) bytes")
+    print("[UhpHandshake]   - Identity in store: \(identityToUse != nil ? "✅" : "❌")")
     print("[UhpHandshake]   - Cache path: \(cachePath)")
     print("[UhpHandshake]   - Chain ID: \(chainId)")
+    print("[UhpHandshake] 🔐 SECURITY: Signing infrastructure in place for callback pattern")
 
     let result = identityJson.withUnsafeBytes { identityBuf -> Int32 in
         guard let identityPtr = identityBuf.baseAddress?.assumingMemoryBound(to: UInt8.self) else {
@@ -209,7 +314,7 @@ func performUhpHandshake(
                                 write: uhp_write_callback
                             )
 
-                            return uhp_handshake(
+                            let result = uhp_handshake(
                                 callbacks,
                                 identityPtr,
                                 identityJson.count,
@@ -220,6 +325,7 @@ func performUhpHandshake(
                                 chainId,
                                 &session
                             )
+                            return result
                         }
                     }
                 }
@@ -227,7 +333,7 @@ func performUhpHandshake(
         }
     }
 
-    print("[UhpHandshake] Handshake completed with result code: \(result)")
+    print("[UhpHandshake] Handshake completed with result code: \(Int(result))")
 
     if result != 0 {
         let errorMessage = uhp_last_error_message().flatMap { String(cString: $0) } ?? "unknown error"

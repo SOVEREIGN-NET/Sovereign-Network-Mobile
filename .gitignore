@@ -118,4 +118,5 @@ android/app/src/main/res/drawable-mdpi/node_modules_reactnavigation_elements_lib
 
 # Rust build artifacts
 android/app/src/main/rust/**/target/
+ios/uhp-ffi/target/
 .env.generated.json
