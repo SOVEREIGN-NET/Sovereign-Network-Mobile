@@ -45,8 +45,10 @@ const BackupIdentityScreen = ({ navigation }: BackupIdentityScreenProps) => {
   const [creating, setCreating] = useState(false);
   const [backupError, setBackupError] = useState<string | null>(null);
 
-  // Get seed phrases from identity (20 words)
-  const seedPhrase = currentIdentity?.seedPhrases?.primary
+  // Get seed phrases from identity (24 words from server or 20 from mock)
+  const seedPhrase = currentIdentity?.walletSeedPhrases?.primary
+    ? currentIdentity.walletSeedPhrases.primary
+    : currentIdentity?.seedPhrases?.primary
     ? currentIdentity.seedPhrases.primary.join(' ')
     : // Fallback mock seed phrase for demo (20 words)
       [

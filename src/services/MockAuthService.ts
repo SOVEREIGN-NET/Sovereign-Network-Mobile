@@ -37,6 +37,12 @@ export interface Identity {
     ubi: string[];
     savings: string[];
   };
+  // Server-generated wallet seeds (24-word phrases as strings)
+  walletSeedPhrases?: {
+    primary?: string;
+    ubi?: string;
+    savings?: string;
+  };
   votingPower?: number;
   ubiEarned?: number;
 }

@@ -4,7 +4,7 @@
  */
 
 import React, { createContext, useState, useCallback, useEffect, useMemo } from 'react';
-import { Platform } from 'react-native';
+import { Platform, NativeModules } from 'react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { NativeStorage } from '../services/NativeStorage';
 import SecureIdentityStorage from '../services/SecureIdentityStorage';
@@ -12,6 +12,7 @@ import SeedVaultService from '../services/SeedVaultService';
 import { rateLimiter } from '../services/RateLimiter';
 import MockAuthService, { Identity } from '../services/MockAuthService';
 import type { CreateIdentityData } from '../services/RealAuthService';
+import { walletKeychainService } from '../services/WalletKeychainService';
 
 // Always import RealAuthService, use it when node is available
 import RealAuthServiceModule from '../services/RealAuthService';
@@ -119,6 +120,9 @@ export interface AuthContextType {
   // SECURITY: Phase 3.1 - Biometric authentication methods
   isBiometricAvailable: () => Promise<boolean>;
   getBiometryType: () => Promise<string | null>;
+  // Wallet seed management (server-generated, stored securely in Keychain)
+  getWalletSeedPhrase: (walletType: 'primary' | 'ubi' | 'savings') => Promise<string | null>;
+  getAllWalletSeeds: () => Promise<{ primary?: string; ubi?: string; savings?: string }>;
 }
 
 export const AuthContext = createContext<AuthContextType | undefined>(undefined);
@@ -141,23 +145,45 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
    * Restore identity from secure storage on app load
    * SECURITY: Uses Keychain-backed storage instead of plaintext AsyncStorage
    * Note: Does not require biometric on startup - user can unlock Keychain later when needed
+   *
+   * SECURITY: Also restores lib-client Identity to handle store for UHP signing
    */
   useEffect(() => {
     const restoreIdentity = async () => {
       try {
-        // Check if identity exists in cache (non-blocking, no biometric prompt)
-        const hasCachedIdentity = await SecureIdentityStorage.hasIdentity();
+        // Try to restore cached identity without biometric prompt on startup
+        // This keeps user logged in between app sessions
+        const identity = await SecureIdentityStorage.getIdentityIfAvailable(true);
 
-        if (hasCachedIdentity) {
+        if (identity) {
           if (__DEV__) {
-            console.log('🔐 AuthContext: Cached identity found, will load when needed');
+            console.log('✅ Restored identity from secure storage:', identity.displayName);
           }
-          // Identity exists but don't fetch it yet - avoid biometric prompt on startup
-          // User will authenticate when they try to access protected features
+          setCurrentIdentity(identity);
+
+          // SECURITY: Restore lib-client Identity to handle store for UHP signing
+          if (identity.identityId && NativeModules.NativeIdentityProvisioning) {
+            try {
+              const result = await NativeModules.NativeIdentityProvisioning.restoreIdentityToHandleStore(
+                identity.identityId
+              );
+              if (result?.status === 'restored') {
+                console.log('[AuthContext] ✅ Identity restored to handle store during bootstrap');
+              } else if (result?.status === 'skipped') {
+                console.log('[AuthContext] ℹ️ Identity restoration skipped (reason:', result.reason + ')');
+                console.log('[AuthContext] 💡 UhpHandshake will use Keychain fallback');
+              } else {
+                console.log('[AuthContext] ℹ️ Handle store restoration result:', result);
+              }
+            } catch (err) {
+              console.error('[AuthContext] ⚠️ Failed to restore Identity to handle store:', err);
+              // Non-fatal - continue anyway
+            }
+          }
         }
       } catch (err) {
-        console.error('Failed to check for cached identity:', err);
-        // Continue with no identity if check fails
+        console.error('Failed to restore cached identity:', err);
+        // Continue with no identity if restore fails
       } finally {
         setIsBootstrapping(false);
       }
@@ -199,6 +225,20 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
       await SecureIdentityStorage.setIdentity(identity, { requireBiometric: true });
 
       setCurrentIdentity(identity);
+
+      // SECURITY: Restore lib-client Identity to handle store for UHP signing
+      if (identity.identityId && NativeModules.NativeIdentityProvisioning) {
+        try {
+          const result = await NativeModules.NativeIdentityProvisioning.restoreIdentityToHandleStore(
+            identity.identityId
+          );
+          console.log('[AuthContext.signIn] ✅ Identity restored to handle store:', result);
+        } catch (err) {
+          console.error('[AuthContext.signIn] ⚠️ Failed to restore Identity to handle store:', err);
+          // Non-fatal - continue anyway
+        }
+      }
+
       return identity;
     } catch (err: any) {
       // SECURITY: Record failed attempt for rate limiting
@@ -290,6 +330,20 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
       await SecureIdentityStorage.setIdentity(identity, { requireBiometric: true });
 
       setCurrentIdentity(identity);
+
+      // SECURITY: Restore lib-client Identity to handle store for UHP signing
+      if (identity.identityId && NativeModules.NativeIdentityProvisioning) {
+        try {
+          const result = await NativeModules.NativeIdentityProvisioning.restoreIdentityToHandleStore(
+            identity.identityId
+          );
+          console.log('[AuthContext.recoverIdentity] ✅ Identity restored to handle store:', result);
+        } catch (err) {
+          console.error('[AuthContext.recoverIdentity] ⚠️ Failed to restore Identity to handle store:', err);
+          // Non-fatal - continue anyway
+        }
+      }
+
       return identity;
     } catch (err: any) {
       const message = err.message || 'Identity recovery failed';
@@ -430,6 +484,7 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
    * Manually set the current identity
    * Used after saving identity to storage (e.g., after seed phrase confirmation)
    * SECURITY: Uses SecureIdentityStorage instead of plaintext AsyncStorage
+   * Also ensures lib-client Identity is available in handle store for signing
    */
   const setIdentity = useCallback(async (identity: Identity) => {
     try {
@@ -439,6 +494,19 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
       // Save to secure storage (Keychain) instead of plaintext AsyncStorage
       await SecureIdentityStorage.setIdentity(identity);
       setCurrentIdentity(identity);
+
+      // SECURITY: Restore lib-client Identity to handle store for UHP signing
+      if (identity.identityId && NativeModules.NativeIdentityProvisioning) {
+        try {
+          const result = await NativeModules.NativeIdentityProvisioning.restoreIdentityToHandleStore(
+            identity.identityId
+          );
+          console.log('[AuthContext.setIdentity] ✅ Identity restored to handle store:', result);
+        } catch (err) {
+          console.error('[AuthContext.setIdentity] ⚠️ Failed to restore Identity to handle store:', err);
+          // Non-fatal - continue anyway
+        }
+      }
     } catch (err: any) {
       const message = err.message || 'Failed to set identity';
       setError(message);
@@ -495,6 +563,35 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
     return SeedVaultService.getBiometryType();
   }, []);
 
+  // Wallet seed management - retrieve from Keychain (server-generated)
+  const getWalletSeedPhrase = useCallback(async (walletType: 'primary' | 'ubi' | 'savings'): Promise<string | null> => {
+    if (!currentIdentity?.identityId) {
+      console.warn('[AuthContext] Cannot retrieve wallet seed - no current identity');
+      return null;
+    }
+    try {
+      const seed = await walletKeychainService.retrieveSeedPhrase(walletType, currentIdentity.identityId);
+      return seed;
+    } catch (error: any) {
+      console.error(`[AuthContext] Failed to retrieve ${walletType} wallet seed:`, error);
+      return null;
+    }
+  }, [currentIdentity?.identityId]);
+
+  const getAllWalletSeeds = useCallback(async () => {
+    if (!currentIdentity?.identityId) {
+      console.warn('[AuthContext] Cannot retrieve wallet seeds - no current identity');
+      return {};
+    }
+    try {
+      const seeds = await walletKeychainService.retrieveAllSeeds(currentIdentity.identityId);
+      return seeds;
+    } catch (error: any) {
+      console.error('[AuthContext] Failed to retrieve all wallet seeds:', error);
+      return {};
+    }
+  }, [currentIdentity?.identityId]);
+
   const value = useMemo<AuthContextType>(() => ({
     currentIdentity,
     isAuthenticated: currentIdentity !== null,
@@ -513,7 +610,9 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
     loadIdentityOnDemand,
     isBiometricAvailable,
     getBiometryType,
-  }), [currentIdentity, isLoading, isBootstrapping, error, signIn, createIdentity, recoverIdentity, signOut, clearError, updateProfile, updatePassphrase, updateBiometric, setIdentity, loadIdentityOnDemand, isBiometricAvailable, getBiometryType]);
+    getWalletSeedPhrase,
+    getAllWalletSeeds,
+  }), [currentIdentity, isLoading, isBootstrapping, error, signIn, createIdentity, recoverIdentity, signOut, clearError, updateProfile, updatePassphrase, updateBiometric, setIdentity, loadIdentityOnDemand, isBiometricAvailable, getBiometryType, getWalletSeedPhrase, getAllWalletSeeds]);
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
 };

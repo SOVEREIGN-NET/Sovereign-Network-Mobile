@@ -4,7 +4,7 @@
  */
 
 import React, { useState } from 'react';
-import { View, Pressable, Text as RNText } from 'react-native';
+import { View, Pressable, Text as RNText, Alert, NativeModules } from 'react-native';
 import LinearGradient from 'react-native-linear-gradient';
 import MaskedView from '@react-native-masked-view/masked-view';
 import { NativeStackScreenProps } from '@react-navigation/native-stack';
@@ -286,6 +286,14 @@ const SignInScreen = ({ navigation }: SignInScreenProps) => {
               variant: 'secondary',
               disabled: isLoading || !isConnected,
             },
+            ...__DEV__ ? [{
+              label: '🧹 Clean Identities',
+              onPress: () => {
+                NativeModules.NativeIdentityProvisioning.cleanKeystoreDirectory();
+                Alert.alert('✅ Cleaned', 'All identities removed. Create a new one.');
+              },
+              variant: 'secondary' as const,
+            }] : [],
           ]}
         />
 

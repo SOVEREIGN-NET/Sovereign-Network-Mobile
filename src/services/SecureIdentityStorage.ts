@@ -102,6 +102,8 @@ export const SecureIdentityStorage = {
    */
   async getIdentity(): Promise<Identity | null> {
     try {
+      console.log('[SecureIdentityStorage] 🔐 getIdentity() called - showing biometric prompt');
+
       // Request identity from Keychain with authentication prompt
       const credentials = await Keychain.getGenericPassword({
         service: IDENTITY_KEYCHAIN_SERVICE,
@@ -112,21 +114,26 @@ export const SecureIdentityStorage = {
         },
       });
 
+      console.log('[SecureIdentityStorage] 🔐 Biometric prompt resolved');
+
       // Return null if no credentials found
       if (!credentials) {
+        console.log('[SecureIdentityStorage] ⚠️ No credentials found in Keychain');
         return null;
       }
 
       // Parse and return identity
       const identity = JSON.parse(credentials.password) as Identity;
 
-      if (__DEV__) {
-        console.log('✅ Identity retrieved from Keychain');
-      }
+      console.log('✅ Identity retrieved from Keychain');
 
       return identity;
-    } catch (error) {
-      console.error('❌ Failed to retrieve identity:', error);
+    } catch (error: any) {
+      if (error.message?.includes('cancelled') || error.userInfo?.['NSDebugDescription']?.includes('cancelled')) {
+        console.log('[SecureIdentityStorage] ℹ️ Biometric authentication cancelled by user');
+        return null;
+      }
+      console.error('[SecureIdentityStorage] ❌ Failed to retrieve identity:', error?.message || error);
       return null;
     }
   },
@@ -190,26 +197,23 @@ export const SecureIdentityStorage = {
 
   /**
    * Get identity ID for use in authenticated request headers
-   * Requires device unlock and may prompt for biometric authentication
+   * Does NOT require biometric - uses cached value from AsyncStorage
    * Used to add X-Zhtp-Identity header to UHP authenticated requests
    *
    * @returns identity_id string or null if not found
    */
   async getIdentityId(): Promise<string | null> {
     try {
-      const identity = await this.getIdentity();
-      if (!identity) {
-        console.warn('⚠️ No identity found for getIdentityId()');
+      // Get cached DID from AsyncStorage without requiring biometric
+      const cachedDid = await this.getCachedDidOnly();
+      if (!cachedDid) {
+        console.warn('[SecureIdentityStorage] ⚠️ No cached identity ID found');
         return null;
       }
-      if (!identity.identityId) {
-        console.warn('⚠️ Identity loaded but identityId is missing');
-        return null;
-      }
-      console.log('[SecureIdentityStorage] ✓ Retrieved identity_id for authenticated request');
-      return identity.identityId;
+      console.log('[SecureIdentityStorage] ✓ Retrieved identity_id for authenticated request (cached, no biometric needed)');
+      return cachedDid;
     } catch (error) {
-      console.error('❌ Failed to get identity ID:', error);
+      console.error('[SecureIdentityStorage] ❌ Failed to get identity ID:', error);
       return null;
     }
   },

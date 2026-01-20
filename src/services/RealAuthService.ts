@@ -19,6 +19,7 @@ import QuicClient from './QuicClient';
 import { createQuicFetchAdapterSync } from './QuicFetchAdapter';
 import CertificatePinning from './CertificatePinning';
 import { nativeIdentityProvisioning } from './NativeIdentityProvisioning';
+import { walletKeychainService } from './WalletKeychainService';
 
 export interface SignInCredentials {
   identity_id: string;
@@ -39,9 +40,11 @@ class RealAuthService {
   private readonly api: ZhtpApi;
   private readonly configProvider: ReactNativeConfigProvider;
   private readonly quicFetch: FetchAdapter;
+  private readonly nodeUrl: string;
 
   constructor(nodeUrl: string) {
     // Node URL comes from .env only - no runtime changes
+    this.nodeUrl = nodeUrl;
     this.configProvider = new ReactNativeConfigProvider(
       {
         ZHTP_NODE_URL: nodeUrl, // Key must match api-client's expected envVar name
@@ -160,74 +163,175 @@ class RealAuthService {
    */
   private async createIdentityIOS(data: CreateIdentityData): Promise<Identity> {
     try {
-      // Get node URL from environment
-      const nodeUrl = this.configProvider.nodeUrl || 'https://localhost:9002';
+      // Use the node URL from constructor (comes from config)
+      const nodeUrl = this.nodeUrl;
 
       console.log('[RealAuthService] 🔑 Starting iOS identity provisioning...');
       console.log('[RealAuthService]    Display name: ' + data.display_name);
       console.log('[RealAuthService]    Server URL: ' + nodeUrl);
 
-      // Step 1: Generate keys locally + register with server + provision locally
-      let provisioningResult;
+      // Step 1: Generate keys locally
+      let generatedIdentity;
       try {
-        provisioningResult = await nativeIdentityProvisioning.provisionIdentity(
+        generatedIdentity = await nativeIdentityProvisioning.provisionIdentity(
           data.display_name,
           nodeUrl
         );
       } catch (nativeError: any) {
-        console.error('[RealAuthService] ❌ Native provisioning failed:', nativeError);
-        throw new Error('Device-based provisioning failed: ' + (nativeError.message || nativeError.toString()));
+        console.error('[RealAuthService] ❌ Native key generation failed:', nativeError);
+        throw new Error('Device-based key generation failed: ' + (nativeError.message || nativeError.toString()));
       }
 
-      console.log(
-        '[RealAuthService] ✅ Identity provisioned successfully:'
-      );
-      console.log('[RealAuthService]    identity_id: ' + provisioningResult.identity_id);
-      console.log('[RealAuthService]    DID: ' + provisioningResult.did);
-      console.log('[RealAuthService]    Device: ' + provisioningResult.device_id);
-      console.log('[RealAuthService]    PQC enabled: ' + provisioningResult.pqc_enabled);
+      console.log('[RealAuthService] ✅ Identity generated locally:');
+      console.log('[RealAuthService]    DID: ' + generatedIdentity.did);
+      console.log('[RealAuthService]    Device: ' + generatedIdentity.deviceId);
 
-      // Step 2: Fetch the created identity from server
-      // (Server should return identity info after registration)
+      // Step 2: Create registration proof (signature)
+      let registrationProof;
       try {
-        // Make a simple request to verify identity was registered
-        // For now, construct identity from provisioning result
-        const seedPhrases = this.generateSeedPhrasesFromMasterSeed(provisioningResult.masterSeedHex);
-
-        console.log(
-          '⚠️ IMPORTANT: Save backup seed phrase securely!',
-          seedPhrases.join(' ')
+        registrationProof = await nativeIdentityProvisioning.createRegistrationProof(
+          data.display_name,
+          { did: generatedIdentity.did }
         );
+      } catch (proofError: any) {
+        console.error('[RealAuthService] ❌ Proof creation failed:', proofError);
+        throw new Error('Failed to create registration proof: ' + (proofError.message || proofError.toString()));
+      }
 
-        // Construct identity from provisioning result
-        // Private keys are in Keychain (identity_id is the reference to fetch them)
-        const identity: Identity & { seedPhrases?: string[] } = {
-          did: provisioningResult.did,
-          displayName: data.display_name,
-          identityId: provisioningResult.identity_id,
-          identityType: 'human',
-          createdAt: Date.now(),
-          seedPhrases,
-          wallets: [],
-          publicKey: '',
+      console.log('[RealAuthService] ✅ Registration proof created');
+
+      // Step 3: Register identity with server via QUIC (client-side key registration)
+      let identityId: string;
+      let walletIds: { primary?: string; ubi?: string; savings?: string } = {};
+      let walletSeedPhrases: { primary?: string; ubi?: string; savings?: string } = {};
+      try {
+        console.log('[RealAuthService] 🔐 Registering client-side generated keys via /api/v1/identity/register...');
+        const registerRequest = {
+          did: generatedIdentity.did,
+          public_key: registrationProof.public_key,
+          kyber_public_key: registrationProof.kyber_public_key,
+          node_id: registrationProof.node_id,
+          device_id: registrationProof.device_id,
+          display_name: data.display_name,
+          identity_type: 'human',
+          registration_proof: registrationProof.registration_proof,
+          timestamp: registrationProof.timestamp,
         };
 
-        return identity;
-      } catch (error: any) {
-        console.warn('Failed to fetch created identity:', error);
-        // Return identity with provisioning result data
-        const seedPhrases = this.generateSeedPhrasesFromMasterSeed(provisioningResult.masterSeedHex);
-        return {
-          did: provisioningResult.did,
-          displayName: data.display_name,
-          identityId: provisioningResult.identity_id,
-          identityType: 'human',
-          createdAt: Date.now(),
-          seedPhrases,
-          wallets: [],
-          publicKey: '',
-        } as Identity & { seedPhrases: string[] };
+        const registerResponse = await this.quicFetch(this.nodeUrl + '/api/v1/identity/register', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(registerRequest),
+        });
+        const registrationResponse = await registerResponse.json();
+
+        console.log('[RealAuthService] 📊 Full server response:', JSON.stringify(registrationResponse, null, 2).substring(0, 500));
+        console.log('[RealAuthService] 📊 Response keys:', Object.keys(registrationResponse));
+
+        identityId = registrationResponse.identity_id || '';
+
+        // Parse wallet IDs from response (new server-generated wallets)
+        walletIds = {
+          primary: registrationResponse.primary_wallet_id,
+          ubi: registrationResponse.ubi_wallet_id,
+          savings: registrationResponse.savings_wallet_id,
+        };
+        console.log('[RealAuthService] 💼 Wallet IDs from server:');
+        console.log('[RealAuthService]    Primary: ' + (walletIds.primary ? walletIds.primary.substring(0, 16) + '...' : 'N/A'));
+        console.log('[RealAuthService]    UBI: ' + (walletIds.ubi ? walletIds.ubi.substring(0, 16) + '...' : 'N/A'));
+        console.log('[RealAuthService]    Savings: ' + (walletIds.savings ? walletIds.savings.substring(0, 16) + '...' : 'N/A'));
+
+        // Parse wallet seed phrases from response (for secure Keychain storage)
+        if (registrationResponse.wallet_seed_phrases) {
+          walletSeedPhrases = registrationResponse.wallet_seed_phrases;
+          console.log('[RealAuthService] 🌱 Wallet seed phrases received from server');
+          console.log('[RealAuthService]    Primary seed: ' + (walletSeedPhrases.primary ? 'received' : 'N/A'));
+          console.log('[RealAuthService]    UBI seed: ' + (walletSeedPhrases.ubi ? 'received' : 'N/A'));
+          console.log('[RealAuthService]    Savings seed: ' + (walletSeedPhrases.savings ? 'received' : 'N/A'));
+        }
+
+        console.log('[RealAuthService] ✅ Server registration succeeded');
+        console.log('[RealAuthService]    Identity ID: ' + identityId);
+      } catch (serverError: any) {
+        console.error('[RealAuthService] ❌ Server registration failed:', serverError);
+        throw new Error('Server registration failed: ' + (serverError.message || serverError.toString()));
       }
+
+      // Step 4: Store provisioned identity in Keychain
+      try {
+        console.log('[RealAuthService] 📦 About to call storeProvisionedIdentity...');
+        console.log('[RealAuthService]    identityId: ' + identityId);
+        console.log('[RealAuthService]    identityId type: ' + typeof identityId);
+        console.log('[RealAuthService]    identityId isEmpty: ' + (identityId === '' || identityId === null || identityId === undefined));
+
+        if (!identityId) {
+          console.error('[RealAuthService] ❌ CRITICAL: identityId is empty/null/undefined!');
+          console.error('[RealAuthService]    Server response:', registrationResponse);
+        }
+
+        const storeResult = await nativeIdentityProvisioning.storeProvisionedIdentity(
+          identityId,
+          { did: generatedIdentity.did }
+        );
+        console.log('[RealAuthService] ✅ storeProvisionedIdentity completed');
+        console.log('[RealAuthService]    Result:', storeResult);
+        console.log('[RealAuthService] ✅ Identity provisioned and stored');
+      } catch (storeError: any) {
+        console.error('[RealAuthService] ⚠️ Keychain storage failed:', storeError);
+        console.error('[RealAuthService]    Error message:', storeError.message);
+        console.error('[RealAuthService]    Error code:', storeError.code);
+        // Non-fatal - continue anyway
+      }
+
+      // Step 4b: Store wallet seed phrases in Keychain (server-generated)
+      if (walletSeedPhrases && Object.keys(walletSeedPhrases).length > 0) {
+        try {
+          console.log('[RealAuthService] 🔐 Storing wallet seed phrases in Keychain...');
+          const seedsStored = await walletKeychainService.storeAllSeeds(walletSeedPhrases, identityId);
+          if (seedsStored) {
+            console.log('[RealAuthService] ✅ Wallet seeds stored securely in Keychain');
+          } else {
+            console.warn('[RealAuthService] ⚠️ Wallet seeds not persisted to Keychain (native module not available)');
+            console.warn('[RealAuthService] ℹ️  Seeds still available from Identity.walletSeedPhrases for this session');
+          }
+        } catch (keychainError: any) {
+          console.error('[RealAuthService] ⚠️ Failed to store wallet seeds in Keychain:', keychainError);
+          // Non-fatal - seeds still available from identity response
+        }
+      }
+
+      // Step 5: Return final identity with wallet information
+      console.log('[RealAuthService] 📱 Creating identity response with wallet data...');
+
+      // Store wallet info in identity for immediate access
+      const identity: Identity & {
+        walletIds?: { primary?: string; ubi?: string; savings?: string };
+        walletSeedPhrases?: { primary?: string; ubi?: string; savings?: string };
+      } = {
+        did: generatedIdentity.did,
+        displayName: data.display_name,
+        identityId: identityId,
+        identityType: 'human',
+        createdAt: Date.now(),
+        walletIds: walletIds,
+        walletSeedPhrases: walletSeedPhrases, // Server-generated, available immediately
+        wallets: [],
+        publicKey: '',
+      };
+
+      console.log('[RealAuthService] ✅ Identity created successfully with wallets:');
+      console.log('[RealAuthService]    Primary Wallet: ' + (walletIds.primary ? '✓' : '✗'));
+      console.log('[RealAuthService]    UBI Wallet: ' + (walletIds.ubi ? '✓' : '✗'));
+      console.log('[RealAuthService]    Savings Wallet: ' + (walletIds.savings ? '✓' : '✗'));
+      if (walletSeedPhrases && Object.keys(walletSeedPhrases).length > 0) {
+        console.log('[RealAuthService] 🌱 Wallet seed phrases available:');
+        console.log('[RealAuthService]    Primary: ' + (walletSeedPhrases.primary ? 'Available' : 'Not provided'));
+        console.log('[RealAuthService]    UBI: ' + (walletSeedPhrases.ubi ? 'Available' : 'Not provided'));
+        console.log('[RealAuthService]    Savings: ' + (walletSeedPhrases.savings ? 'Available' : 'Not provided'));
+      }
+      console.log('[RealAuthService] 📋 Wallet information available via Identity object');
+
+      return identity;
     } catch (error: any) {
       console.error('❌ iOS identity provisioning failed:', error);
       throw new Error(

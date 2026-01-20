@@ -10,30 +10,19 @@
 import { NativeModules, Platform } from 'react-native';
 
 interface GeneratedIdentityData {
+  status: 'generated';
   did: string;
   deviceId: string;
+  publicDilithium: string; // base64
+  publicKyber: string; // base64
   timestamp: number;
-  publicKeySize: number;
-  kyberPublicKeySize: number;
-  nodeIdSize: number;
   masterSeedHex: string; // For user backup only
-}
-
-interface ServerRegistrationResponse {
-  status: string;
-  identity_id: string;
-  did: string;
-  device_id: string;
-  pqc_enabled: boolean;
 }
 
 interface ProvisioningResult {
   status: 'provisioned';
   identity_id: string;
   did: string;
-  device_id: string;
-  pqc_enabled: boolean;
-  masterSeedHex: string; // For user backup/recovery
 }
 
 /**
@@ -54,7 +43,7 @@ class NativeIdentityProvisioningBridge {
 
   /**
    * Generate identity locally on device
-   * Returns public info only - private keys stay in Keychain
+   * Returns generated identity - TypeScript then handles QUIC server registration
    */
   async generateLocalIdentity(displayName: string): Promise<GeneratedIdentityData> {
     if (!this.nativeModule) {
@@ -65,35 +54,40 @@ class NativeIdentityProvisioningBridge {
   }
 
   /**
-   * Register identity with server
-   * Server validates Dilithium5 signature and stores public identity
+   * Provision identity (alias for generateLocalIdentity for backwards compatibility)
+   * Generates keys locally, returns generated identity for QUIC server registration
    */
-  async registerWithServer(
-    identityData: GeneratedIdentityData,
-    displayName: string,
-    serverUrl: string
-  ): Promise<ServerRegistrationResponse> {
+  async provisionIdentity(displayName: string, serverUrl: string): Promise<GeneratedIdentityData> {
     if (!this.nativeModule) {
       throw new Error('NativeIdentityProvisioning not available on this platform');
     }
 
-    return await this.nativeModule.registerWithServer(
-      identityData,
-      displayName,
-      serverUrl
-    );
+    // Call native provisionIdentity which generates keys and caches them
+    return await this.nativeModule.provisionIdentity(displayName, serverUrl);
   }
 
   /**
-   * Complete provisioning flow: generate → register → store
-   * Returns identity_id for UHP handshake
+   * Create registration proof with signature for QUIC POST
+   * Called after generating identity to get the proof data for server registration
    */
-  async provisionIdentity(displayName: string, serverUrl: string): Promise<ProvisioningResult> {
+  async createRegistrationProof(displayName: string, didData: any): Promise<any> {
     if (!this.nativeModule) {
       throw new Error('NativeIdentityProvisioning not available on this platform');
     }
 
-    return await this.nativeModule.provisionIdentity(displayName, serverUrl);
+    return await this.nativeModule.createRegistrationProof(displayName, didData);
+  }
+
+  /**
+   * Store provisioned identity after server registration
+   * Called after successful QUIC POST to /api/v1/identity/register
+   */
+  async storeProvisionedIdentity(identityId: string, didData: any): Promise<ProvisioningResult> {
+    if (!this.nativeModule) {
+      throw new Error('NativeIdentityProvisioning not available on this platform');
+    }
+
+    return await this.nativeModule.storeProvisionedIdentity(identityId, didData);
   }
 }
 
@@ -101,4 +95,4 @@ class NativeIdentityProvisioningBridge {
 export const nativeIdentityProvisioning = new NativeIdentityProvisioningBridge();
 
 // Export types for use throughout app
-export type { GeneratedIdentityData, ServerRegistrationResponse, ProvisioningResult };
+export type { GeneratedIdentityData, ProvisioningResult };

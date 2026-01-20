@@ -122,10 +122,10 @@ const CreateIdentityScreen = ({ navigation }: CreateIdentityScreenProps) => {
         console.log('✅ Identity created successfully');
       }
 
-      // Check if we have seed phrases for all 3 wallets (citizen identity)
-      const hasPrimary = identity?.seedPhrases?.primary?.length > 0;
-      const hasUbi = identity?.seedPhrases?.ubi?.length > 0;
-      const hasSavings = identity?.seedPhrases?.savings?.length > 0;
+      // Check if we have seed phrases for all 3 wallets (server-generated)
+      const hasPrimary = identity?.walletSeedPhrases?.primary?.length > 0;
+      const hasUbi = identity?.walletSeedPhrases?.ubi?.length > 0;
+      const hasSavings = identity?.walletSeedPhrases?.savings?.length > 0;
 
       if (hasPrimary) {
         if (__DEV__) {
@@ -137,18 +137,22 @@ const CreateIdentityScreen = ({ navigation }: CreateIdentityScreenProps) => {
         const totalSteps = (hasPrimary ? 1 : 0) + (hasUbi ? 1 : 0) + (hasSavings ? 1 : 0);
 
         navigation.navigate('SeedPhrase', {
-          seedPhrases: identity.seedPhrases.primary,
+          seedPhrases: identity.walletSeedPhrases?.primary?.split(' ') || [],
           walletType: 'primary',
           identity,
-          allSeedPhrases: identity.seedPhrases,
+          allSeedPhrases: {
+            primary: identity.walletSeedPhrases?.primary?.split(' '),
+            ubi: identity.walletSeedPhrases?.ubi?.split(' '),
+            savings: identity.walletSeedPhrases?.savings?.split(' '),
+          },
           currentStep: 1,
           totalSteps,
         });
       } else {
-        console.warn('⚠️ Identity created but no seed phrases returned');
+        console.warn('⚠️ Identity created but no wallet seed phrases available');
         // SECURITY: Do not log full identity object as it contains sensitive data
         setFieldErrors({
-          displayName: 'Identity created but no wallet seed phrases were returned. Please contact support.',
+          displayName: 'Wallet seed phrases are not available. Please contact support.',
         });
       }
     }).catch((err) => {
