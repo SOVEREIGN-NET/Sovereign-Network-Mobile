@@ -40,6 +40,15 @@ const SIDScreen = ({ navigation }: any) => {
   const [drawerVisible, setDrawerVisible] = useState(false);
   const [activeWalletTab, setActiveWalletTab] = useState('Tokens');
 
+  React.useEffect(() => {
+    console.log('[SIDScreen] 💰 Wallet data updated:', {
+      walletCount: wallets?.length || 0,
+      totalBalance,
+      loading: walletsLoading,
+      wallets: wallets?.map(w => ({ type: w.wallet_type, balance: w.total_balance })),
+    });
+  }, [wallets, totalBalance, walletsLoading]);
+
   // Fetch UBI status and history
   const { data: ubiData } = useAsyncData(
     async () => {

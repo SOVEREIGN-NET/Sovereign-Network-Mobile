@@ -98,6 +98,7 @@ const PUBLIC_ENDPOINT_PATTERNS = [
   // Identity endpoints (public - no UHP authentication required)
   '/api/v1/identity/create',
   '/api/v1/identity/signup',
+  '/api/v1/identity/register',  // Client-side key registration (iOS)
   '/api/v1/identity/login',
   '/api/v1/identity/signin',
   '/api/v1/identity/exists',
@@ -336,15 +337,15 @@ export function createQuicFetchAdapterSync(
       }
     }
 
-    // if (__DEV__) {
-    //   console.log('[QuicFetchAdapterSync] ▶️ REQUEST:', {
-    //     url: quicUrl,
-    //     method: quicOptions.method,
-    //     alpn: quicOptions.alpn,
-    //     headers: quicOptions.headers,
-    //     bodyLength: quicOptions.body?.length || 0,
-    //   });
-    // }
+    if (__DEV__) {
+      console.log('[QuicFetchAdapterSync] ▶️ REQUEST:', {
+        url: quicUrl,
+        method: quicOptions.method,
+        alpn: quicOptions.alpn,
+        headers: quicOptions.headers,
+        bodyLength: quicOptions.body?.length || 0,
+      });
+    }
 
     // SECURITY: QUIC is required - do not fall back to HTTP
     // HTTP would expose the protocol to downgrade attacks
@@ -364,17 +365,17 @@ export function createQuicFetchAdapterSync(
       const quicResponse = await quicRequest(quicUrl, quicOptions);
       const elapsed = Date.now() - startTime;
 
-      // if (__DEV__) {
-      //   console.log('[QuicFetchAdapterSync] ✅ RESPONSE:', {
-      //     url: quicUrl,
-      //     status: quicResponse.status,
-      //     statusText: quicResponse.statusText,
-      //     ok: quicResponse.ok,
-      //     elapsed: `${elapsed}ms`,
-      //     bodyLength: quicResponse.body?.length || 0,
-      //     bodyPreview: quicResponse.body?.substring(0, 200),
-      //   });
-      // }
+      if (__DEV__) {
+        console.log('[QuicFetchAdapterSync] ✅ RESPONSE:', {
+          url: quicUrl,
+          status: quicResponse.status,
+          statusText: quicResponse.statusText,
+          ok: quicResponse.ok,
+          elapsed: `${elapsed}ms`,
+          bodyLength: quicResponse.body?.length || 0,
+          bodyPreview: quicResponse.body?.substring(0, 200),
+        });
+      }
 
       return createResponseFromQuic(quicResponse);
     } catch (error) {

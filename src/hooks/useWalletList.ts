@@ -77,10 +77,23 @@ export const useWalletList = () => {
       }
 
       if (!api || !isInitialized || !identityId) {
+        console.log('[useWalletList] ⚠️ Cannot fetch wallet list:', {
+          hasApi: !!api,
+          isInitialized,
+          identityId,
+        });
         return null;
       }
 
-      return api.getWalletList(identityId);
+      console.log('[useWalletList] 📡 Fetching wallet list for identity:', identityId);
+      const response = await api.getWalletList(identityId);
+      console.log('[useWalletList] ✅ Received wallet list response:', {
+        identityId: response?.identity_id,
+        totalBalance: response?.total_balance,
+        walletCount: response?.wallets?.length || 0,
+        firstWallet: response?.wallets?.[0],
+      });
+      return response;
     },
     [api, isInitialized, identityId, useMock, currentIdentity?.wallets],
     null,
