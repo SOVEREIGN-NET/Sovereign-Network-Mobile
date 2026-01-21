@@ -386,10 +386,16 @@ class NativeQuic: NSObject {
           return
         }
 
-        switch performUhpHandshake(connection: connection, identityId: identityId) {
-        case .failure(let error):
-          doSafeComplete(false, nil, "UHP handshake failed: \(error.localizedDescription)", error)
-        case .success(let sessionInfo):
+        // CRITICAL: Run handshake on background queue to avoid deadlock
+        // Connection callbacks must fire on the queue the connection was started on
+        // If we block that queue here, callbacks will never fire and semaphores will deadlock
+        print("[NativeQuic] 🔄 Dispatching UHP handshake to background queue...")
+        DispatchQueue.global(qos: .userInitiated).async {
+          print("[NativeQuic] 🤝 Starting UHP handshake on background queue...")
+          switch performUhpHandshake(connection: connection, identityId: identityId) {
+          case .failure(let error):
+            doSafeComplete(false, nil, "UHP handshake failed: \(error.localizedDescription)", error)
+          case .success(let sessionInfo):
           do {
             // Session ID is now enforced to be exactly 32 bytes in UhpHandshake.swift
             print("[NativeQuic] ✓ Session ID: \(sessionInfo.sessionId.count) bytes (UHP v2 compliant)")
@@ -405,7 +411,7 @@ class NativeQuic: NSObject {
             )
 
             let requestBody = body?.data(using: .utf8) ?? Data()
-            let zhtpMethod = httpMethodToZhtpMethod(method)
+            let zhtpMethod = self.httpMethodToZhtpMethod(method)
 
             sendAuthenticatedZhtpRequest(
               connection: connection,
@@ -433,6 +439,7 @@ class NativeQuic: NSObject {
             }
           } catch {
             doSafeComplete(false, nil, "MAC key derivation failed: \(error.localizedDescription)", error)
+          }
           }
         }
       } else {

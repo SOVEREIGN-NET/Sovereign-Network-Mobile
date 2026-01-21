@@ -88,29 +88,26 @@ final class UhpConnectionIO {
             }
             bufferLock.unlock()
 
-            print("[UHP]    Buffer empty, calling connection.receive()...")
+            print("[UHP]    Buffer empty, calling receive() directly...")
             let sema = DispatchSemaphore(value: 0)
             var received: Data?
             var receiveError: NWError?
             var isComplete = false
 
-            queue.async {
-                print("[UHP]    ➡️  Receive block executing")
-                self.connection.receive(minimumIncompleteLength: 1, maximumLength: 65536) { content, _, complete, error in
-                    print("[UHP]    ✓ Receive callback: \(content?.count ?? 0) bytes, complete=\(complete), error=\(error?.localizedDescription ?? "nil")")
-                    received = content
-                    receiveError = error
-                    isComplete = complete
-                    sema.signal()
-                }
-                print("[UHP]    → Receive enqueued")
+            // Call receive() directly - don't dispatch to queue
+            self.connection.receive(minimumIncompleteLength: 1, maximumLength: 65536) { content, _, complete, error in
+                print("[UHP]    ✓ Receive callback: \(content?.count ?? 0) bytes, complete=\(complete), error=\(error?.localizedDescription ?? "nil")")
+                received = content
+                receiveError = error
+                isComplete = complete
+                sema.signal()
             }
 
-            print("[UHP]    ⏱️  Waiting for receive callback...")
-            let waitResult = sema.wait(timeout: .now() + 10)
+            print("[UHP]    ⏱️  Waiting for receive callback (30s timeout)...")
+            let waitResult = sema.wait(timeout: .now() + 30)
 
             if waitResult == .timedOut {
-                print("[UHP] ❌ Read timed out after 10s")
+                print("[UHP] ❌ Read timed out after 30s - receive callback never fired")
                 print("[UHP]    connection.state: \(connection.state)")
                 return -1
             }
@@ -149,33 +146,30 @@ final class UhpConnectionIO {
         }
 
         let data = Data(bytes: ptr, count: len)
-        print("[UHP]    Dispatching send to queue...")
         let sema = DispatchSemaphore(value: 0)
         var sendError: NWError?
-        var callbackFired = false
 
-        queue.async(execute: DispatchWorkItem(block: {
-            print("[UHP]    ➡️  Queue block executing, connection state: \(self.connection.state)")
-            self.connection.send(
-                content: data,
-                contentContext: .defaultMessage,
-                isComplete: false,
-                completion: NWConnection.SendCompletion.contentProcessed { error in
-                    callbackFired = true
-                    sendError = error
-                    print("[UHP]    ✓ Send callback fired: error=\(error?.localizedDescription ?? "nil")")
-                    sema.signal()
-                }
-            )
-            print("[UHP]    → Send enqueued, waiting for callback...")
-        }))
+        print("[UHP]    Calling send() directly...")
 
-        print("[UHP]    ⏱️  Waiting on semaphore...")
-        let waitResult = sema.wait(timeout: .now() + 10)
+        // CRITICAL: Call send() synchronously - don't dispatch to queue
+        // First send on QUIC connection can take time to create stream
+        // Dispatching adds overhead and causes timeouts
+        self.connection.send(
+            content: data,
+            contentContext: .defaultMessage,
+            isComplete: false,
+            completion: NWConnection.SendCompletion.contentProcessed { error in
+                sendError = error
+                print("[UHP]    ✓ Send callback fired: error=\(error?.localizedDescription ?? "nil")")
+                sema.signal()
+            }
+        )
+
+        print("[UHP]    → Send enqueued, waiting for callback (30s timeout)...")
+        let waitResult = sema.wait(timeout: .now() + 30)
 
         if waitResult == .timedOut {
-            print("[UHP] ❌ Write timed out after 10s (callback not fired)")
-            print("[UHP]    callbackFired: \(callbackFired)")
+            print("[UHP] ❌ Write timed out after 30s - send callback never fired")
             print("[UHP]    connection.state: \(connection.state)")
             return -1
         }
