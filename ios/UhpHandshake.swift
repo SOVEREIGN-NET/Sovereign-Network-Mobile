@@ -31,8 +31,8 @@ final class UhpConnectionIO {
     }
 
     /// Initialize bidirectional stream for QUIC handshake
-    /// In QUIC, a bidirectional stream is created by the client sending data.
-    /// We send a minimal probe to trigger stream creation.
+    /// Network.framework creates streams implicitly on first send/receive
+    /// Just mark as initialized - actual stream creation happens on I/O
     private func ensureStreamInitialized() -> Bool {
         streamLock.lock()
         defer { streamLock.unlock() }
@@ -41,11 +41,11 @@ final class UhpConnectionIO {
             return true
         }
 
-        print("[UHP] 📡 Initializing bidirectional stream...")
+        print("[UHP] 📡 Preparing for stream I/O...")
 
-        // Wait for connection ready state
+        // Wait for connection ready state (with timeout)
         var attempts = 0
-        let maxAttempts = 100
+        let maxAttempts = 50 // 5 seconds
 
         while connection.state != .ready && attempts < maxAttempts {
             Thread.sleep(forTimeInterval: 0.1)
@@ -53,43 +53,14 @@ final class UhpConnectionIO {
         }
 
         guard connection.state == .ready else {
-            print("[UHP] ❌ Connection not ready: \(connection.state)")
+            print("[UHP] ❌ Connection not ready after \(attempts * 100)ms: \(connection.state)")
             return false
         }
 
-        print("[UHP] ✓ Connection ready, sending stream probe to open bidirectional stream...")
-
-        // CRITICAL: Send a probe message to trigger QUIC stream creation
-        // This ensures Network.framework creates a bidirectional stream context
-        // that the server's accept_bi() can receive
-        let sema = DispatchSemaphore(value: 0)
-        var probeSuccess = false
-
-        queue.async {
-            // Send with .defaultMessage context - this creates a QUIC stream
-            self.connection.send(
-                content: Data(),
-                contentContext: .defaultMessage,
-                isComplete: false,
-                completion: NWConnection.SendCompletion.contentProcessed { error in
-                    if error == nil {
-                        print("[UHP]    ✓ Stream probe sent successfully")
-                        probeSuccess = true
-                    } else {
-                        print("[UHP]    ⚠️  Stream probe send error: \(error?.localizedDescription ?? "unknown")")
-                        // Continue anyway - stream might still be created
-                        probeSuccess = true
-                    }
-                    sema.signal()
-                }
-            )
-        }
-
-        sema.wait()
-
-        print("[UHP] ✓ Bidirectional stream initialized")
+        print("[UHP] ✓ Connection ready (\(attempts * 100)ms)")
+        print("[UHP] ✓ Stream will be created on first send/receive")
         streamInitialized = true
-        return probeSuccess
+        return true
     }
 
     func read(_ ptr: UnsafeMutablePointer<UInt8>, _ len: Int) -> Int {
@@ -97,9 +68,11 @@ final class UhpConnectionIO {
             return 0
         }
 
+        print("[UHP] 📥 read() called: requesting \(len) bytes")
+
         // Ensure stream is initialized before reading
         guard ensureStreamInitialized() else {
-            print("[UHP] Failed to initialize stream for reading")
+            print("[UHP] ❌ Stream initialization failed for read")
             return -1
         }
 
@@ -110,32 +83,45 @@ final class UhpConnectionIO {
                 buffer.copyBytes(to: ptr, count: count)
                 buffer.removeFirst(count)
                 bufferLock.unlock()
+                print("[UHP] ✓ Read from buffer: \(count) bytes")
                 return count
             }
             bufferLock.unlock()
 
+            print("[UHP]    Buffer empty, calling connection.receive()...")
             let sema = DispatchSemaphore(value: 0)
             var received: Data?
             var receiveError: NWError?
             var isComplete = false
 
             queue.async {
+                print("[UHP]    ➡️  Receive block executing")
                 self.connection.receive(minimumIncompleteLength: 1, maximumLength: 65536) { content, _, complete, error in
+                    print("[UHP]    ✓ Receive callback: \(content?.count ?? 0) bytes, complete=\(complete), error=\(error?.localizedDescription ?? "nil")")
                     received = content
                     receiveError = error
                     isComplete = complete
                     sema.signal()
                 }
+                print("[UHP]    → Receive enqueued")
             }
 
-            sema.wait()
+            print("[UHP]    ⏱️  Waiting for receive callback...")
+            let waitResult = sema.wait(timeout: .now() + 10)
+
+            if waitResult == .timedOut {
+                print("[UHP] ❌ Read timed out after 10s")
+                print("[UHP]    connection.state: \(connection.state)")
+                return -1
+            }
 
             if let error = receiveError {
-                print("[UHP] Read error: \(error)")
+                print("[UHP] ❌ Read error: \(error)")
                 return -1
             }
 
             if let content = received, !content.isEmpty {
+                print("[UHP] ✓ Received: \(content.count) bytes")
                 bufferLock.lock()
                 buffer.append(content)
                 bufferLock.unlock()
@@ -143,6 +129,7 @@ final class UhpConnectionIO {
             }
 
             if isComplete {
+                print("[UHP] ✓ Stream complete (EOF)")
                 return 0
             }
         }
@@ -153,35 +140,52 @@ final class UhpConnectionIO {
             return 0
         }
 
+        print("[UHP] 📤 write() called: \(len) bytes")
+
         // Ensure stream is initialized before writing
         guard ensureStreamInitialized() else {
-            print("[UHP] Failed to initialize stream for writing")
+            print("[UHP] ❌ Stream initialization failed")
             return -1
         }
 
         let data = Data(bytes: ptr, count: len)
+        print("[UHP]    Dispatching send to queue...")
         let sema = DispatchSemaphore(value: 0)
         var sendError: NWError?
+        var callbackFired = false
 
         queue.async(execute: DispatchWorkItem(block: {
+            print("[UHP]    ➡️  Queue block executing, connection state: \(self.connection.state)")
             self.connection.send(
                 content: data,
                 contentContext: .defaultMessage,
                 isComplete: false,
                 completion: NWConnection.SendCompletion.contentProcessed { error in
+                    callbackFired = true
                     sendError = error
+                    print("[UHP]    ✓ Send callback fired: error=\(error?.localizedDescription ?? "nil")")
                     sema.signal()
                 }
             )
+            print("[UHP]    → Send enqueued, waiting for callback...")
         }))
 
-        sema.wait()
+        print("[UHP]    ⏱️  Waiting on semaphore...")
+        let waitResult = sema.wait(timeout: .now() + 10)
 
-        if let error = sendError {
-            print("[UHP] Write error: \(error)")
+        if waitResult == .timedOut {
+            print("[UHP] ❌ Write timed out after 10s (callback not fired)")
+            print("[UHP]    callbackFired: \(callbackFired)")
+            print("[UHP]    connection.state: \(connection.state)")
             return -1
         }
 
+        if let error = sendError {
+            print("[UHP] ❌ Write error: \(error)")
+            return -1
+        }
+
+        print("[UHP] ✓ Write succeeded: \(len) bytes sent")
         return len
     }
 }
