@@ -193,6 +193,8 @@ func sendAuthenticatedZhtpRequestViaQuinn(
         )
         session.touch()
 
+        print("[ZHTP Auth] Wire version=1, Request version=1.0")
+
         let cborData = try zhtp_encode_authenticated_request(
             method: method,
             uri: path,
