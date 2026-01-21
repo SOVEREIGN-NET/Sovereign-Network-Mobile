@@ -2,6 +2,8 @@ import Foundation
 import Network
 import Security
 import React
+import Dispatch
+import CryptoKit
 
 /**
  * Native QUIC Module for iOS
@@ -15,6 +17,7 @@ class NativeQuic: NSObject {
 
   private let queue = DispatchQueue(label: "com.sovereignnetwork.quic", qos: .userInitiated)
   private var activeConnections: [String: NWConnection] = [:]
+  private var activeChannelBindings: [String: Data] = [:]
   private let connectionLock = NSLock()
 
   // Default configuration
@@ -305,16 +308,16 @@ class NativeQuic: NSObject {
       port: NWEndpoint.Port(integerLiteral: UInt16(parsedUrl.port))
     )
 
-    let connection = NWConnection(to: endpoint, using: parameters)
-    let connectionId = UUID().uuidString
+    print("[NativeQuic] 🔗 Creating NWConnectionGroup for RFC 9000 bidirectional streams...")
 
-    // Store connection
-    connectionLock.lock()
-    activeConnections[connectionId] = connection
-    connectionLock.unlock()
+    // Create multiplexed group - this creates the QUIC connection
+    let descriptor = NWMultiplexGroup(to: endpoint)
+    let group = NWConnectionGroup(with: descriptor, using: parameters)
+    let connectionId = UUID().uuidString
 
     var hasResolved = false
     let resolveLock = NSLock()
+    var groupReady = false
 
     let doSafeComplete: SafeComplete = { success, result, error, nativeError in
       resolveLock.lock()
@@ -322,8 +325,6 @@ class NativeQuic: NSObject {
       guard !hasResolved else { return }
       hasResolved = true
 
-      // Clear state handler before cleanup to prevent callbacks
-      connection.stateUpdateHandler = nil
       self.cleanupConnection(connectionId)
 
       if success, let res = result {
@@ -333,21 +334,93 @@ class NativeQuic: NSObject {
       }
     }
 
-    connection.stateUpdateHandler = { [weak self] state in
-      self?.handleRequestState(
-        state,
-        connection: connection,
-        connectionId: connectionId,
-        profile: profile,
-        parsedUrl: parsedUrl,
-        method: method,
-        headers: headers,
-        body: body,
-        doSafeComplete: doSafeComplete
-      )
+    // Handle group state - wait for ready, then create explicit stream
+    group.stateUpdateHandler = { [weak self] state in
+      print("[NativeQuic] 🔗 Group State: \(state)")
+      switch state {
+      case .ready:
+        resolveLock.lock()
+        if groupReady {
+          resolveLock.unlock()
+          return
+        }
+        groupReady = true
+        resolveLock.unlock()
+
+        print("[NativeQuic] 📱 Group ready, creating explicit bidirectional stream...")
+
+        // Create explicit stream from group - this matches Quinn's accept_bi() expectation
+        guard let streamConnection = NWConnection(from: group) else {
+          doSafeComplete(false, nil, "Failed to create stream from group", nil)
+          return
+        }
+
+        if let binding = self?.exportQuicChannelBinding(from: group) {
+          self?.connectionLock.lock()
+          self?.activeChannelBindings[connectionId] = binding
+          self?.connectionLock.unlock()
+          let digest = SHA256.hash(data: binding)
+          let hashPrefix = digest.prefix(8).map { String(format: "%02x", $0) }.joined()
+          let hexPrefix = binding.prefix(8).map { String(format: "%02x", $0) }.joined()
+          print("[NativeQuic] 🔐 Stored QUIC channel binding: sha256[0..8]=\(hashPrefix), hex[0..8]=\(hexPrefix)")
+        } else {
+          doSafeComplete(false, nil, "Failed to export QUIC channel binding", nil)
+          return
+        }
+
+        // Store stream connection
+        self?.connectionLock.lock()
+        self?.activeConnections[connectionId] = streamConnection
+        self?.connectionLock.unlock()
+
+        print("[NativeQuic] 📡 Stream created, waiting for stream ready state...")
+
+        // Handle stream state
+        streamConnection.stateUpdateHandler = { [weak self] streamState in
+          print("[NativeQuic] 📡 Stream State: \(streamState)")
+          self?.handleRequestState(
+            streamState,
+            connection: streamConnection,
+            connectionId: connectionId,
+            profile: profile,
+            parsedUrl: parsedUrl,
+            method: method,
+            headers: headers,
+            body: body,
+            doSafeComplete: doSafeComplete
+          )
+        }
+
+        // Start the stream
+        let streamQueue = self?.queue ?? DispatchQueue.global(qos: .userInitiated)
+        streamConnection.start(queue: streamQueue)
+
+      case .failed(let error):
+        resolveLock.lock()
+        defer { resolveLock.unlock() }
+        guard !hasResolved else { return }
+        hasResolved = true
+        doSafeComplete(false, nil, "Group failed: \(error.localizedDescription)", error)
+
+      case .cancelled:
+        resolveLock.lock()
+        defer { resolveLock.unlock() }
+        guard !hasResolved else { return }
+        hasResolved = true
+        doSafeComplete(false, nil, "Group cancelled", nil)
+
+      @unknown default:
+        break
+      }
     }
 
-    connection.start(queue: queue)
+    // Set receive handler (required for group to start)
+    group.setReceiveHandler(handler: { message, content, isComplete in
+      print("[NativeQuic] 📥 Group received: \(content?.count ?? 0) bytes, complete=\(isComplete)")
+    })
+
+    print("[NativeQuic] 🚀 Starting group on queue...")
+    group.start(queue: queue)
 
     // Timeout handler
     queue.asyncAfter(deadline: .now() + timeout) {
@@ -390,9 +463,14 @@ class NativeQuic: NSObject {
         // Connection callbacks must fire on the queue the connection was started on
         // If we block that queue here, callbacks will never fire and semaphores will deadlock
         print("[NativeQuic] 🔄 Dispatching UHP handshake to background queue...")
-        DispatchQueue.global(qos: .userInitiated).async {
+        DispatchQueue.global(qos: .userInitiated).async { [weak self] in
+          guard let self else { return }
           print("[NativeQuic] 🤝 Starting UHP handshake on background queue...")
-          switch performUhpHandshake(connection: connection, identityId: identityId) {
+          var channelBinding: Data?
+          self.connectionLock.lock()
+          channelBinding = self.activeChannelBindings[connectionId]
+          self.connectionLock.unlock()
+          switch performUhpHandshake(connection: connection, identityId: identityId, channelBindingOverride: channelBinding) {
           case .failure(let error):
             doSafeComplete(false, nil, "UHP handshake failed: \(error.localizedDescription)", error)
           case .success(let sessionInfo):
@@ -570,6 +648,25 @@ class NativeQuic: NSObject {
     print("[NativeQuic]    ALPN: \(alpnList.joined(separator: ", "))")
 
     let quicOptions = NWProtocolQUIC.Options(alpn: alpnList)
+
+    // Bidirectional stream configuration for explicit stream creation
+    // This ensures streams created from groups are properly opened
+    quicOptions.direction = .bidirectional
+    print("[NativeQuic]    Direction: Bidirectional")
+
+    // Allow multiple concurrent streams
+    quicOptions.initialMaxStreamsBidirectional = 10
+    print("[NativeQuic]    Initial Max Bi Streams: 10")
+
+    // Flow control for large payloads (UHP identity JSON is ~24KB)
+    // Set to 2MB per stream to safely handle large handshake payloads
+    quicOptions.initialMaxStreamDataBidirectionalLocal = 2_000_000
+    quicOptions.initialMaxStreamDataBidirectionalRemote = 2_000_000
+    print("[NativeQuic]    Stream Flow Control: 2MB local / 2MB remote")
+
+    // Connection-level flow control (10MB total)
+    quicOptions.initialMaxData = 10_000_000
+    print("[NativeQuic]    Connection Flow Control: 10MB")
 
     // QUIC idle timeout in milliseconds (60 seconds)
     quicOptions.idleTimeout = 60_000
@@ -1120,7 +1217,44 @@ class NativeQuic: NSObject {
       connection.stateUpdateHandler = nil
       connection.cancel()
     }
+    activeChannelBindings.removeValue(forKey: connectionId)
     connectionLock.unlock()
+  }
+
+  @available(iOS 15.0, *)
+  private func exportQuicChannelBinding(from group: NWConnectionGroup) -> Data? {
+    guard let quicMetadata = group.metadata(definition: NWProtocolQUIC.definition) as? NWProtocolQUIC.Metadata else {
+      print("[NativeQuic] ⚠️ QUIC metadata unavailable for channel binding")
+      return nil
+    }
+
+    let secMetadata = quicMetadata.securityProtocolMetadata
+    let label = "zhtp-uhp-channel-binding"
+    guard let secret = sec_protocol_metadata_create_secret(
+      secMetadata,
+      label.utf8.count,
+      label,
+      32
+    ) else {
+      print("[NativeQuic] ⚠️ Failed to export QUIC channel binding")
+      return nil
+    }
+
+    let secretData = secret as DispatchData
+    var data = Data()
+    secretData.enumerateBytes { buffer, _, _ in
+      data.append(buffer)
+    }
+
+    guard data.count == 32 else {
+      print("[NativeQuic] ⚠️ Invalid channel binding length: \(data.count) bytes")
+      return nil
+    }
+
+    let digest = SHA256.hash(data: data)
+    let hashPrefix = digest.prefix(8).map { String(format: "%02x", $0) }.joined()
+    print("[NativeQuic] 🔐 Channel binding via group QUIC metadata: sha256[0..8]=\(hashPrefix)")
+    return data
   }
 
   // MARK: - React Native Setup

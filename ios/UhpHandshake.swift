@@ -2,6 +2,7 @@ import Foundation
 import Network
 import Security
 import CryptoKit
+import Dispatch
 
 enum UhpHandshakeError: Error {
     case missingChannelBinding
@@ -25,6 +26,7 @@ final class UhpConnectionIO {
     private let bufferLock = NSLock()
     private var streamInitialized = false
     private let streamLock = NSLock()
+    private var lastStreamIdentifier: UInt64?
 
     init(connection: NWConnection) {
         self.connection = connection
@@ -59,6 +61,7 @@ final class UhpConnectionIO {
 
         print("[UHP] ✓ Connection ready (\(attempts * 100)ms)")
         print("[UHP] ✓ Stream will be created on first send/receive")
+        logQuicStreamIdentifier(context: "ready")
         streamInitialized = true
         return true
     }
@@ -146,45 +149,93 @@ final class UhpConnectionIO {
         }
 
         let data = Data(bytes: ptr, count: len)
+        if len == 4 {
+            let headerValue = data.withUnsafeBytes { rawBuf -> UInt32 in
+                guard let base = rawBuf.baseAddress else { return 0 }
+                return base.load(as: UInt32.self).bigEndian
+            }
+            let headerHex = data.map { String(format: "%02x", $0) }.joined()
+            print("[UHP] 🔍 Frame header: 0x\(headerHex) (len=\(headerValue))")
+        } else if len > 4 {
+            let digest = SHA256.hash(data: data)
+            let hashPrefix = digest.prefix(8).map { String(format: "%02x", $0) }.joined()
+            print("[UHP] 🔍 Frame payload: \(len) bytes, sha256[0..8]=\(hashPrefix)")
+        }
+
+        // Chunk large payloads to avoid flow control or MTU issues
+        // UHP uses length-prefixed framing (4-byte header), so chunking within stream is safe
+        let chunkSize = 8192  // 8KB chunks - conservative for QUIC over UDP MTU (~1200 bytes effective)
+        var bytesWritten = 0
+
+        // For small payloads, send as single chunk; for large, chunked
+        if data.count <= chunkSize {
+            return sendChunk(data, isComplete: false)
+        }
+
+        // Large payload: send in chunks
+        print("[UHP]    Large payload (\(data.count) bytes) - chunking into \(chunkSize)B chunks")
+        var offset = 0
+        while offset < data.count {
+            let end = min(offset + chunkSize, data.count)
+            let chunk = data.subdata(in: offset..<end)
+
+            print("[UHP]    Sending chunk: offset=\(offset), size=\(chunk.count) bytes")
+            let result = sendChunk(chunk, isComplete: false)
+
+            if result < 0 {
+                print("[UHP] ❌ Chunk write failed at offset \(offset)")
+                return -1
+            }
+
+            bytesWritten += result
+            offset = end
+        }
+
+        print("[UHP] ✓ Write succeeded: \(bytesWritten) bytes sent in \((data.count + chunkSize - 1) / chunkSize) chunks")
+        return bytesWritten
+    }
+
+    private func sendChunk(_ chunk: Data, isComplete: Bool) -> Int {
         let sema = DispatchSemaphore(value: 0)
         var sendError: NWError?
 
-        print("[UHP]    Calling send() directly...")
-
-        // CRITICAL: Call send() synchronously - don't dispatch to queue
-        // First send on QUIC connection can take time to create stream
-        // Dispatching adds overhead and causes timeouts
-
-        // CRITICAL FIX: Use .defaultStream to hint at stream-level semantics
-        // This encourages Network.framework to create proper RFC 9000 bidirectional streams
-        // that Quinn's accept_bi() can recognize, instead of connection-level data
+        // Use the default message context so we stay on the existing stream connection.
+        logQuicStreamIdentifier(context: "send")
         self.connection.send(
-            content: data,
-            contentContext: .defaultStream,  // Stream-level context for QUIC streams
-            isComplete: true,  // Force immediate flush and message completion
+            content: chunk,
+            contentContext: .defaultMessage,
+            isComplete: isComplete,
             completion: NWConnection.SendCompletion.contentProcessed { error in
                 sendError = error
-                print("[UHP]    ✓ Send callback fired: error=\(error?.localizedDescription ?? "nil")")
                 sema.signal()
             }
         )
 
-        print("[UHP]    → Send enqueued, waiting for callback (30s timeout)...")
         let waitResult = sema.wait(timeout: .now() + 30)
 
         if waitResult == .timedOut {
-            print("[UHP] ❌ Write timed out after 30s - send callback never fired")
-            print("[UHP]    connection.state: \(connection.state)")
+            print("[UHP]    ❌ Chunk send timed out after 30s")
             return -1
         }
 
         if let error = sendError {
-            print("[UHP] ❌ Write error: \(error)")
+            print("[UHP]    ❌ Chunk send error: \(error)")
             return -1
         }
 
-        print("[UHP] ✓ Write succeeded: \(len) bytes sent")
-        return len
+        return chunk.count
+    }
+
+    private func logQuicStreamIdentifier(context: String) {
+        guard let metadata = connection.metadata(definition: NWProtocolQUIC.definition) as? NWProtocolQUIC.Metadata else {
+            return
+        }
+
+        let streamId = metadata.streamIdentifier
+        if lastStreamIdentifier == nil || lastStreamIdentifier != streamId {
+            print("[UHP] 🔍 QUIC stream id (\(context)): \(streamId)")
+            lastStreamIdentifier = streamId
+        }
     }
 }
 
@@ -216,8 +267,56 @@ func performUhpHandshake(
     identityId: String,
     nonceCachePath: String? = nil,
     chainId: UInt8 = 0,
-    identity: Identity? = nil
+    identity: Identity? = nil,
+    channelBindingOverride: Data? = nil
 ) -> Result<UhpSessionInfo, Error> {
+    func exportQuicChannelBinding(from connection: NWConnection) -> Data? {
+        func exportBinding(from secMetadata: sec_protocol_metadata_t, source: String) -> Data? {
+            let label = "zhtp-uhp-channel-binding"
+            print("[UhpHandshake] 🔐 Exporting channel binding via \(source) label_len=\(label.utf8.count)")
+            let exported = sec_protocol_metadata_create_secret(
+                secMetadata,
+                label.utf8.count,
+                label,
+                32
+            )
+            guard let secret = exported else {
+                print("[UhpHandshake] ⚠️ Failed to export channel binding via \(source)")
+                return nil
+            }
+
+            let secretData = secret as DispatchData
+            let data = Data(secretData)
+
+            guard data.count == 32 else {
+                print("[UhpHandshake] ⚠️ Invalid channel binding length via \(source): \(data.count) bytes")
+                return nil
+            }
+
+            let digest = SHA256.hash(data: data)
+            let hashPrefix = digest.prefix(8).map { String(format: "%02x", $0) }.joined()
+            print("[UhpHandshake] 🔐 Channel binding via \(source): sha256[0..8]=\(hashPrefix)")
+            return data
+        }
+
+        var attempts = 0
+        let maxAttempts = 50 // 5 seconds
+        while connection.state != .ready && attempts < maxAttempts {
+            Thread.sleep(forTimeInterval: 0.1)
+            attempts += 1
+        }
+        if connection.state != .ready {
+            print("[UhpHandshake] ⚠️ Connection not ready for channel binding: \(connection.state)")
+        }
+
+        if let quicMetadata = connection.metadata(definition: NWProtocolQUIC.definition) as? NWProtocolQUIC.Metadata {
+            return exportBinding(from: quicMetadata.securityProtocolMetadata, source: "QUIC")
+        }
+
+        print("[UhpHandshake] ⚠️ QUIC metadata unavailable for channel binding")
+        return nil
+    }
+
     // SECURITY: If Identity object is provided, use it directly (signing stays in Rust)
     // Otherwise, fall back to loading from Keystore (for backwards compatibility)
     let identityToUse: Identity?
@@ -328,10 +427,15 @@ func performUhpHandshake(
     let clientDid = materials.identityDid
     let privateKey = materials.privateKey
 
-    // Channel binding not available on iOS (requires private Security API)
-    // Create deterministic placeholder from identity materials for validation compatibility
-    let channelBindingInput = "\(clientDid):\(identityId)".data(using: .utf8) ?? Data()
-    let channelBinding = Data(SHA256.hash(data: channelBindingInput))
+    // Channel binding must match server's QUIC exporter (label: zhtp-uhp-channel-binding, len: 32)
+    guard let channelBinding = channelBindingOverride else {
+        print("[UhpHandshake] ❌ Missing channel binding override - cannot continue")
+        return .failure(UhpHandshakeError.missingChannelBinding)
+    }
+    let digest = SHA256.hash(data: channelBinding)
+    let hashPrefix = digest.prefix(8).map { String(format: "%02x", $0) }.joined()
+    let hexPrefix = channelBinding.prefix(8).map { String(format: "%02x", $0) }.joined()
+    print("[UhpHandshake] ✅ Using provided channel binding: \(channelBinding.count) bytes, sha256[0..8]=\(hashPrefix), hex[0..8]=\(hexPrefix)")
 
     // SECURITY: Ensure Identity is in handle store for signing operations
     // This keeps the private keys in Rust while allowing signing callbacks
