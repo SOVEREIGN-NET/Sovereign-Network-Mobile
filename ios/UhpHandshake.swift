@@ -154,10 +154,14 @@ final class UhpConnectionIO {
         // CRITICAL: Call send() synchronously - don't dispatch to queue
         // First send on QUIC connection can take time to create stream
         // Dispatching adds overhead and causes timeouts
+
+        // CRITICAL FIX: Use .defaultStream to hint at stream-level semantics
+        // This encourages Network.framework to create proper RFC 9000 bidirectional streams
+        // that Quinn's accept_bi() can recognize, instead of connection-level data
         self.connection.send(
             content: data,
-            contentContext: .defaultMessage,
-            isComplete: false,
+            contentContext: .defaultStream,  // Stream-level context for QUIC streams
+            isComplete: true,  // Force immediate flush and message completion
             completion: NWConnection.SendCompletion.contentProcessed { error in
                 sendError = error
                 print("[UHP]    ✓ Send callback fired: error=\(error?.localizedDescription ?? "nil")")
