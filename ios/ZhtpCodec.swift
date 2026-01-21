@@ -28,7 +28,7 @@ func zhtp_encode_request(_ request: ZhtpRequestWire) throws -> Data {
     print("[ZhtpCodec] After version: \(cborData.count) bytes")
 
     try appendCborString(&cborData, "request_id")
-    try appendCborBytes(&cborData, request.request_id)
+    try appendCborByteArray(&cborData, request.request_id)
     print("[ZhtpCodec] After request_id: \(cborData.count) bytes")
 
     try appendCborString(&cborData, "timestamp_ms")
@@ -146,6 +146,13 @@ private func appendCborBytes(_ data: inout Data, _ bytes: Data) throws {
     data.append(bytes)
 }
 
+private func appendCborByteArray(_ data: inout Data, _ bytes: Data) throws {
+    try appendCborUInt(&data, UInt64(bytes.count), majorType: 4)
+    for byte in bytes {
+        try appendCborUInt(&data, UInt64(byte), majorType: 0)
+    }
+}
+
 private func appendCborStringMap(_ data: inout Data, _ dict: [String: String]) throws {
     try appendCborUInt(&data, UInt64(dict.count), majorType: 5)
     for (key, value) in dict.sorted(by: { $0.key < $1.key }) {
@@ -165,9 +172,9 @@ func encodeRequestWire(_ wire: ZhtpRequestWire) throws -> Data {
     try appendCborString(&data, "version")
     try appendCborUInt(&data, UInt64(wire.version), majorType: 0)
 
-    // request_id (as bytes)
+    // request_id (as CBOR array of bytes)
     try appendCborString(&data, "request_id")
-    try appendCborBytes(&data, wire.request_id)
+    try appendCborByteArray(&data, wire.request_id)
 
     // timestamp_ms
     try appendCborString(&data, "timestamp_ms")
@@ -333,8 +340,9 @@ func zhtp_decode_response(_ cbor_bytes: Data) throws -> ZhtpResponseWire {
         jsonData = try JSONSerialization.data(withJSONObject: errorResponse)
 
         // Return error response
+        let requestId = decodeRequestId((jsonValue as? [String: Any])?["request_id"]) ?? Data()
         return ZhtpResponseWire(
-            request_id: Data(),
+            request_id: requestId,
             status: 500,
             response: ZhtpResponse(
                 version: "1.0",
@@ -389,8 +397,9 @@ func zhtp_decode_response(_ cbor_bytes: Data) throws -> ZhtpResponseWire {
             timestamp: UInt64(Date().timeIntervalSince1970)
         )
 
+        let requestId = decodeRequestId(dict["request_id"]) ?? Data()
         return ZhtpResponseWire(
-            request_id: Data(),
+            request_id: requestId,
             status: statusCode.uint16Value,
             response: response,
             error_code: nil,
@@ -456,6 +465,8 @@ func zhtp_decode_response(_ cbor_bytes: Data) throws -> ZhtpResponseWire {
         }
     }
 
+    let requestId = decodeRequestId(dict["request_id"]) ?? Data()
+
     // Build response
     let response = ZhtpResponse(
         version: version,
@@ -466,12 +477,28 @@ func zhtp_decode_response(_ cbor_bytes: Data) throws -> ZhtpResponseWire {
     )
 
     return ZhtpResponseWire(
-        request_id: Data(),
+        request_id: requestId,
         status: statusCode,
         response: response,
         error_code: nil,
         error_message: nil
     )
+}
+
+private func decodeRequestId(_ value: Any?) -> Data? {
+    if let bytes = value as? [Any] {
+        var data = Data()
+        for item in bytes {
+            if let num = item as? NSNumber {
+                data.append(UInt8(truncatingIfNeeded: num.uint64Value))
+            }
+        }
+        return data
+    }
+    if let base64 = value as? String, let data = Data(base64Encoded: base64) {
+        return data
+    }
+    return nil
 }
 
 // MARK: - Manual CBOR Encoding/Decoding

@@ -345,7 +345,11 @@ private func zhtp_encode_authenticated_request(
     try appendCborUInt(&data, 1)
 
     try appendCborString(&data, "request_id")
-    try appendCborBytes(&data, requestId)
+    let requestIdStart = data.count
+    try appendCborByteArray(&data, requestId)
+    let requestIdSlice = data.subdata(in: requestIdStart..<data.count)
+    let requestIdHex = requestIdSlice.map { String(format: "%02x", $0) }.joined(separator: " ")
+    print("[ZHTP Auth] request_id CBOR bytes: \(requestIdHex)")
 
     try appendCborString(&data, "timestamp_ms")
     try appendCborUInt(&data, timestampMs)
