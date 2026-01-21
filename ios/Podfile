@@ -37,6 +37,8 @@ target 'SovereignNetworkMobile' do
 
   # Rust FFI library for UHP handshake and Blake3
   pod 'uhp_ffi', :path => './uhp-ffi'
+  # Rust Quinn QUIC FFI library
+  pod 'quinn_ffi', :path => './quinn-ffi'
 
   # Rust lib-client for ZHTP identity and registration (uses same crypto as server)
   pod 'lib_client', :path => './lib-client'

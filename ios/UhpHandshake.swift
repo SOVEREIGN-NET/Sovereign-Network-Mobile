@@ -10,6 +10,19 @@ enum UhpHandshakeError: Error {
     case handshakeFailed(String)
 }
 
+extension UhpHandshakeError: LocalizedError {
+    var errorDescription: String? {
+        switch self {
+        case .missingChannelBinding:
+            return "Missing channel binding"
+        case .invalidIdentity:
+            return "Invalid identity"
+        case .handshakeFailed(let message):
+            return message
+        }
+    }
+}
+
 struct UhpSessionInfo {
     let sessionKey: Data
     let sessionId: Data
@@ -575,4 +588,328 @@ func performUhpHandshake(
 
 private func dataFromTuple<T>(_ value: T) -> Data {
     return withUnsafeBytes(of: value) { Data($0) }
+}
+
+func performUhpHandshakeQuinnFfi(
+    host: String,
+    port: UInt16,
+    serverName: String,
+    spkiPin: Data,
+    identityJson: Data,
+    privateKey: UhpPrivateKeyBytesData,
+    clientDid: String,
+    chainId: UInt8
+) -> Result<UhpSessionInfo, Error> {
+    guard spkiPin.count == 32 else {
+        return .failure(UhpHandshakeError.handshakeFailed("Invalid SPKI pin length: \(spkiPin.count) bytes (expected 32)"))
+    }
+
+    var session = UhpSession()
+
+    let result = host.withCString { hostPtr in
+        serverName.withCString { serverNamePtr in
+            spkiPin.withUnsafeBytes { spkiBuf -> Int32 in
+                guard let spkiPtr = spkiBuf.baseAddress?.assumingMemoryBound(to: UInt8.self) else {
+                    return -1
+                }
+                return identityJson.withUnsafeBytes { identityBuf -> Int32 in
+                    guard let identityPtr = identityBuf.baseAddress?.assumingMemoryBound(to: UInt8.self) else {
+                        return -1
+                    }
+                    return privateKey.dilithiumSk.withUnsafeBytes { dilBuf -> Int32 in
+                        guard let dilPtr = dilBuf.baseAddress?.assumingMemoryBound(to: UInt8.self) else {
+                            return -1
+                        }
+                        return privateKey.kyberSk.withUnsafeBytes { kybBuf -> Int32 in
+                            guard let kybPtr = kybBuf.baseAddress?.assumingMemoryBound(to: UInt8.self) else {
+                                return -1
+                            }
+                            return privateKey.masterSeed.withUnsafeBytes { seedBuf -> Int32 in
+                                guard let seedPtr = seedBuf.baseAddress?.assumingMemoryBound(to: UInt8.self) else {
+                                    return -1
+                                }
+
+                                let keyBytes = UhpPrivateKeyBytes(
+                                    dilithium_sk_ptr: dilPtr,
+                                    dilithium_sk_len: privateKey.dilithiumSk.count,
+                                    kyber_sk_ptr: kybPtr,
+                                    kyber_sk_len: privateKey.kyberSk.count,
+                                    master_seed_ptr: seedPtr,
+                                    master_seed_len: privateKey.masterSeed.count
+                                )
+
+                                return uhp_handshake_quic(
+                                    hostPtr,
+                                    port,
+                                    serverNamePtr,
+                                    spkiPtr,
+                                    identityPtr,
+                                    identityJson.count,
+                                    keyBytes,
+                                    chainId,
+                                    &session
+                                )
+                            }
+                        }
+                    }
+                }
+            }
+        }
+    }
+
+    if result != 0 {
+        let errorMessage = uhp_quinn_last_error_message().flatMap { String(cString: $0) } ?? "unknown error"
+        return .failure(UhpHandshakeError.handshakeFailed(errorMessage))
+    }
+
+    guard let peerDidPtr = session.peer_did else {
+        return .failure(UhpHandshakeError.handshakeFailed("Server DID missing"))
+    }
+
+    let peerDid = String(cString: peerDidPtr)
+    uhp_quinn_free_string(peerDidPtr)
+
+    let sessionIdFull = dataFromTuple(session.session_id)
+    let sessionId = Data(sessionIdFull.prefix(32))
+
+    guard sessionId.count == 32 else {
+        return .failure(UhpHandshakeError.handshakeFailed("Invalid session ID length: \(sessionId.count) bytes (expected 32)"))
+    }
+
+    guard !peerDid.isEmpty else {
+        return .failure(UhpHandshakeError.handshakeFailed("Server DID is empty"))
+    }
+
+    let sessionKey = dataFromTuple(session.session_key)
+    guard sessionKey.count == 32 else {
+        return .failure(UhpHandshakeError.handshakeFailed("Invalid session key length: \(sessionKey.count) bytes (expected 32)"))
+    }
+
+    let handshakeHash = dataFromTuple(session.handshake_hash)
+    guard handshakeHash.count == 32 else {
+        return .failure(UhpHandshakeError.handshakeFailed("Invalid handshake hash length: \(handshakeHash.count) bytes (expected 32)"))
+    }
+
+    guard session.pqc_hybrid_enabled == 1 else {
+        return .failure(UhpHandshakeError.handshakeFailed("Server did not enable PQC hybrid key exchange (Kyber1024 required)"))
+    }
+
+    return .success(
+        UhpSessionInfo(
+            sessionKey: sessionKey,
+            sessionId: sessionId,
+            handshakeHash: handshakeHash,
+            peerDid: peerDid,
+            pqcHybridEnabled: true,
+            clientDid: clientDid
+        )
+    )
+}
+
+struct QuinnHandshakeResult {
+    let handle: UInt64
+    let session: UhpSessionInfo
+}
+
+func performUhpHandshakeQuinnFfiWithHandle(
+    host: String,
+    port: UInt16,
+    serverName: String,
+    spkiPin: Data,
+    identityId: String,
+    identity: Identity?,
+    chainId: UInt8
+) -> Result<QuinnHandshakeResult, Error> {
+    guard spkiPin.count == 32 else {
+        return .failure(UhpHandshakeError.handshakeFailed("Invalid SPKI pin length: \(spkiPin.count) bytes (expected 32)"))
+    }
+
+    let materialsResult = loadUhpIdentityMaterials(identityId: identityId, identity: identity)
+    let materials: UhpIdentityMaterials
+    switch materialsResult {
+    case .success(let value):
+        materials = value
+    case .failure(let error):
+        return .failure(error)
+    }
+
+    var session = UhpSession()
+    var handle: UInt64 = 0
+
+    let result = host.withCString { hostPtr in
+        serverName.withCString { serverNamePtr in
+            spkiPin.withUnsafeBytes { spkiBuf -> Int32 in
+                guard let spkiPtr = spkiBuf.baseAddress?.assumingMemoryBound(to: UInt8.self) else {
+                    return -1
+                }
+                return materials.identityJson.withUnsafeBytes { identityBuf -> Int32 in
+                    guard let identityPtr = identityBuf.baseAddress?.assumingMemoryBound(to: UInt8.self) else {
+                        return -1
+                    }
+                    return materials.privateKey.dilithiumSk.withUnsafeBytes { dilBuf -> Int32 in
+                        guard let dilPtr = dilBuf.baseAddress?.assumingMemoryBound(to: UInt8.self) else {
+                            return -1
+                        }
+                        return materials.privateKey.kyberSk.withUnsafeBytes { kybBuf -> Int32 in
+                            guard let kybPtr = kybBuf.baseAddress?.assumingMemoryBound(to: UInt8.self) else {
+                                return -1
+                            }
+                            return materials.privateKey.masterSeed.withUnsafeBytes { seedBuf -> Int32 in
+                                guard let seedPtr = seedBuf.baseAddress?.assumingMemoryBound(to: UInt8.self) else {
+                                    return -1
+                                }
+
+                                let keyBytes = UhpPrivateKeyBytes(
+                                    dilithium_sk_ptr: dilPtr,
+                                    dilithium_sk_len: materials.privateKey.dilithiumSk.count,
+                                    kyber_sk_ptr: kybPtr,
+                                    kyber_sk_len: materials.privateKey.kyberSk.count,
+                                    master_seed_ptr: seedPtr,
+                                    master_seed_len: materials.privateKey.masterSeed.count
+                                )
+
+                                return uhp_quic_connect_and_handshake(
+                                    hostPtr,
+                                    port,
+                                    serverNamePtr,
+                                    spkiPtr,
+                                    identityPtr,
+                                    materials.identityJson.count,
+                                    keyBytes,
+                                    chainId,
+                                    &handle,
+                                    &session
+                                )
+                            }
+                        }
+                    }
+                }
+            }
+        }
+    }
+
+    if result != 0 {
+        let errorMessage = uhp_quinn_last_error_message().flatMap { String(cString: $0) } ?? "unknown error"
+        return .failure(UhpHandshakeError.handshakeFailed(errorMessage))
+    }
+
+    guard let peerDidPtr = session.peer_did else {
+        return .failure(UhpHandshakeError.handshakeFailed("Server DID missing"))
+    }
+
+    let peerDid = String(cString: peerDidPtr)
+    uhp_quinn_free_string(peerDidPtr)
+
+    let sessionIdFull = dataFromTuple(session.session_id)
+    let sessionId = Data(sessionIdFull.prefix(32))
+
+    guard sessionId.count == 32 else {
+        return .failure(UhpHandshakeError.handshakeFailed("Invalid session ID length: \(sessionId.count) bytes (expected 32)"))
+    }
+
+    guard !peerDid.isEmpty else {
+        return .failure(UhpHandshakeError.handshakeFailed("Server DID is empty"))
+    }
+
+    let sessionKey = dataFromTuple(session.session_key)
+    guard sessionKey.count == 32 else {
+        return .failure(UhpHandshakeError.handshakeFailed("Invalid session key length: \(sessionKey.count) bytes (expected 32)"))
+    }
+
+    let handshakeHash = dataFromTuple(session.handshake_hash)
+    guard handshakeHash.count == 32 else {
+        return .failure(UhpHandshakeError.handshakeFailed("Invalid handshake hash length: \(handshakeHash.count) bytes (expected 32)"))
+    }
+
+    guard session.pqc_hybrid_enabled == 1 else {
+        return .failure(UhpHandshakeError.handshakeFailed("Server did not enable PQC hybrid key exchange (Kyber1024 required)"))
+    }
+
+    let sessionInfo = UhpSessionInfo(
+        sessionKey: sessionKey,
+        sessionId: sessionId,
+        handshakeHash: handshakeHash,
+        peerDid: peerDid,
+        pqcHybridEnabled: true,
+        clientDid: materials.identityDid
+    )
+
+    return .success(QuinnHandshakeResult(handle: handle, session: sessionInfo))
+}
+
+private func loadUhpIdentityMaterials(
+    identityId: String,
+    identity: Identity?
+) -> Result<UhpIdentityMaterials, Error> {
+    let identityToUse: Identity?
+
+    if let providedIdentity = identity {
+        print("[UhpHandshake] ✅ Using provided Identity object (DID: \(providedIdentity.did))")
+        identityToUse = providedIdentity
+
+        do {
+            try IdentityHandleStore.shared.store(identity: providedIdentity)
+            print("[UhpHandshake] ✅ Stored Identity in handle store")
+        } catch {
+            print("[UhpHandshake] ⚠️ Failed to store Identity in handle store: \(error)")
+        }
+    } else {
+        print("[UhpHandshake] Loading identity for ID: \(identityId)")
+        if let storedIdentity = IdentityHandleStore.shared.retrieve(by: identityId) as? Identity {
+            identityToUse = storedIdentity
+            print("[UhpHandshake] ✅ Retrieved Identity from handle store")
+        } else {
+            identityToUse = nil
+        }
+    }
+
+    if let freshIdentity = identityToUse {
+        print("[UhpHandshake] ✅ Using fresh Identity from handle store (skipping stale Keychain)")
+
+        do {
+            let handshakeJsonString = try ZhtpClient.serializeIdentityToHandshakeJson(freshIdentity as! Identity)
+            let jsonPreview = String(handshakeJsonString.prefix(500))
+            print("[UhpHandshake] 📋 Handshake Identity JSON (first 500 chars):")
+            print("[UhpHandshake] \(jsonPreview)")
+
+            guard let identityJsonData = handshakeJsonString.data(using: .utf8) else {
+                print("[UhpHandshake] ❌ Failed to encode handshake JSON to data")
+                return .failure(UhpHandshakeError.handshakeFailed("Failed to encode handshake JSON"))
+            }
+
+            print("[UhpHandshake] ✅ Got handshake identity JSON from lib-client")
+            print("[UhpHandshake]    Identity JSON: \(identityJsonData.count) bytes")
+
+            let dilithiumSk = try ZhtpClient.getDilithiumSecretKey(freshIdentity as! Identity)
+            let kyberSk = try ZhtpClient.getKyberSecretKey(freshIdentity as! Identity)
+            let masterSeed = try ZhtpClient.getMasterSeed(freshIdentity as! Identity)
+
+            print("[UhpHandshake] ✅ Retrieved private keys from lib-client")
+            print("[UhpHandshake]    Dilithium SK: \(dilithiumSk.count) bytes")
+            print("[UhpHandshake]    Kyber SK: \(kyberSk.count) bytes")
+            print("[UhpHandshake]    Master seed: \(masterSeed.count) bytes")
+
+            let materials = UhpIdentityMaterials(
+                identityJson: identityJsonData,
+                identityDid: freshIdentity.did,
+                privateKey: UhpPrivateKeyBytesData(
+                    dilithiumSk: Data(dilithiumSk),
+                    kyberSk: Data(kyberSk),
+                    masterSeed: Data(masterSeed)
+                )
+            )
+            return .success(materials)
+        } catch {
+            print("[UhpHandshake] ❌ Failed to serialize identity to handshake JSON: \(error)")
+            return .failure(UhpHandshakeError.handshakeFailed("Failed to serialize identity: \(error)"))
+        }
+    }
+
+    print("[UhpHandshake] Loading identity materials from Keychain for ID: \(identityId)")
+    guard let keychainMaterials = UhpKeystore.loadIdentityForHandshake(identityId: identityId) else {
+        print("[UhpHandshake] ❌ Failed to load identity materials for ID: \(identityId)")
+        return .failure(UhpHandshakeError.invalidIdentity)
+    }
+    print("[UhpHandshake] ✅ Loaded identity materials from Keychain (fallback)")
+    return .success(keychainMaterials)
 }

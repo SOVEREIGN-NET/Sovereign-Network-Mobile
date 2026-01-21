@@ -33,6 +33,8 @@ typedef struct {
     uint8_t pqc_hybrid_enabled;
 } UhpSession;
 
+#define UHP_FFI_TYPES 1
+
 int uhp_handshake(
     UhpIoCallbacks io,
     const uint8_t *identity_json_ptr,

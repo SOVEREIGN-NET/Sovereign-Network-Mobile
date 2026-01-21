@@ -5,3 +5,4 @@
 #import <CommonCrypto/CommonCrypto.h>
 #import <oqs/oqs.h>
 #import "uhp-ffi/include/uhp_ffi.h"
+#import "quinn-ffi/include/quinn_ffi.h"

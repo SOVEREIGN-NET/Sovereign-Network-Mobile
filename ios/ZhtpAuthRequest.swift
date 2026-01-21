@@ -125,7 +125,7 @@ func sendAuthenticatedZhtpRequest(
 
         print("[ZHTP Auth] CBOR encoded: \(cborData.count) bytes")
 
-        // Frame it (add 4-byte big-endian length prefix)
+        // Frame with 4-byte big-endian length prefix
         let framedData: Data
         do {
             framedData = try zhtp_frame_encode(cbor_payload: cborData)
@@ -157,6 +157,100 @@ func sendAuthenticatedZhtpRequest(
         )
     } catch {
         completion(.failure(error))
+    }
+}
+
+/// Send an authenticated ZHTP request over Quinn (Rust FFI).
+func sendAuthenticatedZhtpRequestViaQuinn(
+    quinnHandle: UInt64,
+    session: inout AuthSession,
+    method: ZhtpMethod,
+    path: String,
+    headers: [String: String],
+    body: Data?,
+    requester: String
+) -> Result<(status: UInt16, body: Data), Error> {
+    guard session.isValid() else {
+        return .failure(NSError(domain: "ZHTP", code: 401, userInfo: [NSLocalizedDescriptionKey: "Session invalid or expired"]))
+    }
+
+    let requestBody = body ?? Data()
+    let contentType = headers["content-type"] ?? "application/json"
+    let daoFee = UInt64(headers["dao_fee"] ?? "0") ?? 0
+    let totalFees = UInt64(headers["total_fees"] ?? String(daoFee)) ?? daoFee
+
+    let requestId = Data((0..<16).map { _ in UInt8.random(in: 0...255) })
+    let now = Date()
+    let timestamp = UInt64(now.timeIntervalSince1970)
+    let timestampMs = UInt64(now.timeIntervalSince1970 * 1000)
+
+    do {
+        let authContext = try buildAuthContext(
+            session: &session,
+            method: method,
+            path: path,
+            body: requestBody
+        )
+        session.touch()
+
+        let cborData = try zhtp_encode_authenticated_request(
+            method: method,
+            uri: path,
+            contentType: contentType,
+            requestBody: requestBody,
+            timestamp: timestamp,
+            timestampMs: timestampMs,
+            requestId: requestId,
+            requester: requester,
+            authContext: authContext
+        )
+
+        let framedData = try zhtp_frame_encode(cbor_payload: cborData)
+        var responseData: Data?
+
+        let rc = framedData.withUnsafeBytes { buf -> Int32 in
+            guard let reqPtr = buf.baseAddress?.assumingMemoryBound(to: UInt8.self) else {
+                return -1
+            }
+
+            var respPtr: UnsafeMutablePointer<UInt8>?
+            var respLen: Int = 0
+            let rc = uhp_quic_request(
+                quinnHandle,
+                reqPtr,
+                framedData.count,
+                &respPtr,
+                &respLen
+            )
+            if rc != 0 {
+                return rc
+            }
+
+            guard let responsePtr = respPtr, respLen > 0 else {
+                return -1
+            }
+
+            responseData = Data(bytes: responsePtr, count: respLen)
+            uhp_quic_free_buffer(responsePtr, respLen)
+            return 0
+        }
+
+        if rc != 0 {
+            return .failure(NSError(domain: "ZHTP", code: -1, userInfo: [NSLocalizedDescriptionKey: "Quinn request failed"]))
+        }
+
+        guard let responseData = responseData else {
+            return .failure(NSError(domain: "ZHTP", code: -1, userInfo: [NSLocalizedDescriptionKey: "Empty Quinn response"]))
+        }
+
+        let (payload, _) = try zhtp_frame_decode_message(data: responseData)
+        let responseWire = try zhtp_decode_response(payload)
+        guard responseWire.request_id == requestId else {
+            return .failure(NSError(domain: "ZHTP", code: -1, userInfo: [NSLocalizedDescriptionKey: "Response request_id mismatch"]))
+        }
+        return .success((status: responseWire.status, body: responseWire.response.body))
+    } catch {
+        return .failure(error)
     }
 }
 
@@ -196,8 +290,6 @@ private func receiveAuthenticatedZhtpResponse(
                 do {
                     // Unframe: read 4-byte length, then payload
                     let (payload, _) = try zhtp_frame_decode_message(data: responseData)
-
-                    // Decode CBOR to ZhtpResponseWire
                     let responseWire = try zhtp_decode_response(payload)
 
                     // Verify response request_id matches
@@ -259,13 +351,13 @@ private func zhtp_encode_authenticated_request(
     try appendCborString(&data, "auth_context")
     try appendCborMapHeader(&data, count: 4)
     try appendCborString(&data, "session_id")
-    try appendCborBytes(&data, authContext.session_id)
+    try appendCborByteArray(&data, authContext.session_id)
     try appendCborString(&data, "client_did")
     try appendCborString(&data, authContext.client_did)
     try appendCborString(&data, "sequence")
     try appendCborUInt(&data, authContext.sequence)
     try appendCborString(&data, "request_mac")
-    try appendCborBytes(&data, authContext.request_mac)
+    try appendCborByteArray(&data, authContext.request_mac)
 
     try appendCborString(&data, "request")
     try appendCborMapHeader(&data, count: 7)
@@ -328,6 +420,13 @@ private func appendCborString(_ data: inout Data, _ string: String) throws {
     let bytes = string.data(using: .utf8) ?? Data()
     try appendCborTextHeader(&data, length: bytes.count)
     data.append(bytes)
+}
+
+private func appendCborByteArray(_ data: inout Data, _ bytes: Data) throws {
+    try appendCborLength(&data, majorType: 4, length: bytes.count)
+    for byte in bytes {
+        try appendCborUInt(&data, UInt64(byte))
+    }
 }
 
 private func appendCborBytes(_ data: inout Data, _ bytes: Data) throws {

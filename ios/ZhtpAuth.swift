@@ -388,11 +388,36 @@ enum UhpKeystore {
 
         if status == errSecSuccess, let data = item as? Data {
             print("[UhpKeystore] ✅ Loaded complete serialized Identity from Keychain (\(data.count) bytes)")
-            if let identityDid = parseIdentityDid(data) {
-                print("[UhpKeystore] ✅ Parsed identity DID: \(identityDid)")
-                // Private keys stay in Rust, use empty byte arrays
-                let privateKey = UhpPrivateKeyBytesData(dilithiumSk: Data(), kyberSk: Data(), masterSeed: Data())
-                return UhpIdentityMaterials(identityJson: data, identityDid: identityDid, privateKey: privateKey)
+            if let jsonString = String(data: data, encoding: .utf8) {
+                do {
+                    let identity = try ZhtpClient.deserializeIdentity(jsonString)
+                    do {
+                        try IdentityHandleStore.shared.store(identity: identity)
+                        print("[UhpKeystore] ✅ Stored deserialized Identity in handle store")
+                    } catch {
+                        print("[UhpKeystore] ⚠️ Failed to store deserialized Identity in handle store: \(error)")
+                    }
+
+                    let handshakeJson = try ZhtpClient.serializeIdentityToHandshakeJson(identity)
+                    guard let identityJson = handshakeJson.data(using: .utf8) else {
+                        print("[UhpKeystore] ❌ Failed to encode handshake JSON to data")
+                        return nil
+                    }
+                    let dilithiumSk = try ZhtpClient.getDilithiumSecretKey(identity)
+                    let kyberSk = try ZhtpClient.getKyberSecretKey(identity)
+                    let masterSeed = try ZhtpClient.getMasterSeed(identity)
+                    let privateKey = UhpPrivateKeyBytesData(
+                        dilithiumSk: Data(dilithiumSk),
+                        kyberSk: Data(kyberSk),
+                        masterSeed: Data(masterSeed)
+                    )
+                    print("[UhpKeystore] ✅ Serialized identity to handshake JSON (\(identityJson.count) bytes)")
+                    return UhpIdentityMaterials(identityJson: identityJson, identityDid: identity.did, privateKey: privateKey)
+                } catch {
+                    print("[UhpKeystore] ⚠️ Failed to deserialize identity for handshake: \(error)")
+                }
+            } else {
+                print("[UhpKeystore] ⚠️ Failed to decode serialized Identity as UTF-8")
             }
         }
 

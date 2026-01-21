@@ -36,6 +36,8 @@
 		30E39C5C2F073A1A004BA6A5 /* ZhtpRequest.swift in Sources */ = {isa = PBXBuildFile; fileRef = 30E39C582F073A1A004BA6A5 /* ZhtpRequest.swift */; };
 		30E39C5D2F073A1A004BA6A5 /* ZhtpTypes.swift in Sources */ = {isa = PBXBuildFile; fileRef = 30E39C592F073A1A004BA6A5 /* ZhtpTypes.swift */; };
 		30E39C5E2F073A1A004BA6A5 /* ZhtpWireFraming.swift in Sources */ = {isa = PBXBuildFile; fileRef = 30E39C5A2F073A1A004BA6A5 /* ZhtpWireFraming.swift */; };
+		30E671212F216BAA00115EAD /* QuinnFFI.xcframework in Frameworks */ = {isa = PBXBuildFile; fileRef = 30E671182F215FB900115EAD /* QuinnFFI.xcframework */; };
+		30E671222F216BAA00115EAD /* QuinnFFI.xcframework in Embed Frameworks */ = {isa = PBXBuildFile; fileRef = 30E671182F215FB900115EAD /* QuinnFFI.xcframework */; settings = {ATTRIBUTES = (CodeSignOnCopy, RemoveHeadersOnCopy, ); }; };
 		30F1A0A12F1A0001 /* ZhtpAuth.swift in Sources */ = {isa = PBXBuildFile; fileRef = 30F1A1A12F1A0001 /* ZhtpAuth.swift */; };
 		30F1A0A22F1A0001 /* ZhtpAuthRequest.swift in Sources */ = {isa = PBXBuildFile; fileRef = 30F1A1A22F1A0001 /* ZhtpAuthRequest.swift */; };
 		30F1A0A32F1A0001 /* UhpHandshake.swift in Sources */ = {isa = PBXBuildFile; fileRef = 30F1A1A32F1A0001 /* UhpHandshake.swift */; };
@@ -52,6 +54,20 @@
 		A1001F1912B4D5A500A1F001 /* Web4ViewManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = A1001F0912B4D5A500A1F001 /* Web4ViewManager.swift */; };
 		A1001F1A12B4D5A500A1F001 /* Web4ViewManager.m in Sources */ = {isa = PBXBuildFile; fileRef = A1001F0A12B4D5A500A1F001 /* Web4ViewManager.m */; };
 /* End PBXBuildFile section */
+
+/* Begin PBXCopyFilesBuildPhase section */
+		30E671232F216BAA00115EAD /* Embed Frameworks */ = {
+			isa = PBXCopyFilesBuildPhase;
+			buildActionMask = 2147483647;
+			dstPath = "";
+			dstSubfolderSpec = 10;
+			files = (
+				30E671222F216BAA00115EAD /* QuinnFFI.xcframework in Embed Frameworks */,
+			);
+			name = "Embed Frameworks";
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+/* End PBXCopyFilesBuildPhase section */
 
 /* Begin PBXFileReference section */
 		000000002C80BB129F894103 /* UhpHandshake.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = UhpHandshake.swift; sourceTree = "<group>"; };
@@ -86,6 +102,7 @@
 		30E39C582F073A1A004BA6A5 /* ZhtpRequest.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ZhtpRequest.swift; sourceTree = "<group>"; };
 		30E39C592F073A1A004BA6A5 /* ZhtpTypes.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ZhtpTypes.swift; sourceTree = "<group>"; };
 		30E39C5A2F073A1A004BA6A5 /* ZhtpWireFraming.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ZhtpWireFraming.swift; sourceTree = "<group>"; };
+		30E671182F215FB900115EAD /* QuinnFFI.xcframework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.xcframework; name = QuinnFFI.xcframework; path = "quinn-ffi/QuinnFFI.xcframework"; sourceTree = "<group>"; };
 		30F1A1A12F1A0001 /* ZhtpAuth.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ZhtpAuth.swift; sourceTree = "<group>"; };
 		30F1A1A22F1A0001 /* ZhtpAuthRequest.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ZhtpAuthRequest.swift; sourceTree = "<group>"; };
 		30F1A1A32F1A0001 /* UhpHandshake.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = UhpHandshake.swift; sourceTree = "<group>"; };
@@ -114,6 +131,7 @@
 				30E39C4A2F073687004BA6A5 /* liboqs.xcframework in Frameworks */,
 				013FDF50305A839F2A8A1F49 /* libPods-SovereignNetworkMobile.a in Frameworks */,
 				00000000208CE7D8131E4E77 /* libuhp_ffi.a in Frameworks */,
+				30E671212F216BAA00115EAD /* QuinnFFI.xcframework in Frameworks */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -165,6 +183,7 @@
 		2D16E6871FA4F8E400B85C8A /* Frameworks */ = {
 			isa = PBXGroup;
 			children = (
+				30E671182F215FB900115EAD /* QuinnFFI.xcframework */,
 				30E39C492F073687004BA6A5 /* liboqs.xcframework */,
 				ED297162215061F000B7C4FE /* JavaScriptCore.framework */,
 				8D24FC999DA153288045F4D3 /* libPods-SovereignNetworkMobile.a */,
@@ -251,6 +270,7 @@
 				98F5B260D936A89AA0E42699 /* [CP] Copy Pods Resources */,
 				D7525F5DA4DED1B9CD760D74 /* [CP-User] [RNFB] Core Configuration */,
 				85F9909D87E5776A532DD3B1 /* [CP-User] [RNFB] Crashlytics Configuration */,
+				30E671232F216BAA00115EAD /* Embed Frameworks */,
 			);
 			buildRules = (
 			);

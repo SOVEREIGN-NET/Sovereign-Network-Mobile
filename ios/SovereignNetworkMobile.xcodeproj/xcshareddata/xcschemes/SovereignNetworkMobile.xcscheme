@@ -60,6 +60,13 @@
             ReferencedContainer = "container:SovereignNetworkMobile.xcodeproj">
          </BuildableReference>
       </BuildableProductRunnable>
+      <EnvironmentVariables>
+         <EnvironmentVariable
+            key = "UHP_SKIP_SERVER_REPLAY_CHECK"
+            value = "1"
+            isEnabled = "YES">
+         </EnvironmentVariable>
+      </EnvironmentVariables>
    </LaunchAction>
    <ProfileAction
       buildConfiguration = "Release"

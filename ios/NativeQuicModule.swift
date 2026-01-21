@@ -19,9 +19,22 @@ class NativeQuic: NSObject {
   private var activeConnections: [String: NWConnection] = [:]
   private var activeChannelBindings: [String: Data] = [:]
   private let connectionLock = NSLock()
+  private var quinnRequestQueue: [String: [QuinnQueuedRequest]] = [:]
+  private var quinnHandshakeInProgress: Set<String> = []
+  private final class AuthSessionBox {
+    var session: AuthSession
+
+    init(_ session: AuthSession) {
+      self.session = session
+    }
+  }
 
   // Default configuration
   private let defaultTimeout: TimeInterval = 30.0
+  private let quinnControlPlaneHost = "77.42.37.161"
+  private let quinnControlPlanePort: UInt16 = 9334
+  private let quinnControlPlaneServerName = "zhtp-mesh"
+  private let quinnSpkiPinHex = "d21aa1f13cea799f96588a274c210c6de46786f098dc321477d8e04b7d87e058"
 
   // ALPN profiles
   enum QuicAlpnProfile {
@@ -29,6 +42,14 @@ class NativeQuic: NSObject {
     case controlPlane    // zhtp-uhp/2
   }
   private typealias SafeComplete = (Bool, Any?, String?, Error?) -> Void
+  private struct QuinnQueuedRequest {
+    let parsedUrl: (host: String, port: Int, path: String)
+    let method: String
+    let headers: [String: String]
+    let body: String?
+    let resolve: RCTPromiseResolveBlock
+    let reject: RCTPromiseRejectBlock
+  }
 
   // MARK: - React Native Bridge Methods
 
@@ -280,6 +301,19 @@ class NativeQuic: NSObject {
     let profile: QuicAlpnProfile = alpnOption == "public" ? .publicContent : .controlPlane
     print("[NativeQuic] 🔑 ALPN: '\(alpnOption)' -> \(profile == .publicContent ? "zhtp-public/1" : "zhtp-uhp/2")")
 
+    if profile == .controlPlane {
+      print("[NativeQuic] ✅ Quinn control-plane path selected (bypassing Network.framework)")
+      handleQuinnControlPlaneRequest(
+        parsedUrl: parsedUrl,
+        method: method,
+        headers: headers,
+        body: body,
+        resolve: resolve,
+        reject: reject
+      )
+      return
+    }
+
     // Determine server name for TLS
     // TLS SNI requires a hostname, not an IP address
     var serverNameForTls: String? = headers["Host"]
@@ -426,6 +460,197 @@ class NativeQuic: NSObject {
     queue.asyncAfter(deadline: .now() + timeout) {
       doSafeComplete(false, nil, "Request timed out after \(timeout) seconds", nil)
     }
+  }
+
+  private func handleQuinnControlPlaneRequest(
+    parsedUrl: (host: String, port: Int, path: String),
+    method: String,
+    headers: [String: String],
+    body: String?,
+    resolve: @escaping RCTPromiseResolveBlock,
+    reject: @escaping RCTPromiseRejectBlock
+  ) {
+    uhp_quinn_init()
+    if let versionPtr = uhp_quinn_version() {
+      let version = String(cString: versionPtr)
+      print("[NativeQuic] ✅ Quinn FFI version: \(version)")
+    }
+
+    guard let identityId = extractIdentityId(path: parsedUrl.path, body: body, headers: headers) else {
+      reject("QUIC_ERROR", "Missing identity_id for authenticated request", nil)
+      return
+    }
+
+    guard let spkiPin = dataFromHex(quinnSpkiPinHex), spkiPin.count == 32 else {
+      reject("QUIC_ERROR", "Invalid SPKI pin configuration", nil)
+      return
+    }
+
+    enqueueQuinnRequest(
+      identityId: identityId,
+      parsedUrl: parsedUrl,
+      method: method,
+      headers: headers,
+      body: body,
+      spkiPin: spkiPin,
+      resolve: resolve,
+      reject: reject
+    )
+  }
+
+  private func enqueueQuinnRequest(
+    identityId: String,
+    parsedUrl: (host: String, port: Int, path: String),
+    method: String,
+    headers: [String: String],
+    body: String?,
+    spkiPin: Data,
+    resolve: @escaping RCTPromiseResolveBlock,
+    reject: @escaping RCTPromiseRejectBlock
+  ) {
+    let request = QuinnQueuedRequest(
+      parsedUrl: parsedUrl,
+      method: method,
+      headers: headers,
+      body: body,
+      resolve: resolve,
+      reject: reject
+    )
+
+    var shouldStart = false
+    connectionLock.lock()
+    quinnRequestQueue[identityId, default: []].append(request)
+    if !quinnHandshakeInProgress.contains(identityId) {
+      quinnHandshakeInProgress.insert(identityId)
+      shouldStart = true
+    }
+    connectionLock.unlock()
+
+    guard shouldStart else { return }
+
+    DispatchQueue.global(qos: .userInitiated).async {
+      let handshakeResult = performUhpHandshakeQuinnFfiWithHandle(
+        host: self.quinnControlPlaneHost,
+        port: self.quinnControlPlanePort,
+        serverName: self.quinnControlPlaneServerName,
+        spkiPin: spkiPin,
+        identityId: identityId,
+        identity: nil,
+        chainId: 0
+      )
+
+      switch handshakeResult {
+      case .failure(let error):
+        self.failQuinnQueue(identityId: identityId, error: error)
+      case .success(let result):
+        do {
+          let macKey = try deriveMacKey(sessionKey: result.session.sessionKey, handshakeHash: result.session.handshakeHash)
+          let session = AuthSession(
+            sessionId: result.session.sessionId,
+            macKey: macKey,
+            sequence: 0,
+            clientDid: result.session.clientDid,
+            serverDid: result.session.peerDid,
+            createdAt: Date(),
+            lastActivity: Date()
+          )
+          let sessionBox = AuthSessionBox(session)
+          self.drainQuinnQueue(identityId: identityId, quinnHandle: result.handle, sessionBox: sessionBox)
+        } catch {
+          uhp_quic_close(result.handle)
+          self.failQuinnQueue(identityId: identityId, error: error)
+        }
+      }
+    }
+  }
+
+  private func drainQuinnQueue(identityId: String, quinnHandle: UInt64, sessionBox: AuthSessionBox) {
+    let nextRequest: QuinnQueuedRequest? = {
+      connectionLock.lock()
+      defer { connectionLock.unlock() }
+      guard var queue = quinnRequestQueue[identityId], !queue.isEmpty else {
+        quinnRequestQueue.removeValue(forKey: identityId)
+        quinnHandshakeInProgress.remove(identityId)
+        return nil
+      }
+      let request = queue.removeFirst()
+      if queue.isEmpty {
+        quinnRequestQueue.removeValue(forKey: identityId)
+      } else {
+        quinnRequestQueue[identityId] = queue
+      }
+      return request
+    }()
+
+    guard let request = nextRequest else {
+      uhp_quic_close(quinnHandle)
+      return
+    }
+
+    let requestBody = request.body?.data(using: .utf8) ?? Data()
+    let zhtpMethod = httpMethodToZhtpMethod(request.method)
+    var currentSession = sessionBox.session
+
+    let requestResult = sendAuthenticatedZhtpRequestViaQuinn(
+      quinnHandle: quinnHandle,
+      session: &currentSession,
+      method: zhtpMethod,
+      path: request.parsedUrl.path,
+      headers: request.headers,
+      body: requestBody,
+      requester: currentSession.clientDid
+    )
+
+    switch requestResult {
+    case .success(let (status, responseBody)):
+      let bodyString = String(data: responseBody, encoding: .utf8) ?? ""
+      let response: [String: Any] = [
+        "status": Int(status),
+        "statusText": status >= 200 && status < 300 ? "OK" : "Error",
+        "headers": [:],
+        "body": bodyString,
+        "ok": status >= 200 && status < 300
+      ]
+      request.resolve(response)
+    case .failure(let error):
+      request.reject("QUIC_ERROR", error.localizedDescription, error)
+    }
+
+    sessionBox.session = currentSession
+    self.drainQuinnQueue(identityId: identityId, quinnHandle: quinnHandle, sessionBox: sessionBox)
+  }
+
+  private func failQuinnQueue(identityId: String, error: Error) {
+    let queued: [QuinnQueuedRequest] = {
+      connectionLock.lock()
+      defer { connectionLock.unlock() }
+      let queue = quinnRequestQueue.removeValue(forKey: identityId) ?? []
+      quinnHandshakeInProgress.remove(identityId)
+      return queue
+    }()
+
+    for request in queued {
+      request.reject("QUIC_ERROR", "UHP handshake failed: \(error.localizedDescription)", error)
+    }
+  }
+
+  private func dataFromHex(_ hex: String) -> Data? {
+    var data = Data()
+    var buffer = ""
+    buffer.reserveCapacity(2)
+
+    for char in hex {
+      buffer.append(char)
+      if buffer.count == 2 {
+        guard let byte = UInt8(buffer, radix: 16) else {
+          return nil
+        }
+        data.append(byte)
+        buffer.removeAll(keepingCapacity: true)
+      }
+    }
+
+    return buffer.isEmpty ? data : nil
   }
 
   private func handleRequestState(

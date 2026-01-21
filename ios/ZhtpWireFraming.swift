@@ -27,6 +27,30 @@ func zhtp_frame_encode(cbor_payload: Data) throws -> Data {
     return framed
 }
 
+/// Encode message with ZHTP wire format:
+/// [magic "ZHTP"] + [version 0x01] + [length: 4 BE] + [CBOR payload]
+func zhtp_wire_encode(cbor_payload: Data) throws -> Data {
+    guard cbor_payload.count <= Int(MAX_MESSAGE_SIZE) else {
+        throw NSError(
+            domain: "ZhtpFraming",
+            code: -1,
+            userInfo: [NSLocalizedDescriptionKey: "Message too large: \(cbor_payload.count) > \(MAX_MESSAGE_SIZE) bytes"]
+        )
+    }
+
+    var wireData = Data()
+    wireData.append(contentsOf: [0x5A, 0x48, 0x54, 0x50]) // "ZHTP"
+    wireData.append(0x01)
+
+    var length = UInt32(cbor_payload.count).bigEndian
+    withUnsafeBytes(of: &length) { buffer in
+        wireData.append(contentsOf: buffer)
+    }
+
+    wireData.append(cbor_payload)
+    return wireData
+}
+
 /// Decode message header: read 4-byte big-endian length
 /// Returns (length_value, remaining_bytes_after_header)
 func zhtp_frame_decode_header(data: Data) throws -> (UInt32, Data) {
