@@ -119,7 +119,7 @@ android/app/src/main/res/drawable-mdpi/node_modules_reactnavigation_elements_lib
 # Rust build artifacts
 android/app/src/main/rust/**/target/
 ios/uhp-ffi/target/
-ios/quinn-ffi/target/
-ios/quinn-ffi/build/
-ios/quinn-ffi/QuinnFFI.xcframework/
+
+# Quinn FFI (Rust QUIC library - precompiled)
+ios/quinn-ffi/
 .env.generated.json
