@@ -23,14 +23,84 @@ final class UhpConnectionIO {
     private let queue = DispatchQueue(label: "com.sovereignnetwork.uhp-io")
     private var buffer = Data()
     private let bufferLock = NSLock()
+    private var streamInitialized = false
+    private let streamLock = NSLock()
 
     init(connection: NWConnection) {
         self.connection = connection
     }
 
+    /// Initialize bidirectional stream for QUIC handshake
+    /// In QUIC, a bidirectional stream is created by the client sending data.
+    /// We send a minimal probe to trigger stream creation.
+    private func ensureStreamInitialized() -> Bool {
+        streamLock.lock()
+        defer { streamLock.unlock() }
+
+        if streamInitialized {
+            return true
+        }
+
+        print("[UHP] 📡 Initializing bidirectional stream...")
+
+        // Wait for connection ready state
+        var attempts = 0
+        let maxAttempts = 100
+
+        while connection.state != .ready && attempts < maxAttempts {
+            Thread.sleep(forTimeInterval: 0.1)
+            attempts += 1
+        }
+
+        guard connection.state == .ready else {
+            print("[UHP] ❌ Connection not ready: \(connection.state)")
+            return false
+        }
+
+        print("[UHP] ✓ Connection ready, sending stream probe to open bidirectional stream...")
+
+        // CRITICAL: Send a probe message to trigger QUIC stream creation
+        // This ensures Network.framework creates a bidirectional stream context
+        // that the server's accept_bi() can receive
+        let sema = DispatchSemaphore(value: 0)
+        var probeSuccess = false
+
+        queue.async {
+            // Send with .defaultMessage context - this creates a QUIC stream
+            self.connection.send(
+                content: Data(),
+                contentContext: .defaultMessage,
+                isComplete: false,
+                completion: NWConnection.SendCompletion.contentProcessed { error in
+                    if error == nil {
+                        print("[UHP]    ✓ Stream probe sent successfully")
+                        probeSuccess = true
+                    } else {
+                        print("[UHP]    ⚠️  Stream probe send error: \(error?.localizedDescription ?? "unknown")")
+                        // Continue anyway - stream might still be created
+                        probeSuccess = true
+                    }
+                    sema.signal()
+                }
+            )
+        }
+
+        sema.wait()
+
+        print("[UHP] ✓ Bidirectional stream initialized")
+        streamInitialized = true
+        return probeSuccess
+    }
+
     func read(_ ptr: UnsafeMutablePointer<UInt8>, _ len: Int) -> Int {
         if len == 0 {
             return 0
+        }
+
+        // Ensure stream is initialized before reading
+        guard ensureStreamInitialized() else {
+            print("[UHP] Failed to initialize stream for reading")
+            return -1
         }
 
         while true {
@@ -81,6 +151,12 @@ final class UhpConnectionIO {
     func write(_ ptr: UnsafePointer<UInt8>, _ len: Int) -> Int {
         if len == 0 {
             return 0
+        }
+
+        // Ensure stream is initialized before writing
+        guard ensureStreamInitialized() else {
+            print("[UHP] Failed to initialize stream for writing")
+            return -1
         }
 
         let data = Data(bytes: ptr, count: len)

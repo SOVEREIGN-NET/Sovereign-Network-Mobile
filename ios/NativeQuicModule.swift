@@ -1,5 +1,6 @@
 import Foundation
 import Network
+import Security
 import React
 
 /**
@@ -183,19 +184,36 @@ class NativeQuic: NSObject {
       }
     }
 
+    print("[NativeQuic] 🔍 QUIC Connection Debug:")
+    print("[NativeQuic]   Host: \(host)")
+    print("[NativeQuic]   Port: \(port)")
+    print("[NativeQuic]   Endpoint: \(endpoint)")
+
+    // Monitor network path changes
+    connection.pathUpdateHandler = { path in
+      print("[NativeQuic] 📡 Path Update:")
+      print("[NativeQuic]    Status: \(path.status)")
+      print("[NativeQuic]    IsExpensive: \(path.isExpensive)")
+      print("[NativeQuic]    IsConstrained: \(path.isConstrained)")
+      print("[NativeQuic]    SupportsIPv4: \(path.supportsIPv4)")
+      print("[NativeQuic]    SupportsIPv6: \(path.supportsIPv6)")
+      print("[NativeQuic]    AvailableInterfaces: \(path.availableInterfaces)")
+    }
+
     connection.stateUpdateHandler = { state in
-      print("[NativeQuic] Connection state: \(state)")
+      print("[NativeQuic] ➡️  State: \(state)")
 
       switch state {
       case .setup:
-        print("[NativeQuic] Connection setup...")
+        print("[NativeQuic]    └─ Preparing connection setup...")
 
       case .preparing:
-        print("[NativeQuic] Connection preparing (TLS handshake)...")
+        print("[NativeQuic]    └─ Starting TLS 1.3 + QUIC handshake...")
+        print("[NativeQuic]       This is where QUIC Initial packets should be sent")
 
       case .ready:
         let latency = Date().timeIntervalSince(startTime) * 1000
-        print("[NativeQuic] Connection READY in \(latency)ms")
+        print("[NativeQuic]    └─ ✅ Connection READY after \(latency)ms")
         safeComplete(success: true, result: [
           "success": true,
           "latencyMs": latency,
@@ -205,21 +223,24 @@ class NativeQuic: NSObject {
         ])
 
       case .waiting(let error):
-        print("[NativeQuic] Connection waiting: \(error.localizedDescription)")
+        print("[NativeQuic]    └─ ⏳ Waiting: \(error.localizedDescription)")
+        print("[NativeQuic]       (Connection temporarily blocked, will retry)")
 
       case .failed(let error):
-        print("[NativeQuic] Connection FAILED: \(error.localizedDescription)")
-        safeComplete(success: false, result: nil, error: "Failed to connect: \(error.localizedDescription)", nativeError: error)
+        print("[NativeQuic]    └─ ❌ FAILED: \(error.localizedDescription)")
+        safeComplete(success: false, result: nil, error: "QUIC handshake failed: \(error.localizedDescription)", nativeError: error)
 
       case .cancelled:
-        print("[NativeQuic] Connection cancelled")
+        print("[NativeQuic]    └─ Connection was cancelled")
 
       @unknown default:
-        print("[NativeQuic] Unknown state")
+        print("[NativeQuic]    └─ Unknown state: \(state)")
       }
     }
 
+    print("[NativeQuic] 🚀 Starting connection on queue: \(self.queue)")
     connection.start(queue: self.queue)
+    print("[NativeQuic] ⏱️  Timeout set to \(defaultTimeout)s - waiting for handshake...")
 
     // Timeout after 30 seconds
     self.queue.asyncAfter(deadline: .now() + defaultTimeout) {
@@ -256,9 +277,26 @@ class NativeQuic: NSObject {
     let profile: QuicAlpnProfile = alpnOption == "public" ? .publicContent : .controlPlane
     print("[NativeQuic] 🔑 ALPN: '\(alpnOption)' -> \(profile == .publicContent ? "zhtp-public/1" : "zhtp-uhp/2")")
 
+    // Determine server name for TLS
+    // TLS SNI requires a hostname, not an IP address
+    var serverNameForTls: String? = headers["Host"]
+
+    // If no explicit Host header, check if parsedUrl.host is a hostname or IP
+    if serverNameForTls == nil {
+      let hostValue = parsedUrl.host
+      // Check if it looks like an IP address (simplified check)
+      let isIPAddress = hostValue.contains(".") && hostValue.allSatisfy { $0.isNumber || $0 == "." }
+      if !isIPAddress {
+        serverNameForTls = hostValue
+      }
+      // If it IS an IP address, leave serverNameForTls as nil (no SNI for IPs)
+    }
+
+    print("[NativeQuic] TLS Server Name for SNI: \(serverNameForTls ?? "(no SNI - IP-based connection)")")
+
     let parameters = createQuicParameters(
       insecure: insecure,
-      serverName: headers["Host"] ?? parsedUrl.host,
+      serverName: serverNameForTls,
       profile: profile
     )
 
@@ -521,46 +559,62 @@ class NativeQuic: NSObject {
     case .controlPlane:
       alpnList = ["zhtp-uhp/2"]
     }
-    print("[NativeQuic] Creating QUIC parameters with ALPNs: \(alpnList)")
+    print("[NativeQuic] 🔧 QUIC Config:")
+    print("[NativeQuic]    ALPN: \(alpnList.joined(separator: ", "))")
 
     let quicOptions = NWProtocolQUIC.Options(alpn: alpnList)
-    quicOptions.idleTimeout = 30_000
+
+    // QUIC idle timeout in milliseconds (60 seconds)
+    quicOptions.idleTimeout = 60_000
+    print("[NativeQuic]    Idle Timeout: 60000ms (60 seconds)")
+
+    // Try to enable multipath quic if available (iOS 16+)
+    if #available(iOS 16.0, *) {
+      quicOptions.maxDatagramFrameSize = 1200
+      print("[NativeQuic]    Max Datagram Size: 1200 bytes")
+    }
 
     // Create parameters with QUIC
     let parameters = NWParameters(quic: quicOptions)
 
+    // Set TLS server name if provided (hostname only, not IP)
     if let serverName = serverName, !serverName.isEmpty {
+      print("[NativeQuic]    TLS SNI: \(serverName)")
       sec_protocol_options_set_tls_server_name(
         quicOptions.securityProtocolOptions,
         serverName
       )
+    } else {
+      print("[NativeQuic]    TLS SNI: disabled (IP-based connection)")
     }
 
-    // Always disable certificate verification for now (self-signed certs / TOFU)
-    print("[NativeQuic] Configuring TLS for self-signed certificates")
+    // Configure TLS for self-signed certificates
+    print("[NativeQuic]    TLS Mode: Self-signed certificates enabled")
 
-    // Set verify block to accept all certs
+    // Set verify block to accept all certs (security is via ZHTP layer, not TLS)
     sec_protocol_options_set_verify_block(
       quicOptions.securityProtocolOptions,
       { (metadata, trust, completion) in
-        print("[NativeQuic] TLS verify callback triggered")
-        // Always accept - security is handled by ZHTP layer
+        print("[NativeQuic]    📋 TLS Verify Block called")
+        print("[NativeQuic]       → Accepting certificate (ZHTP layer handles auth)")
         completion(true)
       },
       self.queue
     )
 
-    // TLS 1.3 required for QUIC
+    // Require TLS 1.3 (mandatory for QUIC)
     sec_protocol_options_set_min_tls_protocol_version(
       quicOptions.securityProtocolOptions,
       .TLSv13
     )
+    print("[NativeQuic]    TLS Version: 1.3+ required")
 
-    // Add challenge block to handle any TLS challenges
+    // Set challenge block for client auth (if needed)
     sec_protocol_options_set_challenge_block(
       quicOptions.securityProtocolOptions,
       { (metadata, completion) in
-        print("[NativeQuic] TLS challenge callback triggered")
+        print("[NativeQuic]    📋 TLS Challenge Block called")
+        print("[NativeQuic]       → No client authentication required")
         completion(nil)
       },
       self.queue
