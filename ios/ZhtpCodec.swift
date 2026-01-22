@@ -37,7 +37,7 @@ func zhtp_encode_request(_ request: ZhtpRequestWire) throws -> Data {
 
     if let authContext = request.auth_context {
         try appendCborString(&cborData, "auth_context")
-        try appendCborStringMap(&cborData, authContext)
+        try appendCborAuthContext(&cborData, authContext)
         print("[ZhtpCodec] After auth_context: \(cborData.count) bytes")
     }
 
@@ -161,6 +161,18 @@ private func appendCborStringMap(_ data: inout Data, _ dict: [String: String]) t
     }
 }
 
+private func appendCborAuthContext(_ data: inout Data, _ ctx: AuthContext) throws {
+    data.append(0xa4)
+    try appendCborString(&data, "session_id")
+    try appendCborByteArray(&data, ctx.session_id)
+    try appendCborString(&data, "client_did")
+    try appendCborString(&data, ctx.client_did)
+    try appendCborString(&data, "sequence")
+    try appendCborUInt(&data, ctx.sequence, majorType: 0)
+    try appendCborString(&data, "request_mac")
+    try appendCborByteArray(&data, ctx.request_mac)
+}
+
 /// Encode ZhtpRequestWire (transport envelope with request)
 func encodeRequestWire(_ wire: ZhtpRequestWire) throws -> Data {
     var data = Data()
@@ -183,7 +195,7 @@ func encodeRequestWire(_ wire: ZhtpRequestWire) throws -> Data {
     // auth_context (null for public requests)
     try appendCborString(&data, "auth_context")
     if let authContext = wire.auth_context {
-        try appendCborStringMap(&data, authContext)
+        try appendCborAuthContext(&data, authContext)
     } else {
         data.append(0xf6) // CBOR null
     }

@@ -205,7 +205,7 @@ struct ZhtpRequestWire: Codable {
     let version: UInt16 // 1
     let request_id: Data // [u8; 16]
     let timestamp_ms: UInt64
-    let auth_context: [String: String]? // null for public mode
+    let auth_context: AuthContext? // null for public mode
     let request: ZhtpRequest
 
     enum CodingKeys: String, CodingKey {
@@ -216,7 +216,7 @@ struct ZhtpRequestWire: Codable {
         case request
     }
 
-    init(version: UInt16, request_id: Data, timestamp_ms: UInt64, auth_context: [String: String]?, request: ZhtpRequest) {
+    init(version: UInt16, request_id: Data, timestamp_ms: UInt64, auth_context: AuthContext?, request: ZhtpRequest) {
         self.version = version
         self.request_id = request_id
         self.timestamp_ms = timestamp_ms
@@ -287,7 +287,7 @@ struct ZhtpRequestWire: Codable {
         request_id = Data(base64Encoded: requestIdStr) ?? Data()
 
         timestamp_ms = try container.decode(UInt64.self, forKey: .timestamp_ms)
-        auth_context = try container.decodeIfPresent([String: String].self, forKey: .auth_context)
+        auth_context = try container.decodeIfPresent(AuthContext.self, forKey: .auth_context)
         request = try container.decode(ZhtpRequest.self, forKey: .request)
     }
 }
