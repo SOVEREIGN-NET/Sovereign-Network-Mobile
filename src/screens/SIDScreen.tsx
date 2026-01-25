@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { View, TouchableOpacity, ScrollView, Alert } from 'react-native';
-import Clipboard from '@react-native-clipboard/clipboard';
+// import Clipboard from '@react-native-clipboard/clipboard';
+import { useFocusEffect } from '@react-navigation/native';
 import {
   Card,
   Text,
@@ -36,7 +37,7 @@ const SIDScreen = ({ navigation }: any) => {
   const { t } = useTranslation();
   const { currentIdentity, isLoading } = useAuth();
   const { api, isInitialized } = useApi();
-  const { wallets, walletByType, totalBalance, loading: walletsLoading } = useWalletList();
+  const { wallets, walletByType, totalBalance, loading: walletsLoading, refresh } = useWalletList();
   const [drawerVisible, setDrawerVisible] = useState(false);
   const [activeWalletTab, setActiveWalletTab] = useState('Tokens');
 
@@ -48,6 +49,12 @@ const SIDScreen = ({ navigation }: any) => {
       wallets: wallets?.map(w => ({ type: w.wallet_type, balance: w.total_balance })),
     });
   }, [wallets, totalBalance, walletsLoading]);
+
+  useFocusEffect(
+    React.useCallback(() => {
+      refresh();
+    }, [refresh])
+  );
 
   // Fetch UBI status and history
   const { data: ubiData } = useAsyncData(
@@ -141,19 +148,19 @@ const SIDScreen = ({ navigation }: any) => {
     return 'unknown';
   };
 
-  const copyToClipboard = (id: any) => {
-    let textToCopy = '';
-    if (Array.isArray(id)) {
-      textToCopy = id.map(byte => byte.toString(16).padStart(2, '0')).join('');
-    } else if (typeof id === 'string') {
-      textToCopy = id;
-    }
-
-    if (textToCopy) {
-      Clipboard.setString(textToCopy);
-      Alert.alert('Copied', 'Wallet ID copied to clipboard');
-    }
-  };
+  // const copyToClipboard = (id: any) => {
+  //   let textToCopy = '';
+  //   if (Array.isArray(id)) {
+  //     textToCopy = id.map(byte => byte.toString(16).padStart(2, '0')).join('');
+  //   } else if (typeof id === 'string') {
+  //     textToCopy = id;
+  //   }
+  //
+  //   if (textToCopy) {
+  //     Clipboard.setString(textToCopy);
+  //     Alert.alert('Copied', 'Wallet ID copied to clipboard');
+  //   }
+  // };
 
   return (
     <View style={{ flex: 1, backgroundColor: colors.bg_darkest }}>

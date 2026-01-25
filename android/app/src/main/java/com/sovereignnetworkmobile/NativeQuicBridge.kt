@@ -7,7 +7,7 @@ import android.util.Log
  * Provides low-level QUIC connectivity with self-signed certificate support
  */
 object NativeQuicBridge {
-    private const val TAG = "NativeQuicBridge"
+    private const val TAG = "[🌐 Web4]"
     private var isInitialized = false
 
     init {
@@ -157,6 +157,117 @@ object NativeQuicBridge {
         }
     }
 
+    /**
+     * Initialize the Quinn UHP layer (installs crypto provider)
+     */
+    fun initUhpQuinn(): Boolean {
+        return try {
+            nativeUhpQuinnInit()
+        } catch (e: Exception) {
+            Log.e(TAG, "Failed to initialize UHP Quinn", e)
+            false
+        }
+    }
+
+    /**
+     * Connect + UHP handshake (returns handle + session info map)
+     */
+    fun uhpQuicConnectAndHandshake(
+        host: String,
+        port: Int,
+        serverName: String,
+        spkiPinHex: String,
+        identityJson: String,
+        dilithiumSk: ByteArray,
+        kyberSk: ByteArray,
+        masterSeed: ByteArray,
+        chainId: Int
+    ): Map<String, Any?>? {
+        ensureInitialized()
+        return try {
+            @Suppress("UNCHECKED_CAST")
+            nativeUhpQuicConnectAndHandshake(
+                host,
+                port,
+                serverName,
+                spkiPinHex,
+                identityJson,
+                dilithiumSk,
+                kyberSk,
+                masterSeed,
+                chainId
+            ) as? Map<String, Any?>
+        } catch (e: Exception) {
+            Log.e(TAG, "UHP handshake failed", e)
+            mapOf("ok" to false, "error" to e.message)
+        }
+    }
+
+    /**
+     * Send framed ZHTP request on an existing handle
+     */
+    fun uhpQuicRequest(handle: Long, requestBytes: ByteArray): Map<String, Any?>? {
+        ensureInitialized()
+        return try {
+            @Suppress("UNCHECKED_CAST")
+            nativeUhpQuicRequest(handle, requestBytes) as? Map<String, Any?>
+        } catch (e: Exception) {
+            Log.e(TAG, "UHP request failed", e)
+            mapOf("ok" to false, "error" to e.message)
+        }
+    }
+
+    /**
+     * Send authenticated ZHTP request using existing UHP session
+     */
+    fun uhpQuicAuthenticatedRequest(
+        handle: Long,
+        method: String,
+        path: String,
+        headersJson: String,
+        body: ByteArray?
+    ): Map<String, Any?>? {
+        ensureInitialized()
+        return try {
+            @Suppress("UNCHECKED_CAST")
+            nativeUhpQuicAuthenticatedRequest(handle, method, path, headersJson, body) as? Map<String, Any?>
+        } catch (e: Exception) {
+            Log.e(TAG, "UHP authenticated request failed", e)
+            mapOf("ok" to false, "error" to e.message)
+        }
+    }
+
+    /**
+     * Send authenticated ZHTP request returning raw bytes
+     */
+    fun uhpQuicAuthenticatedRequestBytes(
+        handle: Long,
+        method: String,
+        path: String,
+        headersJson: String,
+        body: ByteArray?
+    ): Map<String, Any?>? {
+        ensureInitialized()
+        return try {
+            @Suppress("UNCHECKED_CAST")
+            nativeUhpQuicAuthenticatedRequestBytes(handle, method, path, headersJson, body) as? Map<String, Any?>
+        } catch (e: Exception) {
+            Log.e(TAG, "UHP authenticated request (bytes) failed", e)
+            mapOf("ok" to false, "error" to e.message)
+        }
+    }
+
+    /**
+     * Close an existing handle
+     */
+    fun uhpQuicClose(handle: Long) {
+        try {
+            nativeUhpQuicClose(handle)
+        } catch (e: Exception) {
+            Log.e(TAG, "UHP close failed", e)
+        }
+    }
+
     private fun ensureInitialized() {
         if (!isInitialized) {
             init()
@@ -188,4 +299,32 @@ object NativeQuicBridge {
     ): Any?
     private external fun nativeCancelAll(): Boolean
     private external fun nativeShutdown()
+    private external fun nativeUhpQuinnInit(): Boolean
+    private external fun nativeUhpQuicConnectAndHandshake(
+        host: String,
+        port: Int,
+        serverName: String,
+        spkiPinHex: String,
+        identityJson: String,
+        dilithiumSk: ByteArray,
+        kyberSk: ByteArray,
+        masterSeed: ByteArray,
+        chainId: Int
+    ): Any?
+    private external fun nativeUhpQuicRequest(handle: Long, requestBytes: ByteArray): Any?
+    private external fun nativeUhpQuicAuthenticatedRequest(
+        handle: Long,
+        method: String,
+        path: String,
+        headersJson: String,
+        body: ByteArray?
+    ): Any?
+    private external fun nativeUhpQuicAuthenticatedRequestBytes(
+        handle: Long,
+        method: String,
+        path: String,
+        headersJson: String,
+        body: ByteArray?
+    ): Any?
+    private external fun nativeUhpQuicClose(handle: Long)
 }

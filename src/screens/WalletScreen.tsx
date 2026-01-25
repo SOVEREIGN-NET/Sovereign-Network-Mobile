@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { View, TouchableOpacity, ScrollView, Alert } from 'react-native';
-import Clipboard from '@react-native-clipboard/clipboard';
+// import Clipboard from '@react-native-clipboard/clipboard';
 import {
   Card,
   Text, LoadingView,
@@ -80,19 +80,19 @@ const WalletScreen = ({ navigation }: any) => {
     return 'unknown';
   };
 
-  const copyToClipboard = (id: any) => {
-    let textToCopy = '';
-    if (Array.isArray(id)) {
-      textToCopy = id.map(byte => byte.toString(16).padStart(2, '0')).join('');
-    } else if (typeof id === 'string') {
-      textToCopy = id;
-    }
-
-    if (textToCopy) {
-      Clipboard.setString(textToCopy);
-      Alert.alert('Copied', 'Wallet ID copied to clipboard');
-    }
-  };
+  // const copyToClipboard = (id: any) => {
+  //   let textToCopy = '';
+  //   if (Array.isArray(id)) {
+  //     textToCopy = id.map(byte => byte.toString(16).padStart(2, '0')).join('');
+  //   } else if (typeof id === 'string') {
+  //     textToCopy = id;
+  //   }
+  //
+  //   if (textToCopy) {
+  //     Clipboard.setString(textToCopy);
+  //     Alert.alert('Copied', 'Wallet ID copied to clipboard');
+  //   }
+  // };
 
   return (
     <View style={{ flex: 1, backgroundColor: colors.bg_darkest }}>

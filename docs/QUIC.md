@@ -158,6 +158,18 @@ Native QUIC Implementation Plan
     - Fallback to embedded Cronet if Play Services unavailable
     - Need to add QUIC hint for the target host
   3. TLS/Certificate Handling:
+
+  ---
+  Wallet List Response Example
+
+  For identity `d0717dc43ff9a9d7a1fd6407eeee2c9aa30fb8e8e3302c1bb234ca450c0d39a8`,
+  the wallet list response includes three wallets:
+
+  - Primary (`wallet_d0717dc43ff9`): 5000 ZHTP (welcome bonus), can vote
+  - Savings (`savings_d0717dc43ff9`): 0 ZHTP
+  - UBI (`ubi_d0717dc43ff9`): 0 ZHTP
+
+  Total balance across all wallets: 5000 ZHTP.
     - Dev mode: Accept self-signed certificates
     - Prod mode: Strict certificate validation
     - Store cert pins in secure storage

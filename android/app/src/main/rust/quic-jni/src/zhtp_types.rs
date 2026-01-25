@@ -5,6 +5,16 @@
 
 use serde::{Deserialize, Serialize};
 
+/// Authentication context - sent with authenticated ZHTP requests
+/// Field order must match server's CBOR decoding
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct AuthContext {
+    pub session_id: Vec<u8>,  // [u8; 32]
+    pub client_did: String,
+    pub sequence: u64,
+    pub request_mac: Vec<u8>, // [u8; 32]
+}
+
 /// ZHTP HTTP method enum (matches server encoding)
 #[derive(Debug, Clone, Copy, Serialize, Deserialize, PartialEq, Eq)]
 #[serde(rename_all = "PascalCase")]
@@ -90,13 +100,13 @@ pub struct ZhtpRequest {
     pub auth_proof: Option<Vec<u8>>,
 }
 
-/// ZHTP Request Wire - transport envelope (public mode: no auth_context)
+/// ZHTP Request Wire - transport envelope
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct ZhtpRequestWire {
     pub version: u16, // 1
     pub request_id: Vec<u8>, // [u8; 16] - serialize as bytes
     pub timestamp_ms: u64,
-    pub auth_context: Option<serde_json::Value>, // null for public mode
+    pub auth_context: Option<AuthContext>, // null for public mode
     pub request: ZhtpRequest,
 }
 

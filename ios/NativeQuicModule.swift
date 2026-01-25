@@ -548,7 +548,7 @@ class NativeQuic: NSObject {
           let session = AuthSession(
             sessionId: result.session.sessionId,
             macKey: macKey,
-            sequence: 0,
+            sequence: 1,
             clientDid: result.session.clientDid,
             serverDid: result.session.peerDid,
             createdAt: Date(),
@@ -706,7 +706,7 @@ class NativeQuic: NSObject {
             var session = AuthSession(
               sessionId: sessionInfo.sessionId,
               macKey: macKey,
-              sequence: 0,
+              sequence: 1,
               clientDid: sessionInfo.clientDid,
               serverDid: sessionInfo.peerDid,
               createdAt: Date(),

@@ -21,13 +21,19 @@ class NativeQuicModule(reactContext: ReactApplicationContext) :
     ReactContextBaseJavaModule(reactContext) {
 
     companion object {
-        private const val TAG = "NativeQuic"
+        private const val TAG = "[🌐 Web4]"
         private const val DEFAULT_TIMEOUT = 30
         private const val ALPN_PROTOCOL = "zhtp-public/1"
+        private const val QUINN_CONTROL_PLANE_HOST = "77.42.37.161"
+        private const val QUINN_CONTROL_PLANE_PORT = 9334
+        private const val QUINN_CONTROL_PLANE_SERVER_NAME = "zhtp-mesh"
     }
 
     private val executor: Executor = Executors.newCachedThreadPool()
     private var isInitialized = false
+    private val connectionLock = Any()
+    private val quinnRequestQueue: MutableMap<String, MutableList<QuinnQueuedRequest>> = mutableMapOf()
+    private val quinnHandshakeInProgress: MutableSet<String> = mutableSetOf()
 
     override fun getName() = "NativeQuic"
 
@@ -45,7 +51,7 @@ class NativeQuicModule(reactContext: ReactApplicationContext) :
     private fun ensureInitialized(): Boolean {
         if (!isInitialized) {
             isInitialized = NativeQuicBridge.init()
-            Log.d(TAG, "Native QUIC initialized: $isInitialized")
+            Log.d(TAG, "[🌐 Web4] Native QUIC initialized: $isInitialized")
         }
         return isInitialized
     }
@@ -57,10 +63,10 @@ class NativeQuicModule(reactContext: ReactApplicationContext) :
     fun isSupported(promise: Promise) {
         try {
             val supported = NativeQuicBridge.isSupported()
-            Log.d(TAG, "QUIC supported: $supported")
+            Log.d(TAG, "[🌐 Web4] QUIC supported: $supported")
             promise.resolve(supported)
         } catch (e: Exception) {
-            Log.e(TAG, "Error checking QUIC support", e)
+            Log.e(TAG, "[🌐 Web4] Error checking QUIC support", e)
             promise.resolve(false)
         }
     }
@@ -83,10 +89,10 @@ class NativeQuicModule(reactContext: ReactApplicationContext) :
                     result?.get("error")?.let { putString("error", it.toString()) }
                 }
 
-                Log.d(TAG, "UDP reachability: $responseMap")
+                Log.d(TAG, "[🌐 Web4] UDP reachability: $responseMap")
                 promise.resolve(responseMap)
             } catch (e: Exception) {
-                Log.e(TAG, "Reachability check failed", e)
+                Log.e(TAG, "[🌐 Web4] Reachability check failed", e)
                 val errorMap = WritableNativeMap().apply {
                     putBoolean("reachable", false)
                     putString("error", e.message ?: "Unknown error")
@@ -106,7 +112,7 @@ class NativeQuicModule(reactContext: ReactApplicationContext) :
         executor.execute {
             try {
                 ensureInitialized()
-                Log.d(TAG, "Testing QUIC connection to $host:$port")
+                Log.d(TAG, "[🌐 Web4] Testing QUIC connection to $host:$port")
 
                 val result = NativeQuicBridge.testConnection(host, port)
 
@@ -123,13 +129,13 @@ class NativeQuicModule(reactContext: ReactApplicationContext) :
                         putString("host", host)
                         putInt("port", port)
                     }
-                    Log.d(TAG, "Connection test succeeded: $responseMap")
+                    Log.d(TAG, "[🌐 Web4] Connection test succeeded: $responseMap")
                     promise.resolve(responseMap)
                 } else {
                     promise.reject("QUIC_ERROR", error ?: "Connection failed", null)
                 }
             } catch (e: Exception) {
-                Log.e(TAG, "Connection test error", e)
+                Log.e(TAG, "[🌐 Web4] Connection test error", e)
                 promise.reject("QUIC_ERROR", "Failed to test connection: ${e.message}", e)
             }
         }
@@ -168,58 +174,48 @@ class NativeQuicModule(reactContext: ReactApplicationContext) :
                     "{}"
                 }
 
-                Log.d(TAG, "QUIC request: $method $url (ALPN: $alpn)")
+                val alpnMode = alpn ?: "authenticated"
+                Log.d(TAG, "[🌐 Web4] QUIC request: $method $url (ALPN: $alpnMode)")
 
-                val result = NativeQuicBridge.request(
-                    url = url,
-                    method = method ?: "GET",
-                    headersJson = headersJson,
-                    body = body ?: "",
-                    timeoutSecs = timeout,
-                    insecure = insecure,
-                    alpn = alpn ?: "authenticated"
-                )
-
-                val status = (result?.get("status") as? Number)?.toInt() ?: 0
-                val statusText = result?.get("statusText") as? String ?: ""
-                val responseBody = result?.get("body") as? String ?: ""
-                val ok = result?.get("ok") as? Boolean ?: false
-                val error = result?.get("error") as? String
-
-                if (error != null && status == 0) {
-                    promise.reject("QUIC_ERROR", error, null)
+                if (alpnMode == "public") {
+                    val result = NativeQuicBridge.request(
+                        url = url,
+                        method = method ?: "GET",
+                        headersJson = headersJson,
+                        body = body ?: "",
+                        timeoutSecs = timeout,
+                        insecure = insecure,
+                        alpn = alpnMode
+                    )
+                    handleStringResponse(result, promise)
                     return@execute
                 }
 
-                // Parse headers from JSON
-                val headersMap = WritableNativeMap()
-                val responseHeadersJson = result?.get("headersJson") as? String
-                if (!responseHeadersJson.isNullOrEmpty()) {
-                    try {
-                        val jsonHeaders = JSONObject(responseHeadersJson)
-                        val keys = jsonHeaders.keys()
-                        while (keys.hasNext()) {
-                            val key = keys.next()
-                            headersMap.putString(key, jsonHeaders.getString(key))
-                        }
-                    } catch (e: Exception) {
-                        Log.w(TAG, "Failed to parse headers JSON", e)
-                    }
+                val parsedUrl = parseQuicUrl(url)
+                if (parsedUrl == null) {
+                    promise.reject("QUIC_ERROR", "Invalid URL", null)
+                    return@execute
                 }
 
-                val responseMap = WritableNativeMap().apply {
-                    putInt("status", status)
-                    putString("statusText", statusText)
-                    putMap("headers", headersMap)
-                    putString("body", responseBody)
-                    putBoolean("ok", ok)
+                val identityId = extractIdentityId(parsedUrl.path, body, headersJson)
+                if (identityId.isNullOrEmpty()) {
+                    promise.reject("QUIC_ERROR", "Missing identity_id for authenticated request", null)
+                    return@execute
                 }
 
-                Log.d(TAG, "Request completed: status=$status ok=$ok")
-                promise.resolve(responseMap)
+                Log.d(TAG, "[🌐 Web4] Auth request identity_id=$identityId path=${parsedUrl.path}")
+                enqueueAuthenticatedRequest(
+                    identityId = identityId,
+                    parsedUrl = parsedUrl,
+                    method = method ?: "GET",
+                    headersJson = headersJson,
+                    body = body ?: "",
+                    promise = promise
+                )
+                return@execute
 
             } catch (e: Exception) {
-                Log.e(TAG, "Request error", e)
+                Log.e(TAG, "[🌐 Web4] Request error", e)
                 promise.reject("QUIC_ERROR", "Request failed: ${e.message}", e)
             }
         }
@@ -232,11 +228,221 @@ class NativeQuicModule(reactContext: ReactApplicationContext) :
     fun cancelAll(promise: Promise) {
         try {
             val result = NativeQuicBridge.cancelAll()
-            Log.d(TAG, "Cancelled all requests: $result")
+            Log.d(TAG, "[🌐 Web4] Cancelled all requests: $result")
             promise.resolve(result)
         } catch (e: Exception) {
-            Log.e(TAG, "Error cancelling requests", e)
+            Log.e(TAG, "[🌐 Web4] Error cancelling requests", e)
             promise.resolve(false)
+        }
+    }
+
+    private fun enqueueAuthenticatedRequest(
+        identityId: String,
+        parsedUrl: ParsedUrl,
+        method: String,
+        headersJson: String,
+        body: String,
+        promise: Promise
+    ) {
+        val request = QuinnQueuedRequest(
+            parsedUrl = parsedUrl,
+            method = method,
+            headersJson = headersJson,
+            body = body,
+            promise = promise
+        )
+
+        var shouldStart = false
+        synchronized(connectionLock) {
+            val queue = quinnRequestQueue.getOrPut(identityId) { mutableListOf() }
+            queue.add(request)
+            if (!quinnHandshakeInProgress.contains(identityId)) {
+                quinnHandshakeInProgress.add(identityId)
+                shouldStart = true
+            }
+        }
+
+        if (!shouldStart) {
+            return
+        }
+
+        executor.execute {
+            val materials = IdentityStore.loadIdentity(reactApplicationContext, identityId)
+            if (materials == null) {
+                failQuinnQueue(identityId, "Identity materials not found for $identityId")
+                return@execute
+            }
+
+            NativeQuicBridge.initUhpQuinn()
+            val spkiPin = reactApplicationContext.getString(R.string.zhtp_spki_pin_hex)
+            val handshake = NativeQuicBridge.uhpQuicConnectAndHandshake(
+                host = QUINN_CONTROL_PLANE_HOST,
+                port = QUINN_CONTROL_PLANE_PORT,
+                serverName = QUINN_CONTROL_PLANE_SERVER_NAME,
+                spkiPinHex = spkiPin,
+                identityJson = materials.handshakeJson,
+                dilithiumSk = materials.dilithiumSk,
+                kyberSk = materials.kyberSk,
+                masterSeed = materials.masterSeed,
+                chainId = 0
+            )
+
+            val ok = handshake?.get("ok") as? Boolean ?: false
+            if (!ok) {
+                val error = handshake?.get("error") as? String ?: "Handshake failed"
+                failQuinnQueue(identityId, error)
+                return@execute
+            }
+
+            val handle = (handshake?.get("handle") as? Number)?.toLong() ?: 0L
+            Log.d(TAG, "[🌐 Web4] Handshake ok handle=$handle identity_id=$identityId")
+            drainQuinnQueue(identityId, handle)
+        }
+    }
+
+    private fun drainQuinnQueue(identityId: String, handle: Long) {
+        val request = synchronized(connectionLock) {
+            val queue = quinnRequestQueue[identityId]
+            if (queue.isNullOrEmpty()) {
+                quinnRequestQueue.remove(identityId)
+                quinnHandshakeInProgress.remove(identityId)
+                null
+            } else {
+                queue.removeAt(0)
+            }
+        }
+
+        if (request == null) {
+            NativeQuicBridge.uhpQuicClose(handle)
+            return
+        }
+
+        val result = NativeQuicBridge.uhpQuicAuthenticatedRequest(
+            handle = handle,
+            method = request.method,
+            path = request.parsedUrl.path,
+            headersJson = request.headersJson,
+            body = (request.body as String).toByteArray()
+        )
+        handleStringResponse(result, request.promise)
+
+        drainQuinnQueue(identityId, handle)
+    }
+
+    private fun failQuinnQueue(identityId: String, error: String) {
+        val queued = synchronized(connectionLock) {
+            val queue = quinnRequestQueue.remove(identityId) ?: mutableListOf()
+            quinnHandshakeInProgress.remove(identityId)
+            queue.toList()
+        }
+        queued.forEach { req ->
+            req.promise.reject("QUIC_ERROR", error, null)
+        }
+    }
+
+    private fun handleStringResponse(result: Map<String, Any?>?, promise: Promise) {
+        val status = (result?.get("status") as? Number)?.toInt() ?: 0
+        val statusText = result?.get("statusText") as? String ?: ""
+        val responseBody = result?.get("body") as? String ?: ""
+        val ok = result?.get("ok") as? Boolean ?: false
+        val error = result?.get("error") as? String
+
+        if (error != null && status == 0) {
+            promise.reject("QUIC_ERROR", error, null)
+            return
+        }
+
+        val responseMap = WritableNativeMap().apply {
+            putInt("status", status)
+            putString("statusText", statusText)
+            putMap("headers", WritableNativeMap())
+            putString("body", responseBody)
+            putBoolean("ok", ok)
+        }
+
+        if (!ok) {
+            Log.d(TAG, "[🌐 Web4] Response error status=$status body=${responseBody.take(300)}")
+        }
+        promise.resolve(responseMap)
+    }
+
+    private data class ParsedUrl(val host: String, val port: Int, val path: String)
+
+    private data class QuinnQueuedRequest(
+        val parsedUrl: ParsedUrl,
+        val method: String,
+        val headersJson: String,
+        val body: Any,
+        val promise: Promise
+    )
+
+    private fun parseQuicUrl(urlString: String): ParsedUrl? {
+        val normalizedUrl = urlString.replace("quic://", "https://")
+        return try {
+            val uri = java.net.URI(normalizedUrl)
+            val host = uri.host ?: return null
+            val port = if (uri.port == -1) 443 else uri.port
+            var path = uri.path ?: "/"
+            if (path.isEmpty()) path = "/"
+            val query = uri.query
+            if (!query.isNullOrEmpty()) {
+                path += "?$query"
+            }
+            ParsedUrl(host, port, path)
+        } catch (e: Exception) {
+            null
+        }
+    }
+
+    private fun extractIdentityId(path: String, body: String?, headersJson: String): String? {
+        try {
+            val headers = JSONObject(headersJson)
+            val headerValue = headers.optString("X-Zhtp-Identity", headers.optString("x-zhtp-identity"))
+            if (headerValue.isNotEmpty()) {
+                return normalizeIdentityId(headerValue)
+            }
+        } catch (_: Exception) {
+        }
+
+        if (!body.isNullOrEmpty()) {
+            try {
+                val json = JSONObject(body)
+                val identityId = json.optString("identity_id", "")
+                if (identityId.isNotEmpty()) {
+                    return normalizeIdentityId(identityId)
+                }
+            } catch (_: Exception) {
+            }
+        }
+
+        val components = path.split("/").filter { it.isNotEmpty() }
+        if (components.size >= 5 &&
+            components[0] == "api" &&
+            components[1] == "v1" &&
+            components[2] == "wallet" &&
+            components[3] == "list"
+        ) {
+            return normalizeIdentityId(components[4])
+        }
+
+        if (components.size >= 6 &&
+            components[0] == "api" &&
+            components[1] == "v1" &&
+            components[2] == "wallet" &&
+            components[3] == "balance"
+        ) {
+            return normalizeIdentityId(components[5])
+        }
+
+        return null
+    }
+
+    private fun normalizeIdentityId(identityId: String): String {
+        val trimmed = identityId.trim()
+        return if (trimmed.startsWith("did:zhtp:")) {
+            trimmed.removePrefix("did:zhtp:")
+        } else {
+            trimmed
         }
     }
 }

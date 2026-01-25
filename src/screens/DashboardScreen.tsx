@@ -1,5 +1,5 @@
 import React, { useMemo, useState } from 'react';
-import { View, TextInput, Animated, Alert, Pressable } from 'react-native';
+import { View, TextInput, Animated } from 'react-native';
 import { useTrendingTokens, formatTokenPrice, formatChange, TokenData } from '../hooks/useTrendingTokens';
 import { useTrendingDapps, formatUserCount, getActivityColor } from '../hooks/useTrendingDapps';
 import {
@@ -87,64 +87,6 @@ const DashboardScreen: React.FC<any> = ({ navigation }) => {
       console.log('[🌐 Web4] Dashboard: Navigating to URL:', targetUrl);
     }
     navigation.navigate('Browser', { url: targetUrl });
-  };
-
-  const testWalletEndpoint = async () => {
-    try {
-      console.log('\n' + '='.repeat(70));
-      console.log('[🧪 TEST] Testing iOS Wallet Balance Endpoint');
-      console.log('='.repeat(70));
-
-      // Use test identity
-      const testIdentityId = 'd0717dc43ff9a9d7a1fd6407eeee2c9aa30fb8e8e3302c1bb234ca450c0d39a8';
-      const testUrl = `quic://77.42.37.161:9334/api/v1/wallet/list/${testIdentityId}`;
-
-      console.log('[🧪 TEST] Endpoint:', testUrl);
-      console.log('[🧪 TEST] ALPN: authenticated (zhtp-uhp/2)');
-      console.log('[🧪 TEST] Header: X-Zhtp-Identity: did:zhtp:' + testIdentityId);
-
-      const response = await QuicClient.request(testUrl, {
-        method: 'GET',
-        alpn: 'authenticated',
-        headers: {
-          'X-Zhtp-Identity': `did:zhtp:${testIdentityId}`,
-        },
-        timeout: 30,
-      });
-
-      console.log('\n[🧪 TEST] Response Status:', response.status);
-      console.log('[🧪 TEST] Response OK:', response.ok);
-      console.log('[🧪 TEST] Response Headers:', response.headers);
-      console.log('[🧪 TEST] Response Body:', response.body);
-
-      if (response.ok) {
-        try {
-          const data = JSON.parse(response.body);
-          console.log('[🧪 TEST] Parsed JSON:', JSON.stringify(data, null, 2));
-          Alert.alert(
-            '✅ Wallet Endpoint Success',
-            `Status: ${response.status}\n\nTotal Balance: ${data.total_balance}\nWallets: ${data.wallets?.length || 0}`,
-            [{ text: 'OK' }]
-          );
-        } catch (e) {
-          Alert.alert('✅ Success (non-JSON)', `Status: ${response.status}\n${response.body.substring(0, 200)}`);
-        }
-      } else {
-        Alert.alert(
-          '❌ Wallet Endpoint Error',
-          `Status: ${response.status}\n\n${response.body}`,
-          [{ text: 'OK' }]
-        );
-      }
-      console.log('='.repeat(70) + '\n');
-    } catch (error: any) {
-      console.error('[🧪 TEST] Error:', error);
-      Alert.alert(
-        '❌ Test Failed',
-        error.message || 'Failed to call wallet endpoint',
-        [{ text: 'OK' }]
-      );
-    }
   };
 
   const { trendingDapps, trendingTokens, bounties } = t.dashboard;
@@ -403,19 +345,6 @@ const DashboardScreen: React.FC<any> = ({ navigation }) => {
           </Column>
         </Card>
 
-        {/* Dev Test Button - Wallet Endpoint */}
-        {__DEV__ && (
-          <Pressable onPress={testWalletEndpoint}>
-            <Card style={{ backgroundColor: colors.primary + '20', borderWidth: 1, borderColor: colors.primary }}>
-              <Row style={{ justifyContent: 'center', alignItems: 'center', gap: spacing.sm }}>
-                <Text style={{ fontSize: typography.size.xl }}>💰</Text>
-                <Text style={{ fontSize: typography.size.base, fontWeight: typography.weight.semibold, color: colors.primary }}>
-                  Test Wallet Endpoint
-                </Text>
-              </Row>
-            </Card>
-          </Pressable>
-        )}
       </ScreenLayout>
     </>
   );

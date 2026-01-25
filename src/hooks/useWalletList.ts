@@ -105,10 +105,15 @@ export const useWalletList = () => {
       acc[normalizeWalletType(wallet.wallet_type)] = wallet;
       return acc;
     }, {});
+    const totalFromWallets = wallets.reduce((sum, wallet) => sum + (wallet.total_balance ?? 0), 0);
+    const totalBalance =
+      data?.total_balance && data.total_balance > 0
+        ? data.total_balance
+        : totalFromWallets;
 
     return {
       identityId: data?.identity_id ?? identityId ?? null,
-      totalBalance: data?.total_balance ?? 0,
+      totalBalance,
       wallets,
       walletByType,
     };

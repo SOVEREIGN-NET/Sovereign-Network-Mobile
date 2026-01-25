@@ -245,8 +245,10 @@ func sendAuthenticatedZhtpRequestViaQuinn(
             return .failure(NSError(domain: "ZHTP", code: -1, userInfo: [NSLocalizedDescriptionKey: "Empty Quinn response"]))
         }
 
-        let (payload, _) = try zhtp_frame_decode_message(data: responseData)
-        let responseWire = try zhtp_decode_response(payload)
+        print("[ZHTP Auth] Quinn response bytes: \(responseData.count)")
+        let payloadHex = responseData.prefix(16).map({ String(format: "%02x", $0) }).joined(separator: " ")
+        print("[ZHTP Auth] Quinn payload hex[0..16]: \(payloadHex)")
+        let responseWire = try zhtp_decode_response_cbor(responseData)
         guard responseWire.request_id == requestId else {
             return .failure(NSError(domain: "ZHTP", code: -1, userInfo: [NSLocalizedDescriptionKey: "Response request_id mismatch"]))
         }
@@ -366,7 +368,7 @@ private func zhtp_encode_authenticated_request(
     try appendCborByteArray(&data, authContext.request_mac)
 
     try appendCborString(&data, "request")
-    try appendCborMapHeader(&data, count: 7)
+    try appendCborMapHeader(&data, count: 6)
     try appendCborString(&data, "method")
     try appendCborString(&data, method.stringValue)
     try appendCborString(&data, "uri")
@@ -387,9 +389,6 @@ private func zhtp_encode_authenticated_request(
     try appendCborBytes(&data, requestBody)
     try appendCborString(&data, "timestamp")
     try appendCborUInt(&data, timestamp)
-    try appendCborString(&data, "requester")
-    try appendCborString(&data, requester)
-
     return data
 }
 

@@ -6,7 +6,7 @@
 
 import React, { useState, useEffect } from 'react';
 import { View, ScrollView, Pressable, Alert } from 'react-native';
-import Clipboard from '@react-native-clipboard/clipboard';
+// import Clipboard from '@react-native-clipboard/clipboard';
 import { NativeStackScreenProps } from '@react-navigation/native-stack';
 import {
   Card,
@@ -117,18 +117,18 @@ const SeedPhraseScreen = ({ navigation, route }: SeedPhraseScreenProps) => {
     );
   }
 
-  const handleCopy = async () => {
-    try {
-      const phraseText = seedPhrases.join(' ');
-      Clipboard.setString(phraseText);
-      setCopied(true);
-      Alert.alert('Copied', 'Seed phrase copied to clipboard');
-      setTimeout(() => setCopied(false), 2000);
-    } catch (err) {
-      console.error('Failed to copy:', err);
-      Alert.alert('Error', 'Failed to copy to clipboard');
-    }
-  };
+  // const handleCopy = async () => {
+  //   try {
+  //     const phraseText = seedPhrases.join(' ');
+  //     Clipboard.setString(phraseText);
+  //     setCopied(true);
+  //     Alert.alert('Copied', 'Seed phrase copied to clipboard');
+  //     setTimeout(() => setCopied(false), 2000);
+  //   } catch (err) {
+  //     console.error('Failed to copy:', err);
+  //     Alert.alert('Error', 'Failed to copy to clipboard');
+  //   }
+  // };
 
   const handleSecureSave = async () => {
     if (!seedPhrases?.length || !isSecureStorageSupported) {
@@ -363,9 +363,9 @@ const SeedPhraseScreen = ({ navigation, route }: SeedPhraseScreenProps) => {
                     </Column>
                   </Row>
 
-                  {/* Copy Button */}
+                  {/* Copy Button - DISABLED */}
                   <Pressable
-                    onPress={handleCopy}
+                    onPress={() => {}}
                     style={{
                       marginTop: spacing.md,
                       paddingVertical: spacing.sm,

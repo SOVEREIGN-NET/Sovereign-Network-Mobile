@@ -29,6 +29,20 @@ TARGETS=(
 
 echo "Building quic-jni for Android using NDK at: $NDK_HOME"
 
+if [ -n "$ANDROID_ABIS" ]; then
+    IFS=',' read -r -a ABI_LIST <<< "$ANDROID_ABIS"
+    FILTERED_TARGETS=()
+    for target_info in "${TARGETS[@]}"; do
+        IFS=':' read -r rust_target android_abi clang_prefix api_level <<< "$target_info"
+        for abi in "${ABI_LIST[@]}"; do
+            if [ "$android_abi" = "$abi" ]; then
+                FILTERED_TARGETS+=("$target_info")
+            fi
+        done
+    done
+    TARGETS=("${FILTERED_TARGETS[@]}")
+fi
+
 for target_info in "${TARGETS[@]}"; do
     IFS=':' read -r rust_target android_abi clang_prefix api_level <<< "$target_info"
 

@@ -2,13 +2,10 @@
 //!
 //! Sends authenticated requests with UHP handshake and session management
 
-use crate::zhtp_types::{ZhtpMethod, ZhtpRequestWire, ZhtpRequest, ZhtpHeaders};
+use crate::zhtp_types::{ZhtpMethod, ZhtpRequestWire, ZhtpRequest, ZhtpHeaders, AuthContext};
 use crate::zhtp_codec::{encode_request, decode_response};
 use crate::zhtp_framing::{frame_encode, frame_decode_message};
-use crate::zhtp_auth::{
-    AuthSession, AuthContext, compute_canonical_request_hash, compute_request_mac,
-    build_auth_context,
-};
+use crate::zhtp_auth::{build_auth_context, AuthSession};
 use quinn::Connection;
 use anyhow::{anyhow, Result};
 use std::collections::HashMap;
@@ -75,13 +72,10 @@ pub async fn send_authenticated_zhtp_request(
     };
 
     // Compute canonical request hash
-    let canonical_hash =
-        compute_canonical_request_hash(&request_id, timestamp_ms, method, path, &request_headers, &request_body);
-
-    // Build auth context
-    let auth_context = build_auth_context(session, &canonical_hash)?;
+    // Build auth context (HMAC-SHA3 over canonical bytes)
+    let auth_context = build_auth_context(session, method, path, &request_body)?;
     log::info!(
-        "[ZHTP Auth] Sequence: {}, MAC computed",
+        "[🌐 Web4] [ZHTP Auth] Sequence: {}, MAC computed",
         auth_context.sequence
     );
 
@@ -100,24 +94,31 @@ pub async fn send_authenticated_zhtp_request(
         auth_proof: None, // Can be filled in with zero-knowledge proofs if needed
     };
 
-    // Build ZhtpRequestWire with auth_context
+    // Build ZhtpRequestWire with auth_context (converted from internal AuthContext)
+    let auth_context_wire = AuthContext {
+        session_id: auth_context.session_id.clone(),
+        client_did: auth_context.client_did.clone(),
+        sequence: auth_context.sequence,
+        request_mac: auth_context.request_mac.clone(),
+    };
+
     let request_wire = ZhtpRequestWire {
         version: 1,
         request_id: request_id.to_vec(),
         timestamp_ms,
-        auth_context: Some(serde_json::to_value(auth_context)?),
+        auth_context: Some(auth_context_wire),
         request: zhtp_request,
     };
 
-    log::info!("[ZHTP Auth] Sending authenticated {} {}", method_str, path);
+    log::info!("[🌐 Web4] [ZHTP Auth] Sending authenticated {} {}", method_str, path);
 
     // Encode to CBOR
     let cbor_data = encode_request(&request_wire)?;
-    log::info!("[ZHTP Auth] CBOR encoded: {} bytes", cbor_data.len());
+    log::info!("[🌐 Web4] [ZHTP Auth] CBOR encoded: {} bytes", cbor_data.len());
 
     // Frame it (add 4-byte length prefix)
     let framed_data = frame_encode(&cbor_data)?;
-    log::info!("[ZHTP Auth] Framed: {} bytes", framed_data.len());
+    log::info!("[🌐 Web4] [ZHTP Auth] Framed: {} bytes", framed_data.len());
 
     // Open bidirectional stream
     let (mut send, mut recv) = connection.open_bi().await?;
@@ -125,19 +126,19 @@ pub async fn send_authenticated_zhtp_request(
     // Send framed request
     send.write_all(&framed_data).await?;
     send.finish()?;
-    log::info!("[ZHTP Auth] Authenticated request sent");
+    log::info!("[🌐 Web4] [ZHTP Auth] Authenticated request sent");
 
     // Receive response
     let response_data = recv.read_to_end(16 * 1024 * 1024).await?; // 16MB max
-    log::info!("[ZHTP Auth] Received {} bytes", response_data.len());
+    log::info!("[🌐 Web4] [ZHTP Auth] Received {} bytes", response_data.len());
 
     // Unframe response
     let (payload, _) = frame_decode_message(&response_data)?;
-    log::info!("[ZHTP Auth] Unframed: {} bytes", payload.len());
+    log::info!("[🌐 Web4] [ZHTP Auth] Unframed: {} bytes", payload.len());
 
     // Decode CBOR to ZhtpResponseWire
     let response = decode_response(&payload)?;
-    log::info!("[ZHTP Auth] Response status: {}", response.status);
+    log::info!("[🌐 Web4] [ZHTP Auth] Response status: {}", response.status);
 
     // Verify response request_id matches
     if response.request_id != request_id {

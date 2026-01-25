@@ -282,45 +282,69 @@ private func encodeHeaders(_ headers: ZhtpHeaders) throws -> Data {
 /// Handles SDK wire format (4-byte length prefix + CBOR)
 /// Falls back to decoding just ZhtpResponse if wire wrapper is not present
 func zhtp_decode_response(_ cbor_bytes: Data) throws -> ZhtpResponseWire {
-    // Step 1: Handle ZHTP wire format: [magic: 4] + [version: 1] + [length: 4 BE] + [body]
-    var actualCbor = cbor_bytes
+    return try zhtp_decode_response_internal(cbor_bytes, allowWireDetection: true)
+}
 
-    // Check for ZHTP magic bytes: 0x5A485450 = "ZHTP"
-    if cbor_bytes.count >= 9 && cbor_bytes[0] == 0x5A && cbor_bytes[1] == 0x48 &&
-       cbor_bytes[2] == 0x54 && cbor_bytes[3] == 0x50 {
-        // Skip magic (4 bytes) and version (1 byte)
-        let version = cbor_bytes[4]
-
-        // Read length (4 bytes, big-endian) from offset 5
-        let lengthBytes = cbor_bytes.subdata(in: 5..<9)
-        let length = lengthBytes.withUnsafeBytes { buffer -> UInt32 in
-            let bytes = buffer.load(fromByteOffset: 0, as: UInt32.self)
-            return UInt32(bigEndian: bytes)
-        }
-
-        // Extract payload (should start at offset 9)
-        let payloadStart = 9
-        if payloadStart + Int(length) <= cbor_bytes.count {
-            actualCbor = cbor_bytes.subdata(in: payloadStart..<(payloadStart + Int(length)))
-            print("[ZhtpCodec] Detected ZHTP wire format: version \(version), length \(length) bytes")
-
-            // Log payload hex for debugging
-            let payloadHex = actualCbor.prefix(128).map({ String(format: "%02x", $0) }).joined(separator: " ")
-            print("[ZhtpCodec] ZHTP payload hex (first 128 bytes): \(payloadHex)")
-        } else {
-            print("[ZhtpCodec] ZHTP header present but invalid length or truncated payload")
-            throw NSError(domain: "ZhtpCodec", code: -1, userInfo: [NSLocalizedDescriptionKey: "Truncated ZHTP response"])
-        }
-    } else if cbor_bytes.count > 4 {
-        // Fallback: try frame format (4-byte length prefix + CBOR) for compatibility
+/// Decode CBOR payload that has already been unframed.
+func zhtp_decode_response_cbor(_ cbor_bytes: Data) throws -> ZhtpResponseWire {
+    var actual = cbor_bytes
+    if cbor_bytes.count > 4 {
         let potentialLength = cbor_bytes.withUnsafeBytes { buffer -> UInt32 in
             let bytes = buffer.load(fromByteOffset: 0, as: UInt32.self)
             return UInt32(bigEndian: bytes)
         }
-
         if potentialLength == cbor_bytes.count - 4 && potentialLength > 0 {
-            actualCbor = cbor_bytes.subdata(in: 4..<cbor_bytes.count)
+            actual = cbor_bytes.subdata(in: 4..<cbor_bytes.count)
             print("[ZhtpCodec] Detected frame format (4-byte length prefix): \(potentialLength) bytes")
+        }
+    }
+    let prefixHex = actual.prefix(16).map({ String(format: "%02x", $0) }).joined(separator: " ")
+    print("[ZhtpCodec] Response CBOR bytes: \(actual.count), hex[0..16]: \(prefixHex)")
+    return try zhtp_decode_response_internal(actual, allowWireDetection: false)
+}
+
+private func zhtp_decode_response_internal(_ cbor_bytes: Data, allowWireDetection: Bool) throws -> ZhtpResponseWire {
+    // Step 1: Handle ZHTP wire format: [magic: 4] + [version: 1] + [length: 4 BE] + [body]
+    var actualCbor = cbor_bytes
+
+    if allowWireDetection {
+        // Check for ZHTP magic bytes: 0x5A485450 = "ZHTP"
+        if cbor_bytes.count >= 9 && cbor_bytes[0] == 0x5A && cbor_bytes[1] == 0x48 &&
+           cbor_bytes[2] == 0x54 && cbor_bytes[3] == 0x50 {
+            // Skip magic (4 bytes) and version (1 byte)
+            let version = cbor_bytes[4]
+
+            // Read length (4 bytes, big-endian) from offset 5
+            let lengthBytes = cbor_bytes.subdata(in: 5..<9)
+            let length = lengthBytes.withUnsafeBytes { buffer -> UInt32 in
+                let bytes = buffer.load(fromByteOffset: 0, as: UInt32.self)
+                return UInt32(bigEndian: bytes)
+            }
+
+            // Extract payload (should start at offset 9)
+            let payloadStart = 9
+            if payloadStart + Int(length) <= cbor_bytes.count {
+                actualCbor = cbor_bytes.subdata(in: payloadStart..<(payloadStart + Int(length)))
+                print("[ZhtpCodec] Detected ZHTP wire format: version \(version), length \(length) bytes")
+
+                // Log payload hex for debugging
+                let payloadHex = actualCbor.prefix(128).map({ String(format: "%02x", $0) }).joined(separator: " ")
+                print("[ZhtpCodec] ZHTP payload hex (first 128 bytes): \(payloadHex)")
+            } else {
+                print("[ZhtpCodec] ZHTP header present but invalid length or truncated payload")
+                throw NSError(domain: "ZhtpCodec", code: -1, userInfo: [NSLocalizedDescriptionKey: "Truncated ZHTP response"])
+            }
+        } else if cbor_bytes.count > 4 {
+            // Fallback: try frame format (4-byte length prefix + CBOR) for compatibility
+            let potentialLength = cbor_bytes.withUnsafeBytes { buffer -> UInt32 in
+                let bytes = buffer.load(fromByteOffset: 0, as: UInt32.self)
+                return UInt32(bigEndian: bytes)
+            }
+
+            if potentialLength == cbor_bytes.count - 4 && potentialLength > 0 {
+                actualCbor = cbor_bytes.subdata(in: 4..<cbor_bytes.count)
+                print("[ZhtpCodec] Detected frame format (4-byte length prefix): \(potentialLength) bytes")
+            }
         }
     }
 
@@ -424,10 +448,12 @@ func zhtp_decode_response(_ cbor_bytes: Data) throws -> ZhtpResponseWire {
         throw NSError(domain: "ZhtpCodec", code: -1, userInfo: [NSLocalizedDescriptionKey: "Response is not a dictionary"])
     }
 
-    // Extract required fields
-    let version = dict["version"] as? String ?? "1.0"
-    let statusMessage = dict["status_message"] as? String ?? ""
-    let timestamp = dict["timestamp"] as? UInt64 ?? UInt64(Date().timeIntervalSince1970)
+    let responseDict = dict["response"] as? [String: Any] ?? dict
+
+    // Extract required fields from nested response
+    let version = responseDict["version"] as? String ?? "1.0"
+    let statusMessage = responseDict["status_message"] as? String ?? ""
+    let timestamp = responseDict["timestamp"] as? UInt64 ?? UInt64(Date().timeIntervalSince1970)
 
     // Extract status (can be "Ok", "NotFound", etc. or numeric)
     var statusCode: UInt16 = 200
@@ -449,13 +475,13 @@ func zhtp_decode_response(_ cbor_bytes: Data) throws -> ZhtpResponseWire {
 
     // Extract body as Data
     var bodyData = Data()
-    if let bodyArray = dict["body"] as? [Any] {
+    if let bodyArray = responseDict["body"] as? [Any] {
         for item in bodyArray {
             if let num = item as? NSNumber {
                 bodyData.append(UInt8(truncatingIfNeeded: num.uint64Value))
             }
         }
-    } else if let bodyStr = dict["body"] as? String {
+    } else if let bodyStr = responseDict["body"] as? String {
         bodyData = Data(bodyStr.utf8)
     }
 
@@ -466,7 +492,7 @@ func zhtp_decode_response(_ cbor_bytes: Data) throws -> ZhtpResponseWire {
         dao_fee: 0,
         total_fees: 0
     )
-    if let headersDict = dict["headers"] as? [String: Any] {
+    if let headersDict = responseDict["headers"] as? [String: Any] {
         if let contentType = headersDict["content_type"] as? String {
             headers = ZhtpHeaders(
                 content_type: contentType,
@@ -579,6 +605,9 @@ private func decodeCborAt(_ data: Data, _ offset: inout Int) throws -> Any {
     case 2, 3: // Byte string or text string
         let lengthValue = try decodeCborUInt(additionalInfo, data, &offset) as! UInt64
         let length = Int(lengthValue)
+        guard length >= 0, offset + length <= data.count else {
+            throw NSError(domain: "ZhtpCodec", code: 5, userInfo: [NSLocalizedDescriptionKey: "CBOR string length out of bounds"])
+        }
         let stringData = data.subdata(in: offset..<offset + length)
         offset += length
         if majorType == 2 {
@@ -614,6 +643,9 @@ private func decodeCborAt(_ data: Data, _ offset: inout Int) throws -> Any {
         } else if additionalInfo == 22 {
             return true
         } else if additionalInfo == 27 {
+            guard offset + 8 <= data.count else {
+                throw NSError(domain: "ZhtpCodec", code: 6, userInfo: [NSLocalizedDescriptionKey: "CBOR float length out of bounds"])
+            }
             let doubleData = data.subdata(in: offset..<offset + 8)
             offset += 8
             var doubleValue: Double = 0

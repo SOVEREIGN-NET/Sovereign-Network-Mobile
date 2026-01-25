@@ -24,7 +24,8 @@ mod zhtp_request;
 mod zhtp_auth;
 mod zhtp_auth_request;
 use zhtp_request::send_zhtp_request;
-use zhtp_auth_request::send_authenticated_zhtp_request;
+mod identity_bridge;
+mod uhp_quinn;
 
 // Global state for the QUIC client
 static mut RUNTIME: Option<Runtime> = None;
@@ -40,17 +41,20 @@ pub extern "system" fn Java_com_sovereignnetworkmobile_NativeQuicBridge_nativeIn
     android_logger::init_once(
         android_logger::Config::default()
             .with_max_level(log::LevelFilter::Debug)
-            .with_tag("NativeQuicRust"),
+            .with_tag("[🌐 Web4]"),
     );
 
-    log::info!("Initializing Quinn QUIC native library");
+    log::info!(
+        "[🌐 Web4] Initializing Quinn QUIC native library (quic-jni {})",
+        env!("CARGO_PKG_VERSION")
+    );
 
     unsafe {
         // Create tokio runtime
         match Runtime::new() {
             Ok(rt) => {
                 RUNTIME = Some(rt);
-                log::info!("Tokio runtime initialized");
+                log::info!("[🌐 Web4] Tokio runtime initialized");
             }
             Err(e) => {
                 log::error!("Failed to create runtime: {}", e);
@@ -60,9 +64,19 @@ pub extern "system" fn Java_com_sovereignnetworkmobile_NativeQuicBridge_nativeIn
 
         // Create QUIC client
         CLIENT = Some(Arc::new(Mutex::new(QuicClient::new())));
-        log::info!("QUIC client initialized");
+        log::info!("[🌐 Web4] QUIC client initialized");
     }
 
+    JNI_TRUE
+}
+
+/// Initialize the UHP Quinn layer (installs crypto provider)
+#[no_mangle]
+pub extern "system" fn Java_com_sovereignnetworkmobile_NativeQuicBridge_nativeUhpQuinnInit(
+    _env: JNIEnv,
+    _class: JClass,
+) -> jboolean {
+    uhp_quinn::uhp_quinn_init();
     JNI_TRUE
 }
 
@@ -91,13 +105,13 @@ pub extern "system" fn Java_com_sovereignnetworkmobile_NativeQuicBridge_nativeCh
         }
     };
 
-    log::info!("Checking reachability to {}:{}", host_str, port);
+    log::info!("[🌐 Web4] Checking reachability to {}:{}", host_str, port);
 
     let result = unsafe {
         if let Some(ref rt) = RUNTIME {
             rt.block_on(async { quic_client::check_udp_reachability(&host_str, port as u16).await })
         } else {
-            Err("Runtime not initialized".into())
+            Err(anyhow::anyhow!("Runtime not initialized"))
         }
     };
 
@@ -120,7 +134,7 @@ pub extern "system" fn Java_com_sovereignnetworkmobile_NativeQuicBridge_nativeTe
         }
     };
 
-    log::info!("Testing QUIC connection to {}:{}", host_str, port);
+    log::info!("[🌐 Web4] Testing QUIC connection to {}:{}", host_str, port);
 
     let result = unsafe {
         if let (Some(ref rt), Some(ref client)) = (&RUNTIME, &CLIENT) {
@@ -129,7 +143,7 @@ pub extern "system" fn Java_com_sovereignnetworkmobile_NativeQuicBridge_nativeTe
                 client.test_connection(&host_str, port as u16).await
             })
         } else {
-            Err("Runtime or client not initialized".into())
+            Err(anyhow::anyhow!("Runtime or client not initialized"))
         }
     };
 
@@ -188,24 +202,18 @@ pub extern "system" fn Java_com_sovereignnetworkmobile_NativeQuicBridge_nativeRe
     };
 
     log::info!(
-        "QUIC request: {} {} (insecure={}, alpn={})",
+        "[🌐 Web4] QUIC request: {} {} (insecure={}, alpn={})",
         method_str,
         url_str,
         insecure_bool,
         alpn_str
     );
 
-    let result = unsafe {
+    let result: Result<(u16, Vec<u8>), anyhow::Error> = unsafe {
         if let Some(ref rt) = RUNTIME {
             rt.block_on(async {
-                // Create QUIC connection and send ZHTP request
-                use std::net::SocketAddr;
-                let addr: SocketAddr = match format!("localhost:443").parse() {
-                    Ok(a) => a,
-                    Err(e) => return Err(format!("Invalid address: {}", e).into()),
-                };
-
                 // Parse URL to get host and port
+                use std::net::SocketAddr;
                 use crate::quic_client::parse_quic_url;
                 let (host, port, path) = parse_quic_url(&url_str)?;
                 let addr: SocketAddr = format!("{}:{}", host, port).parse()?;
@@ -224,12 +232,18 @@ pub extern "system" fn Java_com_sovereignnetworkmobile_NativeQuicBridge_nativeRe
                     endpoint.connect(addr, &host)?.into_future(),
                 )
                     .await
-                    .map_err(|_| "Connection timeout")??;
+                    .map_err(|_| anyhow::anyhow!("Connection timeout"))??;
 
                 // Send ZHTP request (select handler based on ALPN mode)
                 let (status, body) = match alpn_str.as_str() {
-                    "public" => send_zhtp_request(&connection, &method_str, &path, headers, body_str.map(|s| s.into_bytes())).await?,
-                    _ => send_authenticated_zhtp_request(&connection, &method_str, &path, headers, body_str.map(|s| s.into_bytes())).await?,
+                    "public" => {
+                        send_zhtp_request(&connection, &method_str, &path, headers, body_str.map(|s| s.into_bytes())).await?
+                    }
+                    _ => {
+                        return Err(anyhow::anyhow!(
+                            "Authenticated mode requires UHP handshake (not wired in JNI request path)"
+                        ));
+                    }
                 };
 
                 connection.close(0u32.into(), b"done");
@@ -238,11 +252,165 @@ pub extern "system" fn Java_com_sovereignnetworkmobile_NativeQuicBridge_nativeRe
                 Ok((status, body))
             })
         } else {
-            Err("Runtime not initialized".into())
+            Err(anyhow::anyhow!("Runtime not initialized"))
         }
     };
 
     // Convert result to response map
+    let response_result: Result<(i32, &str, String, bool), anyhow::Error> = result
+        .map(|(status, body)| {
+            (
+                status as i32,
+                "",
+                String::from_utf8_lossy(&body).to_string(),
+                true,
+            )
+        });
+
+    create_zhtp_response_map(&mut env, response_result)
+}
+
+/// Perform QUIC connect + UHP handshake (Quinn FFI) and return session info + handle
+#[no_mangle]
+pub extern "system" fn Java_com_sovereignnetworkmobile_NativeQuicBridge_nativeUhpQuicConnectAndHandshake<'local>(
+    mut env: JNIEnv<'local>,
+    _class: JClass<'local>,
+    host: JString<'local>,
+    port: jint,
+    server_name: JString<'local>,
+    spki_pin_hex: JString<'local>,
+    identity_json: JString<'local>,
+    dilithium_sk: JByteArray<'local>,
+    kyber_sk: JByteArray<'local>,
+    master_seed: JByteArray<'local>,
+    chain_id: jint,
+) -> jobject {
+    let host_str: String = match env.get_string(&host) {
+        Ok(s) => s.into(),
+        Err(e) => {
+            log::error!("Failed to get host string: {}", e);
+            return std::ptr::null_mut();
+        }
+    };
+
+    let server_name_str: String = match env.get_string(&server_name) {
+        Ok(s) => s.into(),
+        Err(e) => {
+            log::error!("Failed to get server name string: {}", e);
+            return std::ptr::null_mut();
+        }
+    };
+
+    let spki_hex: String = match env.get_string(&spki_pin_hex) {
+        Ok(s) => s.into(),
+        Err(e) => {
+            log::error!("Failed to get SPKI pin string: {}", e);
+            return std::ptr::null_mut();
+        }
+    };
+
+    let identity_json_str: String = match env.get_string(&identity_json) {
+        Ok(s) => s.into(),
+        Err(e) => {
+            log::error!("Failed to get identity JSON string: {}", e);
+            return std::ptr::null_mut();
+        }
+    };
+
+    let dilithium_sk_vec = env.convert_byte_array(&dilithium_sk).unwrap_or_default();
+    let kyber_sk_vec = env.convert_byte_array(&kyber_sk).unwrap_or_default();
+    let master_seed_vec = env.convert_byte_array(&master_seed).unwrap_or_default();
+
+    let spki_bytes = match hex::decode(&spki_hex) {
+        Ok(bytes) => bytes,
+        Err(e) => {
+            return create_error_map(&mut env, format!("Invalid SPKI pin hex: {}", e));
+        }
+    };
+    if spki_bytes.len() != 32 {
+        return create_error_map(&mut env, "SPKI pin must be 32 bytes".to_string());
+    }
+
+    let mut spki_pin = [0u8; 32];
+    spki_pin.copy_from_slice(&spki_bytes);
+
+    let key_bytes = uhp_quinn::UhpPrivateKeyBytes {
+        dilithium_sk: dilithium_sk_vec,
+        kyber_sk: kyber_sk_vec,
+        master_seed: master_seed_vec,
+    };
+
+    let result = uhp_quinn::quic_connect_and_handshake(
+        &host_str,
+        port as u16,
+        &server_name_str,
+        spki_pin,
+        &identity_json_str,
+        key_bytes,
+        chain_id as u8,
+    );
+
+    create_handshake_result_map(&mut env, result)
+}
+
+/// Send framed ZHTP request on an existing Quinn handle
+#[no_mangle]
+pub extern "system" fn Java_com_sovereignnetworkmobile_NativeQuicBridge_nativeUhpQuicRequest<'local>(
+    mut env: JNIEnv<'local>,
+    _class: JClass<'local>,
+    handle: jni::sys::jlong,
+    request_bytes: JByteArray<'local>,
+) -> jobject {
+    let request = match env.convert_byte_array(&request_bytes) {
+        Ok(bytes) => bytes,
+        Err(_) => Vec::new(),
+    };
+
+    if request.is_empty() {
+        return create_error_map(&mut env, "Request bytes are empty".to_string());
+    }
+
+    let result = uhp_quinn::quic_request(handle as u64, &request);
+    create_quinn_bytes_map(&mut env, result)
+}
+
+/// Send authenticated ZHTP request using stored UHP session
+#[no_mangle]
+pub extern "system" fn Java_com_sovereignnetworkmobile_NativeQuicBridge_nativeUhpQuicAuthenticatedRequest<'local>(
+    mut env: JNIEnv<'local>,
+    _class: JClass<'local>,
+    handle: jni::sys::jlong,
+    method: JString<'local>,
+    path: JString<'local>,
+    headers_json: JString<'local>,
+    body: JByteArray<'local>,
+) -> jobject {
+    let method_str: String = match env.get_string(&method) {
+        Ok(s) => s.into(),
+        Err(_) => "GET".to_string(),
+    };
+    let path_str: String = match env.get_string(&path) {
+        Ok(s) => s.into(),
+        Err(_) => "/".to_string(),
+    };
+    let headers_str: String = match env.get_string(&headers_json) {
+        Ok(s) => s.into(),
+        Err(_) => "{}".to_string(),
+    };
+    let headers: HashMap<String, String> = serde_json::from_str(&headers_str).unwrap_or_default();
+    let body_vec: Option<Vec<u8>> = match env.convert_byte_array(&body) {
+        Ok(bytes) => if bytes.is_empty() { None } else { Some(bytes) },
+        Err(_) => None,
+    };
+
+    let result = uhp_quinn::quic_authenticated_request(
+        handle as u64,
+        &method_str,
+        &path_str,
+        headers,
+        body_vec,
+    );
+
     let response_result = result.map(|(status, body)| {
         (
             status as i32,
@@ -251,8 +419,100 @@ pub extern "system" fn Java_com_sovereignnetworkmobile_NativeQuicBridge_nativeRe
             true,
         )
     });
-
     create_zhtp_response_map(&mut env, response_result)
+}
+
+/// Send authenticated ZHTP request returning raw bytes
+#[no_mangle]
+pub extern "system" fn Java_com_sovereignnetworkmobile_NativeQuicBridge_nativeUhpQuicAuthenticatedRequestBytes<'local>(
+    mut env: JNIEnv<'local>,
+    _class: JClass<'local>,
+    handle: jni::sys::jlong,
+    method: JString<'local>,
+    path: JString<'local>,
+    headers_json: JString<'local>,
+    body: JByteArray<'local>,
+) -> jobject {
+    let method_str: String = match env.get_string(&method) {
+        Ok(s) => s.into(),
+        Err(_) => "GET".to_string(),
+    };
+    let path_str: String = match env.get_string(&path) {
+        Ok(s) => s.into(),
+        Err(_) => "/".to_string(),
+    };
+    let headers_str: String = match env.get_string(&headers_json) {
+        Ok(s) => s.into(),
+        Err(_) => "{}".to_string(),
+    };
+    let headers: HashMap<String, String> = serde_json::from_str(&headers_str).unwrap_or_default();
+    let body_vec: Option<Vec<u8>> = match env.convert_byte_array(&body) {
+        Ok(bytes) => if bytes.is_empty() { None } else { Some(bytes) },
+        Err(_) => None,
+    };
+
+    let result = uhp_quinn::quic_authenticated_request(
+        handle as u64,
+        &method_str,
+        &path_str,
+        headers,
+        body_vec,
+    );
+
+    let bytes_result: Result<(i32, &str, Vec<u8>, bool), anyhow::Error> =
+        result.map(|(status, body)| (status as i32, "", body, true));
+    create_zhtp_bytes_response_map(&mut env, bytes_result)
+}
+
+/// Close an existing Quinn handle
+#[no_mangle]
+pub extern "system" fn Java_com_sovereignnetworkmobile_NativeQuicBridge_nativeUhpQuicClose(
+    _env: JNIEnv,
+    _class: JClass,
+    handle: jni::sys::jlong,
+) {
+    uhp_quinn::quic_close(handle as u64);
+}
+
+// =============================================================================
+// NativeIdentityProvisioning JNI
+// =============================================================================
+
+#[no_mangle]
+pub extern "system" fn Java_com_sovereignnetworkmobile_NativeIdentityProvisioning_nativeGenerateIdentity<'local>(
+    mut env: JNIEnv<'local>,
+    _class: JClass<'local>,
+    device_id: JString<'local>,
+) -> jobject {
+    let device_id_str: String = match env.get_string(&device_id) {
+        Ok(s) => s.into(),
+        Err(e) => {
+            log::error!("Failed to get device id: {}", e);
+            return std::ptr::null_mut();
+        }
+    };
+
+    let result = identity_bridge::generate_identity_bundle(&device_id_str);
+    create_identity_bundle_map(&mut env, result)
+}
+
+#[no_mangle]
+pub extern "system" fn Java_com_sovereignnetworkmobile_NativeIdentityProvisioning_nativeSignRegistrationProof<'local>(
+    mut env: JNIEnv<'local>,
+    _class: JClass<'local>,
+    identity_json: JString<'local>,
+    timestamp: jni::sys::jlong,
+) -> jobject {
+    let identity_json_str: String = match env.get_string(&identity_json) {
+        Ok(s) => s.into(),
+        Err(e) => {
+            log::error!("Failed to get identity json: {}", e);
+            return std::ptr::null_mut();
+        }
+    };
+
+    let result = identity_bridge::sign_registration_proof_from_identity(&identity_json_str, timestamp as u64);
+    create_signature_map(&mut env, result)
 }
 
 /// Make an HTTP request over QUIC returning raw bytes
@@ -307,7 +567,7 @@ pub extern "system" fn Java_com_sovereignnetworkmobile_NativeQuicBridge_nativeRe
     };
 
     log::info!(
-        "QUIC bytes request: {} {} (insecure={}, alpn={})",
+        "[🌐 Web4] QUIC bytes request: {} {} (insecure={}, alpn={})",
         method_str,
         url_str,
         insecure_bool,
@@ -336,12 +596,16 @@ pub extern "system" fn Java_com_sovereignnetworkmobile_NativeQuicBridge_nativeRe
                     endpoint.connect(addr, &host)?.into_future(),
                 )
                     .await
-                    .map_err(|_| "Connection timeout")??;
+                    .map_err(|_| anyhow::anyhow!("Connection timeout"))??;
 
                 // Send ZHTP request (select handler based on ALPN mode)
                 let (status, body) = match alpn_str.as_str() {
                     "public" => send_zhtp_request(&connection, &method_str, &path, headers, body_vec).await?,
-                    _ => send_authenticated_zhtp_request(&connection, &method_str, &path, headers, body_vec).await?,
+                    _ => {
+                        return Err(anyhow::anyhow!(
+                            "Authenticated mode requires UHP handshake (not wired in JNI request path)"
+                        ));
+                    }
                 };
 
                 connection.close(0u32.into(), b"done");
@@ -350,7 +614,7 @@ pub extern "system" fn Java_com_sovereignnetworkmobile_NativeQuicBridge_nativeRe
                 Ok((status, body))
             })
         } else {
-            Err("Runtime not initialized".into())
+            Err(anyhow::anyhow!("Runtime not initialized"))
         }
     };
 
@@ -368,7 +632,7 @@ pub extern "system" fn Java_com_sovereignnetworkmobile_NativeQuicBridge_nativeCa
     _env: JNIEnv,
     _class: JClass,
 ) -> jboolean {
-    log::info!("Cancelling all QUIC requests");
+    log::info!("[🌐 Web4] Cancelling all QUIC requests");
 
     unsafe {
         if let Some(ref client) = CLIENT {
@@ -390,7 +654,7 @@ pub extern "system" fn Java_com_sovereignnetworkmobile_NativeQuicBridge_nativeSh
     _env: JNIEnv,
     _class: JClass,
 ) {
-    log::info!("Shutting down QUIC native library");
+    log::info!("[🌐 Web4] Shutting down QUIC native library");
 
     unsafe {
         CLIENT = None;
@@ -401,7 +665,7 @@ pub extern "system" fn Java_com_sovereignnetworkmobile_NativeQuicBridge_nativeSh
 // Helper to create a HashMap result for reachability
 fn create_result_map<'local>(
     env: &mut JNIEnv<'local>,
-    result: Result<(bool, f64), Box<dyn std::error::Error + Send + Sync>>,
+    result: Result<(bool, f64), anyhow::Error>,
 ) -> jobject {
     let hash_map_class = match env.find_class("java/util/HashMap") {
         Ok(c) => c,
@@ -430,7 +694,7 @@ fn create_result_map<'local>(
 // Helper to create a HashMap result for connection test
 fn create_connection_result_map<'local>(
     env: &mut JNIEnv<'local>,
-    result: Result<(bool, f64, String), Box<dyn std::error::Error + Send + Sync>>,
+    result: Result<(bool, f64, String), anyhow::Error>,
 ) -> jobject {
     let hash_map_class = match env.find_class("java/util/HashMap") {
         Ok(c) => c,
@@ -543,7 +807,7 @@ fn create_bytes_response_map<'local>(
 // Helper to create a HashMap result for ZHTP response
 fn create_zhtp_response_map<'local>(
     env: &mut JNIEnv<'local>,
-    result: Result<(i32, &str, String, bool), Box<dyn std::error::Error + Send + Sync>>,
+    result: Result<(i32, &str, String, bool), anyhow::Error>,
 ) -> jobject {
     let hash_map_class = match env.find_class("java/util/HashMap") {
         Ok(c) => c,
@@ -575,7 +839,7 @@ fn create_zhtp_response_map<'local>(
 // Helper to create a HashMap result for ZHTP bytes response
 fn create_zhtp_bytes_response_map<'local>(
     env: &mut JNIEnv<'local>,
-    result: Result<(i32, &str, Vec<u8>, bool), Box<dyn std::error::Error + Send + Sync>>,
+    result: Result<(i32, &str, Vec<u8>, bool), anyhow::Error>,
 ) -> jobject {
     let hash_map_class = match env.find_class("java/util/HashMap") {
         Ok(c) => c,
@@ -615,6 +879,172 @@ fn create_zhtp_bytes_response_map<'local>(
     map.into_raw()
 }
 
+fn create_error_map<'local>(env: &mut JNIEnv<'local>, message: String) -> jobject {
+    let hash_map_class = match env.find_class("java/util/HashMap") {
+        Ok(c) => c,
+        Err(_) => return std::ptr::null_mut(),
+    };
+
+    let map = match env.new_object(&hash_map_class, "()V", &[]) {
+        Ok(m) => m,
+        Err(_) => return std::ptr::null_mut(),
+    };
+
+    put_boolean(env, &map, "ok", false);
+    put_string(env, &map, "error", &message);
+    map.into_raw()
+}
+
+fn create_handshake_result_map<'local>(
+    env: &mut JNIEnv<'local>,
+    result: Result<uhp_quinn::QuinnHandshakeResult, anyhow::Error>,
+) -> jobject {
+    let hash_map_class = match env.find_class("java/util/HashMap") {
+        Ok(c) => c,
+        Err(_) => return std::ptr::null_mut(),
+    };
+
+    let map = match env.new_object(&hash_map_class, "()V", &[]) {
+        Ok(m) => m,
+        Err(_) => return std::ptr::null_mut(),
+    };
+
+    match result {
+        Ok(result) => {
+            put_boolean(env, &map, "ok", true);
+            put_long(env, &map, "handle", result.handle as i64);
+            put_string(env, &map, "peerDid", &result.session.peer_did);
+            put_string(env, &map, "clientDid", &result.session.client_did);
+            put_boolean(env, &map, "pqcHybridEnabled", result.session.pqc_hybrid_enabled);
+            put_int(env, &map, "sessionIdLen", result.session.session_id_len as i32);
+
+            if let Ok(bytes) = env.byte_array_from_slice(&result.session.session_key) {
+                put_object(env, &map, "sessionKey", bytes.into());
+            }
+            if let Ok(bytes) = env.byte_array_from_slice(&result.session.session_id) {
+                put_object(env, &map, "sessionId", bytes.into());
+            }
+            if let Ok(bytes) = env.byte_array_from_slice(&result.session.handshake_hash) {
+                put_object(env, &map, "handshakeHash", bytes.into());
+            }
+        }
+        Err(err) => {
+            put_boolean(env, &map, "ok", false);
+            put_string(env, &map, "error", &err.to_string());
+        }
+    }
+
+    map.into_raw()
+}
+
+fn create_quinn_bytes_map<'local>(
+    env: &mut JNIEnv<'local>,
+    result: Result<Vec<u8>, anyhow::Error>,
+) -> jobject {
+    let hash_map_class = match env.find_class("java/util/HashMap") {
+        Ok(c) => c,
+        Err(_) => return std::ptr::null_mut(),
+    };
+
+    let map = match env.new_object(&hash_map_class, "()V", &[]) {
+        Ok(m) => m,
+        Err(_) => return std::ptr::null_mut(),
+    };
+
+    match result {
+        Ok(bytes) => {
+            put_boolean(env, &map, "ok", true);
+            if let Ok(byte_array) = env.byte_array_from_slice(&bytes) {
+                put_object(env, &map, "body", byte_array.into());
+            }
+        }
+        Err(err) => {
+            put_boolean(env, &map, "ok", false);
+            put_string(env, &map, "error", &err.to_string());
+        }
+    }
+
+    map.into_raw()
+}
+
+fn create_identity_bundle_map<'local>(
+    env: &mut JNIEnv<'local>,
+    result: Result<identity_bridge::GeneratedIdentity, anyhow::Error>,
+) -> jobject {
+    let hash_map_class = match env.find_class("java/util/HashMap") {
+        Ok(c) => c,
+        Err(_) => return std::ptr::null_mut(),
+    };
+    let map = match env.new_object(&hash_map_class, "()V", &[]) {
+        Ok(m) => m,
+        Err(_) => return std::ptr::null_mut(),
+    };
+
+    match result {
+        Ok(identity) => {
+            put_boolean(env, &map, "ok", true);
+            put_string(env, &map, "did", &identity.did);
+            put_string(env, &map, "deviceId", &identity.device_id);
+            put_long(env, &map, "createdAt", identity.created_at as i64);
+            put_string(env, &map, "identityJson", &identity.identity_json);
+            put_string(env, &map, "handshakeJson", &identity.handshake_json);
+
+            if let Ok(bytes) = env.byte_array_from_slice(&identity.public_key) {
+                put_object(env, &map, "publicKey", bytes.into());
+            }
+            if let Ok(bytes) = env.byte_array_from_slice(&identity.kyber_public_key) {
+                put_object(env, &map, "kyberPublicKey", bytes.into());
+            }
+            if let Ok(bytes) = env.byte_array_from_slice(&identity.node_id) {
+                put_object(env, &map, "nodeId", bytes.into());
+            }
+            if let Ok(bytes) = env.byte_array_from_slice(&identity.dilithium_sk) {
+                put_object(env, &map, "dilithiumSk", bytes.into());
+            }
+            if let Ok(bytes) = env.byte_array_from_slice(&identity.kyber_sk) {
+                put_object(env, &map, "kyberSk", bytes.into());
+            }
+            if let Ok(bytes) = env.byte_array_from_slice(&identity.master_seed) {
+                put_object(env, &map, "masterSeed", bytes.into());
+            }
+        }
+        Err(err) => {
+            put_boolean(env, &map, "ok", false);
+            put_string(env, &map, "error", &err.to_string());
+        }
+    }
+
+    map.into_raw()
+}
+
+fn create_signature_map<'local>(
+    env: &mut JNIEnv<'local>,
+    result: Result<Vec<u8>, anyhow::Error>,
+) -> jobject {
+    let hash_map_class = match env.find_class("java/util/HashMap") {
+        Ok(c) => c,
+        Err(_) => return std::ptr::null_mut(),
+    };
+    let map = match env.new_object(&hash_map_class, "()V", &[]) {
+        Ok(m) => m,
+        Err(_) => return std::ptr::null_mut(),
+    };
+
+    match result {
+        Ok(signature) => {
+            put_boolean(env, &map, "ok", true);
+            if let Ok(bytes) = env.byte_array_from_slice(&signature) {
+                put_object(env, &map, "signature", bytes.into());
+            }
+        }
+        Err(err) => {
+            put_boolean(env, &map, "ok", false);
+            put_string(env, &map, "error", &err.to_string());
+        }
+    }
+
+    map.into_raw()
+}
 // Helper functions to put values into HashMap
 fn put_boolean(env: &mut JNIEnv, map: &JObject, key: &str, value: bool) {
     if let Ok(key_str) = env.new_string(key) {
@@ -635,6 +1065,30 @@ fn put_boolean(env: &mut JNIEnv, map: &JObject, key: &str, value: bool) {
                 }
             }
         }
+    }
+}
+
+fn put_long(env: &mut JNIEnv, map: &JObject, key: &str, value: i64) {
+    if let Ok(key_str) = env.new_string(key) {
+        if let Ok(val) = env.new_object("java/lang/Long", "(J)V", &[JValue::Long(value)]) {
+            let _ = env.call_method(
+                map,
+                "put",
+                "(Ljava/lang/Object;Ljava/lang/Object;)Ljava/lang/Object;",
+                &[JValue::Object(&key_str.into()), JValue::Object(&val)],
+            );
+        }
+    }
+}
+
+fn put_object(env: &mut JNIEnv, map: &JObject, key: &str, value: JObject) {
+    if let Ok(key_str) = env.new_string(key) {
+        let _ = env.call_method(
+            map,
+            "put",
+            "(Ljava/lang/Object;Ljava/lang/Object;)Ljava/lang/Object;",
+            &[JValue::Object(&key_str.into()), JValue::Object(&value)],
+        );
     }
 }
 

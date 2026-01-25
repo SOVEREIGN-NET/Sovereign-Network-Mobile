@@ -45,11 +45,11 @@ impl QuicClient {
         &self,
         host: &str,
         port: u16,
-    ) -> Result<(bool, f64, String), Box<dyn std::error::Error + Send + Sync>> {
+    ) -> Result<(bool, f64, String)> {
         let start = Instant::now();
         let addr: SocketAddr = format!("{}:{}", host, port).parse()?;
 
-        log::info!("Testing QUIC connection to {}", addr);
+        log::info!("[🌐 Web4] Testing QUIC connection to {}", addr);
 
         // Create endpoint with insecure config
         let client_config = create_insecure_client_config()?;
@@ -60,7 +60,7 @@ impl QuicClient {
         let connection = endpoint.connect(addr, host)?.await?;
 
         let latency_ms = start.elapsed().as_secs_f64() * 1000.0;
-        log::info!("QUIC connection established in {:.2}ms", latency_ms);
+        log::info!("[🌐 Web4] QUIC connection established in {:.2}ms", latency_ms);
 
         // Close cleanly
         connection.close(0u32.into(), b"done");
@@ -82,7 +82,7 @@ impl QuicClient {
         let (host, port, path) = parse_quic_url(url)?;
         let addr: SocketAddr = format!("{}:{}", host, port).parse()?;
 
-        log::info!("QUIC request: {} {} to {}", method, path, addr);
+        log::info!("[🌐 Web4] QUIC request: {} {} to {}", method, path, addr);
 
         // Create endpoint
         let client_config = if insecure {
@@ -99,7 +99,7 @@ impl QuicClient {
             .await
             .map_err(|_| "Connection timeout")??;
 
-        log::info!("QUIC connection established, opening stream...");
+        log::info!("[🌐 Web4] QUIC connection established, opening stream...");
 
         // Open bidirectional stream
         let (mut send, mut recv) = connection.open_bi().await?;
@@ -123,18 +123,18 @@ impl QuicClient {
             request.push_str("\r\n");
         }
 
-        log::debug!("Sending request:\n{}", request);
+        log::debug!("[🌐 Web4] Sending request:\n{}", request);
 
         // Send request and close send stream
         send.write_all(request.as_bytes()).await?;
         send.finish()?;
 
-        log::info!("Request sent, waiting for response...");
+        log::info!("[🌐 Web4] Request sent, waiting for response...");
 
         // Receive response
         let response_data = recv.read_to_end(1024 * 1024).await?; // 1MB max
 
-        log::info!("Received {} bytes", response_data.len());
+        log::info!("[🌐 Web4] Received {} bytes", response_data.len());
 
         // Parse HTTP response
         let response_str = String::from_utf8_lossy(&response_data);
@@ -160,7 +160,7 @@ impl QuicClient {
         let (host, port, path) = parse_quic_url(url)?;
         let addr: SocketAddr = format!("{}:{}", host, port).parse()?;
 
-        log::info!("QUIC request (bytes): {} {} to {}", method, path, addr);
+        log::info!("[🌐 Web4] QUIC request (bytes): {} {} to {}", method, path, addr);
 
         // Create endpoint
         let client_config = if insecure {
@@ -177,7 +177,7 @@ impl QuicClient {
             .await
             .map_err(|_| "Connection timeout")??;
 
-        log::info!("QUIC connection established, opening stream...");
+        log::info!("[🌐 Web4] QUIC connection established, opening stream...");
 
         // Open bidirectional stream
         let (mut send, mut recv) = connection.open_bi().await?;
@@ -200,7 +200,7 @@ impl QuicClient {
             request.push_str("\r\n");
         }
 
-        log::debug!("Sending request headers (bytes)...");
+        log::debug!("[🌐 Web4] Sending request headers (bytes)...");
 
         // Send request headers and optional body
         send.write_all(request.as_bytes()).await?;
@@ -209,12 +209,12 @@ impl QuicClient {
         }
         send.finish()?;
 
-        log::info!("Request sent, waiting for response (bytes)...");
+        log::info!("[🌐 Web4] Request sent, waiting for response (bytes)...");
 
         // Receive response
         let response_data = recv.read_to_end(1024 * 1024 * 16).await?; // 16MB max for blobs
 
-        log::info!("Received {} bytes", response_data.len());
+        log::info!("[🌐 Web4] Received {} bytes", response_data.len());
 
         // Parse HTTP response
         let response = parse_http_response_bytes(&response_data)?;
@@ -227,7 +227,7 @@ impl QuicClient {
     }
 
     pub fn cancel_all(&mut self) {
-        log::info!("Cancel all called");
+        log::info!("[🌐 Web4] Cancel all called");
     }
 }
 
@@ -235,11 +235,11 @@ impl QuicClient {
 pub async fn check_udp_reachability(
     host: &str,
     port: u16,
-) -> Result<(bool, f64), Box<dyn std::error::Error + Send + Sync>> {
+) -> Result<(bool, f64)> {
     let start = Instant::now();
     let addr: SocketAddr = format!("{}:{}", host, port).parse()?;
 
-    log::info!("Checking UDP reachability to {}", addr);
+    log::info!("[🌐 Web4] Checking UDP reachability to {}", addr);
 
     // Create UDP socket
     let socket = UdpSocket::bind("0.0.0.0:0").await?;
@@ -250,7 +250,7 @@ pub async fn check_udp_reachability(
     socket.send(&probe).await?;
 
     let latency_ms = start.elapsed().as_secs_f64() * 1000.0;
-    log::info!("UDP reachable in {:.2}ms", latency_ms);
+    log::info!("[🌐 Web4] UDP reachable in {:.2}ms", latency_ms);
 
     Ok((true, latency_ms))
 }
@@ -273,7 +273,7 @@ pub fn create_insecure_client_config() -> Result<ClientConfig> {
             _ocsp_response: &[u8],
             _now: rustls::pki_types::UnixTime,
         ) -> std::result::Result<ServerCertVerified, rustls::Error> {
-            log::info!("InsecureVerifier: Accepting certificate without verification");
+            log::info!("[🌐 Web4] InsecureVerifier: Accepting certificate without verification");
             Ok(ServerCertVerified::assertion())
         }
 

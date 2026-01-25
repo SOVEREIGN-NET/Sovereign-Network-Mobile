@@ -33,7 +33,7 @@ class NativeIdentityProvisioningBridge {
   private nativeModule: any;
 
   constructor() {
-    if (Platform.OS === 'ios') {
+    if (Platform.OS === 'ios' || Platform.OS === 'android') {
       this.nativeModule = NativeModules.NativeIdentityProvisioning;
       if (!this.nativeModule) {
         console.warn('⚠️ NativeIdentityProvisioning module not found');

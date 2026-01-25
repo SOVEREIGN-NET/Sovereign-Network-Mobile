@@ -1,17 +1,19 @@
 //! ZHTP Authenticated Mode - UHP Handshake + Session Management
 //!
-//! Implements authenticated requests with Dilithium5 signing and Kyber512 key exchange.
+//! Mirrors iOS UHP v2 MAC derivation (HKDF-SHA3 + HMAC-SHA3) for interoperability.
 
-use crate::zhtp_types::{ZhtpMethod, ZhtpHeaders};
+use crate::zhtp_types::ZhtpMethod;
 use anyhow::Result;
+use hmac::{Hmac, Mac};
 use serde::{Deserialize, Serialize};
+use sha3::Sha3_256;
 use std::time::{SystemTime, UNIX_EPOCH};
 
 /// Session state for authenticated connections
 #[derive(Debug, Clone)]
 pub struct AuthSession {
-    pub session_id: Vec<u8>,      // [u8; 16] from handshake
-    pub app_key: Vec<u8>,          // [u8; 32] from HKDF derivation
+    pub session_id: Vec<u8>,      // [u8; 32] from handshake (UHP v2)
+    pub mac_key: Vec<u8>,          // [u8; 32] from HKDF-SHA3 derivation
     pub sequence: u64,             // monotonic counter, incremented per request
     pub client_did: String,        // client identity
     pub server_did: String,        // server identity
@@ -67,35 +69,24 @@ pub struct AuthContext {
     pub request_mac: Vec<u8>, // [u8; 32]
 }
 
-/// Compute canonical hash of request following exact server order
-/// Hash input:
-/// 1. WIRE_VERSION (u16 LE) = 1
-/// 2. request_id (16 bytes)
-/// 3. timestamp_ms (u64 LE)
-/// 4. method encoded (1 byte)
-/// 5. uri (length-prefixed string)
-/// 6. headers in fixed order (content_type, content_length, content_encoding, cache_control)
-/// 7. body (length-prefixed bytes)
-pub fn compute_canonical_request_hash(
-    request_id: &[u8; 16],
-    timestamp_ms: u64,
+/// Build canonical request bytes for MAC computation (matches iOS UHP v2)
+///
+/// Format (big-endian):
+/// [method: u8][pathLen: u16 BE][path bytes][bodyLen: u32 BE][body bytes][counter: u64 BE][sessionId: 32 bytes]
+pub fn build_mac_input(
     method: ZhtpMethod,
-    uri: &str,
-    headers: &ZhtpHeaders,
+    path: &str,
     body: &[u8],
-) -> Vec<u8> {
-    let mut hash_input = Vec::new();
+    counter: u64,
+    session_id: &[u8],
+) -> Result<Vec<u8>> {
+    if session_id.len() != 32 {
+        return Err(anyhow::anyhow!(
+            "Session ID must be 32 bytes, got {}",
+            session_id.len()
+        ));
+    }
 
-    // 1. WIRE_VERSION (u16 LE) = 1
-    hash_input.extend_from_slice(&(1u16).to_le_bytes());
-
-    // 2. request_id (16 bytes)
-    hash_input.extend_from_slice(request_id);
-
-    // 3. timestamp_ms (u64 LE)
-    hash_input.extend_from_slice(&timestamp_ms.to_le_bytes());
-
-    // 4. method encoded (1 byte)
     let method_byte = match method {
         ZhtpMethod::Get => 0,
         ZhtpMethod::Post => 1,
@@ -108,130 +99,63 @@ pub fn compute_canonical_request_hash(
         ZhtpMethod::Connect => 8,
         ZhtpMethod::Trace => 9,
     };
-    hash_input.push(method_byte);
 
-    // 5. uri (length-prefixed string)
-    let uri_bytes = uri.as_bytes();
-    hash_input.extend_from_slice(&(uri_bytes.len() as u32).to_le_bytes());
-    hash_input.extend_from_slice(uri_bytes);
-
-    // 6. headers in fixed order
-    // content_type (present flag + length + bytes)
-    if let Some(ct) = &headers.content_type {
-        hash_input.push(1); // present flag
-        let ct_bytes = ct.as_bytes();
-        hash_input.extend_from_slice(&(ct_bytes.len() as u32).to_le_bytes());
-        hash_input.extend_from_slice(ct_bytes);
-    } else {
-        hash_input.push(0); // not present
+    let path_bytes = path.as_bytes();
+    if path_bytes.len() > u16::MAX as usize {
+        return Err(anyhow::anyhow!(
+            "Path too long: {} bytes",
+            path_bytes.len()
+        ));
+    }
+    if body.len() > u32::MAX as usize {
+        return Err(anyhow::anyhow!(
+            "Body too long: {} bytes",
+            body.len()
+        ));
     }
 
-    // content_length (present flag + u64 LE)
-    if let Some(cl) = headers.content_length {
-        hash_input.push(1); // present flag
-        hash_input.extend_from_slice(&cl.to_le_bytes());
-    } else {
-        hash_input.push(0);
-    }
+    let mut data = Vec::with_capacity(
+        1 + 2 + path_bytes.len() + 4 + body.len() + 8 + session_id.len(),
+    );
+    data.push(method_byte);
+    data.extend_from_slice(&(path_bytes.len() as u16).to_be_bytes());
+    data.extend_from_slice(path_bytes);
+    data.extend_from_slice(&(body.len() as u32).to_be_bytes());
+    data.extend_from_slice(body);
+    data.extend_from_slice(&counter.to_be_bytes());
+    data.extend_from_slice(session_id);
 
-    // content_encoding (present flag + length + bytes)
-    if let Some(ce) = &headers.content_encoding {
-        hash_input.push(1);
-        let ce_bytes = ce.as_bytes();
-        hash_input.extend_from_slice(&(ce_bytes.len() as u32).to_le_bytes());
-        hash_input.extend_from_slice(ce_bytes);
-    } else {
-        hash_input.push(0);
-    }
-
-    // cache_control (present flag + length + bytes)
-    if let Some(cc) = &headers.cache_control {
-        hash_input.push(1);
-        let cc_bytes = cc.as_bytes();
-        hash_input.extend_from_slice(&(cc_bytes.len() as u32).to_le_bytes());
-        hash_input.extend_from_slice(cc_bytes);
-    } else {
-        hash_input.push(0);
-    }
-
-    // 7. body (length-prefixed bytes)
-    hash_input.extend_from_slice(&(body.len() as u32).to_le_bytes());
-    hash_input.extend_from_slice(body);
-
-    // Hash with BLAKE3
-    blake3::hash(&hash_input).as_bytes().to_vec()
+    Ok(data)
 }
 
-/// Compute request MAC using BLAKE3 keyed hashing
-/// MAC = BLAKE3_keyed(app_key, session_id || sequence || canonical_hash)
-pub fn compute_request_mac(
-    app_key: &[u8],
-    session_id: &[u8],
-    sequence: u64,
-    canonical_hash: &[u8],
-) -> Vec<u8> {
-    let mut mac_input = Vec::new();
-    mac_input.extend_from_slice(session_id);
-    mac_input.extend_from_slice(&sequence.to_le_bytes());
-    mac_input.extend_from_slice(canonical_hash);
-
-    // Derive keyed MAC from app_key
-    let key_hash = blake3::hash(app_key);
-    let key_array: [u8; 32] = key_hash.as_bytes()[..32].try_into().unwrap_or_default();
-
-    blake3::keyed_hash(&key_array, &mac_input)
-        .as_bytes()
-        .to_vec()
+/// Derive mac_key = HKDF-SHA3-256(session_key, handshake_hash, "zhtp/v2/mac_key")
+pub fn derive_mac_key(session_key: &[u8], handshake_hash: &[u8]) -> Result<Vec<u8>> {
+    let hk = hkdf::Hkdf::<Sha3_256>::new(Some(handshake_hash), session_key);
+    let mut okm = [0u8; 32];
+    hk.expand(b"zhtp/v2/mac_key", &mut okm)
+        .map_err(|_| anyhow::anyhow!("HKDF expand failed"))?;
+    Ok(okm.to_vec())
 }
 
-/// Derive app_key from master_key using BLAKE3
-/// app_key = blake3("zhtp-web4-app-mac" || master_key || session_id || server_did || client_did)
-pub fn derive_app_key(
-    master_key: &[u8],
-    session_id: &[u8],
-    server_did: &str,
-    client_did: &str,
-) -> Vec<u8> {
-    let mut input = Vec::new();
-    input.extend_from_slice(b"zhtp-web4-app-mac");
-    input.extend_from_slice(master_key);
-    input.extend_from_slice(session_id);
-    input.extend_from_slice(server_did.as_bytes());
-    input.extend_from_slice(client_did.as_bytes());
-
-    blake3::hash(&input).as_bytes().to_vec()
-}
-
-/// Derive master key from session components using BLAKE3
-/// Master Key = BLAKE3(
-///   "zhtp-quic-master" ||
-///   uhp_session_key || pqc_shared_secret || uhp_transcript_hash || peer_node_id
-/// )
-pub fn derive_master_key(
-    uhp_session_key: &[u8],
-    pqc_shared_secret: &[u8],
-    uhp_transcript_hash: &[u8],
-    peer_node_id: &str,
-) -> Vec<u8> {
-    let mut input = Vec::new();
-    input.extend_from_slice(b"zhtp-quic-master");
-    input.extend_from_slice(uhp_session_key);
-    input.extend_from_slice(pqc_shared_secret);
-    input.extend_from_slice(uhp_transcript_hash);
-    input.extend_from_slice(peer_node_id.as_bytes());
-
-    blake3::hash(&input).as_bytes()[..32].to_vec()
+/// Compute request MAC using HMAC-SHA3-256 (matches iOS)
+pub fn compute_request_mac(mac_key: &[u8], mac_input: &[u8]) -> Result<Vec<u8>> {
+    let mut hmac = Hmac::<Sha3_256>::new_from_slice(mac_key)
+        .map_err(|_| anyhow::anyhow!("Invalid HMAC key"))?;
+    hmac.update(mac_input);
+    Ok(hmac.finalize().into_bytes().to_vec())
 }
 
 /// Build AuthContext for a request
 pub fn build_auth_context(
     session: &AuthSession,
-    canonical_hash: &[u8],
+    method: ZhtpMethod,
+    path: &str,
+    body: &[u8],
 ) -> Result<AuthContext> {
     let mut session_mut = session.clone();
     let sequence = session_mut.next_sequence();
-
-    let request_mac = compute_request_mac(&session.app_key, &session.session_id, sequence, canonical_hash);
+    let mac_input = build_mac_input(method, path, body, sequence, &session.session_id)?;
+    let request_mac = compute_request_mac(&session.mac_key, &mac_input)?;
 
     Ok(AuthContext {
         session_id: session.session_id.clone(),
@@ -248,8 +172,8 @@ mod tests {
     #[test]
     fn test_session_validity() {
         let session = AuthSession {
-            session_id: vec![0u8; 16],
-            app_key: vec![0u8; 32],
+            session_id: vec![0u8; 32],
+            mac_key: vec![0u8; 32],
             sequence: 0,
             client_did: "client".to_string(),
             server_did: "server".to_string(),
@@ -266,26 +190,15 @@ mod tests {
     }
 
     #[test]
-    fn test_canonical_hash_deterministic() {
-        let request_id = [1u8; 16];
+    fn test_mac_input_deterministic() {
         let method = ZhtpMethod::Post;
         let uri = "/api/v1/transactions";
-        let headers = ZhtpHeaders {
-            content_type: Some("application/json".to_string()),
-            content_length: Some(100),
-            dao_fee: 10,
-            total_fees: 11,
-            content_encoding: None,
-            cache_control: None,
-            network_fee: None,
-            priority: None,
-        };
         let body = b"test";
+        let session_id = vec![7u8; 32];
 
-        let hash1 = compute_canonical_request_hash(&request_id, 1000, method, uri, &headers, body);
-        let hash2 = compute_canonical_request_hash(&request_id, 1000, method, uri, &headers, body);
+        let input1 = build_mac_input(method, uri, body, 42, &session_id).unwrap();
+        let input2 = build_mac_input(method, uri, body, 42, &session_id).unwrap();
 
-        assert_eq!(hash1, hash2, "Canonical hash must be deterministic");
-        assert_eq!(hash1.len(), 32, "BLAKE3 hash should be 32 bytes");
+        assert_eq!(input1, input2, "MAC input must be deterministic");
     }
 }

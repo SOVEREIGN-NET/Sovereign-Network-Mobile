@@ -3,9 +3,9 @@
 //! Sends ZHTP-formatted requests over QUIC instead of HTTP/1.1
 
 use crate::zhtp_types::ZhtpMethod;
-use crate::zhtp_codec::{encode_request, decode_response};
-use crate::zhtp_framing::{frame_encode, frame_decode_message};
-use crate::zhtp_types::ZhtpRequestWire;
+use crate::zhtp_codec::{encode_public_request, decode_response};
+use crate::zhtp_framing::{decode_wire_or_frame_message, wire_encode};
+use crate::zhtp_types::{ZhtpHeaders, ZhtpRequest};
 use quinn::Connection;
 use anyhow::Result;
 use std::collections::HashMap;
@@ -28,23 +28,42 @@ pub async fn send_zhtp_request(
         .cloned()
         .unwrap_or_else(|| "application/json".to_string());
 
-    // Create ZHTP request
-    let zhtp_request = ZhtpRequestWire::new_public(
-        method,
-        path.to_string(),
-        content_type,
-        request_body,
-    );
+    let timestamp = std::time::SystemTime::now()
+        .duration_since(std::time::UNIX_EPOCH)
+        .unwrap_or_default()
+        .as_secs();
 
-    log::info!("[ZHTP] Sending {} {}", method_str, path);
+    let zhtp_request = ZhtpRequest {
+        method,
+        uri: path.to_string(),
+        version: "1.0".to_string(),
+        headers: ZhtpHeaders {
+            content_type: Some(content_type),
+            content_length: Some(request_body.len() as u64),
+            dao_fee: 0,
+            total_fees: 0,
+            content_encoding: None,
+            cache_control: None,
+            network_fee: None,
+            priority: None,
+        },
+        body: request_body,
+        timestamp,
+        requester: None,
+        auth_proof: None,
+    };
+
+    log::info!("[🌐 Web4] [ZHTP] Sending {} {}", method_str, path);
 
     // Encode to CBOR
-    let cbor_data = encode_request(&zhtp_request)?;
-    log::info!("[ZHTP] CBOR encoded: {} bytes", cbor_data.len());
+    let cbor_data = encode_public_request(&zhtp_request)?;
+    let cbor_prefix = hex_prefix(&cbor_data, 16);
+    log::info!("[🌐 Web4] [ZHTP] CBOR encoded: {} bytes, hex[0..16]={}", cbor_data.len(), cbor_prefix);
 
-    // Frame it (add 4-byte length prefix)
-    let framed_data = frame_encode(&cbor_data)?;
-    log::info!("[ZHTP] Framed: {} bytes", framed_data.len());
+    // Wire encode: magic + version + length + CBOR (public mode)
+    let framed_data = wire_encode(&cbor_data)?;
+    let wire_prefix = hex_prefix(&framed_data, 16);
+    log::info!("[🌐 Web4] [ZHTP] Wire encoded: {} bytes, hex[0..16]={}", framed_data.len(), wire_prefix);
 
     // Open bidirectional stream
     let (mut send, mut recv) = connection.open_bi().await?;
@@ -56,11 +75,13 @@ pub async fn send_zhtp_request(
 
     // Receive response
     let response_data = recv.read_to_end(16 * 1024 * 1024).await?; // 16MB max
-    log::info!("[ZHTP] Received {} bytes", response_data.len());
+    let resp_prefix = hex_prefix(&response_data, 16);
+    log::info!("[🌐 Web4] [ZHTP] Received {} bytes, hex[0..16]={}", response_data.len(), resp_prefix);
 
-    // Unframe response
-    let (payload, _) = frame_decode_message(&response_data)?;
-    log::info!("[ZHTP] Unframed: {} bytes", payload.len());
+    // Unframe response (wire or length-prefixed)
+    let (payload, _) = decode_wire_or_frame_message(&response_data)?;
+    let payload_prefix = hex_prefix(&payload, 16);
+    log::info!("[🌐 Web4] [ZHTP] Unframed: {} bytes, hex[0..16]={}", payload.len(), payload_prefix);
 
     // Decode CBOR to ZhtpResponseWire
     let response = decode_response(&payload)?;
@@ -68,6 +89,10 @@ pub async fn send_zhtp_request(
 
     // Extract body from nested response structure
     Ok((response.status, response.response.body.to_vec()))
+}
+
+fn hex_prefix(bytes: &[u8], len: usize) -> String {
+    bytes.iter().take(len).map(|b| format!("{:02x}", b)).collect()
 }
 
 /// Convert HTTP method string to ZhtpMethod

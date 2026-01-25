@@ -147,14 +147,12 @@ class RealAuthService {
       throw new Error('Password must be at least 8 characters');
     }
 
-    // iOS: Device-based identity provisioning
-    if (Platform.OS === 'ios') {
+    // Device-based identity provisioning (iOS + Android)
+    if (Platform.OS === 'ios' || Platform.OS === 'android') {
       return this.createIdentityIOS(data);
     }
 
-    // Android: Falls back to API endpoint (future implementation)
-    console.warn('⚠️ Android identity creation not yet implemented');
-    throw new Error('Identity creation not available on Android');
+    throw new Error('Identity creation not available on this platform');
   }
 
   /**

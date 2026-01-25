@@ -132,6 +132,9 @@ export async function quicRequest(
     console.log('[🌐 Web4] QuicClient: Response received:');
     console.log('[🌐 Web4] QuicClient:   Status:', response.status, response.statusText);
     console.log('[🌐 Web4] QuicClient:   Body length:', response.body?.length || 0, 'bytes');
+    if (!response.ok) {
+      console.log('[🌐 Web4] QuicClient:   Body preview:', response.body?.substring(0, 300) || '');
+    }
     return response;
   } catch (error) {
     console.error('[🌐 Web4] QuicClient: Request failed:', error);
