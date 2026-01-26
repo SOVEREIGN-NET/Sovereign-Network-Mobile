@@ -2,11 +2,180 @@
 //!
 //! Uses ciborium for CBOR serialization.
 //! Field order must match server's serde defaults.
+//! Manual encoding for authenticated requests to match iOS implementation.
 
-use crate::zhtp_types::{ZhtpHeaders, ZhtpRequest, ZhtpRequestWire, ZhtpResponse, ZhtpResponseWire};
+use crate::zhtp_types::{AuthContext, ZhtpHeaders, ZhtpRequest, ZhtpRequestWire, ZhtpResponse, ZhtpResponseWire};
 use anyhow::Result;
 use ciborium::value::Value;
 use std::collections::HashMap;
+
+// ============================================================================
+// Manual CBOR Encoding Helpers - Matches iOS Implementation
+// ============================================================================
+
+/// Append CBOR unsigned integer with explicit major type
+/// Encodes the major type (3-bit field) and additional info
+fn append_cbor_uint(data: &mut Vec<u8>, value: u64, major_type: u8) {
+    let mt = (major_type & 0x07) << 5;
+    match value {
+        0..=23 => data.push(mt | (value as u8)),
+        24..=255 => {
+            data.push(mt | 24);
+            data.push(value as u8);
+        }
+        256..=65535 => {
+            data.push(mt | 25);
+            data.extend_from_slice(&(value as u16).to_be_bytes());
+        }
+        65536..=4294967295 => {
+            data.push(mt | 26);
+            data.extend_from_slice(&(value as u32).to_be_bytes());
+        }
+        _ => {
+            data.push(mt | 27);
+            data.extend_from_slice(&value.to_be_bytes());
+        }
+    }
+}
+
+/// Append CBOR byte array (majorType 4 - array of integers)
+/// Matches iOS appendCborByteArray encoding exactly
+/// Each byte is encoded as a separate CBOR unsigned integer
+fn append_cbor_byte_array(data: &mut Vec<u8>, bytes: &[u8]) {
+    // Array header (majorType 4)
+    append_cbor_uint(data, bytes.len() as u64, 4);
+    // Each byte as separate integer (majorType 0)
+    for &byte in bytes {
+        append_cbor_uint(data, byte as u64, 0);
+    }
+}
+
+/// Append CBOR byte string (majorType 2 - standard encoding)
+fn append_cbor_bytes(data: &mut Vec<u8>, bytes: &[u8]) {
+    append_cbor_uint(data, bytes.len() as u64, 2);
+    data.extend_from_slice(bytes);
+}
+
+/// Append CBOR text string (majorType 3)
+fn append_cbor_string(data: &mut Vec<u8>, s: &str) {
+    let bytes = s.as_bytes();
+    append_cbor_uint(data, bytes.len() as u64, 3);
+    data.extend_from_slice(bytes);
+}
+
+/// Append CBOR map header (majorType 5)
+fn append_cbor_map_header(data: &mut Vec<u8>, count: u64) {
+    append_cbor_uint(data, count, 5);
+}
+
+/// Manually encode authenticated ZHTP request to CBOR bytes
+/// Matches iOS manual encoding exactly (majorType 4 for byte arrays)
+/// This bypasses ciborium's optimization that converts byte arrays to byte strings
+pub fn encode_authenticated_request_manual(request: &ZhtpRequestWire) -> Result<Vec<u8>> {
+    let mut data = Vec::new();
+
+    // Outer map: 5 fields (version, request_id, timestamp_ms, auth_context, request)
+    append_cbor_map_header(&mut data, 5);
+    log::debug!("[🌐 Web4] [CBOR] Map header (5 fields): {:02x?}", &data[data.len()-1..]);
+
+    // Field 1: version
+    append_cbor_string(&mut data, "version");
+    append_cbor_uint(&mut data, request.version as u64, 0);
+
+    // Field 2: request_id (as CBOR array - NOT byte string)
+    append_cbor_string(&mut data, "request_id");
+    append_cbor_byte_array(&mut data, &request.request_id);
+
+    // Field 3: timestamp_ms
+    append_cbor_string(&mut data, "timestamp_ms");
+    append_cbor_uint(&mut data, request.timestamp_ms, 0);
+
+    // Field 4: auth_context
+    append_cbor_string(&mut data, "auth_context");
+    if let Some(ref auth_ctx) = request.auth_context {
+        append_cbor_map_header(&mut data, 4);
+
+        append_cbor_string(&mut data, "session_id");
+        append_cbor_byte_array(&mut data, &auth_ctx.session_id);
+
+        append_cbor_string(&mut data, "client_did");
+        append_cbor_string(&mut data, &auth_ctx.client_did);
+
+        append_cbor_string(&mut data, "sequence");
+        append_cbor_uint(&mut data, auth_ctx.sequence, 0);
+
+        append_cbor_string(&mut data, "request_mac");
+        append_cbor_byte_array(&mut data, &auth_ctx.request_mac);
+    } else {
+        // CBOR null (majorType 7, value 22)
+        data.push(0xf6);
+    }
+
+    // Field 5: request
+    append_cbor_string(&mut data, "request");
+    encode_request_inner(&mut data, &request.request)?;
+
+    Ok(data)
+}
+
+/// Encode the nested ZhtpRequest structure for authenticated requests
+/// Matches iOS: exactly 6 fields (method, uri, version, headers, body, timestamp)
+/// Does NOT encode optional fields like requester or auth_proof
+fn encode_request_inner(data: &mut Vec<u8>, req: &ZhtpRequest) -> Result<()> {
+    // Exactly 6 fields - matches iOS implementation
+    append_cbor_map_header(data, 6);
+
+    append_cbor_string(data, "method");
+    append_cbor_string(data, req.method.as_str());
+
+    append_cbor_string(data, "uri");
+    append_cbor_string(data, &req.uri);
+
+    append_cbor_string(data, "version");
+    append_cbor_string(data, &req.version);
+
+    append_cbor_string(data, "headers");
+    encode_headers(data, &req.headers);
+
+    append_cbor_string(data, "body");
+    append_cbor_bytes(data, &req.body); // Standard byte string encoding
+
+    append_cbor_string(data, "timestamp");
+    append_cbor_uint(data, req.timestamp, 0);
+
+    Ok(())
+}
+
+/// Encode ZhtpHeaders for authenticated requests
+/// Matches iOS: only encodes 4 required fields (content_type, content_length, dao_fee, total_fees)
+fn encode_headers(data: &mut Vec<u8>, headers: &ZhtpHeaders) {
+    // Map with 4 entries (only required fields) - matches iOS exactly
+    append_cbor_map_header(data, 4);
+
+    append_cbor_string(data, "content_type");
+    if let Some(ref ct) = headers.content_type {
+        append_cbor_string(data, ct);
+    } else {
+        data.push(0xf6);
+    }
+
+    append_cbor_string(data, "content_length");
+    if let Some(cl) = headers.content_length {
+        append_cbor_uint(data, cl, 0);
+    } else {
+        data.push(0xf6);
+    }
+
+    append_cbor_string(data, "dao_fee");
+    append_cbor_uint(data, headers.dao_fee, 0);
+
+    append_cbor_string(data, "total_fees");
+    append_cbor_uint(data, headers.total_fees, 0);
+}
+
+// ============================================================================
+// Ciborium-based Encoding - Used for Public (Unauthenticated) Requests
+// ============================================================================
 
 /// Encode ZHTP request to CBOR bytes
 pub fn encode_request(request: &ZhtpRequestWire) -> Result<Vec<u8>> {
@@ -16,7 +185,7 @@ pub fn encode_request(request: &ZhtpRequestWire) -> Result<Vec<u8>> {
     Ok(buffer)
 }
 
-/// Encode public ZHTP request (no wire envelope) to CBOR bytes
+/// Encode public ZHTP request to CBOR bytes (full ZhtpRequest struct)
 pub fn encode_public_request(request: &ZhtpRequest) -> Result<Vec<u8>> {
     let mut buffer = Vec::new();
     ciborium::ser::into_writer(request, &mut buffer)

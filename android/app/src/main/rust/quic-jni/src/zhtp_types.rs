@@ -1,18 +1,21 @@
-//! ZHTP Protocol Types - Public Mode Only (Unauthenticated)
+//! ZHTP Protocol Types - Public Mode and Authenticated Request Types
 //!
 //! Implements serializable types matching server's lib-protocols definitions.
-//! Only includes public mode - no authentication/session state.
+//! For authenticated requests, uses manual CBOR encoding in zhtp_codec.rs
+//! to match iOS's non-standard byte array encoding (majorType 4).
 
 use serde::{Deserialize, Serialize};
 
 /// Authentication context - sent with authenticated ZHTP requests
-/// Field order must match server's CBOR decoding
+/// Field order must match server's CBOR decoding.
+/// Note: When using authenticated requests, these fields are manually encoded
+/// as CBOR arrays (majorType 4) in zhtp_codec::encode_authenticated_request_manual()
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct AuthContext {
-    pub session_id: Vec<u8>,  // [u8; 32]
+    pub session_id: Vec<u8>,
     pub client_did: String,
     pub sequence: u64,
-    pub request_mac: Vec<u8>, // [u8; 32]
+    pub request_mac: Vec<u8>,
 }
 
 /// ZHTP HTTP method enum (matches server encoding)
@@ -64,6 +67,22 @@ impl ZhtpMethod {
             _ => None,
         }
     }
+
+    /// Get string representation for CBOR encoding (PascalCase as per serde config)
+    pub fn as_str(&self) -> &'static str {
+        match self {
+            ZhtpMethod::Get => "Get",
+            ZhtpMethod::Post => "Post",
+            ZhtpMethod::Put => "Put",
+            ZhtpMethod::Delete => "Delete",
+            ZhtpMethod::Options => "Options",
+            ZhtpMethod::Head => "Head",
+            ZhtpMethod::Patch => "Patch",
+            ZhtpMethod::Verify => "Verify",
+            ZhtpMethod::Connect => "Connect",
+            ZhtpMethod::Trace => "Trace",
+        }
+    }
 }
 
 /// ZHTP Headers - required and optional fields
@@ -101,12 +120,14 @@ pub struct ZhtpRequest {
 }
 
 /// ZHTP Request Wire - transport envelope
+/// Note: request_id is manually encoded as a CBOR array in authenticated requests
+/// via encode_authenticated_request_manual()
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct ZhtpRequestWire {
-    pub version: u16, // 1
-    pub request_id: Vec<u8>, // [u8; 16] - serialize as bytes
+    pub version: u16,
+    pub request_id: Vec<u8>,
     pub timestamp_ms: u64,
-    pub auth_context: Option<AuthContext>, // null for public mode
+    pub auth_context: Option<AuthContext>,
     pub request: ZhtpRequest,
 }
 

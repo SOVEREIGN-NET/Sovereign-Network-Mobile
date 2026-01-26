@@ -32,7 +32,8 @@ class Web4Client(
             headersJson = """{"content-type":"application/json"}""",
             body = payload.toString(),
             timeoutSecs = timeoutSecs,
-            insecure = insecure
+            insecure = insecure,
+            alpn = "public"
         ) ?: throw IllegalStateException("No response")
 
         val status = (response["status"] as? Number)?.toInt() ?: 0
@@ -76,7 +77,8 @@ class Web4Client(
             headersJson = """{"content-type":"application/json"}""",
             body = payload.toString(),
             timeoutSecs = timeoutSecs,
-            insecure = insecure
+            insecure = insecure,
+            alpn = "public"
         ) ?: throw IllegalStateException("No response")
 
         val status = (response["status"] as? Number)?.toInt() ?: 0
@@ -169,7 +171,8 @@ class Web4Client(
             headersJson = """{"content-type":"application/json"}""",
             body = payload.toString().toByteArray(),
             timeoutSecs = timeoutSecs,
-            insecure = insecure
+            insecure = insecure,
+            alpn = "public"
         ) ?: throw IllegalStateException("No response")
 
         val status = (response["status"] as? Number)?.toInt() ?: 0

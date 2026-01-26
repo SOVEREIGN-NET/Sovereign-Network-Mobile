@@ -3,7 +3,7 @@
 //! Sends authenticated requests with UHP handshake and session management
 
 use crate::zhtp_types::{ZhtpMethod, ZhtpRequestWire, ZhtpRequest, ZhtpHeaders, AuthContext};
-use crate::zhtp_codec::{encode_request, decode_response};
+use crate::zhtp_codec::{encode_authenticated_request_manual, decode_response};
 use crate::zhtp_framing::{frame_encode, frame_decode_message};
 use crate::zhtp_auth::{build_auth_context, AuthSession};
 use quinn::Connection;
@@ -112,9 +112,9 @@ pub async fn send_authenticated_zhtp_request(
 
     log::info!("[🌐 Web4] [ZHTP Auth] Sending authenticated {} {}", method_str, path);
 
-    // Encode to CBOR
-    let cbor_data = encode_request(&request_wire)?;
-    log::info!("[🌐 Web4] [ZHTP Auth] CBOR encoded: {} bytes", cbor_data.len());
+    // Encode to CBOR using manual encoding (matches iOS byte-for-byte)
+    let cbor_data = encode_authenticated_request_manual(&request_wire)?;
+    log::info!("[🌐 Web4] [ZHTP Auth] CBOR encoded (manual): {} bytes", cbor_data.len());
 
     // Frame it (add 4-byte length prefix)
     let framed_data = frame_encode(&cbor_data)?;
