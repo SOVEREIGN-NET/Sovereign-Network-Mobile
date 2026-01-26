@@ -26,6 +26,8 @@ class Web4Client(
             put("version", JSONObject.NULL)
         }
         val url = makeUrl("/api/v1/web4/domains/resolve")
+        Log.i(tag, "Resolving domain: $domain with alpn=public")
+
         val response = NativeQuicBridge.request(
             url = url,
             method = "POST",
@@ -34,16 +36,25 @@ class Web4Client(
             timeoutSecs = timeoutSecs,
             insecure = insecure,
             alpn = "public"
-        ) ?: throw IllegalStateException("No response")
+        ) ?: throw IllegalStateException("No response from resolver")
 
         val status = (response["status"] as? Number)?.toInt() ?: 0
+        val responseBody = response["body"] as? String ?: ""
+
+        Log.d(tag, "Resolver response: status=$status")
         if (status !in 200..299) {
-            val error = response["body"] as? String ?: "resolve_failed"
-            throw IllegalStateException("Resolve failed ($status): $error")
+            Log.e(tag, "Resolve failed ($status): $responseBody")
+            throw IllegalStateException("Resolve failed ($status): $responseBody")
         }
 
-        val body = response["body"] as? String ?: throw IllegalStateException("Empty resolve body")
-        val json = JSONObject(body)
+        if (responseBody.isEmpty()) {
+            Log.e(tag, "Empty resolve response body")
+            throw IllegalStateException("Empty resolve body")
+        }
+
+        val json = JSONObject(responseBody)
+        Log.d(tag, "Domain resolved successfully: ${json.optString("domain")}")
+
 
         val version = if (json.has("version") && !json.isNull("version")) {
             json.optLong("version")
@@ -71,6 +82,8 @@ class Web4Client(
             put("cid", manifestCid)
         }
         val url = makeUrl("/api/v1/web4/content/manifest")
+        Log.i(tag, "Fetching manifest: $manifestCid")
+
         val response = NativeQuicBridge.request(
             url = url,
             method = "POST",
@@ -79,16 +92,24 @@ class Web4Client(
             timeoutSecs = timeoutSecs,
             insecure = insecure,
             alpn = "public"
-        ) ?: throw IllegalStateException("No response")
+        ) ?: throw IllegalStateException("No response from manifest server")
 
         val status = (response["status"] as? Number)?.toInt() ?: 0
+        val responseBody = response["body"] as? String ?: ""
+
+        Log.d(tag, "Manifest response: status=$status")
         if (status !in 200..299) {
-            val error = response["body"] as? String ?: "manifest_failed"
-            throw IllegalStateException("Manifest fetch failed ($status): $error")
+            Log.e(tag, "Manifest fetch failed ($status): $responseBody")
+            throw IllegalStateException("Manifest fetch failed ($status): $responseBody")
         }
 
-        val body = response["body"] as? String ?: throw IllegalStateException("Empty manifest body")
-        val json = JSONObject(body)
+        if (responseBody.isEmpty()) {
+            Log.e(tag, "Empty manifest response body")
+            throw IllegalStateException("Empty manifest body")
+        }
+
+        val json = JSONObject(responseBody)
+        Log.d(tag, "Manifest fetched successfully")
 
         val files = mutableListOf<Web4ManifestFile>()
         val filesNode = json.opt("files")
@@ -165,6 +186,8 @@ class Web4Client(
             put("cid", cid)
         }
         val url = makeUrl("/api/v1/web4/content/blob")
+        Log.i(tag, "Fetching blob: $cid")
+
         val response = NativeQuicBridge.requestBytes(
             url = url,
             method = "POST",
@@ -173,15 +196,24 @@ class Web4Client(
             timeoutSecs = timeoutSecs,
             insecure = insecure,
             alpn = "public"
-        ) ?: throw IllegalStateException("No response")
+        ) ?: throw IllegalStateException("No response from blob server")
 
         val status = (response["status"] as? Number)?.toInt() ?: 0
+        val error = response["error"] as? String ?: ""
+
+        Log.d(tag, "Blob response: status=$status, size=${(response["body"] as? ByteArray)?.size ?: 0}")
         if (status !in 200..299) {
-            val error = response["error"] as? String ?: "blob_failed"
+            Log.e(tag, "Blob fetch failed ($status): $error")
             throw IllegalStateException("Blob fetch failed ($status): $error")
         }
 
-        val body = response["body"] as? ByteArray ?: throw IllegalStateException("Empty blob body")
+        val body = response["body"] as? ByteArray
+        if (body == null || body.isEmpty()) {
+            Log.e(tag, "Empty blob response body")
+            throw IllegalStateException("Empty blob body")
+        }
+
+        Log.d(tag, "Blob fetched successfully: ${body.size} bytes")
         return body
     }
 }

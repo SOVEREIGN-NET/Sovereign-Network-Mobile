@@ -133,6 +133,21 @@ export const SecureIdentityStorage = {
         console.log('[SecureIdentityStorage] ℹ️ Biometric authentication cancelled by user');
         return null;
       }
+
+      // If decryption failed (Android Keystore reset, fingerprint changed, etc),
+      // clear the corrupted identity data so user can create a new one
+      if (error.message?.includes('Decryption failed') ||
+          error.message?.includes('Authentication tag verification failed') ||
+          error.message?.includes('Signature/MAC verification failed')) {
+        console.error('[SecureIdentityStorage] 🔄 Decryption failed - clearing corrupted identity', error?.message);
+        try {
+          await this.clearIdentity();
+        } catch (clearError) {
+          console.error('[SecureIdentityStorage] Failed to clear corrupted identity:', clearError);
+        }
+        return null;
+      }
+
       console.error('[SecureIdentityStorage] ❌ Failed to retrieve identity:', error?.message || error);
       return null;
     }
