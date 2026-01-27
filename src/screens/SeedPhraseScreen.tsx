@@ -5,8 +5,7 @@
  */
 
 import React, { useState, useEffect } from 'react';
-import { View, ScrollView, Pressable, Alert } from 'react-native';
-// import Clipboard from '@react-native-clipboard/clipboard';
+import { View, ScrollView, Pressable } from 'react-native';
 import { NativeStackScreenProps } from '@react-navigation/native-stack';
 import {
   Card,
@@ -60,7 +59,6 @@ const SeedPhraseScreen = ({ navigation, route }: SeedPhraseScreenProps) => {
   } = route.params || {};
   const { setCurrentIdentity } = useAuth();
 
-  const [copied, setCopied] = useState(false);
   const [confirmedSaved, setConfirmedSaved] = useState(false);
   const [showPhrase, setShowPhrase] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
@@ -90,7 +88,6 @@ const SeedPhraseScreen = ({ navigation, route }: SeedPhraseScreenProps) => {
     // Reset state when navigating to new wallet
     setConfirmedSaved(false);
     setShowPhrase(false);
-    setCopied(false);
     setVaultState('idle');
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [walletType, currentStep]);
@@ -116,19 +113,6 @@ const SeedPhraseScreen = ({ navigation, route }: SeedPhraseScreenProps) => {
       </ScreenLayout>
     );
   }
-
-  // const handleCopy = async () => {
-  //   try {
-  //     const phraseText = seedPhrases.join(' ');
-  //     Clipboard.setString(phraseText);
-  //     setCopied(true);
-  //     Alert.alert('Copied', 'Seed phrase copied to clipboard');
-  //     setTimeout(() => setCopied(false), 2000);
-  //   } catch (err) {
-  //     console.error('Failed to copy:', err);
-  //     Alert.alert('Error', 'Failed to copy to clipboard');
-  //   }
-  // };
 
   const handleSecureSave = async () => {
     if (!seedPhrases?.length || !isSecureStorageSupported) {
@@ -362,29 +346,6 @@ const SeedPhraseScreen = ({ navigation, route }: SeedPhraseScreenProps) => {
                       ))}
                     </Column>
                   </Row>
-
-                  {/* Copy Button - DISABLED */}
-                  <Pressable
-                    onPress={() => {}}
-                    style={{
-                      marginTop: spacing.md,
-                      paddingVertical: spacing.sm,
-                      paddingHorizontal: spacing.md,
-                      backgroundColor: copied ? colors.success : colors.primary,
-                      borderRadius: borderRadius.sm,
-                      alignItems: 'center',
-                    }}
-                  >
-                    <Text
-                      style={{
-                        fontSize: typography.size.xs,
-                        color: colors.white,
-                        fontWeight: typography.weight.semibold,
-                      }}
-                    >
-                      {copied ? '✓ Copied!' : '📋 Copy to Clipboard'}
-                    </Text>
-                  </Pressable>
                 </View>
               ) : (
                 <Pressable
