@@ -177,6 +177,7 @@ const DashboardScreen: React.FC<any> = ({ navigation }) => {
               return (
                 <Animated.View
                   key={dapp.id}
+                  onTouchEnd={() => openBrowser(dapp.url)}
                   style={{
                     flexDirection: 'row',
                     justifyContent: 'space-between',

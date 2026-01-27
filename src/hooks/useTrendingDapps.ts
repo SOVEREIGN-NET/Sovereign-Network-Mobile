@@ -5,6 +5,7 @@ export interface DappData {
   id: string;
   name: string;
   desc: string;
+  url: string;
   activeUsers: number;
   change: number;
   activityLevel: 'high' | 'medium' | 'low';
@@ -17,16 +18,17 @@ interface DappConfig {
   id: string;
   name: string;
   desc: string;
+  url: string;
   baseUsers: number;
   volatility: number;
   baseChange: number;
 }
 
 const DAPP_CONFIGS: DappConfig[] = [
-  { id: 'defi', name: 'DeFi Hub', desc: 'Decentralized finance', baseUsers: 342, volatility: 0.08, baseChange: 234 },
-  { id: 'gamefi', name: 'GameFi Arena', desc: 'Play-to-earn gaming', baseUsers: 287, volatility: 0.12, baseChange: 189 },
-  { id: 'nft', name: 'NFT Marketplace', desc: 'Trade collectibles', baseUsers: 156, volatility: 0.06, baseChange: 156 },
-  { id: 'social', name: 'Social Graph', desc: 'Decentralized social', baseUsers: 89, volatility: 0.1, baseChange: 143 },
+  { id: 'central', name: 'Central.sov', desc: 'CBE applications', url: 'zhtp://central.sov', baseUsers: 342, volatility: 0.08, baseChange: 234 },
+  { id: 'sovswap', name: 'SovSwap', desc: 'DAO registry - Token Swap', url: 'zhtp://sovswap.sov', baseUsers: 287, volatility: 0.12, baseChange: 189 },
+  { id: 'breakroom', name: 'Breakroom', desc: 'Employee management', url: 'zhtp://breakroom.sov', baseUsers: 156, volatility: 0.06, baseChange: 156 },
+  { id: 'ballot', name: 'Ballot', desc: 'Voting Platform', url: 'zhtp://ballot.sov', baseUsers: 89, volatility: 0.1, baseChange: 143 },
 ];
 
 const UPDATE_INTERVAL = 8000;
@@ -60,6 +62,7 @@ export const useTrendingDapps = (): DappData[] => {
       id: config.id,
       name: config.name,
       desc: config.desc,
+      url: config.url,
       activeUsers: config.baseUsers,
       change: config.baseChange,
       activityLevel: getActivityLevel(config.volatility, config.baseChange),
