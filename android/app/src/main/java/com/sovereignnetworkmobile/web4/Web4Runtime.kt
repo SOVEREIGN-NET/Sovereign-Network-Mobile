@@ -40,11 +40,22 @@ class Web4Runtime(
             ?: resolveManifest(domain)
 
         // Normalize path: "/" -> "/index.html"
-        val normalizedPath = if (path == "/" || path.isEmpty()) "/index.html" else path
+        var normalizedPath = if (path == "/" || path.isEmpty()) "/index.html" else path
 
-        // Try exact match first, then fallback to /index.html for SPA behavior
-        val fileEntry = manifest.files.find { it.path == normalizedPath }
-            ?: manifest.files.find { it.path == "/index.html" }
+        // Try exact match first
+        var fileEntry = manifest.files.find { it.path == normalizedPath }
+
+        // If not found and path starts with /, try without leading slash (manifest may not include it)
+        if (fileEntry == null && normalizedPath.startsWith("/")) {
+            val pathWithoutSlash = normalizedPath.substring(1)
+            fileEntry = manifest.files.find { it.path == pathWithoutSlash }
+        }
+
+        // Fallback to /index.html or index.html for SPA behavior
+        if (fileEntry == null) {
+            fileEntry = manifest.files.find { it.path == "/index.html" }
+                ?: manifest.files.find { it.path == "index.html" }
+        }
 
         fileEntry ?: return null
 

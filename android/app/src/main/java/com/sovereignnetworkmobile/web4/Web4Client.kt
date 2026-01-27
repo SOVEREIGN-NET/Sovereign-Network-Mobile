@@ -55,7 +55,6 @@ class Web4Client(
         val json = JSONObject(responseBody)
         Log.d(tag, "Domain resolved successfully: ${json.optString("domain")}")
 
-
         val version = if (json.has("version") && !json.isNull("version")) {
             json.optLong("version")
         } else {
@@ -68,9 +67,21 @@ class Web4Client(
             null
         }
 
+        // Try both field names: web4_manifest_cid (new) and manifest_cid (old)
+        val manifestCid = if (json.has("web4_manifest_cid") && !json.isNull("web4_manifest_cid")) {
+            json.getString("web4_manifest_cid")
+        } else {
+            json.optString("manifest_cid", null)
+        }
+
+        if (manifestCid == null) {
+            Log.e(tag, "Missing manifest_cid or web4_manifest_cid in resolver response")
+            throw IllegalStateException("Missing manifest_cid in resolver response")
+        }
+
         return Web4ResolveResponse(
             domain = json.getString("domain"),
-            manifest_cid = json.getString("manifest_cid"),
+            manifest_cid = manifestCid,
             version = version,
             spa = json.optBoolean("spa", false),
             spa_fallback = resolveSpaFallback
