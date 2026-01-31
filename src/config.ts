@@ -59,6 +59,16 @@ export const DEFAULT_NODE_PORT = parsedPort;
  */
 export const DEFAULT_NETWORK_TYPE: 'testnet' | 'mainnet' = 'testnet';
 
+/**
+ * Determine if testnet uses self-signed certificates
+ * Testnet (77.42.37.161) uses self-signed rcgen certificates with certificate pinning
+ * Mainnet would use proper SSL certificates
+ */
+function isTestnetWithSelfSignedCerts(): boolean {
+  const networkType = DEFAULT_NETWORK_TYPE;
+  return networkType === 'testnet'; // Testnet server uses self-signed cert
+}
+
 // =============================================================================
 // API ENDPOINTS
 // =============================================================================
@@ -151,8 +161,12 @@ export const QUIC_CONFIG = {
   /** Default request timeout in seconds */
   defaultTimeout: 30,
 
-  /** Accept self-signed certificates (dev mode) */
-  insecure: __DEV__,
+  /** Accept self-signed certificates in:
+   * 1. Development builds (__DEV__)
+   * 2. Testnet (uses self-signed rcgen certificates with certificate pinning)
+   * Mainnet would require proper SSL certificates
+   */
+  insecure: __DEV__ || isTestnetWithSelfSignedCerts(),
 
   /** Fallback to HTTP if QUIC unavailable - disabled since server is pure QUIC */
   fallbackToHttp: false,
@@ -180,6 +194,19 @@ export const APP_DEFAULTS = {
 
   /** Debug mode - extra logging */
   debugMode: __DEV__,
+} as const;
+
+// =============================================================================
+// FEATURE FLAGS
+// =============================================================================
+
+/**
+ * Compile-time feature flags for experimental or development features
+ * Set flags based on development mode - only visible in dev builds by default
+ */
+export const FEATURE_FLAGS = {
+  /** Enable Token Creator UI - create, mint, transfer tokens */
+  ENABLE_TOKEN_CREATOR: __DEV__,
 } as const;
 
 // =============================================================================

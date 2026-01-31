@@ -117,3 +117,93 @@ fn identity_to_handshake_json(identity: &Identity) -> Result<String> {
 
     Ok(serde_json::to_string(&zhtp_identity)?)
 }
+
+/// Build a signed token create transaction (hex-encoded)
+pub fn build_token_create_transaction(
+    identity_json: &str,
+    name: &str,
+    symbol: &str,
+    initial_supply: u64,
+    decimals: u8,
+    chain_id: u8,
+) -> Result<String> {
+    let identity = deserialize_identity(identity_json)?;
+    zhtp_client::build_create_token_tx(&identity, name, symbol, initial_supply, decimals, chain_id)
+        .map_err(|e| anyhow::anyhow!("Failed to build token create transaction: {}", e))
+}
+
+/// Build a signed token mint transaction (hex-encoded)
+pub fn build_token_mint_transaction(
+    identity_json: &str,
+    token_id: &[u8],
+    to_pubkey: &[u8],
+    amount: u64,
+    chain_id: u8,
+) -> Result<String> {
+    let identity = deserialize_identity(identity_json)?;
+
+    let mut token_id_arr = [0u8; 32];
+    if token_id.len() >= 32 {
+        token_id_arr.copy_from_slice(&token_id[..32]);
+    } else {
+        token_id_arr[..token_id.len()].copy_from_slice(token_id);
+    }
+
+    let mut to_arr = [0u8; 32];
+    if to_pubkey.len() >= 32 {
+        to_arr.copy_from_slice(&to_pubkey[..32]);
+    } else {
+        to_arr[..to_pubkey.len()].copy_from_slice(to_pubkey);
+    }
+
+    zhtp_client::build_mint_tx(&identity, &token_id_arr, &to_arr, amount, chain_id)
+        .map_err(|e| anyhow::anyhow!("Failed to build token mint transaction: {}", e))
+}
+
+/// Build a signed token transfer transaction (hex-encoded)
+pub fn build_token_transfer_transaction(
+    identity_json: &str,
+    token_id: &[u8],
+    to_pubkey: &[u8],
+    amount: u64,
+    chain_id: u8,
+) -> Result<String> {
+    let identity = deserialize_identity(identity_json)?;
+
+    let mut token_id_arr = [0u8; 32];
+    if token_id.len() >= 32 {
+        token_id_arr.copy_from_slice(&token_id[..32]);
+    } else {
+        token_id_arr[..token_id.len()].copy_from_slice(token_id);
+    }
+
+    let mut to_arr = [0u8; 32];
+    if to_pubkey.len() >= 32 {
+        to_arr.copy_from_slice(&to_pubkey[..32]);
+    } else {
+        to_arr[..to_pubkey.len()].copy_from_slice(to_pubkey);
+    }
+
+    zhtp_client::build_transfer_tx(&identity, &token_id_arr, &to_arr, amount, chain_id)
+        .map_err(|e| anyhow::anyhow!("Failed to build token transfer transaction: {}", e))
+}
+
+/// Build a signed token burn transaction (hex-encoded)
+pub fn build_token_burn_transaction(
+    identity_json: &str,
+    token_id: &[u8],
+    amount: u64,
+    chain_id: u8,
+) -> Result<String> {
+    let identity = deserialize_identity(identity_json)?;
+
+    let mut token_id_arr = [0u8; 32];
+    if token_id.len() >= 32 {
+        token_id_arr.copy_from_slice(&token_id[..32]);
+    } else {
+        token_id_arr[..token_id.len()].copy_from_slice(token_id);
+    }
+
+    zhtp_client::build_burn_tx(&identity, &token_id_arr, amount, chain_id)
+        .map_err(|e| anyhow::anyhow!("Failed to build token burn transaction: {}", e))
+}

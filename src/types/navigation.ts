@@ -35,6 +35,7 @@ export type SIDStackParamList = {
   ReceiveTokens: undefined;
   StakeTokens: undefined;
   ConfirmTransaction: undefined;
+  TokenCreator: undefined;
 };
 
 export type DAOStackParamList = {

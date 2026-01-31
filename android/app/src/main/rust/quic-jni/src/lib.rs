@@ -515,6 +515,125 @@ pub extern "system" fn Java_com_sovereignnetworkmobile_NativeIdentityProvisionin
     create_signature_map(&mut env, result)
 }
 
+/// Build signed token create transaction
+#[no_mangle]
+pub extern "system" fn Java_com_sovereignnetworkmobile_NativeIdentityProvisioning_nativeBuildTokenCreate<'local>(
+    mut env: JNIEnv<'local>,
+    _class: JClass<'local>,
+    identity_json: JString<'local>,
+    name: JString<'local>,
+    symbol: JString<'local>,
+    initial_supply: jni::sys::jlong,
+    decimals: jni::sys::jint,
+    chain_id: jni::sys::jint,
+) -> JString<'local> {
+    let identity_json_str: String = match env.get_string(&identity_json) {
+        Ok(s) => s.into(),
+        Err(_) => return env.new_string("").unwrap_or_default(),
+    };
+    let name_str: String = match env.get_string(&name) {
+        Ok(s) => s.into(),
+        Err(_) => return env.new_string("").unwrap_or_default(),
+    };
+    let symbol_str: String = match env.get_string(&symbol) {
+        Ok(s) => s.into(),
+        Err(_) => return env.new_string("").unwrap_or_default(),
+    };
+
+    match identity_bridge::build_token_create_transaction(
+        &identity_json_str,
+        &name_str,
+        &symbol_str,
+        initial_supply as u64,
+        decimals as u8,
+        chain_id as u8,
+    ) {
+        Ok(hex_tx) => env.new_string(&hex_tx).unwrap_or_default(),
+        Err(e) => {
+            log::error!("Failed to build token create transaction: {}", e);
+            env.new_string("").unwrap_or_default()
+        }
+    }
+}
+
+/// Build signed token mint transaction
+#[no_mangle]
+pub extern "system" fn Java_com_sovereignnetworkmobile_NativeIdentityProvisioning_nativeBuildTokenMint<'local>(
+    mut env: JNIEnv<'local>,
+    _class: JClass<'local>,
+    identity_json: JString<'local>,
+    token_id: JByteArray<'local>,
+    to_pubkey: JByteArray<'local>,
+    amount: jni::sys::jlong,
+    chain_id: jni::sys::jint,
+) -> JString<'local> {
+    let identity_json_str: String = match env.get_string(&identity_json) {
+        Ok(s) => s.into(),
+        Err(_) => return env.new_string("").unwrap_or_default(),
+    };
+    let token_id_bytes: Vec<u8> = match env.convert_byte_array(&token_id) {
+        Ok(b) => b,
+        Err(_) => return env.new_string("").unwrap_or_default(),
+    };
+    let to_pubkey_bytes: Vec<u8> = match env.convert_byte_array(&to_pubkey) {
+        Ok(b) => b,
+        Err(_) => return env.new_string("").unwrap_or_default(),
+    };
+
+    match identity_bridge::build_token_mint_transaction(
+        &identity_json_str,
+        &token_id_bytes,
+        &to_pubkey_bytes,
+        amount as u64,
+        chain_id as u8,
+    ) {
+        Ok(hex_tx) => env.new_string(&hex_tx).unwrap_or_default(),
+        Err(e) => {
+            log::error!("Failed to build token mint transaction: {}", e);
+            env.new_string("").unwrap_or_default()
+        }
+    }
+}
+
+/// Build signed token transfer transaction
+#[no_mangle]
+pub extern "system" fn Java_com_sovereignnetworkmobile_NativeIdentityProvisioning_nativeBuildTokenTransfer<'local>(
+    mut env: JNIEnv<'local>,
+    _class: JClass<'local>,
+    identity_json: JString<'local>,
+    token_id: JByteArray<'local>,
+    to_pubkey: JByteArray<'local>,
+    amount: jni::sys::jlong,
+    chain_id: jni::sys::jint,
+) -> JString<'local> {
+    let identity_json_str: String = match env.get_string(&identity_json) {
+        Ok(s) => s.into(),
+        Err(_) => return env.new_string("").unwrap_or_default(),
+    };
+    let token_id_bytes: Vec<u8> = match env.convert_byte_array(&token_id) {
+        Ok(b) => b,
+        Err(_) => return env.new_string("").unwrap_or_default(),
+    };
+    let to_pubkey_bytes: Vec<u8> = match env.convert_byte_array(&to_pubkey) {
+        Ok(b) => b,
+        Err(_) => return env.new_string("").unwrap_or_default(),
+    };
+
+    match identity_bridge::build_token_transfer_transaction(
+        &identity_json_str,
+        &token_id_bytes,
+        &to_pubkey_bytes,
+        amount as u64,
+        chain_id as u8,
+    ) {
+        Ok(hex_tx) => env.new_string(&hex_tx).unwrap_or_default(),
+        Err(e) => {
+            log::error!("Failed to build token transfer transaction: {}", e);
+            env.new_string("").unwrap_or_default()
+        }
+    }
+}
+
 /// Make an HTTP request over QUIC returning raw bytes
 #[no_mangle]
 pub extern "system" fn Java_com_sovereignnetworkmobile_NativeQuicBridge_nativeRequestBytes<'local>(

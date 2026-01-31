@@ -25,6 +25,7 @@ public class IdentityHandleStore {
     public static let shared = IdentityHandleStore()
 
     private var identities: [String: Any] = [:]
+    private var latestIdentity: Any? = nil
     private let queue = DispatchQueue(label: "com.sovereign.identity-handle-store", attributes: .concurrent)
 
     private init() {}
@@ -51,6 +52,7 @@ public class IdentityHandleStore {
         queue.sync(flags: .barrier) {
             // Store by DID (primary key)
             identities[actualDid] = identity
+            latestIdentity = identity
 
             // Also store by identity_id hash if provided (for handshake lookup)
             if let idHash = identityId {
@@ -98,10 +100,18 @@ public class IdentityHandleStore {
         }
     }
 
+    /// Get the most recently stored identity (for token signing operations)
+    public func getLatestIdentity() -> Any? {
+        return queue.sync {
+            latestIdentity
+        }
+    }
+
     /// Clear all stored identities
     public func clear() {
         queue.sync(flags: .barrier) {
             identities.removeAll()
+            latestIdentity = nil
         }
     }
 }

@@ -27,4 +27,16 @@ RCT_EXTERN_METHOD(restoreIdentityToHandleStore:(NSString *)identityId
 
 RCT_EXTERN_METHOD(cleanKeystoreDirectory)
 
+RCT_EXTERN_METHOD(signTokenCreateTransaction:(NSDictionary *)params
+                  resolve:(RCTPromiseResolveBlock)resolve
+                  reject:(RCTPromiseRejectBlock)reject)
+
+RCT_EXTERN_METHOD(signTokenMintTransaction:(NSDictionary *)params
+                  resolve:(RCTPromiseResolveBlock)resolve
+                  reject:(RCTPromiseRejectBlock)reject)
+
+RCT_EXTERN_METHOD(signTokenTransferTransaction:(NSDictionary *)params
+                  resolve:(RCTPromiseResolveBlock)resolve
+                  reject:(RCTPromiseRejectBlock)reject)
+
 @end

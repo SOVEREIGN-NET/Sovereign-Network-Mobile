@@ -89,6 +89,57 @@ class NativeIdentityProvisioningBridge {
 
     return await this.nativeModule.storeProvisionedIdentity(identityId, didData);
   }
+
+  /**
+   * Sign a token creation transaction with Dilithium keypair
+   * Private key remains in device Keychain - never reaches JavaScript
+   * Returns hex-encoded signed transaction ready for API
+   */
+  async signTokenCreateTransaction(params: {
+    name: string;
+    symbol: string;
+    initialSupply: number;
+    decimals: number;
+    maxSupply: number | null;
+  }): Promise<{ signed_tx: string }> {
+    if (!this.nativeModule) {
+      throw new Error('NativeIdentityProvisioning not available on this platform');
+    }
+
+    return await this.nativeModule.signTokenCreateTransaction(params);
+  }
+
+  /**
+   * Sign a token mint transaction with Dilithium keypair
+   * Returns hex-encoded signed transaction ready for API
+   */
+  async signTokenMintTransaction(params: {
+    tokenId: string;
+    amount: number;
+    recipientDid: string;
+  }): Promise<{ signed_tx: string }> {
+    if (!this.nativeModule) {
+      throw new Error('NativeIdentityProvisioning not available on this platform');
+    }
+
+    return await this.nativeModule.signTokenMintTransaction(params);
+  }
+
+  /**
+   * Sign a token transfer transaction with Dilithium keypair
+   * Returns hex-encoded signed transaction ready for API
+   */
+  async signTokenTransferTransaction(params: {
+    tokenId: string;
+    toAddress: string;
+    amount: number;
+  }): Promise<{ signed_tx: string }> {
+    if (!this.nativeModule) {
+      throw new Error('NativeIdentityProvisioning not available on this platform');
+    }
+
+    return await this.nativeModule.signTokenTransferTransaction(params);
+  }
 }
 
 // Export singleton instance

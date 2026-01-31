@@ -222,6 +222,144 @@ class NativeIdentityProvisioning(reactContext: ReactApplicationContext) :
         return if (!androidId.isNullOrBlank()) androidId else UUID.randomUUID().toString()
     }
 
+    @ReactMethod
+    fun signTokenCreateTransaction(params: ReadableMap, promise: Promise) {
+        executor.execute {
+            try {
+                val name = params.getString("name") ?: ""
+                val symbol = params.getString("symbol") ?: ""
+                val initialSupply = params.getDouble("initialSupply").toLong()
+                val decimals = params.getInt("decimals")
+
+                val identity = getLatestIdentity()
+                if (identity == null) {
+                    promise.reject("IDENTITY_ERROR", "No identity available for signing")
+                    return@execute
+                }
+
+                Log.d(TAG, "Building token create transaction: $name/$symbol")
+
+                // Use lib-client JNI to build and sign the full transaction
+                // JNI handles: bincode serialization, signing, Transaction wrapping, hex encoding
+                val hexSignedTx = nativeBuildTokenCreate(
+                    identity.identityJson,
+                    name,
+                    symbol,
+                    initialSupply,
+                    decimals,
+                    0x02  // testnet
+                )
+
+                if (hexSignedTx == null) {
+                    promise.reject("SIGNING_ERROR", "Failed to build token creation transaction")
+                    return@execute
+                }
+
+                val response = WritableNativeMap().apply {
+                    putString("signed_tx", hexSignedTx)
+                }
+                promise.resolve(response)
+            } catch (e: Exception) {
+                Log.e(TAG, "Token creation signing failed", e)
+                promise.reject("IDENTITY_ERROR", "Failed to sign token creation: ${e.message}", e)
+            }
+        }
+    }
+
+    @ReactMethod
+    fun signTokenMintTransaction(params: ReadableMap, promise: Promise) {
+        executor.execute {
+            try {
+                val tokenId = params.getString("tokenId") ?: ""
+                val amount = params.getDouble("amount").toLong()
+                val recipientDid = params.getString("recipientDid") ?: ""
+
+                val identity = getLatestIdentity()
+                if (identity == null) {
+                    promise.reject("IDENTITY_ERROR", "No identity available for signing")
+                    return@execute
+                }
+
+                // Parse token ID and recipient from hex strings
+                val tokenIdBytes = tokenId.chunked(2).mapNotNull { it.toByteOrNull(16) }.toByteArray()
+                val recipientBytes = recipientDid.chunked(2).mapNotNull { it.toByteOrNull(16) }.toByteArray()
+
+                Log.d(TAG, "Building token mint transaction: $tokenId -> $recipientDid")
+
+                // Use lib-client JNI to build and sign the full transaction
+                val hexSignedTx = nativeBuildTokenMint(
+                    identity.identityJson,
+                    tokenIdBytes,
+                    recipientBytes,
+                    amount,
+                    0x02  // testnet
+                )
+
+                if (hexSignedTx == null) {
+                    promise.reject("SIGNING_ERROR", "Failed to build token mint transaction")
+                    return@execute
+                }
+
+                val response = WritableNativeMap().apply {
+                    putString("signed_tx", hexSignedTx)
+                }
+                promise.resolve(response)
+            } catch (e: Exception) {
+                Log.e(TAG, "Token mint signing failed", e)
+                promise.reject("IDENTITY_ERROR", "Failed to sign token mint: ${e.message}", e)
+            }
+        }
+    }
+
+    @ReactMethod
+    fun signTokenTransferTransaction(params: ReadableMap, promise: Promise) {
+        executor.execute {
+            try {
+                val tokenId = params.getString("tokenId") ?: ""
+                val toAddress = params.getString("toAddress") ?: ""
+                val amount = params.getDouble("amount").toLong()
+
+                val identity = getLatestIdentity()
+                if (identity == null) {
+                    promise.reject("IDENTITY_ERROR", "No identity available for signing")
+                    return@execute
+                }
+
+                // Parse token ID and recipient from hex strings
+                val tokenIdBytes = tokenId.chunked(2).mapNotNull { it.toByteOrNull(16) }.toByteArray()
+                val toAddressBytes = toAddress.chunked(2).mapNotNull { it.toByteOrNull(16) }.toByteArray()
+
+                Log.d(TAG, "Building token transfer transaction: $tokenId -> $toAddress")
+
+                // Use lib-client JNI to build and sign the full transaction
+                val hexSignedTx = nativeBuildTokenTransfer(
+                    identity.identityJson,
+                    tokenIdBytes,
+                    toAddressBytes,
+                    amount,
+                    0x02  // testnet
+                )
+
+                if (hexSignedTx == null) {
+                    promise.reject("SIGNING_ERROR", "Failed to build token transfer transaction")
+                    return@execute
+                }
+
+                val response = WritableNativeMap().apply {
+                    putString("signed_tx", hexSignedTx)
+                }
+                promise.resolve(response)
+            } catch (e: Exception) {
+                Log.e(TAG, "Token transfer signing failed", e)
+                promise.reject("IDENTITY_ERROR", "Failed to sign token transfer: ${e.message}", e)
+            }
+        }
+    }
+
+    private fun getLatestIdentity(): CachedIdentity? {
+        return cachedIdentities.values.lastOrNull()
+    }
+
     private fun b64(data: ByteArray): String {
         return Base64.encodeToString(data, Base64.NO_WRAP)
     }
@@ -229,4 +367,38 @@ class NativeIdentityProvisioning(reactContext: ReactApplicationContext) :
     // Native methods (implemented in Rust via JNI)
     private external fun nativeGenerateIdentity(deviceId: String): Any?
     private external fun nativeSignRegistrationProof(identityJson: String, timestamp: Long): Any?
+    private external fun nativeSignMessage(identityJson: String, messageData: ByteArray): Any?
+
+    // Token transaction building (returns hex-encoded signed transaction)
+    private external fun nativeBuildTokenCreate(
+        identityJson: String,
+        name: String,
+        symbol: String,
+        initialSupply: Long,
+        decimals: Int,
+        chainId: Int
+    ): String?
+
+    private external fun nativeBuildTokenMint(
+        identityJson: String,
+        tokenId: ByteArray,
+        toPubkey: ByteArray,
+        amount: Long,
+        chainId: Int
+    ): String?
+
+    private external fun nativeBuildTokenTransfer(
+        identityJson: String,
+        tokenId: ByteArray,
+        toPubkey: ByteArray,
+        amount: Long,
+        chainId: Int
+    ): String?
+
+    private external fun nativeBuildTokenBurn(
+        identityJson: String,
+        tokenId: ByteArray,
+        amount: Long,
+        chainId: Int
+    ): String?
 }

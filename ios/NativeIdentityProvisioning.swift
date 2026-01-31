@@ -560,6 +560,168 @@ class NativeIdentityProvisioning: NSObject {
         }
     }
 
+    // MARK: - Token Transaction Signing
+
+    /// Sign a token creation transaction with Dilithium keypair
+    /// Private key remains in Keychain - never reaches JavaScript
+    /// Returns hex-encoded signed transaction
+    @objc
+    func signTokenCreateTransaction(
+        _ params: NSDictionary,
+        resolve: @escaping RCTPromiseResolveBlock,
+        reject: @escaping RCTPromiseRejectBlock
+    ) {
+        queue.async { [weak self] in
+            do {
+                guard let name = params["name"] as? String,
+                      let symbol = params["symbol"] as? String,
+                      let initialSupply = params["initialSupply"] as? NSNumber,
+                      let decimals = params["decimals"] as? NSNumber else {
+                    reject("INVALID_PARAMS", "Missing required token parameters", nil)
+                    return
+                }
+
+                let maxSupply = params["maxSupply"] as? NSNumber
+
+                print("[NativeIdentityProvisioning] Building signed token create transaction")
+                print("[NativeIdentityProvisioning]   Name: \(name)")
+                print("[NativeIdentityProvisioning]   Symbol: \(symbol)")
+                print("[NativeIdentityProvisioning]   Supply: \(initialSupply)")
+
+                // Get the current identity from handle store
+                guard let identityAny = IdentityHandleStore.shared.getLatestIdentity(),
+                      let identity = identityAny as? Identity else {
+                    reject("NO_IDENTITY", "No active identity for signing", nil)
+                    return
+                }
+
+                // Use lib-client FFI to build and sign the full transaction
+                // FFI handles: bincode serialization, signing, Transaction wrapping, hex encoding
+                let hexSignedTx = try ZhtpClient.buildTokenCreate(
+                    name: name,
+                    symbol: symbol,
+                    initialSupply: initialSupply.uint64Value,
+                    decimals: decimals.uint8Value,
+                    using: identity,
+                    chainId: 0x02  // testnet
+                )
+
+                print("[NativeIdentityProvisioning] ✅ Token create transaction built and signed")
+                resolve(["signed_tx": hexSignedTx])
+
+            } catch {
+                print("[NativeIdentityProvisioning] ❌ Token signing failed: \(error)")
+                reject("SIGNING_ERROR", "Failed to sign token transaction: \(error)", nil)
+            }
+        }
+    }
+
+    /// Sign a token mint transaction with Dilithium keypair
+    @objc
+    func signTokenMintTransaction(
+        _ params: NSDictionary,
+        resolve: @escaping RCTPromiseResolveBlock,
+        reject: @escaping RCTPromiseRejectBlock
+    ) {
+        queue.async { [weak self] in
+            do {
+                guard let tokenId = params["tokenId"] as? String,
+                      let amount = params["amount"] as? NSNumber,
+                      let recipientDid = params["recipientDid"] as? String else {
+                    reject("INVALID_PARAMS", "Missing required mint parameters", nil)
+                    return
+                }
+
+                print("[NativeIdentityProvisioning] Building signed token mint transaction")
+                print("[NativeIdentityProvisioning]   Token ID: \(tokenId)")
+                print("[NativeIdentityProvisioning]   Amount: \(amount)")
+                print("[NativeIdentityProvisioning]   Recipient: \(recipientDid)")
+
+                guard let identityAny = IdentityHandleStore.shared.getLatestIdentity(),
+                      let identity = identityAny as? Identity else {
+                    reject("NO_IDENTITY", "No active identity for signing", nil)
+                    return
+                }
+
+                // Parse token ID and recipient DID from hex strings
+                guard let tokenIdData = Data(fromHexString: tokenId),
+                      let recipientPubkey = Data(fromHexString: recipientDid) else {
+                    reject("INVALID_PARAMS", "Invalid token ID or recipient DID format", nil)
+                    return
+                }
+
+                // Use lib-client FFI to build and sign the full transaction
+                let hexSignedTx = try ZhtpClient.buildTokenMint(
+                    tokenId: tokenIdData,
+                    toPublicKey: recipientPubkey,
+                    amount: amount.uint64Value,
+                    using: identity,
+                    chainId: 0x02  // testnet
+                )
+
+                print("[NativeIdentityProvisioning] ✅ Token mint transaction built and signed")
+                resolve(["signed_tx": hexSignedTx])
+
+            } catch {
+                print("[NativeIdentityProvisioning] ❌ Mint signing failed: \(error)")
+                reject("SIGNING_ERROR", "Failed to sign mint transaction: \(error)", nil)
+            }
+        }
+    }
+
+    /// Sign a token transfer transaction with Dilithium keypair
+    @objc
+    func signTokenTransferTransaction(
+        _ params: NSDictionary,
+        resolve: @escaping RCTPromiseResolveBlock,
+        reject: @escaping RCTPromiseRejectBlock
+    ) {
+        queue.async { [weak self] in
+            do {
+                guard let tokenId = params["tokenId"] as? String,
+                      let toAddress = params["toAddress"] as? String,
+                      let amount = params["amount"] as? NSNumber else {
+                    reject("INVALID_PARAMS", "Missing required transfer parameters", nil)
+                    return
+                }
+
+                print("[NativeIdentityProvisioning] Building signed token transfer transaction")
+                print("[NativeIdentityProvisioning]   Token ID: \(tokenId)")
+                print("[NativeIdentityProvisioning]   Amount: \(amount)")
+                print("[NativeIdentityProvisioning]   To: \(toAddress)")
+
+                guard let identityAny = IdentityHandleStore.shared.getLatestIdentity(),
+                      let identity = identityAny as? Identity else {
+                    reject("NO_IDENTITY", "No active identity for signing", nil)
+                    return
+                }
+
+                // Parse token ID and recipient address from hex strings
+                guard let tokenIdData = Data(fromHexString: tokenId),
+                      let toPubkey = Data(fromHexString: toAddress) else {
+                    reject("INVALID_PARAMS", "Invalid token ID or recipient address format", nil)
+                    return
+                }
+
+                // Use lib-client FFI to build and sign the full transaction
+                let hexSignedTx = try ZhtpClient.buildTokenTransfer(
+                    tokenId: tokenIdData,
+                    toPublicKey: toPubkey,
+                    amount: amount.uint64Value,
+                    using: identity,
+                    chainId: 0x02  // testnet
+                )
+
+                print("[NativeIdentityProvisioning] ✅ Token transfer transaction built and signed")
+                resolve(["signed_tx": hexSignedTx])
+
+            } catch {
+                print("[NativeIdentityProvisioning] ❌ Transfer signing failed: \(error)")
+                reject("SIGNING_ERROR", "Failed to sign transfer transaction: \(error)", nil)
+            }
+        }
+    }
+
     // MARK: - Module Configuration
 
     @objc
@@ -573,5 +735,27 @@ class NativeIdentityProvisioning: NSObject {
 extension Data {
     var hexString: String {
         map { String(format: "%02x", $0) }.joined()
+    }
+}
+
+extension Array where Element == UInt8 {
+    var hexString: String {
+        map { String(format: "%02x", $0) }.joined()
+    }
+}
+
+extension Data {
+    init?(fromHexString hexString: String) {
+        let hexString = hexString.hasPrefix("0x") ? String(hexString.dropFirst(2)) : hexString
+        let chars = Array(hexString)
+        guard chars.count % 2 == 0 else { return nil }
+
+        var data = Data()
+        for i in stride(from: 0, to: chars.count, by: 2) {
+            let hex = String([chars[i], chars[i + 1]])
+            guard let byte = UInt8(hex, radix: 16) else { return nil }
+            data.append(byte)
+        }
+        self = data
     }
 }

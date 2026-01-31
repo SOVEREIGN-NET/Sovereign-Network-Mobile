@@ -121,6 +121,17 @@ const PUBLIC_ENDPOINT_PATTERNS = [
 ];
 
 /**
+ * COMPLIANCE: Mutating endpoints that require identity auto-population
+ * These endpoints must derive sender/creator identity from authenticated session
+ * not from client-supplied request body
+ */
+const MUTATING_IDENTITY_ENDPOINTS = [
+  { path: '/api/v1/token/create', identityField: 'creator_identity' },
+  { path: '/api/v1/token/mint', identityField: 'creator_identity' },
+  { path: '/api/v1/token/transfer', identityField: 'from' },
+];
+
+/**
  * Determine if a URL path requires public (unauthenticated) ALPN
  */
 function isPublicEndpoint(url: string): boolean {
@@ -158,6 +169,53 @@ function normalizeIdentityBody(body: string, url?: string): string {
     return body;
   }
   return body;
+}
+
+/**
+ * COMPLIANCE: Populate identity fields in request body for mutating endpoints
+ * Ensures sender/creator identity is derived from authenticated session
+ * Called by convertOptions before final request preparation
+ */
+async function populateIdentityFields(body: string, url?: string, method?: string): Promise<string> {
+  if (!url || !body || method === 'GET') {
+    return body;
+  }
+
+  try {
+    const urlObj = new URL(url.replace(/^quic:\/\//, 'https://'));
+    const path = urlObj.pathname.replace(/\/+$/, '');
+
+    // Check if this is a mutating endpoint that requires identity
+    const identityEndpoint = MUTATING_IDENTITY_ENDPOINTS.find(e => path === e.path);
+    if (!identityEndpoint) {
+      return body;
+    }
+
+    // Get authenticated identity from session
+    const identityId = await SecureIdentityStorage.getIdentityId();
+    if (!identityId) {
+      console.warn('[QuicFetchAdapter] ⚠️ No authenticated identity for mutating endpoint:', path);
+      return body;
+    }
+
+    // Parse request body
+    const parsed = JSON.parse(body);
+    if (!parsed) {
+      return body;
+    }
+
+    // Populate identity field if not already set
+    if (!parsed[identityEndpoint.identityField]) {
+      parsed[identityEndpoint.identityField] = identityId;
+      console.log('[QuicFetchAdapter] ✓ Auto-populated identity field:', identityEndpoint.identityField);
+      return JSON.stringify(parsed);
+    }
+
+    return body;
+  } catch (error) {
+    console.warn('[QuicFetchAdapter] Failed to populate identity fields:', error);
+    return body;
+  }
 }
 
 /**
@@ -334,6 +392,15 @@ export function createQuicFetchAdapterSync(
         }
       } catch (error) {
         console.warn('[🌐 Web4] QuicFetchAdapter: Failed to retrieve identity_id:', error);
+      }
+
+      // COMPLIANCE: Populate identity fields in request body for mutating endpoints
+      if (quicOptions.body) {
+        try {
+          quicOptions.body = await populateIdentityFields(quicOptions.body, quicUrl, quicOptions.method);
+        } catch (error) {
+          console.warn('[QuicFetchAdapter] Failed to populate identity fields:', error);
+        }
       }
     }
 

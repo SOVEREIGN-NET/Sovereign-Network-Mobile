@@ -5,6 +5,7 @@
  */
 
 import { NativeModules, Platform } from 'react-native';
+import { QUIC_CONFIG } from '../config';
 
 const { NativeQuic } = NativeModules;
 
@@ -123,6 +124,7 @@ export async function quicRequest(
   console.log('[🌐 Web4] QuicClient:   Method:', requestOptions.method);
   console.log('[🌐 Web4] QuicClient:   ALPN:', requestOptions.alpn);
   console.log('[🌐 Web4] QuicClient:   Timeout:', requestOptions.timeout, 'seconds');
+  console.log('[🌐 Web4] QuicClient:   Insecure:', requestOptions.insecure, '(options.insecure=', options.insecure, ', __DEV__=', __DEV__, ')');
   if (options.body) {
     console.log('[🌐 Web4] QuicClient:   Body:', options.body);
   }
@@ -214,7 +216,7 @@ export async function testQuicHealthCheck(
     const response = await quicRequest(url, {
       method: 'GET',
       timeout: 10,
-      insecure: true,
+      insecure: QUIC_CONFIG.insecure,  // From config - allows self-signed certs for testnet
       alpn: 'public',
     });
 
