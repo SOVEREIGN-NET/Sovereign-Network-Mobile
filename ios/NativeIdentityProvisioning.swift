@@ -575,18 +575,41 @@ class NativeIdentityProvisioning: NSObject {
             do {
                 guard let name = params["name"] as? String,
                       let symbol = params["symbol"] as? String,
-                      let initialSupply = params["initialSupply"] as? NSNumber,
                       let decimals = params["decimals"] as? NSNumber else {
                     reject("INVALID_PARAMS", "Missing required token parameters", nil)
                     return
                 }
 
-                let maxSupply = params["maxSupply"] as? NSNumber
+                // Parse initialSupply - accept both String and NSNumber
+                // String is preferred to preserve exact value without float precision loss
+                var initialSupplyValue: UInt64 = 0
+                if let supplyStr = params["initialSupply"] as? String {
+                    guard let parsed = UInt64(supplyStr) else {
+                        reject("INVALID_PARAMS", "initialSupply must be a valid integer string", nil)
+                        return
+                    }
+                    initialSupplyValue = parsed
+                } else if let supplyNum = params["initialSupply"] as? NSNumber {
+                    initialSupplyValue = supplyNum.uint64Value
+                } else {
+                    reject("INVALID_PARAMS", "initialSupply is required (string or number)", nil)
+                    return
+                }
+
+                // Parse maxSupply - accept both String, NSNumber, or nil
+                var maxSupplyValue: UInt64? = nil
+                if let maxStr = params["maxSupply"] as? String {
+                    if !maxStr.isEmpty, let parsed = UInt64(maxStr) {
+                        maxSupplyValue = parsed
+                    }
+                } else if let maxNum = params["maxSupply"] as? NSNumber {
+                    maxSupplyValue = maxNum.uint64Value
+                }
 
                 print("[NativeIdentityProvisioning] Building signed token create transaction")
                 print("[NativeIdentityProvisioning]   Name: \(name)")
                 print("[NativeIdentityProvisioning]   Symbol: \(symbol)")
-                print("[NativeIdentityProvisioning]   Supply: \(initialSupply)")
+                print("[NativeIdentityProvisioning]   Supply: \(initialSupplyValue) (parsed from string)")
 
                 // Get the current identity from handle store
                 guard let identityAny = IdentityHandleStore.shared.getLatestIdentity(),
@@ -600,7 +623,7 @@ class NativeIdentityProvisioning: NSObject {
                 let hexSignedTx = try ZhtpClient.buildTokenCreate(
                     name: name,
                     symbol: symbol,
-                    initialSupply: initialSupply.uint64Value,
+                    initialSupply: initialSupplyValue,
                     decimals: decimals.uint8Value,
                     using: identity,
                     chainId: 0x02  // testnet
@@ -640,15 +663,30 @@ class NativeIdentityProvisioning: NSObject {
         queue.async { [weak self] in
             do {
                 guard let tokenId = params["tokenId"] as? String,
-                      let amount = params["amount"] as? NSNumber,
                       let recipientDid = params["recipientDid"] as? String else {
                     reject("INVALID_PARAMS", "Missing required mint parameters", nil)
                     return
                 }
 
+                // Parse amount - accept both String and Number
+                // String is preferred to preserve exact value without float precision loss
+                var amountValue: UInt64 = 0
+                if let amountStr = params["amount"] as? String {
+                    guard let parsed = UInt64(amountStr) else {
+                        reject("INVALID_PARAMS", "amount must be a valid integer string", nil)
+                        return
+                    }
+                    amountValue = parsed
+                } else if let amountNum = params["amount"] as? NSNumber {
+                    amountValue = amountNum.uint64Value
+                } else {
+                    reject("INVALID_PARAMS", "amount must be a string or number", nil)
+                    return
+                }
+
                 print("[NativeIdentityProvisioning] Building signed token mint transaction")
                 print("[NativeIdentityProvisioning]   Token ID: \(tokenId)")
-                print("[NativeIdentityProvisioning]   Amount: \(amount)")
+                print("[NativeIdentityProvisioning]   Amount: \(amountValue)")
                 print("[NativeIdentityProvisioning]   Recipient: \(recipientDid)")
 
                 guard let identityAny = IdentityHandleStore.shared.getLatestIdentity(),
@@ -668,7 +706,7 @@ class NativeIdentityProvisioning: NSObject {
                 let hexSignedTx = try ZhtpClient.buildTokenMint(
                     tokenId: tokenIdData,
                     toPublicKey: recipientPubkey,
-                    amount: amount.uint64Value,
+                    amount: amountValue,
                     using: identity,
                     chainId: 0x02  // testnet
                 )
@@ -706,15 +744,30 @@ class NativeIdentityProvisioning: NSObject {
         queue.async { [weak self] in
             do {
                 guard let tokenId = params["tokenId"] as? String,
-                      let toAddress = params["toAddress"] as? String,
-                      let amount = params["amount"] as? NSNumber else {
+                      let toAddress = params["toAddress"] as? String else {
                     reject("INVALID_PARAMS", "Missing required transfer parameters", nil)
+                    return
+                }
+
+                // Parse amount - accept both String and Number
+                // String is preferred to preserve exact value without float precision loss
+                var amountValue: UInt64 = 0
+                if let amountStr = params["amount"] as? String {
+                    guard let parsed = UInt64(amountStr) else {
+                        reject("INVALID_PARAMS", "amount must be a valid integer string", nil)
+                        return
+                    }
+                    amountValue = parsed
+                } else if let amountNum = params["amount"] as? NSNumber {
+                    amountValue = amountNum.uint64Value
+                } else {
+                    reject("INVALID_PARAMS", "amount must be a string or number", nil)
                     return
                 }
 
                 print("[NativeIdentityProvisioning] Building signed token transfer transaction")
                 print("[NativeIdentityProvisioning]   Token ID: \(tokenId)")
-                print("[NativeIdentityProvisioning]   Amount: \(amount)")
+                print("[NativeIdentityProvisioning]   Amount: \(amountValue)")
                 print("[NativeIdentityProvisioning]   To: \(toAddress)")
 
                 guard let identityAny = IdentityHandleStore.shared.getLatestIdentity(),
@@ -734,7 +787,7 @@ class NativeIdentityProvisioning: NSObject {
                 let hexSignedTx = try ZhtpClient.buildTokenTransfer(
                     tokenId: tokenIdData,
                     toPublicKey: toPubkey,
-                    amount: amount.uint64Value,
+                    amount: amountValue,
                     using: identity,
                     chainId: 0x02  // testnet
                 )

@@ -228,7 +228,25 @@ class NativeIdentityProvisioning(reactContext: ReactApplicationContext) :
             try {
                 val name = params.getString("name") ?: ""
                 val symbol = params.getString("symbol") ?: ""
-                val initialSupply = params.getDouble("initialSupply").toLong()
+
+                // Parse initialSupply - accept both String and Number
+                // String is preferred to preserve exact value without float precision loss
+                val initialSupply = try {
+                    when {
+                        params.hasKey("initialSupply") && params.getType("initialSupply").name == "String" -> {
+                            val supplyStr = params.getString("initialSupply") ?: "0"
+                            supplyStr.toLong()
+                        }
+                        else -> {
+                            // Fall back to Double->Long conversion (less precise but still supported)
+                            params.getDouble("initialSupply").toLong()
+                        }
+                    }
+                } catch (e: Exception) {
+                    promise.reject("INVALID_PARAMS", "initialSupply must be a valid integer string or number: ${e.message}")
+                    return@execute
+                }
+
                 val decimals = params.getInt("decimals")
 
                 val identity = getLatestIdentity()
@@ -237,7 +255,7 @@ class NativeIdentityProvisioning(reactContext: ReactApplicationContext) :
                     return@execute
                 }
 
-                Log.d(TAG, "Building token create transaction: $name/$symbol")
+                Log.d(TAG, "Building token create transaction: $name/$symbol with supply=$initialSupply")
 
                 // Use lib-client JNI to build and sign the full transaction
                 // JNI handles: bincode serialization, signing, Transaction wrapping, hex encoding
@@ -271,8 +289,25 @@ class NativeIdentityProvisioning(reactContext: ReactApplicationContext) :
         executor.execute {
             try {
                 val tokenId = params.getString("tokenId") ?: ""
-                val amount = params.getDouble("amount").toLong()
                 val recipientDid = params.getString("recipientDid") ?: ""
+
+                // Parse amount - accept both String and Number
+                // String is preferred to preserve exact value without float precision loss
+                val amount = try {
+                    when {
+                        params.hasKey("amount") && params.getType("amount").name == "String" -> {
+                            val amountStr = params.getString("amount") ?: "0"
+                            amountStr.toLong()
+                        }
+                        else -> {
+                            // Fall back to Double->Long conversion (less precise but still supported)
+                            params.getDouble("amount").toLong()
+                        }
+                    }
+                } catch (e: Exception) {
+                    promise.reject("INVALID_PARAMS", "amount must be a valid integer string or number: ${e.message}")
+                    return@execute
+                }
 
                 val identity = getLatestIdentity()
                 if (identity == null) {
@@ -317,7 +352,24 @@ class NativeIdentityProvisioning(reactContext: ReactApplicationContext) :
             try {
                 val tokenId = params.getString("tokenId") ?: ""
                 val toAddress = params.getString("toAddress") ?: ""
-                val amount = params.getDouble("amount").toLong()
+
+                // Parse amount - accept both String and Number
+                // String is preferred to preserve exact value without float precision loss
+                val amount = try {
+                    when {
+                        params.hasKey("amount") && params.getType("amount").name == "String" -> {
+                            val amountStr = params.getString("amount") ?: "0"
+                            amountStr.toLong()
+                        }
+                        else -> {
+                            // Fall back to Double->Long conversion (less precise but still supported)
+                            params.getDouble("amount").toLong()
+                        }
+                    }
+                } catch (e: Exception) {
+                    promise.reject("INVALID_PARAMS", "amount must be a valid integer string or number: ${e.message}")
+                    return@execute
+                }
 
                 val identity = getLatestIdentity()
                 if (identity == null) {

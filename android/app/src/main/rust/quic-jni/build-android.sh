@@ -20,11 +20,11 @@ fi
 OUTPUT_DIR="../../jniLibs"
 
 # Android targets: rust_target:android_abi:clang_prefix:api_level
+# Note: i686 (32-bit x86) removed - obsolete on modern Android, causes wasmtime PIC issues
 TARGETS=(
     "aarch64-linux-android:arm64-v8a:aarch64-linux-android:24"
     "armv7-linux-androideabi:armeabi-v7a:armv7a-linux-androideabi:24"
     "x86_64-linux-android:x86_64:x86_64-linux-android:24"
-    "i686-linux-android:x86:i686-linux-android:24"
 )
 
 echo "Building quic-jni for Android using NDK at: $NDK_HOME"

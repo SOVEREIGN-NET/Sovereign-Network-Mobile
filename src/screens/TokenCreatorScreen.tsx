@@ -156,9 +156,9 @@ const TokenCreatorScreen: React.FC<TokenCreatorScreenProps> = ({ onClose }) => {
       const createRequest: TokenCreateRequest = {
         name: name.trim(),
         symbol: symbol.trim().toUpperCase(),
-        initial_supply: Number.parseFloat(initialSupply),
+        initial_supply: initialSupply.trim(),  // Keep as string to preserve exact value
         decimals: Number.parseInt(decimals, 10) || 8,
-        max_supply: maxSupply.trim() ? Number.parseFloat(maxSupply) : null,
+        max_supply: maxSupply.trim() ? maxSupply.trim() : null,  // Keep as string too
       };
 
       const response = await tokenService.createToken(createRequest);
@@ -178,7 +178,7 @@ const TokenCreatorScreen: React.FC<TokenCreatorScreenProps> = ({ onClose }) => {
 
       setStatus({
         type: 'success',
-        message: `Token created successfully! Token ID: ${response.token_id}`,
+        message: `Token creation submitted! ⛏️ Mining in progress...\n\nToken ID: ${response.token_id}\n\nℹ️ Please return in about 1 minute to verify the token has been created on the blockchain.`,
       });
 
       // Reset form
@@ -195,9 +195,13 @@ const TokenCreatorScreen: React.FC<TokenCreatorScreenProps> = ({ onClose }) => {
           onClose();
         }
 
-        // Show success alert
-        Alert.alert('Success', `Token "${name}" created successfully!`);
-      }, 1500);
+        // Show success alert with mining info
+        Alert.alert(
+          'Token Creation Submitted',
+          `Token "${name}" has been submitted for creation.\n\nToken ID: ${response.token_id}\n\nThe blockchain is mining your transaction. Please return in about 1 minute to verify the token has been created.\n\nSave your Token ID for reference.`,
+          [{ text: 'OK' }]
+        );
+      }, 2000);
     } catch (error: any) {
       console.error('[TokenCreatorScreen] Creation failed:', error);
       setStatus({
@@ -471,9 +475,10 @@ const TokenCreatorScreen: React.FC<TokenCreatorScreenProps> = ({ onClose }) => {
             const displayedSupply = rawSupply / Math.pow(10, dec);
 
             // Format with thousands separators and decimals
+            const maxFractionDigits = Math.max(2, Math.min(dec, 8));
             const formatter = new Intl.NumberFormat('en-US', {
               minimumFractionDigits: 2,
-              maximumFractionDigits: Math.min(dec, 8),
+              maximumFractionDigits: maxFractionDigits,
             });
             const formatted = formatter.format(displayedSupply);
 

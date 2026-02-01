@@ -5,7 +5,7 @@
 use crate::zhtp_types::{ZhtpMethod, ZhtpRequestWire, ZhtpRequest, ZhtpHeaders, AuthContext};
 use crate::zhtp_codec::{encode_authenticated_request_manual, decode_response};
 use crate::zhtp_framing::{frame_encode, frame_decode_message};
-use crate::zhtp_auth::{build_auth_context, AuthSession};
+use crate::zhtp_auth::{build_auth_context_with_sequence, AuthSession};
 use quinn::Connection;
 use anyhow::{anyhow, Result};
 use std::collections::HashMap;
@@ -71,9 +71,18 @@ pub async fn send_authenticated_zhtp_request(
             .and_then(|p| p.parse::<u8>().ok()),
     };
 
+    // CRITICAL: Increment session counter BEFORE building auth context
+    // This matches iOS behavior where the session is passed by mutable reference
+    // and the counter is incremented in the actual session object
+    let sequence = session.next_sequence();
+    log::info!(
+        "[🌐 Web4] [ZHTP Auth] Counter incremented to: {}",
+        session.sequence
+    );
+
     // Compute canonical request hash
-    // Build auth context (HMAC-SHA3 over canonical bytes)
-    let auth_context = build_auth_context(session, method, path, &request_body)?;
+    // Build auth context (HMAC-SHA3 over canonical bytes) using the incremented sequence
+    let auth_context = build_auth_context_with_sequence(session, method, path, &request_body, sequence)?;
     log::info!(
         "[🌐 Web4] [ZHTP Auth] Sequence: {}, MAC computed",
         auth_context.sequence

@@ -86,6 +86,10 @@ class TokenService {
         }
       );
 
+      if (!response.ok) {
+        throw new Error(`HTTP ${response.status}: Failed to create token`);
+      }
+
       const data = await response.json();
       console.log('[TokenService] Token created:', data.token_id);
       return data;
@@ -103,9 +107,10 @@ class TokenService {
     try {
       console.log('[TokenService] Minting tokens for:', request.token_id);
       console.log('[TokenService] Signing token mint transaction with Dilithium keypair');
+      const amountStr = typeof request.amount === 'string' ? request.amount : String(request.amount);
       const signingResult = await nativeIdentityProvisioning.signTokenMintTransaction({
         tokenId: request.token_id,
-        amount: request.amount,
+        amount: amountStr,
         recipientDid: normalizeDIDToAddress(request.to),
       });
 
@@ -138,10 +143,11 @@ class TokenService {
     try {
       console.log('[TokenService] Transferring tokens to:', request.to);
       console.log('[TokenService] Signing token transfer transaction with Dilithium keypair');
+      const amountStr = typeof request.amount === 'string' ? request.amount : String(request.amount);
       const signingResult = await nativeIdentityProvisioning.signTokenTransferTransaction({
         tokenId: request.token_id,
         toAddress: normalizeDIDToAddress(request.to),
-        amount: request.amount,
+        amount: amountStr,
       });
 
       const signedTx = signingResult.signed_tx;
@@ -180,6 +186,10 @@ class TokenService {
           headers: { 'Content-Type': 'application/json' },
         }
       );
+
+      if (!response.ok) {
+        throw new Error(`HTTP ${response.status}: Token not found`);
+      }
 
       const data = await response.json();
       console.log('[TokenService] Token info retrieved:', data.name);

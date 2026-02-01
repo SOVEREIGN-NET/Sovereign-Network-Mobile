@@ -9,9 +9,9 @@
 export interface TokenCreateRequest {
   name: string;
   symbol: string;
-  initial_supply: number;
+  initial_supply: string | number;  // String to preserve exact value (no float precision loss)
   decimals: number;
-  max_supply: number | null;
+  max_supply: string | number | null;  // String to preserve exact value
   creator_identity?: string; // Auto-derived from authenticated session, not client-supplied
 }
 
@@ -29,7 +29,7 @@ export interface TokenCreateResponse {
 
 export interface TokenMintRequest {
   token_id: string;
-  amount: number;
+  amount: string | number; // String to preserve exact value (no float precision loss)
   to: string; // Recipient DID
   creator_identity?: string; // Auto-derived from authenticated session, not client-supplied
 }
@@ -47,7 +47,7 @@ export interface TokenTransferRequest {
   token_id: string;
   from?: string; // Auto-derived from authenticated session, not client-supplied
   to: string; // Recipient DID
-  amount: number;
+  amount: string | number; // String to preserve exact value (no float precision loss)
 }
 
 export interface TokenTransferResponse {
