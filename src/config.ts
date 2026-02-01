@@ -113,9 +113,7 @@ export const API_ENDPOINTS = {
 
   // UBI endpoints
   ubi: {
-    status: '/api/v1/ubi/status', // /{identity_id}
     claim: '/api/v1/ubi/claim',
-    history: '/api/v1/ubi/history', // /{identity_id}
   },
 
   // Network/Protocol endpoints

@@ -20,6 +20,7 @@ import { createQuicFetchAdapterSync } from './QuicFetchAdapter';
 import CertificatePinning from './CertificatePinning';
 import { nativeIdentityProvisioning } from './NativeIdentityProvisioning';
 import { walletKeychainService } from './WalletKeychainService';
+import { QUIC_CONFIG } from '../config';
 
 export interface SignInCredentials {
   identity_id: string;
@@ -56,15 +57,12 @@ class RealAuthService {
       undefined,
     );
 
-    // SECURITY: Only accept self-signed certificates in development
-    // Production builds require valid certificates
-    const isDevelopment = __DEV__ || process.env.NODE_ENV === 'development';
-
     // Create QUIC-based fetch adapter for native transport
+    // Uses insecure setting from config (defaults to __DEV__)
     this.quicFetch = createQuicFetchAdapterSync({
-      insecure: isDevelopment,  // Only accept self-signed certs in development
-      timeout: 30,
-      fallbackToHttp: false, // Server only supports QUIC - no HTTP fallback
+      insecure: QUIC_CONFIG.insecure,  // From config.ts - allows self-signed certs in dev
+      timeout: QUIC_CONFIG.defaultTimeout,
+      fallbackToHttp: QUIC_CONFIG.fallbackToHttp, // Disabled - server is pure QUIC
       onFallback: (url, reason) => {
         // SECURITY: Throw error instead of fallback to HTTP
         throw new Error(
@@ -74,24 +72,20 @@ class RealAuthService {
       },
     });
 
-    // SECURITY: Verify insecure mode is not accidentally enabled in production
-    if (!isDevelopment) {
-      const adapterStr = this.quicFetch.toString();
-      if (adapterStr.includes('insecure') && adapterStr.includes('true')) {
-        throw new Error(
-          '🔴 SECURITY CRITICAL: QUIC insecure mode is enabled in production build! ' +
-          'This is a critical security vulnerability.'
-        );
-      }
-    }
+    // Always log this critical config, not just in dev
+    console.log('✅ QUIC adapter configured');
+    console.log('[RealAuthService]   insecure:', QUIC_CONFIG.insecure);
+    console.log('[RealAuthService]   timeout:', QUIC_CONFIG.defaultTimeout, 'seconds');
+    console.log('[RealAuthService]   fallbackToHttp:', QUIC_CONFIG.fallbackToHttp);
+    console.log('[RealAuthService]   __DEV__:', __DEV__);
+    console.log('[RealAuthService]   DEFAULT_NETWORK_TYPE:', require('../config').DEFAULT_NETWORK_TYPE);
+    console.log('📌 Certificate pinning configured for:', CertificatePinning.getPinnedHosts().join(', '));
 
     // SECURITY: Phase 3.2 - Verify certificate pinning is configured for production
-    if (!isDevelopment && CertificatePinning.PINNING_CONFIG.enabled) {
+    if (!__DEV__ && CertificatePinning.PINNING_CONFIG.enabled) {
       const pinnedHosts = CertificatePinning.getPinnedHosts();
       if (pinnedHosts.length === 0) {
         console.warn('⚠️ Certificate pinning enabled but no hosts are configured');
-      } else if (__DEV__) {
-        console.log(`✅ Certificate pinning enabled for hosts: ${pinnedHosts.join(', ')}`);
       }
     }
 

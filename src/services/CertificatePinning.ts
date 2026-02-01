@@ -31,22 +31,14 @@ export interface CertificatePin {
  * IMPORTANT: Keep backup pins for certificate rotation
  */
 export const PINNED_CERTIFICATES: Record<string, CertificatePin> = {
-  // Production mainnet
-  'sov-mainnet.example.com': {
-    host: 'sov-mainnet.example.com',
-    sha256Pin: 'AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA=', // Replace with actual pin
-    sha256PinBackup: 'BBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBB=', // Backup pin for rotation
-  },
-  // Test/staging network
-  'sov-testnet.example.com': {
-    host: 'sov-testnet.example.com',
-    sha256Pin: 'CCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCC=', // Replace with actual pin
-    sha256PinBackup: 'DDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDD=', // Backup pin for rotation
-  },
-  // Development network
-  'sov-dev.example.com': {
-    host: 'sov-dev.example.com',
-    sha256Pin: 'EEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEE=', // Replace with actual pin
+  // ZHTP testnet node (77.42.37.161:9334)
+  // Self-signed rcgen certificate
+  // Generated: Jan 27, 2026
+  '77.42.37.161': {
+    host: '77.42.37.161',
+    sha256Pin: '0hqh8TzqeZ+WWIonTCEMbeRnhvCY3DIUd9jgS32H4Fg=',
+    // Backup pin - update when certificate is rotated
+    sha256PinBackup: undefined,
   },
 };
 

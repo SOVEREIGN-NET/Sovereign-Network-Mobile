@@ -77,9 +77,24 @@ export interface TokenInfoResponse {
 
 export interface TokenBalanceResponse {
   token_id: string;
-  address: string;
   balance: number;
+  decimals: number;
   symbol: string;
+  name: string;
+  is_creator?: boolean;
+}
+
+// ============ BURN TOKEN ============
+
+export interface TokenBurnRequest {
+  token_id: string;
+  amount: number;
+}
+
+export interface TokenBurnResponse {
+  success: boolean;
+  amount_burned: number;
+  remaining_balance: number;
 }
 
 // ============ LIST TOKENS ============
@@ -102,6 +117,7 @@ export type TokenResponse =
   | TokenCreateResponse
   | TokenMintResponse
   | TokenTransferResponse
+  | TokenBurnResponse
   | TokenInfoResponse
   | TokenBalanceResponse
   | TokenListResponse;

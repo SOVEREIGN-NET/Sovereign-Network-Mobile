@@ -49,27 +49,15 @@ const ProfileScreen = ({ navigation }: any) => {
   // Fetch UBI data for stats
   const { data: ubiData } = useAsyncData(
     async () => {
-      if (!api || !isInitialized || !currentIdentity?.did) {
+      if (!currentIdentity?.did) {
         return null;
       }
 
-      try {
-        const [statusResponse, historyResponse] = await Promise.all([
-          api.request(`/api/v1/ubi/status/${currentIdentity.did}`).catch(() => null),
-          api.request(`/api/v1/ubi/history/${currentIdentity.did}`).catch(() => null),
-        ]);
-
-        const totalEarned = historyResponse?.claims?.reduce((sum: number, claim: any) => sum + (claim.amount || 0), 0) || 0;
-
-        return {
-          total_earned: totalEarned || statusResponse?.total_earned || 0,
-        };
-      } catch (error) {
-        console.warn('⚠️ Profile: Failed to fetch UBI data:', error);
-        return null;
-      }
+      return {
+        total_earned: currentIdentity.ubiEarned || 0,
+      };
     },
-    [api, isInitialized, currentIdentity?.did],
+    [currentIdentity?.did],
   );
 
   // Fetch DAO stats

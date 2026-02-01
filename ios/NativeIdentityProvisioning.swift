@@ -606,7 +606,21 @@ class NativeIdentityProvisioning: NSObject {
                     chainId: 0x02  // testnet
                 )
 
-                print("[NativeIdentityProvisioning] ✅ Token create transaction built and signed")
+                print("[NativeIdentityProvisioning] Token create transaction built and signed")
+                print("[NativeIdentityProvisioning] Hex tx length: \(hexSignedTx.count)")
+                print("[NativeIdentityProvisioning] DID: \(identity.did)")
+
+                // Print full hex without emojis for easy copy-paste
+                let chunkSize = 1000
+                var offset = 0
+                while offset < hexSignedTx.count {
+                    let startIndex = hexSignedTx.index(hexSignedTx.startIndex, offsetBy: offset)
+                    let endIndex = hexSignedTx.index(startIndex, offsetBy: min(chunkSize, hexSignedTx.count - offset), limitedBy: hexSignedTx.endIndex) ?? hexSignedTx.endIndex
+                    let chunk = String(hexSignedTx[startIndex..<endIndex])
+                    print(chunk)
+                    offset += chunkSize
+                }
+
                 resolve(["signed_tx": hexSignedTx])
 
             } catch {
@@ -659,7 +673,20 @@ class NativeIdentityProvisioning: NSObject {
                     chainId: 0x02  // testnet
                 )
 
-                print("[NativeIdentityProvisioning] ✅ Token mint transaction built and signed")
+                print("[NativeIdentityProvisioning] Token mint transaction built and signed")
+                print("[NativeIdentityProvisioning] Hex tx length: \(hexSignedTx.count)")
+
+                // Print full hex without emojis for easy copy-paste
+                let chunkSize = 1000
+                var offset = 0
+                while offset < hexSignedTx.count {
+                    let startIndex = hexSignedTx.index(hexSignedTx.startIndex, offsetBy: offset)
+                    let endIndex = hexSignedTx.index(startIndex, offsetBy: min(chunkSize, hexSignedTx.count - offset), limitedBy: hexSignedTx.endIndex) ?? hexSignedTx.endIndex
+                    let chunk = String(hexSignedTx[startIndex..<endIndex])
+                    print(chunk)
+                    offset += chunkSize
+                }
+
                 resolve(["signed_tx": hexSignedTx])
 
             } catch {
@@ -712,7 +739,20 @@ class NativeIdentityProvisioning: NSObject {
                     chainId: 0x02  // testnet
                 )
 
-                print("[NativeIdentityProvisioning] ✅ Token transfer transaction built and signed")
+                print("[NativeIdentityProvisioning] Token transfer transaction built and signed")
+                print("[NativeIdentityProvisioning] Hex tx length: \(hexSignedTx.count)")
+
+                // Print full hex without emojis for easy copy-paste
+                let chunkSize = 1000
+                var offset = 0
+                while offset < hexSignedTx.count {
+                    let startIndex = hexSignedTx.index(hexSignedTx.startIndex, offsetBy: offset)
+                    let endIndex = hexSignedTx.index(startIndex, offsetBy: min(chunkSize, hexSignedTx.count - offset), limitedBy: hexSignedTx.endIndex) ?? hexSignedTx.endIndex
+                    let chunk = String(hexSignedTx[startIndex..<endIndex])
+                    print(chunk)
+                    offset += chunkSize
+                }
+
                 resolve(["signed_tx": hexSignedTx])
 
             } catch {

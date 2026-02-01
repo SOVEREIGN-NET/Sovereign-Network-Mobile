@@ -32,6 +32,8 @@ import BackupIdentityScreen from '../screens/BackupIdentityScreen';
 import BiometricVerificationScreen from '../screens/BiometricVerificationScreen';
 import BrowserScreen from '../screens/BrowserScreen';
 import ProfileScreen from '../screens/ProfileScreen';
+import TokenCreatorScreen from '../screens/TokenCreatorScreen';
+import TokenManagementScreen from '../screens/TokenManagementScreen';
 
 const Stack = createNativeStackNavigator();
 const Tab = createBottomTabNavigator();
@@ -188,6 +190,28 @@ const SIDStack = () => {
           headerBackTitle: '',
           headerStyle: { backgroundColor: colors.bg_dark },
           headerTintColor: colors.text_primary,
+        }}
+      />
+      <Stack.Screen
+        name="TokenCreator"
+        component={TokenCreatorScreen}
+        options={{
+          headerShown: false,
+          presentation: 'modal',
+          animation: 'slide_from_bottom',
+        }}
+      />
+      <Stack.Screen
+        name="TokenManagement"
+        component={TokenManagementScreen}
+        options={{
+          headerShown: true,
+          title: 'Manage Tokens',
+          headerBackTitle: '',
+          headerStyle: { backgroundColor: colors.bg_dark },
+          headerTintColor: colors.text_primary,
+          presentation: 'modal',
+          animation: 'slide_from_bottom',
         }}
       />
     </Stack.Navigator>

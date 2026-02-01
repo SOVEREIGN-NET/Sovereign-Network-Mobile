@@ -104,9 +104,6 @@ const PUBLIC_ENDPOINT_PATTERNS = [
   '/api/v1/identity/exists',
   // Protocol health
   '/api/v1/protocol/health',
-  // UBI endpoints (read-only GET)
-  '/api/v1/ubi/status',
-  '/api/v1/ubi/history',
   // DAO endpoints (read-only GET)
   '/api/v1/dao/proposals',
   '/api/v1/dao/vote/history',

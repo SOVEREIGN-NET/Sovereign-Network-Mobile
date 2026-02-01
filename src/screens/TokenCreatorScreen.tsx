@@ -1,12 +1,11 @@
 /**
  * Token Creator Screen
- * Create, mint, transfer, and view tokens via QUIC endpoints
- * Feature-flagged to only show in development builds
+ * Create new tokens via QUIC endpoints
  */
 
-import React, { useEffect, useMemo, useState } from 'react';
-import { View, ScrollView, StyleSheet, Modal, TouchableOpacity, Pressable } from 'react-native';
-import { useNavigation } from '@react-navigation/native';
+import React, { useState } from 'react';
+import { View, ScrollView, StyleSheet, Modal, TouchableOpacity, Alert, KeyboardAvoidingView, Platform } from 'react-native';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import {
   Button,
@@ -14,29 +13,15 @@ import {
   FormField,
   HeaderBar,
   Text,
-  ErrorView,
   LoadingView,
-  SideDrawer,
-  DrawerItem,
 } from '../components';
-import { colors, spacing, typography } from '../theme';
+import { colors, spacing, typography, borderRadius } from '../theme';
 import tokenService from '../services/TokenService';
 import { useAuth } from '../hooks/useAuth';
-import { useTokenOperations } from '../hooks/useTokenOperations';
-import {
-  TokenCreateRequest,
-  TokenMintRequest,
-  TokenTransferRequest,
-  TokenListItem,
-  TokenInfoResponse,
-} from '../types/token';
+import { TokenCreateRequest } from '../types/token';
 
-type TabName = 'create' | 'mint' | 'transfer' | 'view';
-
-interface SubmitStatus {
-  type: 'success' | 'error' | null;
-  message: string;
-}
+// Storage keys
+const CREATED_TOKENS_KEY = 'sov:created_tokens';
 
 interface CreateFormErrors {
   name?: string;
@@ -46,119 +31,45 @@ interface CreateFormErrors {
   max_supply?: string;
 }
 
-interface MintFormErrors {
-  amount?: string;
-  to?: string;
+interface SubmitStatus {
+  type: 'success' | 'error' | null;
+  message: string;
 }
 
-interface TransferFormErrors {
-  amount?: string;
-  to?: string;
+interface TokenCreatorScreenProps {
+  onClose?: () => void;
 }
 
-export const TokenCreatorScreen = () => {
-  const navigation = useNavigation();
+const TokenCreatorScreen: React.FC<TokenCreatorScreenProps> = ({ onClose }) => {
   const insets = useSafeAreaInsets();
   const { currentIdentity } = useAuth();
-  const [activeTab, setActiveTab] = useState<TabName>('create');
-  const [drawerVisible, setDrawerVisible] = useState(false);
 
-  // CREATE TAB STATE
+  // FORM STATE
   const [name, setName] = useState('');
   const [symbol, setSymbol] = useState('');
   const [initialSupply, setInitialSupply] = useState('');
   const [decimals, setDecimals] = useState('8');
   const [maxSupply, setMaxSupply] = useState('');
-  const [createErrors, setCreateErrors] = useState<CreateFormErrors>({});
-  const [createLoading, setCreateLoading] = useState(false);
-  const [createStatus, setCreateStatus] = useState<SubmitStatus>({ type: null, message: '' });
+  const [errors, setErrors] = useState<CreateFormErrors>({});
+  const [loading, setLoading] = useState(false);
+  const [status, setStatus] = useState<SubmitStatus>({ type: null, message: '' });
 
-  // MINT TAB STATE
-  const [myTokens, setMyTokens] = useState<TokenListItem[]>([]);
-  const [selectedTokenId, setSelectedTokenId] = useState<string>('');
-  const [mintAmount, setMintAmount] = useState('');
-  const [mintRecipient, setMintRecipient] = useState('');
-  const [mintErrors, setMintErrors] = useState<MintFormErrors>({});
-  const [mintLoading, setMintLoading] = useState(false);
-  const [mintStatus, setMintStatus] = useState<SubmitStatus>({ type: null, message: '' });
-
-  // TRANSFER TAB STATE
-  const [transferAmount, setTransferAmount] = useState('');
-  const [transferRecipient, setTransferRecipient] = useState('');
-  const [transferErrors, setTransferErrors] = useState<TransferFormErrors>({});
-  const [transferLoading, setTransferLoading] = useState(false);
-  const [transferStatus, setTransferStatus] = useState<SubmitStatus>({ type: null, message: '' });
-
-  // VIEW TAB STATE
-  const [allTokens, setAllTokens] = useState<TokenListItem[]>([]);
-  const [viewLoading, setViewLoading] = useState(false);
-  const [selectedTokenDetail, setSelectedTokenDetail] = useState<TokenInfoResponse | null>(null);
-  const [detailModalVisible, setDetailModalVisible] = useState(false);
-
-  const tabs: { id: TabName; label: string }[] = [
-    { id: 'create', label: 'Create' },
-    { id: 'mint', label: 'Mint' },
-    { id: 'transfer', label: 'Transfer' },
-    { id: 'view', label: 'View' },
-  ];
-
-  // Load user's tokens on mount
-  useEffect(() => {
-    loadUserTokens();
-  }, []);
-
-  const loadUserTokens = async () => {
-    try {
-      const response = await tokenService.listTokens();
-      const userTokens = response.tokens.filter(
-        (t) => t.token_id && currentIdentity?.did
-      );
-      setMyTokens(userTokens);
-      if (userTokens.length > 0) {
-        setSelectedTokenId(userTokens[0].token_id);
-      }
-    } catch (error) {
-      console.error('Failed to load user tokens:', error);
-    }
-  };
-
-  const loadAllTokens = async () => {
-    setViewLoading(true);
-    try {
-      const response = await tokenService.listTokens();
-      setAllTokens(response.tokens);
-    } catch (error) {
-      console.error('Failed to load all tokens:', error);
-    } finally {
-      setViewLoading(false);
-    }
-  };
-
-  const loadTokenDetail = async (tokenId: string) => {
-    try {
-      const detail = await tokenService.getTokenInfo(tokenId);
-      setSelectedTokenDetail(detail);
-      setDetailModalVisible(true);
-    } catch (error) {
-      console.error('Failed to load token detail:', error);
-    }
-  };
-
-  // VALIDATION FUNCTIONS
-
-  const validateCreateForm = (): boolean => {
+  // Validate create form
+  const validateForm = (): boolean => {
     const newErrors: CreateFormErrors = {};
 
     if (!name.trim()) {
       newErrors.name = 'Token name is required';
-    } else if (name.length < 2 || name.length > 50) {
-      newErrors.name = 'Name must be 2-50 characters';
+    } else if (name.trim().length < 3) {
+      newErrors.name = 'Token name must be at least 3 characters';
     }
 
     if (!symbol.trim()) {
       newErrors.symbol = 'Token symbol is required';
-    } else if (!/^[A-Z]{2,10}$/.test(symbol)) {
-      newErrors.symbol = 'Symbol must be 2-10 uppercase letters';
+    } else if (!/^[A-Z0-9]+$/.test(symbol.toUpperCase())) {
+      newErrors.symbol = 'Symbol must contain only letters and numbers';
+    } else if (symbol.trim().length < 1 || symbol.trim().length > 10) {
+      newErrors.symbol = 'Symbol must be 1-10 characters';
     }
 
     if (!initialSupply.trim()) {
@@ -166,744 +77,459 @@ export const TokenCreatorScreen = () => {
     } else {
       const supply = Number.parseFloat(initialSupply);
       if (Number.isNaN(supply) || supply <= 0) {
-        newErrors.initial_supply = 'Must be a positive number';
+        newErrors.initial_supply = 'Initial supply must be a positive number';
       }
     }
 
-    const dec = Number.parseInt(decimals);
-    if (Number.isNaN(dec) || dec < 0 || dec > 18) {
-      newErrors.decimals = 'Decimals must be 0-18';
-    }
-
-    if (maxSupply && maxSupply.trim() !== '') {
-      const maxSup = Number.parseFloat(maxSupply);
-      const initSup = Number.parseFloat(initialSupply);
-      if (Number.isNaN(maxSup) || maxSup < initSup) {
-        newErrors.max_supply = 'Max supply must be >= initial supply';
+    if (decimals) {
+      const dec = Number.parseInt(decimals, 10);
+      if (Number.isNaN(dec) || dec < 0 || dec > 18) {
+        newErrors.decimals = 'Decimals must be between 0 and 18';
       }
     }
 
-    setCreateErrors(newErrors);
+    if (maxSupply.trim()) {
+      const max = Number.parseFloat(maxSupply);
+      const initial = Number.parseFloat(initialSupply);
+      if (Number.isNaN(max) || max <= 0) {
+        newErrors.max_supply = 'Max supply must be a positive number';
+      } else if (max < initial) {
+        newErrors.max_supply = 'Max supply must be greater than or equal to initial supply';
+      }
+    }
+
+    setErrors(newErrors);
     return Object.keys(newErrors).length === 0;
   };
 
-  const validateMintForm = (): boolean => {
-    const newErrors: MintFormErrors = {};
-
-    if (!mintAmount.trim()) {
-      newErrors.amount = 'Amount is required';
-    } else {
-      const amount = Number.parseFloat(mintAmount);
-      if (Number.isNaN(amount) || amount <= 0) {
-        newErrors.amount = 'Must be a positive number';
-      }
+  // Handle token creation
+  const handleCreate = async () => {
+    if (!validateForm()) {
+      return;
     }
 
-    if (!mintRecipient.trim()) {
-      newErrors.to = 'Recipient DID is required';
-    } else if (!mintRecipient.startsWith('did:zhtp:')) {
-      newErrors.to = 'Invalid DID format (must start with did:zhtp:)';
+    if (!currentIdentity?.did) {
+      setStatus({
+        type: 'error',
+        message: 'Identity not available',
+      });
+      return;
     }
 
-    setMintErrors(newErrors);
-    return Object.keys(newErrors).length === 0;
-  };
-
-  const validateTransferForm = (): boolean => {
-    const newErrors: TransferFormErrors = {};
-
-    if (!transferAmount.trim()) {
-      newErrors.amount = 'Amount is required';
-    } else {
-      const amount = Number.parseFloat(transferAmount);
-      if (Number.isNaN(amount) || amount <= 0) {
-        newErrors.amount = 'Must be a positive number';
-      }
-    }
-
-    if (!transferRecipient.trim()) {
-      newErrors.to = 'Recipient DID is required';
-    } else if (!transferRecipient.startsWith('did:zhtp:')) {
-      newErrors.to = 'Invalid DID format (must start with did:zhtp:)';
-    }
-
-    setTransferErrors(newErrors);
-    return Object.keys(newErrors).length === 0;
-  };
-
-  // SUBMIT HANDLERS
-
-  const handleCreateToken = async () => {
-    if (!validateCreateForm() || !currentIdentity?.did) return;
-
-    setCreateLoading(true);
-    setCreateStatus({ type: null, message: '' });
+    setLoading(true);
+    setStatus({ type: null, message: '' });
 
     try {
-      const request: TokenCreateRequest = {
-        name,
-        symbol,
+      console.log('[TokenCreatorScreen] Creating token:', name);
+
+      const createRequest: TokenCreateRequest = {
+        name: name.trim(),
+        symbol: symbol.trim().toUpperCase(),
         initial_supply: Number.parseFloat(initialSupply),
-        decimals: Number.parseInt(decimals),
-        max_supply: maxSupply ? Number.parseFloat(maxSupply) : null,
-        // creator_identity auto-derived from authenticated session
+        decimals: Number.parseInt(decimals, 10) || 8,
+        max_supply: maxSupply.trim() ? Number.parseFloat(maxSupply) : null,
       };
 
-      const result = await tokenService.createToken(request);
+      const response = await tokenService.createToken(createRequest);
 
-      if (result.success) {
-        setCreateStatus({
-          type: 'success',
-          message: `✅ Token ${result.symbol} created! ID: ${result.token_id.slice(0, 8)}...`,
-        });
-        // Clear form
+      // Save created token ID to storage for later reference
+      try {
+        const createdTokensJson = await AsyncStorage.getItem(CREATED_TOKENS_KEY);
+        const createdTokens: string[] = createdTokensJson ? JSON.parse(createdTokensJson) : [];
+        if (!createdTokens.includes(response.token_id)) {
+          createdTokens.push(response.token_id);
+          await AsyncStorage.setItem(CREATED_TOKENS_KEY, JSON.stringify(createdTokens));
+          console.log('[TokenCreatorScreen] Saved created token ID:', response.token_id);
+        }
+      } catch (storageError) {
+        console.warn('[TokenCreatorScreen] Failed to save token ID to storage:', storageError);
+      }
+
+      setStatus({
+        type: 'success',
+        message: `Token created successfully! Token ID: ${response.token_id}`,
+      });
+
+      // Reset form
+      setTimeout(() => {
         setName('');
         setSymbol('');
         setInitialSupply('');
         setDecimals('8');
         setMaxSupply('');
-        // Reload token list
-        loadUserTokens();
-      } else {
-        setCreateStatus({
-          type: 'error',
-          message: '❌ Token creation failed',
-        });
-      }
+        setStatus({ type: null, message: '' });
+
+        // Close modal if callback provided
+        if (onClose) {
+          onClose();
+        }
+
+        // Show success alert
+        Alert.alert('Success', `Token "${name}" created successfully!`);
+      }, 1500);
     } catch (error: any) {
-      setCreateStatus({
+      console.error('[TokenCreatorScreen] Creation failed:', error);
+      setStatus({
         type: 'error',
-        message: `❌ ${error.message || 'Failed to create token'}`,
+        message: error.message || 'Failed to create token',
       });
     } finally {
-      setCreateLoading(false);
+      setLoading(false);
     }
   };
 
-  const handleMintToken = async () => {
-    if (!validateMintForm() || !currentIdentity?.did || !selectedTokenId) return;
-
-    setMintLoading(true);
-    setMintStatus({ type: null, message: '' });
-
-    try {
-      const request: TokenMintRequest = {
-        token_id: selectedTokenId,
-        amount: Number.parseFloat(mintAmount),
-        to: mintRecipient,
-        // creator_identity auto-derived from authenticated session
-      };
-
-      const result = await tokenService.mintToken(request);
-
-      if (result.success) {
-        setMintStatus({
-          type: 'success',
-          message: `✅ Minted ${result.amount_minted} tokens! New total: ${result.new_total_supply}`,
-        });
-        setMintAmount('');
-        setMintRecipient('');
-      } else {
-        setMintStatus({
-          type: 'error',
-          message: '❌ Mint failed',
-        });
-      }
-    } catch (error: any) {
-      setMintStatus({
-        type: 'error',
-        message: `❌ ${error.message || 'Failed to mint tokens'}`,
-      });
-    } finally {
-      setMintLoading(false);
-    }
-  };
-
-  const handleTransferToken = async () => {
-    if (!validateTransferForm() || !currentIdentity?.did || !selectedTokenId) return;
-
-    setTransferLoading(true);
-    setTransferStatus({ type: null, message: '' });
-
-    try {
-      const request: TokenTransferRequest = {
-        token_id: selectedTokenId,
-        // from auto-derived from authenticated session
-        to: transferRecipient,
-        amount: Number.parseFloat(transferAmount),
-      };
-
-      const result = await tokenService.transferToken(request);
-
-      if (result.success) {
-        setTransferStatus({
-          type: 'success',
-          message: `✅ Transferred ${result.amount} tokens! Your balance: ${result.from_balance}`,
-        });
-        setTransferAmount('');
-        setTransferRecipient('');
-      } else {
-        setTransferStatus({
-          type: 'error',
-          message: '❌ Transfer failed',
-        });
-      }
-    } catch (error: any) {
-      setTransferStatus({
-        type: 'error',
-        message: `❌ ${error.message || 'Failed to transfer tokens'}`,
-      });
-    } finally {
-      setTransferLoading(false);
-    }
-  };
-
-  const drawerItems: DrawerItem[] = [
-    {
-      id: 'close',
-      label: 'Close',
-      icon: '✕',
-      onPress: () => {
-        setDrawerVisible(false);
-        // Close modal
-        navigation.goBack();
-      },
+  const styles = StyleSheet.create({
+    container: {
+      flex: 1,
+      backgroundColor: colors.bg_darkest,
     },
-  ];
+    scrollContent: {
+      padding: spacing.md,
+      paddingBottom: spacing.xl * 2.5,
+    },
+    statusMessage: {
+      marginBottom: spacing.md,
+      padding: spacing.md,
+      borderRadius: borderRadius.lg,
+      backgroundColor: status.type === 'success' ? colors.success + '20' : colors.error + '20',
+    },
+    statusText: {
+      color: status.type === 'success' ? colors.success : colors.error,
+      fontSize: typography.size.sm,
+    },
+  });
+
+  if (!currentIdentity) {
+    return <LoadingView />;
+  }
 
   return (
-    <View style={[styles.container, { backgroundColor: colors.bg_dark }]}>
-      {/* Custom Header with Back Button and Menu */}
-      <View style={{
-        backgroundColor: colors.bg_dark,
-        paddingHorizontal: spacing.lg,
-        paddingTop: spacing.md + insets.top,
-        paddingBottom: spacing.md,
-        borderBottomWidth: 1,
-        borderBottomColor: colors.border,
-        flexDirection: 'row',
-        alignItems: 'center',
-        justifyContent: 'space-between',
-      }}>
-        {/* Back Button */}
-        <Pressable
-          onPress={() => {
-            // Close modal
-            navigation.goBack();
-          }}
-          style={{ padding: spacing.sm, marginLeft: -spacing.sm }}
-        >
-          <Text style={{ fontSize: 24 }}>←</Text>
-        </Pressable>
-
-        {/* Title */}
-        <Text style={{
-          fontSize: typography.size.lg,
-          fontWeight: typography.weight.semibold,
-          color: colors.text_primary,
-        }}>
-          Token Creator
-        </Text>
-
-        {/* Hamburger Menu */}
-        <Pressable
-          onPress={() => setDrawerVisible(true)}
-          style={{ padding: spacing.sm, marginRight: -spacing.sm }}
-        >
-          <View style={{ gap: spacing.xs }}>
-            <View style={{ width: 20, height: 2, backgroundColor: colors.text_primary }} />
-            <View style={{ width: 20, height: 2, backgroundColor: colors.text_primary }} />
-            <View style={{ width: 20, height: 2, backgroundColor: colors.text_primary }} />
-          </View>
-        </Pressable>
-      </View>
-
-      {/* Side Drawer */}
-      <SideDrawer
-        visible={drawerVisible}
-        onClose={() => setDrawerVisible(false)}
-        items={drawerItems}
-        title="Menu"
+    <View style={styles.container}>
+      <HeaderBar
+        title="Create Token"
+        onBackPress={() => onClose?.()}
       />
 
-      {/* TAB SELECTOR */}
-      <View style={[styles.tabContainer, { backgroundColor: colors.bg_dark, paddingHorizontal: spacing.lg, marginBottom: spacing.lg, gap: spacing.sm, flexDirection: 'row', justifyContent: 'space-between' }]}>
-        {tabs.map((tab) => (
-          <TouchableOpacity
-            key={tab.id}
-            onPress={() => {
-              setActiveTab(tab.id);
-              if (tab.id === 'view') {
-                loadAllTokens();
-              }
+      <KeyboardAvoidingView
+        behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+        style={{ flex: 1 }}
+      >
+        <ScrollView
+          showsVerticalScrollIndicator={false}
+          contentContainerStyle={styles.scrollContent}
+          keyboardShouldPersistTaps="handled"
+        >
+        {/* Status Message */}
+        {status.message && (
+          <View style={styles.statusMessage}>
+            <Text style={styles.statusText}>{status.message}</Text>
+          </View>
+        )}
+
+        {/* Quick Help */}
+        <View
+          style={{
+            marginBottom: spacing.md,
+            padding: spacing.md,
+            backgroundColor: colors.bg_darker,
+            borderRadius: borderRadius.lg,
+          }}
+        >
+          <Text
+            style={{
+              fontSize: typography.size.xs,
+              fontWeight: typography.weight.semibold,
+              color: colors.text_secondary,
+              marginBottom: spacing.xs,
             }}
-            style={[
-              styles.tabButton,
-              {
-                paddingVertical: spacing.sm,
-                paddingHorizontal: spacing.md,
-                borderBottomWidth: activeTab === tab.id ? 2 : 0,
-                borderBottomColor: activeTab === tab.id ? colors.cyan : 'transparent',
-              },
-            ]}
           >
+            💡 HOW DECIMALS WORK
+          </Text>
+          <Text
+            style={{
+              fontSize: typography.size.xs,
+              color: colors.text_secondary,
+              lineHeight: 16,
+            }}
+          >
+            • 8 decimals: 1,000,000,000 raw = 10.00 tokens{'\n'}
+            • 18 decimals: 1,000,000,000 raw = 0.000000001 tokens
+          </Text>
+        </View>
+
+        {/* Create Form Card */}
+        <Card>
+          <View style={{ marginBottom: spacing.md }}>
             <Text
-              numberOfLines={1}
               style={{
-                color: activeTab === tab.id ? colors.cyan : colors.text_primary,
-                fontSize: 13,
-                fontWeight: '400',
+                fontSize: typography.size.lg,
+                fontWeight: typography.weight.semibold,
+                color: colors.text_primary,
+                marginBottom: spacing.sm,
               }}
             >
-              {tab.label}
+              Create New Token
             </Text>
-          </TouchableOpacity>
-        ))}
-      </View>
-
-      {/* TAB CONTENT */}
-      <ScrollView
-        style={styles.content}
-        contentContainerStyle={{ paddingBottom: spacing.xl }}
-      >
-        {/* CREATE TAB */}
-        {activeTab === 'create' && (
-          <View style={{ paddingHorizontal: spacing.lg, gap: spacing.md }}>
-            <FormField
-              label="Token Name"
-              placeholder="e.g., MyToken"
-              value={name}
-              onChangeText={(text) => {
-                setName(text);
-                if (createErrors.name) {
-                  setCreateErrors({ ...createErrors, name: undefined });
-                }
+            <Text
+              style={{
+                fontSize: typography.size.sm,
+                color: colors.text_secondary,
               }}
-              error={createErrors.name}
-              editable={!createLoading}
-            />
+            >
+              Define your token's properties
+            </Text>
+          </View>
 
-            <FormField
-              label="Symbol"
-              placeholder="e.g., MTK"
-              value={symbol}
-              onChangeText={(text) => {
-                setSymbol(text.toUpperCase());
-                if (createErrors.symbol) {
-                  setCreateErrors({ ...createErrors, symbol: undefined });
-                }
+          {/* User DID Reference */}
+          <View
+            style={{
+              marginBottom: spacing.md,
+              padding: spacing.sm,
+              backgroundColor: colors.bg_darker,
+              borderRadius: borderRadius.base,
+            }}
+          >
+            <Text
+              style={{
+                fontSize: typography.size.xs,
+                color: colors.text_secondary,
+                marginBottom: spacing.xs,
               }}
-              error={createErrors.symbol}
-              editable={!createLoading}
-            />
-
-            <FormField
-              label="Initial Supply"
-              placeholder="1000000"
-              value={initialSupply}
-              onChangeText={(text) => {
-                setInitialSupply(text);
-                if (createErrors.initial_supply) {
-                  setCreateErrors({ ...createErrors, initial_supply: undefined });
-                }
+            >
+              Your DID (Creator):
+            </Text>
+            <Text
+              style={{
+                fontSize: typography.size.xs,
+                color: colors.text_primary,
+                fontFamily: 'Courier',
               }}
-              error={createErrors.initial_supply}
-              editable={!createLoading}
-              keyboardType="decimal-pad"
-            />
+              numberOfLines={1}
+            >
+              {currentIdentity.did}
+            </Text>
+          </View>
 
-            <FormField
-              label="Decimals"
-              placeholder="8"
-              value={decimals}
-              onChangeText={(text) => {
-                setDecimals(text);
-                if (createErrors.decimals) {
-                  setCreateErrors({ ...createErrors, decimals: undefined });
-                }
-              }}
-              error={createErrors.decimals}
-              editable={!createLoading}
-              keyboardType="number-pad"
-            />
+          {/* Token Name */}
+          <FormField
+            label="Token Name"
+            placeholder="e.g., My Token"
+            value={name}
+            onChangeText={(text) => {
+              setName(text);
+              if (errors.name) {
+                setErrors((prev) => ({ ...prev, name: undefined }));
+              }
+            }}
+            error={errors.name}
+            editable={!loading}
+          />
 
-            <FormField
-              label="Max Supply (Optional)"
-              placeholder="Leave empty for unlimited"
-              value={maxSupply}
-              onChangeText={(text) => {
-                setMaxSupply(text);
-                if (createErrors.max_supply) {
-                  setCreateErrors({ ...createErrors, max_supply: undefined });
-                }
-              }}
-              error={createErrors.max_supply}
-              editable={!createLoading}
-              keyboardType="decimal-pad"
-            />
+          {/* Token Symbol */}
+          <FormField
+            label="Token Symbol"
+            placeholder="e.g., MYTKN"
+            value={symbol}
+            onChangeText={(text) => {
+              setSymbol(text.toUpperCase());
+              if (errors.symbol) {
+                setErrors((prev) => ({ ...prev, symbol: undefined }));
+              }
+            }}
+            error={errors.symbol}
+            editable={!loading}
+          />
 
-            {createStatus.type && (
-              <Card
+          {/* Initial Supply */}
+          <FormField
+            label="Initial Supply"
+            placeholder="e.g., 1000000"
+            value={initialSupply}
+            onChangeText={(text) => {
+              setInitialSupply(text);
+              if (errors.initial_supply) {
+                setErrors((prev) => ({ ...prev, initial_supply: undefined }));
+              }
+            }}
+            keyboardType="decimal-pad"
+            error={errors.initial_supply}
+            editable={!loading}
+          />
+
+          {/* Decimals */}
+          <FormField
+            label="Decimals"
+            placeholder="e.g., 8 or 18"
+            value={decimals}
+            onChangeText={(text) => {
+              setDecimals(text);
+              if (errors.decimals) {
+                setErrors((prev) => ({ ...prev, decimals: undefined }));
+              }
+            }}
+            keyboardType="number-pad"
+            error={errors.decimals}
+            editable={!loading}
+          />
+
+          {/* Decimals Preview */}
+          {decimals && !errors.decimals && initialSupply && !errors.initial_supply && (() => {
+            const rawSupply = Number(initialSupply);
+            const dec = Number(decimals);
+            const displayedSupply = rawSupply / Math.pow(10, dec);
+
+            // Format with thousands separators and decimals
+            const formatter = new Intl.NumberFormat('en-US', {
+              minimumFractionDigits: 2,
+              maximumFractionDigits: Math.min(dec, 8),
+            });
+            const formatted = formatter.format(displayedSupply);
+
+            // Calculate scale label
+            let scaleLabel = '';
+            if (displayedSupply >= 1e9) {
+              scaleLabel = `${(displayedSupply / 1e9).toFixed(2)} Billion`;
+            } else if (displayedSupply >= 1e6) {
+              scaleLabel = `${(displayedSupply / 1e6).toFixed(2)} Million`;
+            } else if (displayedSupply >= 1e3) {
+              scaleLabel = `${(displayedSupply / 1e3).toFixed(2)} Thousand`;
+            } else {
+              scaleLabel = `${displayedSupply.toFixed(2)}`;
+            }
+
+            return (
+              <View
                 style={{
-                  borderLeftWidth: 1,
-                  borderLeftColor: colors.text_secondary,
-                  backgroundColor: colors.bg_secondary,
+                  marginBottom: spacing.md,
+                  padding: spacing.md,
+                  backgroundColor: colors.primary + '15',
+                  borderRadius: borderRadius.base,
+                  borderLeftWidth: 3,
+                  borderLeftColor: colors.primary,
                 }}
               >
-                <Text style={{ color: colors.text_secondary, fontSize: 12, fontWeight: '400' }}>
-                  {createStatus.message}
+                <Text
+                  style={{
+                    fontSize: typography.size.xs,
+                    fontWeight: typography.weight.semibold,
+                    color: colors.text_secondary,
+                    marginBottom: spacing.md,
+                  }}
+                >
+                  DECIMALS PREVIEW
                 </Text>
-              </Card>
-            )}
 
+                <Text
+                  style={{
+                    fontSize: typography.size.xs,
+                    color: colors.text_secondary,
+                    marginBottom: spacing.xs,
+                  }}
+                >
+                  Decimals: <Text style={{ color: colors.primary, fontWeight: typography.weight.semibold }}>{dec}</Text>
+                </Text>
+                <Text
+                  style={{
+                    fontSize: typography.size.xs,
+                    color: colors.text_secondary,
+                    marginBottom: spacing.md,
+                  }}
+                >
+                  Raw supply: {Number(initialSupply).toLocaleString()}
+                </Text>
+
+                {/* Main Display */}
+                <View
+                  style={{
+                    paddingTop: spacing.md,
+                    paddingBottom: spacing.md,
+                    borderTopWidth: 1,
+                    borderTopColor: colors.primary + '30',
+                    borderBottomWidth: 1,
+                    borderBottomColor: colors.primary + '30',
+                  }}
+                >
+                  <Text
+                    style={{
+                      fontSize: typography.size.xs,
+                      color: colors.text_secondary,
+                      marginBottom: spacing.xs,
+                    }}
+                  >
+                    Your token supply:
+                  </Text>
+                  <Text
+                    style={{
+                      fontSize: typography.size.lg,
+                      fontWeight: typography.weight.bold,
+                      color: colors.primary,
+                      marginBottom: spacing.xs,
+                    }}
+                  >
+                    {formatted}
+                  </Text>
+                  <Text
+                    style={{
+                      fontSize: typography.size.sm,
+                      fontWeight: typography.weight.semibold,
+                      color: colors.text_secondary,
+                    }}
+                  >
+                    {scaleLabel}
+                  </Text>
+                </View>
+              </View>
+            );
+          })()}
+
+          {/* Max Supply (Optional) */}
+          <FormField
+            label="Max Supply (Optional)"
+            placeholder="Leave empty for unlimited"
+            value={maxSupply}
+            onChangeText={(text) => {
+              setMaxSupply(text);
+              if (errors.max_supply) {
+                setErrors((prev) => ({ ...prev, max_supply: undefined }));
+              }
+            }}
+            keyboardType="decimal-pad"
+            error={errors.max_supply}
+            editable={!loading}
+          />
+
+          {/* Action Buttons */}
+          <View
+            style={{
+              flexDirection: 'row',
+              gap: spacing.md,
+              marginTop: spacing.lg,
+            }}
+          >
             <Button
               variant="primary"
-              onPress={handleCreateToken}
-              loading={createLoading}
-              disabled={createLoading}
-              style={{ opacity: 0.9 }}
+              onPress={handleCreate}
+              loading={loading}
+              style={{ flex: 1 }}
             >
               Create Token
             </Button>
-          </View>
-        )}
-
-        {/* MINT TAB */}
-        {activeTab === 'mint' && (
-          <View style={{ paddingHorizontal: spacing.lg, gap: spacing.md }}>
-            {myTokens.length === 0 ? (
-              <Card>
-                <Text style={{ color: colors.text_secondary, textAlign: 'center' }}>
-                  No tokens created yet. Create a token first!
-                </Text>
-              </Card>
-            ) : (
-              <>
-                <View>
-                  <Text style={{ color: colors.text_secondary, marginBottom: spacing.sm, fontSize: 12 }}>
-                    Select Token
-                  </Text>
-                  <View style={{ flexDirection: 'row', gap: spacing.sm, flexWrap: 'wrap' }}>
-                    {myTokens.map((token) => (
-                      <TouchableOpacity
-                        key={token.token_id}
-                        onPress={() => setSelectedTokenId(token.token_id)}
-                        style={{
-                          paddingVertical: spacing.sm,
-                          paddingHorizontal: spacing.md,
-                          borderWidth: selectedTokenId === token.token_id ? 1 : 0.5,
-                          borderColor: selectedTokenId === token.token_id ? colors.cyan : colors.text_secondary,
-                          borderRadius: 4,
-                        }}
-                      >
-                        <Text
-                          style={{
-                            color: selectedTokenId === token.token_id ? colors.cyan : colors.text_secondary,
-                            fontSize: 12,
-                            fontWeight: '400',
-                          }}
-                        >
-                          {token.symbol}
-                        </Text>
-                      </TouchableOpacity>
-                    ))}
-                  </View>
-                </View>
-
-                <FormField
-                  label="Amount to Mint"
-                  placeholder="1000"
-                  value={mintAmount}
-                  onChangeText={(text) => {
-                    setMintAmount(text);
-                    if (mintErrors.amount) {
-                      setMintErrors({ ...mintErrors, amount: undefined });
-                    }
-                  }}
-                  error={mintErrors.amount}
-                  editable={!mintLoading}
-                  keyboardType="decimal-pad"
-                />
-
-                <FormField
-                  label="Recipient DID"
-                  placeholder="did:zhtp:..."
-                  value={mintRecipient}
-                  onChangeText={(text) => {
-                    setMintRecipient(text);
-                    if (mintErrors.to) {
-                      setMintErrors({ ...mintErrors, to: undefined });
-                    }
-                  }}
-                  error={mintErrors.to}
-                  editable={!mintLoading}
-                />
-
-                {mintStatus.type && (
-                  <Card
-                    style={{
-                      borderLeftWidth: 1,
-                      borderLeftColor: colors.text_secondary,
-                      backgroundColor: colors.bg_secondary,
-                    }}
-                  >
-                    <Text style={{ color: colors.text_secondary, fontSize: 12, fontWeight: '400' }}>
-                      {mintStatus.message}
-                    </Text>
-                  </Card>
-                )}
-
-                <Button
-                  variant="primary"
-                  onPress={handleMintToken}
-                  loading={mintLoading}
-                  disabled={mintLoading}
-                  style={{ opacity: 0.9 }}
-                >
-                  Mint Tokens
-                </Button>
-              </>
+            {onClose && (
+              <Button
+                variant="secondary"
+                onPress={onClose}
+                disabled={loading}
+                style={{ flex: 1 }}
+              >
+                Cancel
+              </Button>
             )}
           </View>
-        )}
-
-        {/* TRANSFER TAB */}
-        {activeTab === 'transfer' && (
-          <View style={{ paddingHorizontal: spacing.lg, gap: spacing.md }}>
-            {myTokens.length === 0 ? (
-              <Card>
-                <Text style={{ color: colors.text_secondary, textAlign: 'center' }}>
-                  No tokens to transfer. Create a token first!
-                </Text>
-              </Card>
-            ) : (
-              <>
-                <View>
-                  <Text style={{ color: colors.text_secondary, marginBottom: spacing.sm, fontSize: 12 }}>
-                    Select Token
-                  </Text>
-                  <View style={{ flexDirection: 'row', gap: spacing.sm, flexWrap: 'wrap' }}>
-                    {myTokens.map((token) => (
-                      <TouchableOpacity
-                        key={token.token_id}
-                        onPress={() => setSelectedTokenId(token.token_id)}
-                        style={{
-                          paddingVertical: spacing.sm,
-                          paddingHorizontal: spacing.md,
-                          borderWidth: selectedTokenId === token.token_id ? 1 : 0.5,
-                          borderColor: selectedTokenId === token.token_id ? colors.cyan : colors.text_secondary,
-                          borderRadius: 4,
-                        }}
-                      >
-                        <Text
-                          style={{
-                            color: selectedTokenId === token.token_id ? colors.cyan : colors.text_secondary,
-                            fontSize: 12,
-                            fontWeight: '400',
-                          }}
-                        >
-                          {token.symbol}
-                        </Text>
-                      </TouchableOpacity>
-                    ))}
-                  </View>
-                </View>
-
-                <FormField
-                  label="Amount to Transfer"
-                  placeholder="100"
-                  value={transferAmount}
-                  onChangeText={(text) => {
-                    setTransferAmount(text);
-                    if (transferErrors.amount) {
-                      setTransferErrors({ ...transferErrors, amount: undefined });
-                    }
-                  }}
-                  error={transferErrors.amount}
-                  editable={!transferLoading}
-                  keyboardType="decimal-pad"
-                />
-
-                <FormField
-                  label="Recipient DID"
-                  placeholder="did:zhtp:..."
-                  value={transferRecipient}
-                  onChangeText={(text) => {
-                    setTransferRecipient(text);
-                    if (transferErrors.to) {
-                      setTransferErrors({ ...transferErrors, to: undefined });
-                    }
-                  }}
-                  error={transferErrors.to}
-                  editable={!transferLoading}
-                />
-
-                {transferStatus.type && (
-                  <Card
-                    style={{
-                      borderLeftWidth: 1,
-                      borderLeftColor: colors.text_secondary,
-                      backgroundColor: colors.bg_secondary,
-                    }}
-                  >
-                    <Text style={{ color: colors.text_secondary, fontSize: 12, fontWeight: '400' }}>
-                      {transferStatus.message}
-                    </Text>
-                  </Card>
-                )}
-
-                <Button
-                  variant="primary"
-                  onPress={handleTransferToken}
-                  loading={transferLoading}
-                  disabled={transferLoading}
-                  style={{ opacity: 0.9 }}
-                >
-                  Transfer Tokens
-                </Button>
-              </>
-            )}
-          </View>
-        )}
-
-        {/* VIEW TAB */}
-        {activeTab === 'view' && (
-          <View style={{ paddingHorizontal: spacing.lg, gap: spacing.md }}>
-            {viewLoading ? (
-              <LoadingView message="Loading tokens..." />
-            ) : allTokens.length === 0 ? (
-              <Card>
-                <Text style={{ color: colors.text_secondary, textAlign: 'center' }}>
-                  No tokens on network yet
-                </Text>
-              </Card>
-            ) : (
-              allTokens.map((token) => (
-                <Card
-                  key={token.token_id}
-                  onPress={() => loadTokenDetail(token.token_id)}
-                  style={{ borderWidth: 1, borderColor: colors.text_secondary }}
-                >
-                  <View style={{ gap: spacing.sm }}>
-                    <View style={{ flexDirection: 'row', justifyContent: 'space-between' }}>
-                      <Text style={{ color: colors.text_primary, fontWeight: '400' }}>
-                        {token.name}
-                      </Text>
-                      <Text style={{ color: colors.text_secondary, fontSize: 12, fontWeight: '400' }}>{token.symbol}</Text>
-                    </View>
-                    <Text style={{ color: colors.text_secondary, fontSize: 12, fontWeight: '400' }}>
-                      {token.total_supply}
-                    </Text>
-                  </View>
-                </Card>
-              ))
-            )}
-          </View>
-        )}
+        </Card>
       </ScrollView>
-
-      {/* TOKEN DETAIL MODAL */}
-      <Modal
-        visible={detailModalVisible}
-        transparent
-        animationType="slide"
-        onRequestClose={() => setDetailModalVisible(false)}
-      >
-        <View style={[styles.modalOverlay, { backgroundColor: 'rgba(0,0,0,0.5)' }]}>
-          <View style={[styles.modalContent, { backgroundColor: colors.bg_dark }]}>
-            {selectedTokenDetail && (
-              <ScrollView style={{ flex: 1 }}>
-                <View style={{ paddingHorizontal: spacing.lg, paddingTop: spacing.lg, gap: spacing.md }}>
-                  <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}>
-                    <Text style={{ color: colors.text_primary, fontSize: 18, fontWeight: '400' }}>
-                      {selectedTokenDetail.name}
-                    </Text>
-                    <TouchableOpacity
-                      onPress={() => setDetailModalVisible(false)}
-                      style={{ padding: spacing.sm }}
-                    >
-                      <Text style={{ color: colors.text_secondary, fontSize: 18 }}>✕</Text>
-                    </TouchableOpacity>
-                  </View>
-
-                  <Card style={{ borderWidth: 1, borderColor: colors.text_secondary }}>
-                    <View style={{ gap: spacing.md }}>
-                      <View style={{ flexDirection: 'row', justifyContent: 'space-between' }}>
-                        <Text style={{ color: colors.text_secondary, fontSize: 12, fontWeight: '400' }}>Symbol</Text>
-                        <Text style={{ color: colors.text_primary, fontWeight: '400', fontSize: 12 }}>
-                          {selectedTokenDetail.symbol}
-                        </Text>
-                      </View>
-                      <View style={{ flexDirection: 'row', justifyContent: 'space-between' }}>
-                        <Text style={{ color: colors.text_secondary, fontSize: 12, fontWeight: '400' }}>Decimals</Text>
-                        <Text style={{ color: colors.text_primary, fontSize: 12, fontWeight: '400' }}>
-                          {selectedTokenDetail.decimals}
-                        </Text>
-                      </View>
-                      <View style={{ flexDirection: 'row', justifyContent: 'space-between' }}>
-                        <Text style={{ color: colors.text_secondary, fontSize: 12, fontWeight: '400' }}>Total Supply</Text>
-                        <Text style={{ color: colors.text_primary, fontSize: 12, fontWeight: '400' }}>
-                          {selectedTokenDetail.total_supply}
-                        </Text>
-                      </View>
-                      <View style={{ flexDirection: 'row', justifyContent: 'space-between' }}>
-                        <Text style={{ color: colors.text_secondary, fontSize: 12, fontWeight: '400' }}>Max Supply</Text>
-                        <Text style={{ color: colors.text_primary, fontSize: 12, fontWeight: '400' }}>
-                          {selectedTokenDetail.max_supply || '∞'}
-                        </Text>
-                      </View>
-                      <View style={{ flexDirection: 'row', justifyContent: 'space-between' }}>
-                        <Text style={{ color: colors.text_secondary, fontSize: 12, fontWeight: '400' }}>Deflationary</Text>
-                        <Text style={{ color: colors.text_primary, fontSize: 12, fontWeight: '400' }}>
-                          {selectedTokenDetail.is_deflationary ? 'Yes' : 'No'}
-                        </Text>
-                      </View>
-                      <View style={{ flexDirection: 'row', justifyContent: 'space-between' }}>
-                        <Text style={{ color: colors.text_secondary, fontSize: 12, fontWeight: '400' }}>Creator</Text>
-                        <Text style={{ color: colors.text_secondary, fontSize: 11, fontWeight: '400' }}>
-                          {selectedTokenDetail.creator.slice(0, 16)}...
-                        </Text>
-                      </View>
-                      <View style={{ flexDirection: 'row', justifyContent: 'space-between' }}>
-                        <Text style={{ color: colors.text_secondary, fontSize: 12, fontWeight: '400' }}>Block</Text>
-                        <Text style={{ color: colors.text_primary, fontSize: 12, fontWeight: '400' }}>
-                          {selectedTokenDetail.created_at_block}
-                        </Text>
-                      </View>
-                    </View>
-                  </Card>
-                </View>
-              </ScrollView>
-            )}
-          </View>
-        </View>
-      </Modal>
+      </KeyboardAvoidingView>
     </View>
   );
 };
 
-const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-  },
-  tabContainer: {
-    borderBottomWidth: 1,
-    borderBottomColor: colors.bg_secondary,
-  },
-  tabButton: {
-    flex: 1,
-    alignItems: 'center',
-  },
-  content: {
-    flex: 1,
-  },
-  modalOverlay: {
-    flex: 1,
-    justifyContent: 'flex-end',
-  },
-  modalContent: {
-    height: '80%',
-    borderTopLeftRadius: 16,
-    borderTopRightRadius: 16,
-  },
-});
+export default TokenCreatorScreen;

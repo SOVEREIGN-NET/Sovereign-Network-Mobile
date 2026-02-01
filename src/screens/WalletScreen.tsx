@@ -1,6 +1,5 @@
 import React, { useState } from 'react';
-import { View, TouchableOpacity, ScrollView, Alert } from 'react-native';
-// import Clipboard from '@react-native-clipboard/clipboard';
+import { View, TouchableOpacity, ScrollView, Alert, Clipboard } from 'react-native';
 import {
   Card,
   Text, LoadingView,
@@ -10,7 +9,7 @@ import {
   DrawerItem,
 } from '../components';
 import SShieldLogo from '../components/atoms/Logo';
-import { useAuth, useWalletList } from '../hooks';
+import { useAuth, useWalletList, useUserTokenBalances } from '../hooks';
 import { useTranslation } from '../i18n';
 import { colors, spacing, typography, borderRadius } from '../theme';
 
@@ -18,6 +17,7 @@ const WalletScreen = ({ navigation }: any) => {
   const { t } = useTranslation();
   const { currentIdentity, isLoading } = useAuth();
   const { wallets, walletByType, loading: walletsLoading } = useWalletList();
+  const { tokens, loading: tokensLoading } = useUserTokenBalances();
   const [activeTab, setActiveTab] = useState('Tokens');
   const [drawerVisible, setDrawerVisible] = useState(false);
 
@@ -80,19 +80,20 @@ const WalletScreen = ({ navigation }: any) => {
     return 'unknown';
   };
 
-  // const copyToClipboard = (id: any) => {
-  //   let textToCopy = '';
-  //   if (Array.isArray(id)) {
-  //     textToCopy = id.map(byte => byte.toString(16).padStart(2, '0')).join('');
-  //   } else if (typeof id === 'string') {
-  //     textToCopy = id;
-  //   }
-  //
-  //   if (textToCopy) {
-  //     Clipboard.setString(textToCopy);
-  //     Alert.alert('Copied', 'Wallet ID copied to clipboard');
-  //   }
-  // };
+  const copyToClipboard = (id: any) => {
+    let textToCopy = '';
+    if (Array.isArray(id)) {
+      textToCopy = id.map(byte => byte.toString(16).padStart(2, '0')).join('');
+    } else if (typeof id === 'string') {
+      textToCopy = id;
+    }
+
+    if (textToCopy) {
+      Clipboard.setString(textToCopy);
+      Alert.alert('Copied', 'Wallet ID copied to clipboard');
+    }
+  };
+
 
   return (
     <View style={{ flex: 1, backgroundColor: colors.bg_darkest }}>
@@ -164,25 +165,55 @@ const WalletScreen = ({ navigation }: any) => {
                     paddingVertical: spacing.sm,
                   }}
                 >
-                  <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: spacing.md }}>
-                    <Text style={{ fontSize: typography.size.xs, color: colors.text_secondary }}>
-                      {t.wallet.details.address}
-                    </Text>
-                    <TouchableOpacity onPress={() => selectedWallet?.id && copyToClipboard(selectedWallet.id)}>
-                      <Text style={{ fontSize: typography.size.xs, color: colors.primary }}>{t.wallet.actions.copy}</Text>
-                    </TouchableOpacity>
-                  </View>
-                  <Text
-                    style={{
-                      fontSize: typography.size.sm,
-                      fontWeight: typography.weight.semibold,
-                      color: colors.text_primary,
-                      letterSpacing: 0.5,
-                    }}
-                    numberOfLines={1}
-                  >
-                    {truncateId(selectedWallet?.id)}
+                  <Text style={{ fontSize: typography.size.xs, color: colors.text_secondary, marginBottom: spacing.md }}>
+                    WALLET ADDRESS (for SOV transfers)
                   </Text>
+                  <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: spacing.lg }}>
+                    <Text
+                      style={{
+                        fontSize: typography.size.sm,
+                        fontWeight: typography.weight.semibold,
+                        color: colors.text_primary,
+                        letterSpacing: 0.5,
+                        flex: 1,
+                      }}
+                      numberOfLines={1}
+                    >
+                      {selectedWallet.id}
+                    </Text>
+                    {selectedWallet?.id && (
+                      <TouchableOpacity onPress={() => {
+                        copyToClipboard(selectedWallet.id);
+                      }} style={{ marginLeft: spacing.sm }}>
+                        <Text style={{ fontSize: typography.size.xs, color: colors.primary }}>{t.wallet.actions.copy}</Text>
+                      </TouchableOpacity>
+                    )}
+                  </View>
+
+                  <Text style={{ fontSize: typography.size.xs, color: colors.text_secondary, marginBottom: spacing.md }}>
+                    YOUR DID (for token transfers & sharing)
+                  </Text>
+                  <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}>
+                    <Text
+                      style={{
+                        fontSize: typography.size.sm,
+                        fontWeight: typography.weight.semibold,
+                        color: colors.text_primary,
+                        letterSpacing: 0.5,
+                        flex: 1,
+                      }}
+                      numberOfLines={1}
+                    >
+                      {currentIdentity?.did || 'Loading...'}
+                    </Text>
+                    {currentIdentity?.did && (
+                      <TouchableOpacity onPress={() => {
+                        copyToClipboard(currentIdentity.did);
+                      }} style={{ marginLeft: spacing.sm }}>
+                        <Text style={{ fontSize: typography.size.xs, color: colors.primary }}>{t.wallet.actions.copy}</Text>
+                      </TouchableOpacity>
+                    )}
+                  </View>
                 </View>
 
                 {/* Balance Section */}
@@ -263,77 +294,202 @@ const WalletScreen = ({ navigation }: any) => {
           </View>
 
           {/* Tab Content */}
-          {activeTab === 'Tokens' && wallets.length > 0 && (
+          {activeTab === 'Tokens' && (
             <View style={{ paddingHorizontal: spacing.md }}>
               <Column gap="md">
-                {wallets.map((wallet) => (
-                  <TouchableOpacity
-                    key={wallet.id}
-                    activeOpacity={0.7}
-                  >
-                    <Card style={{ marginHorizontal: 0 }}>
-                      <View
+                {/* SOV Wallets Section */}
+                {wallets.length > 0 && (
+                  <>
+                    <View>
+                      <Text
                         style={{
-                          paddingHorizontal: spacing.md,
-                          paddingVertical: spacing.xs,
+                          fontSize: typography.size.sm,
+                          fontWeight: typography.weight.semibold,
+                          color: colors.text_secondary,
+                          marginBottom: spacing.sm,
                         }}
                       >
-                        <View style={{ flexDirection: 'row', alignItems: 'flex-start', gap: spacing.md, marginBottom: spacing.xxs }}>
-                          <View
-                            style={{
-                              width: 48,
-                              height: 48,
-                              borderRadius: borderRadius.full,
-                              backgroundColor: colors.primary,
-                              justifyContent: 'center',
-                              alignItems: 'center',
-                              overflow: 'hidden',
-                            }}
+                        WALLETS
+                      </Text>
+                      <Column gap="md">
+                        {wallets.map((wallet) => (
+                          <TouchableOpacity
+                            key={wallet.id}
+                            activeOpacity={0.7}
                           >
-                            <SShieldLogo size={48} />
-                          </View>
-                          <View style={{ flex: 1 }}>
-                            <Text
-                              style={{
-                                fontSize: typography.size.sm,
-                                fontWeight: typography.weight.semibold,
-                                color: colors.text_primary,
-                              }}
-                            >
-                              {wallet.name}
-                            </Text>
-                            <Text
-                              style={{
-                                fontSize: typography.size.xs,
-                                color: colors.text_secondary,
-                                marginTop: spacing.xxs,
-                              }}
-                              numberOfLines={1}
-                            >
-                              {truncateId(wallet.id)}
-                            </Text>
-                            <TouchableOpacity onPress={() => wallet.id && copyToClipboard(wallet.id)}>
-                              <Text style={{ fontSize: typography.size.xs, color: colors.primary, marginTop: spacing.xxs }}>
-                                Copy
-                              </Text>
-                            </TouchableOpacity>
-                          </View>
-                        </View>
-                        <View style={{ alignItems: 'flex-end' }}>
-                          <Text
-                            style={{
-                              fontSize: typography.size.lg,
-                              fontWeight: typography.weight.bold,
-                              color: colors.text_primary,
-                            }}
+                            <Card style={{ marginHorizontal: 0 }}>
+                              <View
+                                style={{
+                                  paddingHorizontal: spacing.md,
+                                  paddingVertical: spacing.xs,
+                                }}
+                              >
+                                <View style={{ flexDirection: 'row', alignItems: 'flex-start', gap: spacing.md, marginBottom: spacing.xxs }}>
+                                  <View
+                                    style={{
+                                      width: 48,
+                                      height: 48,
+                                      borderRadius: borderRadius.full,
+                                      backgroundColor: colors.primary,
+                                      justifyContent: 'center',
+                                      alignItems: 'center',
+                                      overflow: 'hidden',
+                                    }}
+                                  >
+                                    <SShieldLogo size={48} />
+                                  </View>
+                                  <View style={{ flex: 1 }}>
+                                    <Text
+                                      style={{
+                                        fontSize: typography.size.sm,
+                                        fontWeight: typography.weight.semibold,
+                                        color: colors.text_primary,
+                                      }}
+                                    >
+                                      {wallet.name}
+                                    </Text>
+                                    <Text
+                                      style={{
+                                        fontSize: typography.size.xs,
+                                        color: colors.text_secondary,
+                                        marginTop: spacing.xxs,
+                                      }}
+                                      numberOfLines={1}
+                                    >
+                                      {truncateId(wallet.id)}
+                                    </Text>
+                                    <TouchableOpacity onPress={() => wallet.id && copyToClipboard(wallet.id)}>
+                                      <Text style={{ fontSize: typography.size.xs, color: colors.primary, marginTop: spacing.xxs }}>
+                                        Copy
+                                      </Text>
+                                    </TouchableOpacity>
+                                  </View>
+                                </View>
+                                <View style={{ alignItems: 'flex-end' }}>
+                                  <Text
+                                    style={{
+                                      fontSize: typography.size.lg,
+                                      fontWeight: typography.weight.bold,
+                                      color: colors.text_primary,
+                                    }}
+                                  >
+                                    {Math.floor(wallet.total_balance).toLocaleString()} SOV
+                                  </Text>
+                                </View>
+                              </View>
+                            </Card>
+                          </TouchableOpacity>
+                        ))}
+                      </Column>
+                    </View>
+                  </>
+                )}
+
+                {/* Custom Tokens Section */}
+                {tokens.length > 0 && (
+                  <>
+                    <View>
+                      <Text
+                        style={{
+                          fontSize: typography.size.sm,
+                          fontWeight: typography.weight.semibold,
+                          color: colors.text_secondary,
+                          marginBottom: spacing.sm,
+                        }}
+                      >
+                        TOKENS
+                      </Text>
+                      <Column gap="md">
+                        {tokens.map((token) => (
+                          <TouchableOpacity
+                            key={token.token_id}
+                            activeOpacity={0.7}
                           >
-                            {Math.floor(wallet.total_balance).toLocaleString()} SOV
-                          </Text>
-                        </View>
-                      </View>
-                    </Card>
-                  </TouchableOpacity>
-                ))}
+                            <Card style={{ marginHorizontal: 0 }}>
+                              <View
+                                style={{
+                                  paddingHorizontal: spacing.md,
+                                  paddingVertical: spacing.xs,
+                                }}
+                              >
+                                <View style={{ flexDirection: 'row', alignItems: 'flex-start', gap: spacing.md, marginBottom: spacing.xxs }}>
+                                  <View
+                                    style={{
+                                      width: 48,
+                                      height: 48,
+                                      borderRadius: borderRadius.full,
+                                      backgroundColor: colors.bg_medium,
+                                      justifyContent: 'center',
+                                      alignItems: 'center',
+                                      overflow: 'hidden',
+                                      borderWidth: 2,
+                                      borderColor: colors.primary,
+                                    }}
+                                  >
+                                    <Text style={{ fontSize: typography.size.lg, fontWeight: typography.weight.bold }}>
+                                      {token.symbol.substring(0, 2).toUpperCase()}
+                                    </Text>
+                                  </View>
+                                  <View style={{ flex: 1 }}>
+                                    <View style={{ flexDirection: 'row', alignItems: 'center', gap: spacing.xs }}>
+                                      <Text
+                                        style={{
+                                          fontSize: typography.size.sm,
+                                          fontWeight: typography.weight.semibold,
+                                          color: colors.text_primary,
+                                        }}
+                                      >
+                                        {token.symbol}
+                                      </Text>
+                                      {token.isCreatedByUser && (
+                                        <Text style={{ fontSize: typography.size.sm }}>⭐</Text>
+                                      )}
+                                    </View>
+                                    <Text
+                                      style={{
+                                        fontSize: typography.size.xs,
+                                        color: colors.text_secondary,
+                                        marginTop: spacing.xxs,
+                                      }}
+                                      numberOfLines={1}
+                                    >
+                                      {token.token_id ? `${token.token_id.substring(0, 12)}...` : 'Unknown'}
+                                    </Text>
+                                  </View>
+                                </View>
+                                <View style={{ alignItems: 'flex-end' }}>
+                                  <Text
+                                    style={{
+                                      fontSize: typography.size.lg,
+                                      fontWeight: typography.weight.bold,
+                                      color: colors.text_primary,
+                                    }}
+                                  >
+                                    {Math.floor(token.balance).toLocaleString()} {token.symbol}
+                                  </Text>
+                                </View>
+                              </View>
+                            </Card>
+                          </TouchableOpacity>
+                        ))}
+                      </Column>
+                    </View>
+                  </>
+                )}
+
+                {/* Empty State */}
+                {wallets.length === 0 && tokens.length === 0 && !walletsLoading && !tokensLoading && (
+                  <Card>
+                    <Column gap="md" style={{ alignItems: 'center', paddingVertical: spacing.lg }}>
+                      <Text style={{ fontSize: typography.size.lg, fontWeight: typography.weight.semibold, color: colors.text_primary }}>
+                        No tokens yet
+                      </Text>
+                      <Text style={{ fontSize: typography.size.sm, color: colors.text_secondary }}>
+                        Create or receive tokens to see them here
+                      </Text>
+                    </Column>
+                  </Card>
+                )}
               </Column>
             </View>
           )}
