@@ -305,6 +305,36 @@ export const SecureIdentityStorage = {
       return null;
     }
   },
+
+  /**
+   * Sync backup after successful authentication
+   * Ensures AsyncStorage backup stays up-to-date with latest identity
+   * Called after successful Keychain retrieval to keep backup current
+   *
+   * @param identity - Identity to backup
+   */
+  async syncBackup(identity: Identity): Promise<void> {
+    try {
+      const identityData = JSON.stringify({
+        did: identity.did,
+        displayName: identity.displayName,
+        identityType: identity.identityType,
+        avatar: identity.avatar,
+        createdAt: identity.createdAt,
+        citizenship: identity.citizenship,
+        identityId: identity.identityId,
+      });
+
+      await AsyncStorage.setItem(IDENTITY_BACKUP_STORAGE, identityData);
+
+      if (__DEV__) {
+        console.log('[SecureIdentityStorage] ✅ Backup synced with current identity');
+      }
+    } catch (error) {
+      console.warn('[SecureIdentityStorage] Failed to sync backup (non-fatal):', error);
+      // Don't throw - backup sync failure shouldn't block operation
+    }
+  },
 };
 
 export default SecureIdentityStorage;

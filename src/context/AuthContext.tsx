@@ -531,6 +531,10 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
       if (identity) {
         console.log('[AuthContext] ✅ Identity loaded on-demand');
         setCurrentIdentity(identity);
+        // Sync backup with latest identity (ensures backup stays current)
+        await SecureIdentityStorage.syncBackup(identity).catch(() => {
+          // Non-fatal - backup sync failure shouldn't block operation
+        });
         return identity;
       }
       console.log('[AuthContext] ⚠️ No identity found');
