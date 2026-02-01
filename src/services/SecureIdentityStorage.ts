@@ -13,6 +13,7 @@ import { Identity } from './MockAuthService';
 
 const IDENTITY_KEYCHAIN_SERVICE = 'sovnet_identity_secure';
 const IDENTITY_ID_ASYNC_STORAGE = 'sovnet_identity_id'; // Non-sensitive, used for UI state only
+const IDENTITY_BACKUP_STORAGE = 'sovnet_identity_backup'; // Unencrypted fallback backup (survives Keystore resets)
 
 interface SecureIdentityStorageOptions {
   requireBiometric?: boolean;
@@ -73,19 +74,25 @@ export const SecureIdentityStorage = {
         keychainOptions.accessControl = Keychain.ACCESS_CONTROL.BIOMETRY_ANY_OR_DEVICE_PASSCODE;
       }
 
-      // 4. Store encrypted identity in Keychain
+      // 4. Store encrypted identity in Keychain (primary secure storage)
       await Keychain.setGenericPassword(
         'identity_data',
         identityData,
         keychainOptions
       );
 
-      // 5. Store only DID in AsyncStorage for quick, non-authenticated UI state
+      // 5. Store backup copy in AsyncStorage (survives Keystore resets on Android)
+      // This is NOT ideal from a security standpoint, but essential for UX
+      // Android Keystore can be reset by: biometric changes, system updates, lock settings changes
+      // Without backup, users lose access to their identity permanently
+      await AsyncStorage.setItem(IDENTITY_BACKUP_STORAGE, identityData);
+
+      // 6. Store only DID in AsyncStorage for quick, non-authenticated UI state
       // This allows checking if user is logged in without unlocking Keychain
       await AsyncStorage.setItem(IDENTITY_ID_ASYNC_STORAGE, identity.did);
 
       if (__DEV__) {
-        console.log('✅ Identity stored securely in Keychain');
+        console.log('✅ Identity stored securely in Keychain + AsyncStorage backup');
       }
     } catch (error) {
       console.error('❌ Failed to store identity securely:', error);
@@ -94,15 +101,21 @@ export const SecureIdentityStorage = {
   },
 
   /**
-   * Retrieve identity from device Keychain
-   * Requires device unlock (Keychain access control enforced by OS)
-   * May prompt for biometric authentication if configured
+   * Retrieve identity from device Keychain with AsyncStorage fallback
+   *
+   * PRIMARY: Try Keychain (Requires device unlock + biometric if configured)
+   * FALLBACK: If Keychain fails, restore from AsyncStorage backup
+   *
+   * This is critical for Android reliability:
+   * - Android Keystore can reset on: biometric changes, system updates, lock settings changes
+   * - Without fallback, users lose permanent access to their identity
+   * - AsyncStorage backup ensures users never lose access completely
    *
    * @returns Identity object or null if not found
    */
   async getIdentity(): Promise<Identity | null> {
     try {
-      console.log('[SecureIdentityStorage] 🔐 getIdentity() called - showing biometric prompt');
+      console.log('[SecureIdentityStorage] 🔐 getIdentity() called - trying Keychain first');
 
       // Request identity from Keychain with authentication prompt
       const credentials = await Keychain.getGenericPassword({
@@ -119,13 +132,14 @@ export const SecureIdentityStorage = {
       // Return null if no credentials found
       if (!credentials) {
         console.log('[SecureIdentityStorage] ⚠️ No credentials found in Keychain');
-        return null;
+        // Try AsyncStorage fallback
+        return await this.restoreFromBackup();
       }
 
       // Parse and return identity
       const identity = JSON.parse(credentials.password) as Identity;
 
-      console.log('✅ Identity retrieved from Keychain');
+      console.log('✅ Identity retrieved successfully from Keychain');
 
       return identity;
     } catch (error: any) {
@@ -135,16 +149,29 @@ export const SecureIdentityStorage = {
       }
 
       // If decryption failed (Android Keystore reset, fingerprint changed, etc),
-      // clear the corrupted identity data so user can create a new one
+      // try to restore from AsyncStorage backup instead of clearing
       if (error.message?.includes('Decryption failed') ||
           error.message?.includes('Authentication tag verification failed') ||
           error.message?.includes('Signature/MAC verification failed')) {
-        console.error('[SecureIdentityStorage] 🔄 Decryption failed - clearing corrupted identity', error?.message);
+        console.warn('[SecureIdentityStorage] ⚠️ Keychain decryption failed:', error?.message);
+        console.log('[SecureIdentityStorage] 🔄 Attempting to restore from AsyncStorage backup...');
+
         try {
-          await this.clearIdentity();
-        } catch (clearError) {
-          console.error('[SecureIdentityStorage] Failed to clear corrupted identity:', clearError);
+          const backup = await this.restoreFromBackup();
+          if (backup) {
+            console.log('✅ Identity restored from backup (Keychain was reset)');
+            // Try to re-store to Keychain for next time
+            try {
+              await this.setIdentity(backup, { requireBiometric: true });
+            } catch (restoreError) {
+              console.warn('[SecureIdentityStorage] Could not update Keychain after restore:', restoreError);
+            }
+            return backup;
+          }
+        } catch (backupError) {
+          console.error('[SecureIdentityStorage] Backup restore also failed:', backupError);
         }
+
         return null;
       }
 
@@ -154,8 +181,30 @@ export const SecureIdentityStorage = {
   },
 
   /**
+   * Restore identity from AsyncStorage backup
+   * Used when Keychain is unavailable or corrupted
+   * @returns Identity object or null if backup not found
+   */
+  async restoreFromBackup(): Promise<Identity | null> {
+    try {
+      const backup = await AsyncStorage.getItem(IDENTITY_BACKUP_STORAGE);
+      if (!backup) {
+        console.log('[SecureIdentityStorage] ⚠️ No backup found in AsyncStorage');
+        return null;
+      }
+
+      const identity = JSON.parse(backup) as Identity;
+      console.log('✅ Identity restored from AsyncStorage backup');
+      return identity;
+    } catch (error) {
+      console.error('[SecureIdentityStorage] Failed to restore from backup:', error);
+      return null;
+    }
+  },
+
+  /**
    * Clear stored identity (called on sign out)
-   * Removes both Keychain and AsyncStorage entries
+   * Removes Keychain entry and AsyncStorage entries (both backup and DID)
    *
    * @throws Error if clearing fails
    */
@@ -166,11 +215,14 @@ export const SecureIdentityStorage = {
         service: IDENTITY_KEYCHAIN_SERVICE
       });
 
+      // Remove backup from AsyncStorage
+      await AsyncStorage.removeItem(IDENTITY_BACKUP_STORAGE);
+
       // Remove DID from AsyncStorage
       await AsyncStorage.removeItem(IDENTITY_ID_ASYNC_STORAGE);
 
       if (__DEV__) {
-        console.log('✅ Identity cleared from secure storage');
+        console.log('✅ Identity cleared from secure storage (Keychain + AsyncStorage backup)');
       }
     } catch (error) {
       console.error('❌ Failed to clear identity:', error);
