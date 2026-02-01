@@ -4,8 +4,7 @@
  */
 
 import React, { useState } from 'react';
-import { View, ScrollView, TouchableOpacity, Alert } from 'react-native';
-// import Clipboard from '@react-native-clipboard/clipboard';
+import { View, ScrollView, TouchableOpacity, Alert, Clipboard } from 'react-native';
 import {
   Card,
   Text,
@@ -132,19 +131,24 @@ const ProfileScreen = ({ navigation }: any) => {
     return 'unknown';
   };
 
-  // const copyToClipboard = (id: any) => {
-  //   let textToCopy = '';
-  //   if (Array.isArray(id)) {
-  //     textToCopy = id.map(byte => byte.toString(16).padStart(2, '0')).join('');
-  //   } else if (typeof id === 'string') {
-  //     textToCopy = id;
-  //   }
-  //
-  //   if (textToCopy) {
-  //     Clipboard.setString(textToCopy);
-  //     Alert.alert('Copied', 'DID copied to clipboard');
-  //   }
-  // };
+  const copyToClipboard = async (id: any) => {
+    let textToCopy = '';
+    if (Array.isArray(id)) {
+      textToCopy = id.map(byte => byte.toString(16).padStart(2, '0')).join('');
+    } else if (typeof id === 'string') {
+      textToCopy = id;
+    }
+
+    if (textToCopy) {
+      try {
+        await Clipboard.setString(textToCopy);
+        Alert.alert('Copied', `DID copied to clipboard:\n\n${textToCopy}`);
+      } catch (error) {
+        console.error('Failed to copy DID:', error);
+        Alert.alert('Error', 'Failed to copy DID to clipboard');
+      }
+    }
+  };
 
   // Stats values
   const votingPower = daoStats?.voting_power || 0;
@@ -199,10 +203,52 @@ const ProfileScreen = ({ navigation }: any) => {
 
               {/* Identity Details */}
               <Column gap="sm">
-                <DetailRow
-                  label="DID"
-                  value={truncateId(currentIdentity.did)}
-                />
+                {/* Full DID with Copy */}
+                <View
+                  style={{
+                    paddingVertical: spacing.md,
+                    paddingHorizontal: spacing.md,
+                    backgroundColor: colors.bg_darker,
+                    borderRadius: borderRadius.base,
+                    borderLeftWidth: 3,
+                    borderLeftColor: colors.primary,
+                  }}
+                >
+                  <Text
+                    style={{
+                      fontSize: typography.size.xs,
+                      color: colors.text_secondary,
+                      marginBottom: spacing.sm,
+                      fontWeight: typography.weight.semibold,
+                    }}
+                  >
+                    DECENTRALIZED IDENTITY (DID)
+                  </Text>
+                  <TouchableOpacity onPress={() => copyToClipboard(currentIdentity.did)}>
+                    <Text
+                      style={{
+                        fontSize: typography.size.xs,
+                        color: colors.primary,
+                        fontFamily: 'Courier',
+                        fontWeight: '600',
+                        marginBottom: spacing.xs,
+                      }}
+                    >
+                      {typeof currentIdentity.did === 'string'
+                        ? currentIdentity.did
+                        : truncateId(currentIdentity.did)}
+                    </Text>
+                  </TouchableOpacity>
+                  <Text
+                    style={{
+                      fontSize: typography.size.xs,
+                      color: colors.text_secondary,
+                      fontStyle: 'italic',
+                    }}
+                  >
+                    Tap to copy full DID
+                  </Text>
+                </View>
                 <DetailRow
                   label={t.identity.details.identityType}
                   value={currentIdentity.identityType || 'Citizen'}

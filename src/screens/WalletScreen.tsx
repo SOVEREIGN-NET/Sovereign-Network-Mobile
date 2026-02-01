@@ -80,7 +80,7 @@ const WalletScreen = ({ navigation }: any) => {
     return 'unknown';
   };
 
-  const copyToClipboard = (id: any) => {
+  const copyToClipboard = async (id: any) => {
     let textToCopy = '';
     if (Array.isArray(id)) {
       textToCopy = id.map(byte => byte.toString(16).padStart(2, '0')).join('');
@@ -89,8 +89,13 @@ const WalletScreen = ({ navigation }: any) => {
     }
 
     if (textToCopy) {
-      Clipboard.setString(textToCopy);
-      Alert.alert('Copied', 'Wallet ID copied to clipboard');
+      try {
+        await Clipboard.setString(textToCopy);
+        Alert.alert('Copied', `Wallet ID copied to clipboard:\n\n${textToCopy}`);
+      } catch (error) {
+        console.error('Failed to copy wallet ID:', error);
+        Alert.alert('Error', 'Failed to copy wallet ID to clipboard');
+      }
     }
   };
 

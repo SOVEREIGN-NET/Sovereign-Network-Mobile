@@ -53,6 +53,10 @@ const TokenCreatorScreen: React.FC<TokenCreatorScreenProps> = ({ onClose }) => {
   const [errors, setErrors] = useState<CreateFormErrors>({});
   const [loading, setLoading] = useState(false);
   const [status, setStatus] = useState<SubmitStatus>({ type: null, message: '' });
+  const [symbolStatus, setSymbolStatus] = useState<{ available: boolean | null; checking: boolean }>({
+    available: null,
+    checking: false,
+  });
 
   // Validate create form
   const validateForm = (): boolean => {
@@ -100,6 +104,33 @@ const TokenCreatorScreen: React.FC<TokenCreatorScreenProps> = ({ onClose }) => {
 
     setErrors(newErrors);
     return Object.keys(newErrors).length === 0;
+  };
+
+  // Check if symbol is available
+  const checkSymbolAvailability = async (sym: string) => {
+    if (!sym.trim() || sym.trim().length < 1) {
+      setSymbolStatus({ available: null, checking: false });
+      return;
+    }
+
+    setSymbolStatus({ available: null, checking: true });
+
+    try {
+      const response = await tokenService.listTokens();
+      const tokens = response.tokens || [];
+      const symbolUpper = sym.trim().toUpperCase();
+      const exists = tokens.some(token => token.symbol.toUpperCase() === symbolUpper);
+
+      setSymbolStatus({
+        available: !exists,
+        checking: false,
+      });
+
+      console.log(`[TokenCreatorScreen] Symbol "${symbolUpper}" is ${exists ? 'taken' : 'available'}`);
+    } catch (error) {
+      console.warn('[TokenCreatorScreen] Failed to check symbol availability:', error);
+      setSymbolStatus({ available: null, checking: false });
+    }
   };
 
   // Handle token creation
@@ -335,10 +366,71 @@ const TokenCreatorScreen: React.FC<TokenCreatorScreenProps> = ({ onClose }) => {
               if (errors.symbol) {
                 setErrors((prev) => ({ ...prev, symbol: undefined }));
               }
+              // Reset availability check on change
+              setSymbolStatus({ available: null, checking: false });
+            }}
+            onBlur={() => {
+              if (symbol.trim()) {
+                checkSymbolAvailability(symbol);
+              }
             }}
             error={errors.symbol}
             editable={!loading}
           />
+
+          {/* Symbol Availability Status */}
+          {symbol.trim() && symbolStatus.available !== null && (
+            <View
+              style={{
+                marginBottom: spacing.md,
+                paddingVertical: spacing.sm,
+                paddingHorizontal: spacing.md,
+                borderRadius: borderRadius.base,
+                backgroundColor: symbolStatus.available
+                  ? 'rgba(76, 175, 80, 0.15)'
+                  : 'rgba(244, 67, 54, 0.15)',
+                borderLeftWidth: 3,
+                borderLeftColor: symbolStatus.available ? '#4caf50' : '#f44336',
+              }}
+            >
+              <Text
+                style={{
+                  fontSize: typography.size.sm,
+                  fontWeight: typography.weight.semibold,
+                  color: symbolStatus.available ? '#4caf50' : '#f44336',
+                }}
+              >
+                {symbolStatus.available ? '✓ Symbol Available' : '✗ Symbol Already Taken'}
+              </Text>
+            </View>
+          )}
+
+          {/* Symbol Checking Indicator */}
+          {symbol.trim() && symbolStatus.checking && (
+            <View
+              style={{
+                marginBottom: spacing.md,
+                paddingVertical: spacing.sm,
+                paddingHorizontal: spacing.md,
+                borderRadius: borderRadius.base,
+                backgroundColor: colors.primary + '15',
+                borderLeftWidth: 3,
+                borderLeftColor: colors.primary,
+                flexDirection: 'row',
+                alignItems: 'center',
+              }}
+            >
+              <Text
+                style={{
+                  fontSize: typography.size.sm,
+                  fontWeight: typography.weight.semibold,
+                  color: colors.primary,
+                }}
+              >
+                Checking availability...
+              </Text>
+            </View>
+          )}
 
           {/* Initial Supply */}
           <FormField

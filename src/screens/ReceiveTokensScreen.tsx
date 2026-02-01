@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { View, Share, Alert } from 'react-native';
+import { View, Share, Alert, Clipboard, TouchableOpacity } from 'react-native';
 import { Card, Text, Button, Column, ScreenLayout, SectionLabel } from '../components';
 import { useAuth } from '../hooks';
 import { useTranslation } from '../i18n';
@@ -31,9 +31,16 @@ const ReceiveTokensScreen = () => {
   };
   const walletAddress = getWalletAddress();
 
-  const handleCopyAddress = () => {
-    setCopied(true);
-    setTimeout(() => setCopied(false), 2000);
+  const handleCopyAddress = async () => {
+    try {
+      await Clipboard.setString(walletAddress);
+      setCopied(true);
+      Alert.alert('Copied', `Wallet address copied to clipboard:\n\n${walletAddress}`);
+      setTimeout(() => setCopied(false), 2000);
+    } catch (error) {
+      console.error('Failed to copy address:', error);
+      Alert.alert('Error', 'Failed to copy address to clipboard');
+    }
   };
 
   const handleShare = async () => {
@@ -114,7 +121,8 @@ const ReceiveTokensScreen = () => {
               >
                 {t.receiveTokens.address}
               </Text>
-              <View
+              <TouchableOpacity
+                onPress={handleCopyAddress}
                 style={{
                   backgroundColor: colors.bg_darker,
                   padding: spacing.md,
@@ -128,11 +136,25 @@ const ReceiveTokensScreen = () => {
                     fontSize: typography.size.sm,
                     color: colors.primary,
                     letterSpacing: 0.5,
+                    fontFamily: 'Courier',
+                    fontWeight: '600',
+                    textAlign: 'center',
+                    marginBottom: spacing.xs,
                   }}
                 >
                   {walletAddress}
                 </Text>
-              </View>
+                <Text
+                  style={{
+                    fontSize: typography.size.xs,
+                    color: colors.text_secondary,
+                    textAlign: 'center',
+                    fontStyle: 'italic',
+                  }}
+                >
+                  Tap to copy
+                </Text>
+              </TouchableOpacity>
             </View>
 
             {/* Copy and Share Buttons */}
