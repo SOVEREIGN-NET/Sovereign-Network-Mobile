@@ -60,11 +60,30 @@ function createResponseFromQuic(quicResponse: QuicResponse): Response {
 
     // Body methods
     json: async function () {
-      return JSON.parse(quicResponse.body);
+      // Ensure body is a string before parsing (Android may return different types)
+      const bodyStr = typeof quicResponse.body === 'string'
+        ? quicResponse.body
+        : JSON.stringify(quicResponse.body);
+
+      if (!bodyStr || bodyStr.trim() === '') {
+        return {};
+      }
+
+      try {
+        return JSON.parse(bodyStr);
+      } catch (error) {
+        console.error('[QuicFetchAdapter] JSON parse failed:', error);
+        console.error('[QuicFetchAdapter] Body type:', typeof quicResponse.body);
+        console.error('[QuicFetchAdapter] Body value:', String(quicResponse.body).substring(0, 200));
+        throw new Error(`JSON parse error: ${error}`);
+      }
     },
 
     text: async function () {
-      return quicResponse.body;
+      // Ensure body is a string (Android may return different types)
+      return typeof quicResponse.body === 'string'
+        ? quicResponse.body
+        : String(quicResponse.body);
     },
 
     arrayBuffer: async function () {

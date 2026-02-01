@@ -256,7 +256,36 @@ class TokenService {
         }
       );
 
-      const data = await response.json();
+      // Handle response - add extra debugging for Android JSON parse issues
+      let data: any;
+
+      if (!response.ok) {
+        console.error('[TokenService] Non-OK response status:', response.status);
+        const text = await response.text();
+        throw new Error(`HTTP ${response.status}: ${text}`);
+      }
+
+      try {
+        // Try JSON parsing with better error handling
+        data = await response.json();
+      } catch (jsonError: any) {
+        console.error('[TokenService] JSON parse error:', jsonError.message);
+
+        // Fallback: try to read as text and parse manually
+        try {
+          const bodyText = await response.text();
+          console.error('[TokenService] Raw response body (first 200 chars):', bodyText.substring(0, 200));
+          console.error('[TokenService] Body type:', typeof bodyText);
+          console.error('[TokenService] Body length:', bodyText?.length);
+
+          // Try parsing again with better error info
+          data = JSON.parse(bodyText);
+        } catch (fallbackError) {
+          console.error('[TokenService] Fallback parse also failed:', fallbackError);
+          throw new Error(`Failed to parse token balances response: ${jsonError.message}`);
+        }
+      }
+
       // API returns { address, balances: [...] } - extract the balances array
       const balances = data.balances || [];
       console.log('[TokenService] User token balances retrieved:', balances.length, 'tokens');
