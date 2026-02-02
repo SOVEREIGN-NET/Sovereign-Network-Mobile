@@ -29,7 +29,7 @@ type SignInScreenProps = NativeStackScreenProps<AuthStackParamList, 'SignIn'>;
 const SignInScreen = ({ navigation }: SignInScreenProps) => {
   const { t } = useTranslation();
   const { signIn, isLoading, error, setCurrentIdentity } = useAuth();
-  const { isConnected, isLoading: nodeLoading, checkConnection, getProtocol } = useNodeConnection(true);
+  const { isConnected, isLoading: nodeLoading, checkConnection, getProtocol } = useNodeConnection(false);
 
   const [did, setDid] = useState('');
   const [passphrase, setPassphrase] = useState('');

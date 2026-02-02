@@ -155,7 +155,7 @@ function isPublicEndpoint(url: string): boolean {
     const urlObj = new URL(url.replace(/^quic:\/\//, 'https://'));
     const path = urlObj.pathname;
     const isPublic = PUBLIC_ENDPOINT_PATTERNS.some(pattern => path.startsWith(pattern));
-    if (isPublic) {
+    if (__DEV__ && isPublic) {
       console.log('[🌐 Web4] QuicFetchAdapter: Public endpoint detected');
       console.log('[🌐 Web4] QuicFetchAdapter:   URL:', url);
       console.log('[🌐 Web4] QuicFetchAdapter:   Path:', path);
@@ -223,7 +223,9 @@ async function populateIdentityFields(body: string, url?: string, method?: strin
     // Populate identity field if not already set
     if (!parsed[identityEndpoint.identityField]) {
       parsed[identityEndpoint.identityField] = identityId;
-      console.log('[QuicFetchAdapter] ✓ Auto-populated identity field:', identityEndpoint.identityField);
+      if (__DEV__) {
+        console.log('[QuicFetchAdapter] ✓ Auto-populated identity field:', identityEndpoint.identityField);
+      }
       return JSON.stringify(parsed);
     }
 
@@ -271,9 +273,11 @@ function convertOptions(init?: RequestInit, url?: string): QuicRequestOptions {
   // Determine ALPN based on endpoint
   const alpn: 'public' | 'authenticated' = url && isPublicEndpoint(url) ? 'public' : 'authenticated';
 
-  console.log('[🌐 Web4] QuicFetchAdapter: ALPN selection:');
-  console.log('[🌐 Web4] QuicFetchAdapter:   URL:', url);
-  console.log('[🌐 Web4] QuicFetchAdapter:   ALPN:', alpn);
+  if (__DEV__) {
+    console.log('[🌐 Web4] QuicFetchAdapter: ALPN selection:');
+    console.log('[🌐 Web4] QuicFetchAdapter:   URL:', url);
+    console.log('[🌐 Web4] QuicFetchAdapter:   ALPN:', alpn);
+  }
 
   return {
     method: (init?.method as QuicRequestOptions['method']) || 'GET',
@@ -341,9 +345,11 @@ export async function createQuicFetchAdapter(
       const quicResponse = await quicRequest(quicUrl, quicOptions);
       const elapsed = Date.now() - startTime;
 
-      console.log('[🌐 Web4] QuicFetchAdapter: Request completed');
-      console.log('[🌐 Web4] QuicFetchAdapter:   Time taken:', `${elapsed}ms`);
-      console.log('[🌐 Web4] QuicFetchAdapter:   Response body length:', `${quicResponse.body?.length || 0} bytes`);
+      if (__DEV__) {
+        console.log('[🌐 Web4] QuicFetchAdapter: Request completed');
+        console.log('[🌐 Web4] QuicFetchAdapter:   Time taken:', `${elapsed}ms`);
+        console.log('[🌐 Web4] QuicFetchAdapter:   Response body length:', `${quicResponse.body?.length || 0} bytes`);
+      }
 
       return createResponseFromQuic(quicResponse);
     } catch (error) {
@@ -402,7 +408,9 @@ export function createQuicFetchAdapterSync(
         if (identityId) {
           quicOptions.headers = quicOptions.headers || {};
           quicOptions.headers['X-Zhtp-Identity'] = identityId;
-          console.log('[🌐 Web4] QuicFetchAdapter: Added X-Zhtp-Identity header for authenticated request');
+          if (__DEV__) {
+            console.log('[🌐 Web4] QuicFetchAdapter: Added X-Zhtp-Identity header for authenticated request');
+          }
         } else {
           console.warn('[🌐 Web4] QuicFetchAdapter: ⚠️ No identity_id found for authenticated request');
         }

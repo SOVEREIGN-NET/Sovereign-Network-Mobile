@@ -26,7 +26,7 @@ type CreateIdentityScreenProps = NativeStackScreenProps<AuthStackParamList, 'Cre
 const CreateIdentityScreen = ({ navigation }: CreateIdentityScreenProps) => {
   const { t } = useTranslation();
   const { createIdentity } = useAuth();
-  const { isConnected, isLoading: nodeLoading } = useNodeConnection(true);
+  const { isConnected, isLoading: nodeLoading } = useNodeConnection(false);
 
   // Form state
   const [identityType, setIdentityType] = useState<

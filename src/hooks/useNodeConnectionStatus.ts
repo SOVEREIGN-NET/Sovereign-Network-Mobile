@@ -35,16 +35,16 @@ export function useNodeConnectionStatus(
       // First check if QUIC is supported
       const supported = await QuicClient.isSupported();
       if (!supported) {
-        console.warn('QUIC not supported on this device');
+        if (__DEV__) console.warn('QUIC not supported on this device');
         setConnectionStatus('disconnected');
         return;
       }
 
-      // Check QUIC node connection
+      // Use cheap UDP reachability check instead of full PQC handshake
       setConnectionStatus('checking');
-      const result = await QuicClient.testConnection(DEFAULT_NODE_HOST, DEFAULT_NODE_PORT);
+      const result = await QuicClient.checkReachability(DEFAULT_NODE_HOST, DEFAULT_NODE_PORT);
 
-      if (result.success) {
+      if (result.reachable) {
         setConnectionStatus('connected');
         setLatencyMs(result.latencyMs ? Math.round(result.latencyMs) : null);
       } else {
@@ -52,6 +52,7 @@ export function useNodeConnectionStatus(
         setLatencyMs(null);
       }
     } catch (error) {
+      if (__DEV__) console.error('Node reachability check failed:', error);
       setConnectionStatus('disconnected');
       setLatencyMs(null);
     }

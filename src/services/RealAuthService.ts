@@ -72,14 +72,16 @@ class RealAuthService {
       },
     });
 
-    // Always log this critical config, not just in dev
-    console.log('✅ QUIC adapter configured');
-    console.log('[RealAuthService]   insecure:', QUIC_CONFIG.insecure);
-    console.log('[RealAuthService]   timeout:', QUIC_CONFIG.defaultTimeout, 'seconds');
-    console.log('[RealAuthService]   fallbackToHttp:', QUIC_CONFIG.fallbackToHttp);
-    console.log('[RealAuthService]   __DEV__:', __DEV__);
-    console.log('[RealAuthService]   DEFAULT_NETWORK_TYPE:', require('../config').DEFAULT_NETWORK_TYPE);
-    console.log('📌 Certificate pinning configured for:', CertificatePinning.getPinnedHosts().join(', '));
+    // Log critical config in dev only
+    if (__DEV__) {
+      console.log('✅ QUIC adapter configured');
+      console.log('[RealAuthService]   insecure:', QUIC_CONFIG.insecure);
+      console.log('[RealAuthService]   timeout:', QUIC_CONFIG.defaultTimeout, 'seconds');
+      console.log('[RealAuthService]   fallbackToHttp:', QUIC_CONFIG.fallbackToHttp);
+      console.log('[RealAuthService]   __DEV__:', __DEV__);
+      console.log('[RealAuthService]   DEFAULT_NETWORK_TYPE:', require('../config').DEFAULT_NETWORK_TYPE);
+      console.log('📌 Certificate pinning configured for:', CertificatePinning.getPinnedHosts().join(', '));
+    }
 
     // SECURITY: Phase 3.2 - Verify certificate pinning is configured for production
     if (!__DEV__ && CertificatePinning.PINNING_CONFIG.enabled) {
