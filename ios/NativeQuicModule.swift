@@ -76,94 +76,43 @@ class NativeQuic: NSObject {
   func checkReachability(_ host: String, port: Int, resolve: @escaping RCTPromiseResolveBlock, reject: @escaping RCTPromiseRejectBlock) {
     let startTime = Date()
 
-    // Use TCP for reachability - has clearer state transitions than raw UDP
-    let parameters = NWParameters.tcp
-
-    // Create endpoint
     let endpoint = NWEndpoint.hostPort(
       host: NWEndpoint.Host(host),
       port: NWEndpoint.Port(integerLiteral: UInt16(port))
     )
 
-    // Create TCP connection
-    let connection = NWConnection(to: endpoint, using: parameters)
-    var hasResolved = false
-    let resolveLock = NSLock()
+    let connection = NWConnection(to: endpoint, using: NWParameters.tcp)
+    var resolved = false
+    let lock = NSLock()
 
-    // Helper to safely resolve only once and cleanup
-    func safeResolve(_ result: [String: Any]) {
-      resolveLock.lock()
-      defer { resolveLock.unlock() }
-      guard !hasResolved else { return }
-      hasResolved = true
-      connection.stateUpdateHandler = nil
+    func finish(_ result: [String: Any]) {
+      lock.lock()
+      defer { lock.unlock() }
+      guard !resolved else { return }
+      resolved = true
       connection.cancel()
       resolve(result)
     }
 
-    connection.stateUpdateHandler = { [weak connection] state in
-      guard let conn = connection else { return }
-
-      resolveLock.lock()
-      let alreadyResolved = hasResolved
-      resolveLock.unlock()
-      guard !alreadyResolved else { return }
-
-      print("[NativeQuic] 🔍 TCP Reachability state: \(state)")
-
+    connection.stateUpdateHandler = { state in
       switch state {
-      case .setup:
-        print("[NativeQuic]    └─ TCP connection setup initiated")
-
-      case .preparing:
-        print("[NativeQuic]    └─ TCP handshake in progress...")
-
       case .ready:
         let latency = Date().timeIntervalSince(startTime) * 1000
-        print("[NativeQuic]    └─ ✅ Port reachable in \(latency)ms")
-        safeResolve([
-          "reachable": true,
-          "latencyMs": latency,
-          "host": host,
-          "port": port
-        ])
-
-      case .failed(let error):
-        print("[NativeQuic]    └─ ❌ TCP FAILED: \(error.localizedDescription)")
-        safeResolve([
-          "reachable": false,
-          "error": error.localizedDescription,
-          "host": host,
-          "port": port
-        ])
-
+        finish(["reachable": true, "latencyMs": latency, "host": host, "port": port])
+      case .failed:
+        finish(["reachable": false, "error": "Connection failed", "host": host, "port": port])
       case .cancelled:
-        print("[NativeQuic]    └─ ⛔ Connection cancelled")
-        safeResolve([
-          "reachable": false,
-          "error": "Cancelled",
-          "host": host,
-          "port": port
-        ])
-
-      case .waiting(let error):
-        print("[NativeQuic]    └─ ⏳ Waiting: \(error.localizedDescription)")
-
-      @unknown default:
-        print("[NativeQuic]    └─ 🤷 Unknown state")
+        finish(["reachable": false, "error": "Cancelled", "host": host, "port": port])
+      default:
+        break
       }
     }
 
     connection.start(queue: queue)
 
-    // Timeout for reachability check (10 seconds for TCP)
-    queue.asyncAfter(deadline: .now() + 10.0) {
-      safeResolve([
-        "reachable": false,
-        "error": "Timeout",
-        "host": host,
-        "port": port
-      ])
+    // 3 second timeout
+    queue.asyncAfter(deadline: .now() + 3.0) {
+      finish(["reachable": false, "error": "Timeout", "host": host, "port": port])
     }
   }
 
