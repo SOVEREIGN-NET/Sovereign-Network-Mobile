@@ -64,7 +64,8 @@ class NativeSettings: NSObject {
   func getAllSettings(_ resolve: @escaping RCTPromiseResolveBlock, reject: @escaping RCTPromiseRejectBlock) {
     let defaults = UserDefaults.standard
     let useMockData = defaults.bool(forKey: "useMockData") // Default is false if not set
-    let nodeUrl = defaults.string(forKey: "nodeUrl") ?? "http://77.42.37.161:9334"
+    // Use GeneratedConfig as fallback - this is generated from .env at build time
+    let nodeUrl = defaults.string(forKey: "nodeUrl") ?? GeneratedConfig.nodeUrl
 
     let settings: [String: Any] = [
       "useMockData": useMockData,

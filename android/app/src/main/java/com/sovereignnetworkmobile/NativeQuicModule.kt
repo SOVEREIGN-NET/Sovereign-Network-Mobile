@@ -24,9 +24,11 @@ class NativeQuicModule(reactContext: ReactApplicationContext) :
         private const val TAG = "[🌐 Web4]"
         private const val DEFAULT_TIMEOUT = 30
         private const val ALPN_PROTOCOL = "zhtp-public/1"
-        private const val QUINN_CONTROL_PLANE_HOST = "77.42.37.161"
-        private const val QUINN_CONTROL_PLANE_PORT = 9334
-        private const val QUINN_CONTROL_PLANE_SERVER_NAME = "zhtp-mesh"
+        // These values are loaded from GeneratedConfig.kt which is generated from .env file
+        // GeneratedConfig.kt is the single source of truth - updated at build time
+        private const val QUINN_CONTROL_PLANE_HOST = com.sovereignnetworkmobile.config.GeneratedConfig.QUINN_CONTROL_PLANE_HOST
+        private const val QUINN_CONTROL_PLANE_PORT = com.sovereignnetworkmobile.config.GeneratedConfig.QUINN_CONTROL_PLANE_PORT
+        private const val QUINN_CONTROL_PLANE_SERVER_NAME = com.sovereignnetworkmobile.config.GeneratedConfig.QUINN_CONTROL_PLANE_SERVER_NAME
     }
 
     private val executor: Executor = Executors.newCachedThreadPool()

@@ -30,11 +30,13 @@ class NativeQuic: NSObject {
   }
 
   // Default configuration
+  // These values are loaded from GeneratedConfig.swift which is generated from .env file
+  // GeneratedConfig.swift is the single source of truth - updated at build time
   private let defaultTimeout: TimeInterval = 30.0
-  private let quinnControlPlaneHost = "77.42.37.161"
-  private let quinnControlPlanePort: UInt16 = 9334
-  private let quinnControlPlaneServerName = "zhtp-mesh"
-  private let quinnSpkiPinHex = "d21aa1f13cea799f96588a274c210c6de46786f098dc321477d8e04b7d87e058"
+  private let quinnControlPlaneHost = GeneratedConfig.quinnControlPlaneHost
+  private let quinnControlPlanePort = GeneratedConfig.quinnControlPlanePort
+  private let quinnControlPlaneServerName = GeneratedConfig.quinnControlPlaneServerName
+  private let quinnSpkiPinHex = GeneratedConfig.quinnSpkiPinHex
 
   // ALPN profiles
   enum QuicAlpnProfile {
