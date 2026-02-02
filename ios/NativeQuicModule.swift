@@ -68,55 +68,6 @@ class NativeQuic: NSObject {
   }
 
   /**
-   * Simple UDP reachability check - verifies the node port is open
-   * This doesn't do a full QUIC handshake, just checks if UDP port is reachable
-   * Useful for showing node status without PQC handshake
-   */
-  @objc
-  func checkReachability(_ host: String, port: Int, resolve: @escaping RCTPromiseResolveBlock, reject: @escaping RCTPromiseRejectBlock) {
-    let startTime = Date()
-
-    let endpoint = NWEndpoint.hostPort(
-      host: NWEndpoint.Host(host),
-      port: NWEndpoint.Port(integerLiteral: UInt16(port))
-    )
-
-    let connection = NWConnection(to: endpoint, using: NWParameters.tcp)
-    var resolved = false
-    let lock = NSLock()
-
-    func finish(_ result: [String: Any]) {
-      lock.lock()
-      defer { lock.unlock() }
-      guard !resolved else { return }
-      resolved = true
-      connection.cancel()
-      resolve(result)
-    }
-
-    connection.stateUpdateHandler = { state in
-      switch state {
-      case .ready:
-        let latency = Date().timeIntervalSince(startTime) * 1000
-        finish(["reachable": true, "latencyMs": latency, "host": host, "port": port])
-      case .failed:
-        finish(["reachable": false, "error": "Connection failed", "host": host, "port": port])
-      case .cancelled:
-        finish(["reachable": false, "error": "Cancelled", "host": host, "port": port])
-      default:
-        break
-      }
-    }
-
-    connection.start(queue: queue)
-
-    // 3 second timeout
-    queue.asyncAfter(deadline: .now() + 3.0) {
-      finish(["reachable": false, "error": "Timeout", "host": host, "port": port])
-    }
-  }
-
-  /**
    * Test connection to a QUIC server
    */
   @objc

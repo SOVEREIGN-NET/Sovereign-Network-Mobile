@@ -40,11 +40,11 @@ export function useNodeConnectionStatus(
         return;
       }
 
-      // Check node reachability via UDP (simpler than full QUIC handshake)
+      // Check QUIC node connection
       setConnectionStatus('checking');
-      const result = await QuicClient.checkReachability(DEFAULT_NODE_HOST, DEFAULT_NODE_PORT);
+      const result = await QuicClient.testConnection(DEFAULT_NODE_HOST, DEFAULT_NODE_PORT);
 
-      if (result.reachable) {
+      if (result.success) {
         setConnectionStatus('connected');
         setLatencyMs(result.latencyMs ? Math.round(result.latencyMs) : null);
       } else {
