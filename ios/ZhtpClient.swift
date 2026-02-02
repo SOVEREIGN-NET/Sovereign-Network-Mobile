@@ -122,6 +122,26 @@ private func cBuildTokenBurn(
     _ chainId: UInt8
 ) -> UnsafeMutablePointer<CChar>?
 
+// Domain transaction building functions (return hex-encoded signed transaction)
+
+/// Build signed domain registration transaction
+@_silgen_name("zhtp_client_build_domain_register")
+private func cBuildDomainRegister(
+    _ handle: UnsafePointer<UInt8>?,
+    _ domain: UnsafePointer<CChar>?,
+    _ durationDays: UInt32,
+    _ chainId: UInt8
+) -> UnsafeMutablePointer<CChar>?
+
+/// Build signed domain update transaction
+@_silgen_name("zhtp_client_build_domain_update")
+private func cBuildDomainUpdate(
+    _ handle: UnsafePointer<UInt8>?,
+    _ domain: UnsafePointer<CChar>?,
+    _ contentCid: UnsafePointer<CChar>?,
+    _ chainId: UInt8
+) -> UnsafeMutablePointer<CChar>?
+
 // MARK: - C Types
 
 struct ByteBuffer {
@@ -421,6 +441,50 @@ public class ZhtpClient {
             )
         }) else {
             throw ClientError.signingError("Failed to build token burn transaction")
+        }
+        defer { cFreeString(hexPtr) }
+        return String(cString: hexPtr)
+    }
+
+    /// Build signed domain registration transaction (returns hex-encoded string ready for API)
+    public static func buildDomainRegister(
+        domain: String,
+        durationDays: UInt32,
+        using identity: Identity,
+        chainId: UInt8 = 0x02  // testnet
+    ) throws -> String {
+        guard let hexPtr = domain.withCString({ domainPtr in
+            cBuildDomainRegister(
+                identity.getHandle().assumingMemoryBound(to: UInt8.self),
+                domainPtr,
+                durationDays,
+                chainId
+            )
+        }) else {
+            throw ClientError.signingError("Failed to build domain register transaction")
+        }
+        defer { cFreeString(hexPtr) }
+        return String(cString: hexPtr)
+    }
+
+    /// Build signed domain update transaction (returns hex-encoded string ready for API)
+    public static func buildDomainUpdate(
+        domain: String,
+        contentCid: String,
+        using identity: Identity,
+        chainId: UInt8 = 0x02  // testnet
+    ) throws -> String {
+        guard let hexPtr = domain.withCString({ domainPtr in
+            contentCid.withCString { cidPtr in
+                cBuildDomainUpdate(
+                    identity.getHandle().assumingMemoryBound(to: UInt8.self),
+                    domainPtr,
+                    cidPtr,
+                    chainId
+                )
+            }
+        }) else {
+            throw ClientError.signingError("Failed to build domain update transaction")
         }
         defer { cFreeString(hexPtr) }
         return String(cString: hexPtr)
