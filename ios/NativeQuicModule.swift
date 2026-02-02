@@ -76,8 +76,10 @@ class NativeQuic: NSObject {
   func checkReachability(_ host: String, port: Int, resolve: @escaping RCTPromiseResolveBlock, reject: @escaping RCTPromiseRejectBlock) {
     let startTime = Date()
 
-    // Create UDP parameters (QUIC runs over UDP)
-    let parameters = NWParameters.udp
+    // Use TCP for reachability - has clearer state transitions than raw UDP
+    var parameters = NWParameters.tcp
+    // Disable TLS for direct TCP connection
+    parameters.defaultProtocolStack.tls = nil
 
     // Create endpoint
     let endpoint = NWEndpoint.hostPort(
@@ -85,7 +87,7 @@ class NativeQuic: NSObject {
       port: NWEndpoint.Port(integerLiteral: UInt16(port))
     )
 
-    // Create UDP connection
+    // Create TCP connection
     let connection = NWConnection(to: endpoint, using: parameters)
     var hasResolved = false
     let resolveLock = NSLock()
@@ -109,36 +111,27 @@ class NativeQuic: NSObject {
       resolveLock.unlock()
       guard !alreadyResolved else { return }
 
-      print("[NativeQuic] UDP Reachability state: \(state)")
+      print("[NativeQuic] 🔍 TCP Reachability state: \(state)")
 
       switch state {
+      case .setup:
+        print("[NativeQuic]    └─ TCP connection setup initiated")
+
+      case .preparing:
+        print("[NativeQuic]    └─ TCP handshake in progress...")
+
       case .ready:
         let latency = Date().timeIntervalSince(startTime) * 1000
-        print("[NativeQuic] UDP port reachable in \(latency)ms")
-
-        // Send a small probe packet to verify bidirectional connectivity
-        let probeData = Data([0x00])
-        conn.send(content: probeData, completion: .contentProcessed { error in
-          if error != nil {
-            safeResolve([
-              "reachable": true,
-              "latencyMs": latency,
-              "host": host,
-              "port": port,
-              "note": "Port open, send probe had error"
-            ])
-          } else {
-            safeResolve([
-              "reachable": true,
-              "latencyMs": latency,
-              "host": host,
-              "port": port
-            ])
-          }
-        })
+        print("[NativeQuic]    └─ ✅ Port reachable in \(latency)ms")
+        safeResolve([
+          "reachable": true,
+          "latencyMs": latency,
+          "host": host,
+          "port": port
+        ])
 
       case .failed(let error):
-        print("[NativeQuic] UDP FAILED: \(error.localizedDescription)")
+        print("[NativeQuic]    └─ ❌ TCP FAILED: \(error.localizedDescription)")
         safeResolve([
           "reachable": false,
           "error": error.localizedDescription,
@@ -147,6 +140,7 @@ class NativeQuic: NSObject {
         ])
 
       case .cancelled:
+        print("[NativeQuic]    └─ ⛔ Connection cancelled")
         safeResolve([
           "reachable": false,
           "error": "Cancelled",
@@ -154,15 +148,18 @@ class NativeQuic: NSObject {
           "port": port
         ])
 
-      default:
-        break
+      case .waiting(let error):
+        print("[NativeQuic]    └─ ⏳ Waiting: \(error.localizedDescription)")
+
+      @unknown default:
+        print("[NativeQuic]    └─ 🤷 Unknown state")
       }
     }
 
     connection.start(queue: queue)
 
-    // Short timeout for reachability check (5 seconds)
-    queue.asyncAfter(deadline: .now() + 5.0) {
+    // Timeout for reachability check (10 seconds for TCP)
+    queue.asyncAfter(deadline: .now() + 10.0) {
       safeResolve([
         "reachable": false,
         "error": "Timeout",
