@@ -540,32 +540,60 @@ const SendTokensScreen = ({ navigation }: any) => {
               <View
                 style={{
                   marginBottom: spacing.lg,
-                  padding: spacing.sm,
+                  padding: spacing.md,
                   backgroundColor: colors.bg_darker,
                   borderRadius: borderRadius.base,
+                  borderLeftWidth: 3,
+                  borderLeftColor: colors.primary,
                 }}
               >
                 <Text
                   style={{
                     fontSize: typography.size.xs,
                     color: colors.text_secondary,
-                    marginBottom: spacing.xs,
+                    marginBottom: spacing.sm,
+                    textTransform: 'uppercase',
+                    letterSpacing: 0.5,
+                    fontWeight: typography.weight.semibold,
                   }}
                 >
-                  {selectedToken.type === 'sov' ? 'Your Wallet:' : 'Your DID:'}
+                  {selectedToken.type === 'sov' ? 'Sending From' : 'Your DID'}
                 </Text>
-                <Text
-                  style={{
-                    fontSize: typography.size.xs,
-                    color: colors.text_primary,
-                    fontFamily: 'Courier',
-                  }}
-                  numberOfLines={1}
-                >
-                  {selectedToken.type === 'sov' && wallets[0]
-                    ? wallets[0].id
-                    : currentIdentity.did}
-                </Text>
+                {selectedToken.type === 'sov' && wallets[0] ? (
+                  <View>
+                    <Text
+                      style={{
+                        fontSize: typography.size.sm,
+                        color: colors.text_primary,
+                        fontWeight: typography.weight.semibold,
+                        marginBottom: spacing.xs,
+                      }}
+                    >
+                      {wallets[0].wallet_type || 'Primary'} Wallet
+                    </Text>
+                    <Text
+                      style={{
+                        fontSize: typography.size.xs,
+                        color: colors.text_secondary,
+                        fontFamily: 'Courier',
+                      }}
+                      numberOfLines={1}
+                    >
+                      {wallets[0].id}
+                    </Text>
+                  </View>
+                ) : (
+                  <Text
+                    style={{
+                      fontSize: typography.size.xs,
+                      color: colors.text_primary,
+                      fontFamily: 'Courier',
+                    }}
+                    numberOfLines={1}
+                  >
+                    {currentIdentity.did}
+                  </Text>
+                )}
               </View>
 
               {/* Recipient Input - Changes based on token type */}

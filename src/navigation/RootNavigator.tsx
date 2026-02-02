@@ -34,6 +34,10 @@ import BrowserScreen from '../screens/BrowserScreen';
 import ProfileScreen from '../screens/ProfileScreen';
 import TokenCreatorScreen from '../screens/TokenCreatorScreen';
 import TokenManagementScreen from '../screens/TokenManagementScreen';
+import MyTokensScreen from '../screens/MyTokensScreen';
+import TokenDetailScreen from '../screens/TokenDetailScreen';
+import MyDomainsScreen from '../screens/MyDomainsScreen';
+import DomainDetailScreen from '../screens/DomainDetailScreen';
 
 const Stack = createNativeStackNavigator();
 const Tab = createBottomTabNavigator();
@@ -212,6 +216,42 @@ const SIDStack = () => {
           headerTintColor: colors.text_primary,
           presentation: 'modal',
           animation: 'slide_from_bottom',
+        }}
+      />
+      <Stack.Screen
+        name="MyTokens"
+        component={MyTokensScreen}
+        options={{
+          headerShown: false,
+          title: 'My Tokens',
+          presentation: 'modal',
+          animation: 'slide_from_bottom',
+        }}
+      />
+      <Stack.Screen
+        name="TokenDetail"
+        component={TokenDetailScreen}
+        options={{
+          headerShown: false,
+          title: 'Token Details',
+        }}
+      />
+      <Stack.Screen
+        name="MyDomains"
+        component={MyDomainsScreen}
+        options={{
+          headerShown: false,
+          title: 'My Domains',
+          presentation: 'modal',
+          animation: 'slide_from_bottom',
+        }}
+      />
+      <Stack.Screen
+        name="DomainDetail"
+        component={DomainDetailScreen}
+        options={{
+          headerShown: false,
+          title: 'Domain Details',
         }}
       />
     </Stack.Navigator>

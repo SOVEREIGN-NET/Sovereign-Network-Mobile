@@ -60,9 +60,8 @@ echo ""
 echo "🛠️  Building lib-client for aarch64-apple-ios..."
 cd lib-client
 
-IPHONEOS_DEPLOYMENT_TARGET=18.5 \
-  RUSTFLAGS="-C link-arg=-Wl,-undefined,suppress -C link-arg=-Wl,-flat_namespace" \
-  cargo build --release --target aarch64-apple-ios 2>&1 | tail -20
+IPHONEOS_DEPLOYMENT_TARGET=14.0 \
+  cargo build --release --target aarch64-apple-ios --package lib-client --lib 2>&1 | tail -20
 
 echo ""
 echo "📋 Verifying build output..."

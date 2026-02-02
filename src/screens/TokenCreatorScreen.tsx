@@ -1,17 +1,16 @@
 /**
  * Token Creator Screen
  * Create new tokens via QUIC endpoints
+ * Minimal, elegant design
  */
 
 import React, { useState } from 'react';
-import { View, ScrollView, StyleSheet, Modal, TouchableOpacity, Alert, KeyboardAvoidingView, Platform } from 'react-native';
+import { View, ScrollView, TouchableOpacity, Alert, KeyboardAvoidingView, Platform } from 'react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import {
   Button,
-  Card,
   FormField,
-  HeaderBar,
   Text,
   LoadingView,
 } from '../components';
@@ -156,14 +155,14 @@ const TokenCreatorScreen: React.FC<TokenCreatorScreenProps> = ({ onClose }) => {
       const createRequest: TokenCreateRequest = {
         name: name.trim(),
         symbol: symbol.trim().toUpperCase(),
-        initial_supply: initialSupply.trim(),  // Keep as string to preserve exact value
+        initial_supply: initialSupply.trim(),
         decimals: Number.parseInt(decimals, 10) || 8,
-        max_supply: maxSupply.trim() ? maxSupply.trim() : null,  // Keep as string too
+        max_supply: maxSupply.trim() ? maxSupply.trim() : null,
       };
 
       const response = await tokenService.createToken(createRequest);
 
-      // Save created token ID to storage for later reference
+      // Save created token ID to storage
       try {
         const createdTokensJson = await AsyncStorage.getItem(CREATED_TOKENS_KEY);
         const createdTokens: string[] = createdTokensJson ? JSON.parse(createdTokensJson) : [];
@@ -178,7 +177,7 @@ const TokenCreatorScreen: React.FC<TokenCreatorScreenProps> = ({ onClose }) => {
 
       setStatus({
         type: 'success',
-        message: `Token creation submitted! ⛏️ Mining in progress...\n\nToken ID: ${response.token_id}\n\nℹ️ Please return in about 1 minute to verify the token has been created on the blockchain.`,
+        message: `Token created. Token ID: ${response.token_id}`,
       });
 
       // Reset form
@@ -190,17 +189,9 @@ const TokenCreatorScreen: React.FC<TokenCreatorScreenProps> = ({ onClose }) => {
         setMaxSupply('');
         setStatus({ type: null, message: '' });
 
-        // Close modal if callback provided
         if (onClose) {
           onClose();
         }
-
-        // Show success alert with mining info
-        Alert.alert(
-          'Token Creation Submitted',
-          `Token "${name}" has been submitted for creation.\n\nToken ID: ${response.token_id}\n\nThe blockchain is mining your transaction. Please return in about 1 minute to verify the token has been created.\n\nSave your Token ID for reference.`,
-          [{ text: 'OK' }]
-        );
       }, 2000);
     } catch (error: any) {
       console.error('[TokenCreatorScreen] Creation failed:', error);
@@ -213,170 +204,85 @@ const TokenCreatorScreen: React.FC<TokenCreatorScreenProps> = ({ onClose }) => {
     }
   };
 
-  const styles = StyleSheet.create({
-    container: {
-      flex: 1,
-      backgroundColor: colors.bg_darkest,
-    },
-    header: {
-      flexDirection: 'row',
-      justifyContent: 'space-between',
-      alignItems: 'center',
-      paddingHorizontal: spacing.md,
-      paddingVertical: spacing.md,
-      borderBottomWidth: 1,
-      borderBottomColor: colors.border,
-    },
-    headerTitle: {
-      fontSize: typography.size.lg,
-      fontWeight: '600',
-      color: colors.text_primary,
-    },
-    closeButton: {
-      padding: spacing.sm,
-    },
-    closeButtonText: {
-      fontSize: typography.size.xl,
-      color: colors.text_secondary,
-      fontWeight: '300',
-    },
-    scrollContent: {
-      padding: spacing.md,
-      paddingBottom: spacing.xl * 2.5,
-    },
-    statusMessage: {
-      marginBottom: spacing.md,
-      padding: spacing.md,
-      borderRadius: borderRadius.lg,
-      backgroundColor: status.type === 'success' ? colors.success + '20' : colors.error + '20',
-    },
-    statusText: {
-      color: status.type === 'success' ? colors.success : colors.error,
-      fontSize: typography.size.sm,
-    },
-  });
-
   if (!currentIdentity) {
     return <LoadingView />;
   }
 
   return (
-    <View style={styles.container}>
-      <View style={styles.header}>
-        <Text style={styles.headerTitle}>Create Token</Text>
-        <TouchableOpacity
-          onPress={() => onClose?.()}
-          style={styles.closeButton}
-          hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
-        >
-          <Text style={styles.closeButtonText}>✕</Text>
-        </TouchableOpacity>
-      </View>
-
-      <KeyboardAvoidingView
-        behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
-        style={{ flex: 1 }}
-      >
-        <ScrollView
-          showsVerticalScrollIndicator={false}
-          contentContainerStyle={styles.scrollContent}
-          keyboardShouldPersistTaps="handled"
-        >
-        {/* Status Message */}
-        {status.message && (
-          <View style={styles.statusMessage}>
-            <Text style={styles.statusText}>{status.message}</Text>
-          </View>
-        )}
-
-        {/* Quick Help */}
+    <KeyboardAvoidingView
+      behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+      style={{ flex: 1, backgroundColor: colors.bg_darkest }}
+    >
+      <View style={{ flex: 1, backgroundColor: colors.bg_darkest }}>
+        {/* Header */}
         <View
           style={{
-            marginBottom: spacing.md,
-            padding: spacing.md,
-            backgroundColor: colors.bg_darker,
-            borderRadius: borderRadius.lg,
+            flexDirection: 'row',
+            justifyContent: 'space-between',
+            alignItems: 'center',
+            paddingHorizontal: spacing.md,
+            paddingVertical: spacing.md,
+            paddingTop: insets.top + spacing.md,
           }}
         >
           <Text
             style={{
-              fontSize: typography.size.xs,
+              fontSize: typography.size.lg,
               fontWeight: typography.weight.semibold,
-              color: colors.text_secondary,
-              marginBottom: spacing.xs,
+              color: colors.text_primary,
             }}
           >
-            💡 HOW DECIMALS WORK
+            Create Token
           </Text>
-          <Text
-            style={{
-              fontSize: typography.size.xs,
-              color: colors.text_secondary,
-              lineHeight: 16,
-            }}
+          <TouchableOpacity
+            onPress={onClose}
+            hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
           >
-            • 8 decimals: 1,000,000,000 raw = 10.00 tokens{'\n'}
-            • 18 decimals: 1,000,000,000 raw = 0.000000001 tokens
-          </Text>
-        </View>
-
-        {/* Create Form Card */}
-        <Card>
-          <View style={{ marginBottom: spacing.md }}>
             <Text
               style={{
                 fontSize: typography.size.lg,
-                fontWeight: typography.weight.semibold,
-                color: colors.text_primary,
-                marginBottom: spacing.sm,
-              }}
-            >
-              Create New Token
-            </Text>
-            <Text
-              style={{
-                fontSize: typography.size.sm,
                 color: colors.text_secondary,
+                fontWeight: typography.weight.light,
               }}
             >
-              Define your token's properties
+              ✕
             </Text>
-          </View>
+          </TouchableOpacity>
+        </View>
 
-          {/* User DID Reference */}
-          <View
-            style={{
-              marginBottom: spacing.md,
-              padding: spacing.sm,
-              backgroundColor: colors.bg_darker,
-              borderRadius: borderRadius.base,
-            }}
-          >
-            <Text
+        <ScrollView
+          showsVerticalScrollIndicator={false}
+          contentContainerStyle={{
+            padding: spacing.md,
+            paddingBottom: spacing.xl * 2,
+          }}
+          keyboardShouldPersistTaps="handled"
+        >
+          {/* Status Message */}
+          {status.message && (
+            <View
               style={{
-                fontSize: typography.size.xs,
-                color: colors.text_secondary,
-                marginBottom: spacing.xs,
+                marginBottom: spacing.lg,
+                padding: spacing.md,
+                backgroundColor: status.type === 'success' ? `${colors.success}15` : `${colors.error}15`,
+                borderRadius: borderRadius.md,
               }}
             >
-              Your DID (Creator):
-            </Text>
-            <Text
-              style={{
-                fontSize: typography.size.xs,
-                color: colors.text_primary,
-                fontFamily: 'Courier',
-              }}
-              numberOfLines={1}
-            >
-              {currentIdentity.did}
-            </Text>
-          </View>
+              <Text
+                style={{
+                  fontSize: typography.size.sm,
+                  color: status.type === 'success' ? colors.success : colors.error,
+                }}
+              >
+                {status.message}
+              </Text>
+            </View>
+          )}
 
           {/* Token Name */}
           <FormField
-            label="Token Name"
-            placeholder="e.g., My Token"
+            label="Name"
+            placeholder="My Token"
             value={name}
             onChangeText={(text) => {
               setName(text);
@@ -390,15 +296,14 @@ const TokenCreatorScreen: React.FC<TokenCreatorScreenProps> = ({ onClose }) => {
 
           {/* Token Symbol */}
           <FormField
-            label="Token Symbol"
-            placeholder="e.g., MYTKN"
+            label="Symbol"
+            placeholder="MYTKN"
             value={symbol}
             onChangeText={(text) => {
               setSymbol(text.toUpperCase());
               if (errors.symbol) {
                 setErrors((prev) => ({ ...prev, symbol: undefined }));
               }
-              // Reset availability check on change
               setSymbolStatus({ available: null, checking: false });
             }}
             onBlur={() => {
@@ -410,52 +315,19 @@ const TokenCreatorScreen: React.FC<TokenCreatorScreenProps> = ({ onClose }) => {
             editable={!loading}
           />
 
-          {/* Symbol Availability Status */}
-          {symbol.trim() && symbolStatus.available !== null && (
-            <View
-              style={{
-                marginBottom: spacing.md,
-                paddingVertical: spacing.sm,
-                paddingHorizontal: spacing.md,
-                borderRadius: borderRadius.base,
-                backgroundColor: symbolStatus.available
-                  ? 'rgba(76, 175, 80, 0.15)'
-                  : 'rgba(244, 67, 54, 0.15)',
-                borderLeftWidth: 3,
-                borderLeftColor: symbolStatus.available ? '#4caf50' : '#f44336',
-              }}
-            >
-              <Text
-                style={{
-                  fontSize: typography.size.sm,
-                  fontWeight: typography.weight.semibold,
-                  color: symbolStatus.available ? '#4caf50' : '#f44336',
-                }}
-              >
-                {symbolStatus.available ? '✓ Symbol Available' : '✗ Symbol Already Taken'}
-              </Text>
-            </View>
-          )}
-
-          {/* Symbol Checking Indicator */}
+          {/* Symbol Availability */}
           {symbol.trim() && symbolStatus.checking && (
             <View
               style={{
-                marginBottom: spacing.md,
-                paddingVertical: spacing.sm,
-                paddingHorizontal: spacing.md,
-                borderRadius: borderRadius.base,
-                backgroundColor: colors.primary + '15',
-                borderLeftWidth: 3,
-                borderLeftColor: colors.primary,
-                flexDirection: 'row',
-                alignItems: 'center',
+                marginBottom: spacing.lg,
+                padding: spacing.md,
+                backgroundColor: `${colors.primary}15`,
+                borderRadius: borderRadius.md,
               }}
             >
               <Text
                 style={{
                   fontSize: typography.size.sm,
-                  fontWeight: typography.weight.semibold,
                   color: colors.primary,
                 }}
               >
@@ -464,10 +336,31 @@ const TokenCreatorScreen: React.FC<TokenCreatorScreenProps> = ({ onClose }) => {
             </View>
           )}
 
+          {symbol.trim() && !symbolStatus.checking && symbolStatus.available !== null && (
+            <View
+              style={{
+                marginBottom: spacing.lg,
+                padding: spacing.md,
+                backgroundColor: symbolStatus.available ? `${colors.success}15` : `${colors.error}15`,
+                borderRadius: borderRadius.md,
+              }}
+            >
+              <Text
+                style={{
+                  fontSize: typography.size.sm,
+                  color: symbolStatus.available ? colors.success : colors.error,
+                  fontWeight: typography.weight.semibold,
+                }}
+              >
+                {symbolStatus.available ? '✓ Available' : '✗ Already taken'}
+              </Text>
+            </View>
+          )}
+
           {/* Initial Supply */}
           <FormField
             label="Initial Supply"
-            placeholder="e.g., 1000000"
+            placeholder="1000000"
             value={initialSupply}
             onChangeText={(text) => {
               setInitialSupply(text);
@@ -483,7 +376,7 @@ const TokenCreatorScreen: React.FC<TokenCreatorScreenProps> = ({ onClose }) => {
           {/* Decimals */}
           <FormField
             label="Decimals"
-            placeholder="e.g., 8 or 18"
+            placeholder="8"
             value={decimals}
             onChangeText={(text) => {
               setDecimals(text);
@@ -496,13 +389,28 @@ const TokenCreatorScreen: React.FC<TokenCreatorScreenProps> = ({ onClose }) => {
             editable={!loading}
           />
 
+          {/* Max Supply */}
+          <FormField
+            label="Max Supply (Optional)"
+            placeholder="Leave empty for unlimited"
+            value={maxSupply}
+            onChangeText={(text) => {
+              setMaxSupply(text);
+              if (errors.max_supply) {
+                setErrors((prev) => ({ ...prev, max_supply: undefined }));
+              }
+            }}
+            keyboardType="decimal-pad"
+            error={errors.max_supply}
+            editable={!loading}
+          />
+
           {/* Decimals Preview */}
           {decimals && !errors.decimals && initialSupply && !errors.initial_supply && (() => {
             const rawSupply = Number(initialSupply);
             const dec = Number(decimals);
             const displayedSupply = rawSupply / Math.pow(10, dec);
 
-            // Format with thousands separators and decimals
             const maxFractionDigits = Math.max(2, Math.min(dec, 8));
             const formatter = new Intl.NumberFormat('en-US', {
               minimumFractionDigits: 2,
@@ -510,7 +418,6 @@ const TokenCreatorScreen: React.FC<TokenCreatorScreenProps> = ({ onClose }) => {
             });
             const formatted = formatter.format(displayedSupply);
 
-            // Calculate scale label
             let scaleLabel = '';
             if (displayedSupply >= 1e9) {
               scaleLabel = `${(displayedSupply / 1e9).toFixed(2)} Billion`;
@@ -525,12 +432,10 @@ const TokenCreatorScreen: React.FC<TokenCreatorScreenProps> = ({ onClose }) => {
             return (
               <View
                 style={{
-                  marginBottom: spacing.md,
+                  marginBottom: spacing.lg,
                   padding: spacing.md,
-                  backgroundColor: colors.primary + '15',
-                  borderRadius: borderRadius.base,
-                  borderLeftWidth: 3,
-                  borderLeftColor: colors.primary,
+                  backgroundColor: `${colors.primary}15`,
+                  borderRadius: borderRadius.md,
                 }}
               >
                 <Text
@@ -539,39 +444,20 @@ const TokenCreatorScreen: React.FC<TokenCreatorScreenProps> = ({ onClose }) => {
                     fontWeight: typography.weight.semibold,
                     color: colors.text_secondary,
                     marginBottom: spacing.md,
+                    textTransform: 'uppercase',
+                    letterSpacing: 0.5,
                   }}
                 >
-                  DECIMALS PREVIEW
+                  Decimals Preview
                 </Text>
 
-                <Text
-                  style={{
-                    fontSize: typography.size.xs,
-                    color: colors.text_secondary,
-                    marginBottom: spacing.xs,
-                  }}
-                >
-                  Decimals: <Text style={{ color: colors.primary, fontWeight: typography.weight.semibold }}>{dec}</Text>
-                </Text>
-                <Text
-                  style={{
-                    fontSize: typography.size.xs,
-                    color: colors.text_secondary,
-                    marginBottom: spacing.md,
-                  }}
-                >
-                  Raw supply: {Number(initialSupply).toLocaleString()}
-                </Text>
-
-                {/* Main Display */}
                 <View
                   style={{
-                    paddingTop: spacing.md,
-                    paddingBottom: spacing.md,
+                    paddingVertical: spacing.md,
                     borderTopWidth: 1,
-                    borderTopColor: colors.primary + '30',
+                    borderTopColor: `${colors.primary}30`,
                     borderBottomWidth: 1,
-                    borderBottomColor: colors.primary + '30',
+                    borderBottomColor: `${colors.primary}30`,
                   }}
                 >
                   <Text
@@ -579,6 +465,36 @@ const TokenCreatorScreen: React.FC<TokenCreatorScreenProps> = ({ onClose }) => {
                       fontSize: typography.size.xs,
                       color: colors.text_secondary,
                       marginBottom: spacing.xs,
+                    }}
+                  >
+                    Raw supply:
+                  </Text>
+                  <Text
+                    style={{
+                      fontSize: typography.size.sm,
+                      color: colors.text_primary,
+                      marginBottom: spacing.md,
+                      fontFamily: 'Courier',
+                    }}
+                  >
+                    {Number(initialSupply).toLocaleString()}
+                  </Text>
+
+                  <Text
+                    style={{
+                      fontSize: typography.size.xs,
+                      color: colors.text_secondary,
+                      marginBottom: spacing.xs,
+                    }}
+                  >
+                    Decimals: <Text style={{ color: colors.primary, fontWeight: typography.weight.semibold }}>{dec}</Text>
+                  </Text>
+
+                  <Text
+                    style={{
+                      fontSize: typography.size.xs,
+                      color: colors.text_secondary,
+                      marginBottom: spacing.md,
                     }}
                   >
                     Your token supply:
@@ -607,53 +523,22 @@ const TokenCreatorScreen: React.FC<TokenCreatorScreenProps> = ({ onClose }) => {
             );
           })()}
 
-          {/* Max Supply (Optional) */}
-          <FormField
-            label="Max Supply (Optional)"
-            placeholder="Leave empty for unlimited"
-            value={maxSupply}
-            onChangeText={(text) => {
-              setMaxSupply(text);
-              if (errors.max_supply) {
-                setErrors((prev) => ({ ...prev, max_supply: undefined }));
-              }
-            }}
-            keyboardType="decimal-pad"
-            error={errors.max_supply}
-            editable={!loading}
-          />
-
-          {/* Action Buttons */}
-          <View
+          {/* Create Button */}
+          <Button
+            onPress={handleCreate}
+            disabled={loading || !name || !symbol || !initialSupply}
             style={{
-              flexDirection: 'row',
-              gap: spacing.md,
-              marginTop: spacing.lg,
+              backgroundColor:
+                loading || !name || !symbol || !initialSupply
+                  ? colors.text_secondary
+                  : colors.primary,
             }}
           >
-            <Button
-              variant="primary"
-              onPress={handleCreate}
-              loading={loading}
-              style={{ flex: 1 }}
-            >
-              Create Token
-            </Button>
-            {onClose && (
-              <Button
-                variant="secondary"
-                onPress={onClose}
-                disabled={loading}
-                style={{ flex: 1 }}
-              >
-                Cancel
-              </Button>
-            )}
-          </View>
-        </Card>
-      </ScrollView>
-      </KeyboardAvoidingView>
-    </View>
+            {loading ? 'Creating...' : 'Create Token'}
+          </Button>
+        </ScrollView>
+      </View>
+    </KeyboardAvoidingView>
   );
 };
 

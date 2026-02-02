@@ -140,6 +140,37 @@ class NativeIdentityProvisioningBridge {
 
     return await this.nativeModule.signTokenTransferTransaction(params);
   }
+
+  /**
+   * Sign a domain registration transaction with Dilithium keypair
+   * Private key remains in device Keychain - never reaches JavaScript
+   * Returns hex-encoded signed transaction ready for API
+   */
+  async signDomainRegisterTransaction(params: {
+    domain: string;
+    durationDays: number;
+  }): Promise<{ signed_tx: string }> {
+    if (!this.nativeModule) {
+      throw new Error('NativeIdentityProvisioning not available on this platform');
+    }
+
+    return await this.nativeModule.signDomainRegisterTransaction(params);
+  }
+
+  /**
+   * Sign a domain update transaction with Dilithium keypair
+   * Returns hex-encoded signed transaction ready for API
+   */
+  async signDomainUpdateTransaction(params: {
+    domain: string;
+    contentCid: string;
+  }): Promise<{ signed_tx: string }> {
+    if (!this.nativeModule) {
+      throw new Error('NativeIdentityProvisioning not available on this platform');
+    }
+
+    return await this.nativeModule.signDomainUpdateTransaction(params);
+  }
 }
 
 // Export singleton instance

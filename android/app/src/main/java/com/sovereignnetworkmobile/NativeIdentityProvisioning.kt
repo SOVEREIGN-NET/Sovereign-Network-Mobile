@@ -453,4 +453,112 @@ class NativeIdentityProvisioning(reactContext: ReactApplicationContext) :
         amount: Long,
         chainId: Int
     ): String?
+
+    // Domain transaction building (returns hex-encoded signed transaction)
+    private external fun nativeBuildDomainRegister(
+        identityJson: String,
+        domain: String,
+        durationDays: Int,
+        chainId: Int
+    ): String?
+
+    private external fun nativeBuildDomainUpdate(
+        identityJson: String,
+        domain: String,
+        contentCid: String,
+        chainId: Int
+    ): String?
+
+    @ReactMethod
+    fun signDomainRegisterTransaction(params: ReadableMap, promise: Promise) {
+        executor.execute {
+            try {
+                val domain = params.getString("domain") ?: ""
+                val durationDays = params.getInt("durationDays")
+
+                if (domain.isEmpty()) {
+                    promise.reject("INVALID_PARAMS", "domain parameter is required")
+                    return@execute
+                }
+
+                val identity = getLatestIdentity()
+                if (identity == null) {
+                    promise.reject("IDENTITY_ERROR", "No identity available for signing")
+                    return@execute
+                }
+
+                Log.d(TAG, "Building domain register transaction: $domain for $durationDays days")
+
+                // Use lib-client JNI to build and sign the full transaction
+                val hexSignedTx = nativeBuildDomainRegister(
+                    identity.identityJson,
+                    domain,
+                    durationDays,
+                    0x02  // testnet
+                )
+
+                if (hexSignedTx == null) {
+                    promise.reject("SIGNING_ERROR", "Failed to build domain registration transaction")
+                    return@execute
+                }
+
+                val response = WritableNativeMap().apply {
+                    putString("signed_tx", hexSignedTx)
+                }
+                promise.resolve(response)
+            } catch (e: Exception) {
+                Log.e(TAG, "Domain registration signing failed", e)
+                promise.reject("IDENTITY_ERROR", "Failed to sign domain registration: ${e.message}", e)
+            }
+        }
+    }
+
+    @ReactMethod
+    fun signDomainUpdateTransaction(params: ReadableMap, promise: Promise) {
+        executor.execute {
+            try {
+                val domain = params.getString("domain") ?: ""
+                val contentCid = params.getString("contentCid") ?: ""
+
+                if (domain.isEmpty()) {
+                    promise.reject("INVALID_PARAMS", "domain parameter is required")
+                    return@execute
+                }
+
+                if (contentCid.isEmpty()) {
+                    promise.reject("INVALID_PARAMS", "contentCid parameter is required")
+                    return@execute
+                }
+
+                val identity = getLatestIdentity()
+                if (identity == null) {
+                    promise.reject("IDENTITY_ERROR", "No identity available for signing")
+                    return@execute
+                }
+
+                Log.d(TAG, "Building domain update transaction: $domain")
+
+                // Use lib-client JNI to build and sign the full transaction
+                val hexSignedTx = nativeBuildDomainUpdate(
+                    identity.identityJson,
+                    domain,
+                    contentCid,
+                    0x02  // testnet
+                )
+
+                if (hexSignedTx == null) {
+                    promise.reject("SIGNING_ERROR", "Failed to build domain update transaction")
+                    return@execute
+                }
+
+                val response = WritableNativeMap().apply {
+                    putString("signed_tx", hexSignedTx)
+                }
+                promise.resolve(response)
+            } catch (e: Exception) {
+                Log.e(TAG, "Domain update signing failed", e)
+                promise.reject("IDENTITY_ERROR", "Failed to sign domain update: ${e.message}", e)
+            }
+        }
+    }
 }

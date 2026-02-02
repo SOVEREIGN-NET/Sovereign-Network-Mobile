@@ -294,6 +294,90 @@ const ProfileScreen = ({ navigation }: any) => {
             </Card>
           </View>
 
+          {/* Assets Card */}
+          <View style={{ paddingHorizontal: spacing.sm }}>
+            <Card style={{ marginHorizontal: 0 }}>
+              <SectionLabel>My Assets</SectionLabel>
+              <Column gap="sm">
+                <TouchableOpacity
+                  onPress={() => navigation?.navigate('MyTokens')}
+                  style={{
+                    paddingVertical: spacing.md,
+                    paddingHorizontal: spacing.md,
+                    backgroundColor: colors.bg_darker,
+                    borderRadius: borderRadius.md,
+                    flexDirection: 'row',
+                    justifyContent: 'space-between',
+                    alignItems: 'center',
+                  }}
+                >
+                  <View style={{ flexDirection: 'row', alignItems: 'center', gap: spacing.md }}>
+                    <Text style={{ fontSize: typography.size.lg }}>◆</Text>
+                    <View>
+                      <Text
+                        style={{
+                          fontSize: typography.size.sm,
+                          fontWeight: typography.weight.semibold,
+                          color: colors.text_primary,
+                        }}
+                      >
+                        My Tokens
+                      </Text>
+                      <Text
+                        style={{
+                          fontSize: typography.size.xs,
+                          color: colors.text_secondary,
+                          marginTop: spacing.xs,
+                        }}
+                      >
+                        View & manage your tokens
+                      </Text>
+                    </View>
+                  </View>
+                  <Text style={{ fontSize: typography.size.lg, color: colors.text_secondary }}>›</Text>
+                </TouchableOpacity>
+
+                <TouchableOpacity
+                  onPress={() => navigation?.navigate('MyDomains')}
+                  style={{
+                    paddingVertical: spacing.md,
+                    paddingHorizontal: spacing.md,
+                    backgroundColor: colors.bg_darker,
+                    borderRadius: borderRadius.md,
+                    flexDirection: 'row',
+                    justifyContent: 'space-between',
+                    alignItems: 'center',
+                  }}
+                >
+                  <View style={{ flexDirection: 'row', alignItems: 'center', gap: spacing.md }}>
+                    <Text style={{ fontSize: typography.size.lg }}>🌐</Text>
+                    <View>
+                      <Text
+                        style={{
+                          fontSize: typography.size.sm,
+                          fontWeight: typography.weight.semibold,
+                          color: colors.text_primary,
+                        }}
+                      >
+                        My Domains
+                      </Text>
+                      <Text
+                        style={{
+                          fontSize: typography.size.xs,
+                          color: colors.text_secondary,
+                          marginTop: spacing.xs,
+                        }}
+                      >
+                        View & manage your .sov domains
+                      </Text>
+                    </View>
+                  </View>
+                  <Text style={{ fontSize: typography.size.lg, color: colors.text_secondary }}>›</Text>
+                </TouchableOpacity>
+              </Column>
+            </Card>
+          </View>
+
           {/* Actions Card */}
           <View style={{ paddingHorizontal: spacing.sm }}>
             <Card style={{ marginHorizontal: 0 }}>

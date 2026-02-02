@@ -17,6 +17,7 @@ import { useAuth, useApi, useAsyncData, useWalletList } from '../hooks';
 import { useTranslation } from '../i18n';
 import { colors, spacing, typography, borderRadius } from '../theme';
 import TokenCreatorScreen from './TokenCreatorScreen';
+import DomainRegistrationScreen from './DomainRegistrationScreen';
 
 // Wallet type info for display
 const WALLET_DISPLAY: Record<string, { icon: string; color: string; description: string }> = {
@@ -41,6 +42,7 @@ const SIDScreen = ({ navigation }: any) => {
   const [drawerVisible, setDrawerVisible] = useState(false);
   const [activeWalletTab, setActiveWalletTab] = useState('Tokens');
   const [tokenCreatorModalVisible, setTokenCreatorModalVisible] = useState(false);
+  const [domainRegistrationModalVisible, setDomainRegistrationModalVisible] = useState(false);
 
   React.useEffect(() => {
     console.log('[SIDScreen] 💰 Wallet data updated:', {
@@ -202,6 +204,21 @@ const SIDScreen = ({ navigation }: any) => {
                     onPress={() => setTokenCreatorModalVisible(true)}
                   >
                     <Text style={{ fontSize: typography.size.xl }}>◆</Text>
+                  </TouchableOpacity>
+                  <TouchableOpacity
+                    style={{
+                      width: 36,
+                      height: 36,
+                      borderRadius: borderRadius.full,
+                      backgroundColor: colors.bg_darker,
+                      justifyContent: 'center',
+                      alignItems: 'center',
+                      borderWidth: 1,
+                      borderColor: colors.border,
+                    }}
+                    onPress={() => setDomainRegistrationModalVisible(true)}
+                  >
+                    <Text style={{ fontSize: typography.size.xl }}>🌐</Text>
                   </TouchableOpacity>
                   <TouchableOpacity
                     style={{
@@ -547,6 +564,18 @@ const SIDScreen = ({ navigation }: any) => {
         <View style={{ flex: 1, backgroundColor: colors.bg_darkest }}>
           <TokenCreatorScreen
             onClose={() => setTokenCreatorModalVisible(false)}
+          />
+        </View>
+      </Modal>
+
+      <Modal
+        visible={domainRegistrationModalVisible}
+        animationType="slide"
+        presentationStyle="formSheet"
+      >
+        <View style={{ flex: 1, backgroundColor: colors.bg_darkest }}>
+          <DomainRegistrationScreen
+            onClose={() => setDomainRegistrationModalVisible(false)}
           />
         </View>
       </Modal>
