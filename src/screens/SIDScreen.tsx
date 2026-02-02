@@ -440,22 +440,6 @@ const SIDScreen = ({ navigation }: any) => {
                                 SOV
                               </Text>
                             </Row>
-                            {wallet?.id && (
-                              <TouchableOpacity
-                                onPress={() => copyToClipboard(wallet.id)}
-                                style={{ marginTop: spacing.xs }}
-                              >
-                                <Text
-                                  style={{
-                                    fontSize: typography.size.xs,
-                                    color: colors.text_tertiary,
-                                  }}
-                                  numberOfLines={1}
-                                >
-                                  {truncateId(wallet.id)}
-                                </Text>
-                              </TouchableOpacity>
-                            )}
                           </View>
                         </Card>
                       </TouchableOpacity>
