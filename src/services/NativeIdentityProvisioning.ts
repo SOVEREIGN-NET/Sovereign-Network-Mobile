@@ -143,8 +143,7 @@ class NativeIdentityProvisioningBridge {
 
   /**
    * Sign a domain registration transaction with Dilithium keypair
-   * Private key remains in device Keychain - never reaches JavaScript
-   * Returns hex-encoded signed transaction ready for API
+   * Routes through unified domain transaction signing
    */
   async signDomainRegisterTransaction(params: {
     domain: string;
@@ -154,12 +153,12 @@ class NativeIdentityProvisioningBridge {
       throw new Error('NativeIdentityProvisioning not available on this platform');
     }
 
-    return await this.nativeModule.signDomainRegisterTransaction(params);
+    return await this.nativeModule.signDomainTransaction('domain_register', params);
   }
 
   /**
    * Sign a domain update transaction with Dilithium keypair
-   * Returns hex-encoded signed transaction ready for API
+   * Routes through unified domain transaction signing
    */
   async signDomainUpdateTransaction(params: {
     domain: string;
@@ -169,7 +168,7 @@ class NativeIdentityProvisioningBridge {
       throw new Error('NativeIdentityProvisioning not available on this platform');
     }
 
-    return await this.nativeModule.signDomainUpdateTransaction(params);
+    return await this.nativeModule.signDomainTransaction('domain_update', params);
   }
 }
 
