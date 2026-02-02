@@ -77,9 +77,7 @@ class NativeQuic: NSObject {
     let startTime = Date()
 
     // Use TCP for reachability - has clearer state transitions than raw UDP
-    var parameters = NWParameters.tcp
-    // Disable TLS for direct TCP connection
-    parameters.defaultProtocolStack.tls = nil
+    let parameters = NWParameters.tcp
 
     // Create endpoint
     let endpoint = NWEndpoint.hostPort(
