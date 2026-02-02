@@ -218,6 +218,28 @@ const TokenCreatorScreen: React.FC<TokenCreatorScreenProps> = ({ onClose }) => {
       flex: 1,
       backgroundColor: colors.bg_darkest,
     },
+    header: {
+      flexDirection: 'row',
+      justifyContent: 'space-between',
+      alignItems: 'center',
+      paddingHorizontal: spacing.md,
+      paddingVertical: spacing.md,
+      borderBottomWidth: 1,
+      borderBottomColor: colors.border,
+    },
+    headerTitle: {
+      fontSize: typography.size.lg,
+      fontWeight: '600',
+      color: colors.text_primary,
+    },
+    closeButton: {
+      padding: spacing.sm,
+    },
+    closeButtonText: {
+      fontSize: typography.size.xl,
+      color: colors.text_secondary,
+      fontWeight: '300',
+    },
     scrollContent: {
       padding: spacing.md,
       paddingBottom: spacing.xl * 2.5,
@@ -240,10 +262,16 @@ const TokenCreatorScreen: React.FC<TokenCreatorScreenProps> = ({ onClose }) => {
 
   return (
     <View style={styles.container}>
-      <HeaderBar
-        title="Create Token"
-        onBackPress={() => onClose?.()}
-      />
+      <View style={styles.header}>
+        <Text style={styles.headerTitle}>Create Token</Text>
+        <TouchableOpacity
+          onPress={() => onClose?.()}
+          style={styles.closeButton}
+          hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
+        >
+          <Text style={styles.closeButtonText}>✕</Text>
+        </TouchableOpacity>
+      </View>
 
       <KeyboardAvoidingView
         behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
