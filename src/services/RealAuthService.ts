@@ -461,8 +461,8 @@ class RealAuthService {
   async getProtocolInfo() {
     // console.log('[RealAuthService] 🌐 getProtocolInfo() - Full QUIC Health Check');
     try {
-      const baseUrl = this.api.getBaseUrl();
-      const healthUrl = `${baseUrl}/api/v1/protocol/health`;
+      // Use the configured node URL directly (this.nodeUrl is set from config in constructor)
+      const healthUrl = `${this.nodeUrl}/api/v1/protocol/health`;
       // console.log(`[RealAuthService] Requesting: ${healthUrl}`);
 
       const response = await quicRequest(healthUrl, {
