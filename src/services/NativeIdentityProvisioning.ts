@@ -229,6 +229,26 @@ class NativeIdentityProvisioningBridge {
 
     return await this.nativeModule.signDomainUpdateTransaction(params);
   }
+
+  /**
+   * Sign an arbitrary message with Dilithium keypair
+   * Returns hex-encoded signature
+   */
+  async signMessage(message: string): Promise<string> {
+    if (!this.nativeModule) {
+      throw new Error('NativeIdentityProvisioning not available on this platform');
+    }
+
+    if (!this.nativeModule.signMessage) {
+      throw new Error('NativeIdentityProvisioning.signMessage not available');
+    }
+
+    const result = await this.nativeModule.signMessage(message);
+    if (!result?.signature) {
+      throw new Error('NativeIdentityProvisioning.signMessage returned no signature');
+    }
+    return result.signature;
+  }
 }
 
 // Export singleton instance

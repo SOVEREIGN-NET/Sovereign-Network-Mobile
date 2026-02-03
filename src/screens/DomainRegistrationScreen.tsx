@@ -4,7 +4,7 @@
  * Minimal, elegant design consistent with TokenCreatorScreen
  */
 
-import React, { useState, useCallback } from 'react';
+import React, { useState, useCallback, useEffect } from 'react';
 import { View, ScrollView, TouchableOpacity, KeyboardAvoidingView, Platform } from 'react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -57,6 +57,26 @@ const DomainRegistrationScreen: React.FC<DomainRegistrationScreenProps> = ({ onC
   });
   const [durationPickerVisible, setDurationPickerVisible] = useState(false);
   const [debounceTimer, setDebounceTimer] = useState<NodeJS.Timeout | null>(null);
+  const [hasExistingDomain, setHasExistingDomain] = useState(false);
+
+  useEffect(() => {
+    const loadExisting = async () => {
+      try {
+        if (!currentIdentity?.did) {
+          setHasExistingDomain(false);
+          return;
+        }
+        const storedDomainsJson = await AsyncStorage.getItem(REGISTERED_DOMAINS_KEY);
+        const storedDomains = storedDomainsJson ? JSON.parse(storedDomainsJson) : [];
+        const hasOwned = storedDomains.some((d: DomainData) => d.owner === currentIdentity.did);
+        setHasExistingDomain(hasOwned);
+      } catch (error) {
+        console.warn('[DomainRegistrationScreen] Failed to load existing domains:', error);
+        setHasExistingDomain(false);
+      }
+    };
+    loadExisting();
+  }, [currentIdentity?.did]);
 
   // Validate registration form
   const validateForm = (): boolean => {
@@ -161,6 +181,13 @@ const DomainRegistrationScreen: React.FC<DomainRegistrationScreenProps> = ({ onC
       });
       return;
     }
+    if (hasExistingDomain) {
+      setStatus({
+        type: 'error',
+        message: 'Limit reached: one domain per identity.',
+      });
+      return;
+    }
 
     if (availabilityStatus.available === false) {
       setStatus({
@@ -176,7 +203,13 @@ const DomainRegistrationScreen: React.FC<DomainRegistrationScreenProps> = ({ onC
     try {
       const fullDomain = `${domain}.sov`;
       const durationDays = yearsToDays(parseInt(years, 10));
-      const feeAmount = availabilityStatus.registrarFee ?? 0;
+      const feeAmount = 10;
+      const contentMappings = {
+        '/': {
+          content: `<html><body>${fullDomain}</body></html>`,
+          content_type: 'text/html',
+        },
+      };
 
       console.log('[DomainRegistrationScreen] Registering domain:', { domain: fullDomain, durationDays, feeAmount });
 
@@ -188,8 +221,8 @@ const DomainRegistrationScreen: React.FC<DomainRegistrationScreenProps> = ({ onC
       const response = await domainService.registerDomain({
         domain: fullDomain,
         owner: currentIdentity.did,
-        fee_amount: feeAmount,
-        content_mappings: {},
+        fee: feeAmount,
+        content_mappings: contentMappings,
       });
 
       console.log('[DomainRegistrationScreen] Domain registered:', response.tx_hash);
@@ -208,6 +241,7 @@ const DomainRegistrationScreen: React.FC<DomainRegistrationScreenProps> = ({ onC
 
       storedDomains.push(newDomain);
       await AsyncStorage.setItem(REGISTERED_DOMAINS_KEY, JSON.stringify(storedDomains));
+      setHasExistingDomain(true);
 
       setStatus({
         type: 'success',
@@ -330,6 +364,35 @@ const DomainRegistrationScreen: React.FC<DomainRegistrationScreenProps> = ({ onC
               Register a .sov domain to establish your web4 presence. Domains are yours for the selected duration and can be renewed.
             </Text>
           </View>
+          {hasExistingDomain && (
+            <View
+              style={{
+                marginBottom: spacing.lg,
+                padding: spacing.md,
+                backgroundColor: `${colors.warning}15`,
+                borderRadius: borderRadius.md,
+              }}
+            >
+              <Text
+                style={{
+                  fontSize: typography.size.sm,
+                  color: colors.warning,
+                  fontWeight: typography.weight.semibold,
+                }}
+              >
+                Limit: 1 domain per identity
+              </Text>
+              <Text
+                style={{
+                  fontSize: typography.size.xs,
+                  color: colors.text_secondary,
+                  marginTop: spacing.xs,
+                }}
+              >
+                This identity already has a registered domain. Creating more is not allowed on mobile.
+              </Text>
+            </View>
+          )}
 
           {/* Domain Input */}
           <FormField
@@ -339,7 +402,7 @@ const DomainRegistrationScreen: React.FC<DomainRegistrationScreenProps> = ({ onC
             onChangeText={handleDomainChange}
             onBlur={handleDomainBlur}
             error={errors.domain}
-            editable={!loading}
+            editable={!loading && !hasExistingDomain}
             autoCapitalize="none"
             autoCorrect={false}
             rightIcon={
@@ -601,10 +664,10 @@ const DomainRegistrationScreen: React.FC<DomainRegistrationScreenProps> = ({ onC
           {/* Register Button */}
           <Button
             onPress={handleRegister}
-            disabled={loading || availabilityStatus.available === false || !domain}
+            disabled={loading || availabilityStatus.available === false || !domain || hasExistingDomain}
             style={{
               backgroundColor:
-                loading || availabilityStatus.available === false || !domain
+                loading || availabilityStatus.available === false || !domain || hasExistingDomain
                   ? colors.text_secondary
                   : colors.primary,
             }}

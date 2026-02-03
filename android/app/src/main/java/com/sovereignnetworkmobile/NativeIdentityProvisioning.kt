@@ -69,6 +69,8 @@ class NativeIdentityProvisioning(reactContext: ReactApplicationContext) :
                     masterSeed = masterSeed
                 )
                 cachedIdentities[did] = cached
+                val identityId = if (did.startsWith("did:zhtp:")) did.removePrefix("did:zhtp:") else did
+                IdentityStore.storeIdentity(reactApplicationContext, identityId, cached)
 
                 val response = WritableNativeMap().apply {
                     putString("status", "generated")
@@ -595,6 +597,36 @@ class NativeIdentityProvisioning(reactContext: ReactApplicationContext) :
             } catch (e: Exception) {
                 Log.e(TAG, "Domain registration signing failed", e)
                 promise.reject("IDENTITY_ERROR", "Failed to sign domain registration: ${e.message}", e)
+            }
+        }
+    }
+
+    @ReactMethod
+    fun signMessage(message: String, promise: Promise) {
+        executor.execute {
+            try {
+                val identity = getLatestIdentity()
+                if (identity == null) {
+                    promise.reject("IDENTITY_ERROR", "No identity available for signing")
+                    return@execute
+                }
+
+                val result = nativeSignMessage(identity.identityJson, message.toByteArray(Charsets.UTF_8)) as? Map<*, *>
+                if (result == null || result["ok"] != true) {
+                    val error = result?.get("error")?.toString() ?: "Message signing failed"
+                    promise.reject("SIGNING_ERROR", error)
+                    return@execute
+                }
+
+                val signature = result["signature"] as? ByteArray ?: ByteArray(0)
+                val hex = signature.joinToString("") { "%02x".format(it) }
+                val response = WritableNativeMap().apply {
+                    putString("signature", hex)
+                }
+                promise.resolve(response)
+            } catch (e: Exception) {
+                Log.e(TAG, "Message signing failed", e)
+                promise.reject("SIGNING_ERROR", "Failed to sign message: ${e.message}", e)
             }
         }
     }

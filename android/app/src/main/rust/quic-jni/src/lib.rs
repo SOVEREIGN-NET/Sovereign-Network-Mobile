@@ -516,6 +516,33 @@ pub extern "system" fn Java_com_sovereignnetworkmobile_NativeIdentityProvisionin
 }
 
 #[no_mangle]
+pub extern "system" fn Java_com_sovereignnetworkmobile_NativeIdentityProvisioning_nativeSignMessage<'local>(
+    mut env: JNIEnv<'local>,
+    _class: JClass<'local>,
+    identity_json: JString<'local>,
+    message: JByteArray<'local>,
+) -> jobject {
+    let identity_json_str: String = match env.get_string(&identity_json) {
+        Ok(s) => s.into(),
+        Err(e) => {
+            log::error!("Failed to get identity json: {}", e);
+            return std::ptr::null_mut();
+        }
+    };
+
+    let message_bytes = match env.convert_byte_array(&message) {
+        Ok(bytes) => bytes,
+        Err(e) => {
+            log::error!("Failed to get message bytes: {}", e);
+            return std::ptr::null_mut();
+        }
+    };
+
+    let result = identity_bridge::sign_message_from_identity(&identity_json_str, &message_bytes);
+    create_signature_map(&mut env, result)
+}
+
+#[no_mangle]
 pub extern "system" fn Java_com_sovereignnetworkmobile_NativeIdentityProvisioning_nativeGetSeedPhrase<'local>(
     mut env: JNIEnv<'local>,
     _class: JClass<'local>,

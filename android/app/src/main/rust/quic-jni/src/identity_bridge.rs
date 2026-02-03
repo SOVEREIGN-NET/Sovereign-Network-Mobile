@@ -1,7 +1,7 @@
 use anyhow::Result;
 use zhtp_client::identity::{
     deserialize_identity, get_seed_phrase, restore_identity_from_phrase, serialize_identity,
-    sign_registration_proof, Identity,
+    sign_message, sign_registration_proof, Identity,
 };
 use zhtp_client::{generate_identity, get_public_identity};
 use serde_json::json;
@@ -44,6 +44,11 @@ pub fn generate_identity_bundle(device_id: &str) -> Result<GeneratedIdentity> {
 pub fn sign_registration_proof_from_identity(identity_json: &str, timestamp: u64) -> Result<Vec<u8>> {
     let identity = deserialize_identity(identity_json)?;
     Ok(sign_registration_proof(&identity, timestamp)?)
+}
+
+pub fn sign_message_from_identity(identity_json: &str, message: &[u8]) -> Result<Vec<u8>> {
+    let identity = deserialize_identity(identity_json)?;
+    Ok(sign_message(&identity, message)?)
 }
 
 pub fn get_seed_phrase_from_identity(identity_json: &str) -> Result<String> {

@@ -77,7 +77,7 @@ const BrowserScreen = ({ route, navigation }: any) => {
     if (route?.params?.url) {
       handleNavigate(route.params.url);
     }
-  }, [handleNavigate, route?.params?.url]);
+  }, [route?.params?.url]);
 
   const renderZhtp = () => (
       <View style={{ flex: 1, backgroundColor: colors.bg_darkest }}>

@@ -81,7 +81,7 @@ const DAOScreen = ({ navigation }: any) => {
         daoStats: MockDataService.getDAOStats(),
       };
     },
-    [api, isInitialized],
+    [],
   );
 
   if (loading) {

@@ -86,18 +86,15 @@ class DomainService {
   async registerDomain(request: DomainRegisterRequest): Promise<DomainRegisterResponse> {
     try {
       console.log('[DomainService] Registering domain:', request.domain);
-      console.log('[DomainService] Signing domain register transaction with Dilithium keypair');
+      console.log('[DomainService] Signing domain registration message');
 
-      // Sign transaction (duration is handled at API level, not encoded in tx)
-      const signingResult = await nativeIdentityProvisioning.signDomainRegisterTransaction({
-        domain: request.domain,
-        contentCid: undefined, // Optional content CID for initial registration
-      });
+      const timestamp = Math.floor(Date.now() / 1000);
+      const fee = request.fee;
+      const message = `${request.domain}|${timestamp}|${fee}`;
+      const signature = await nativeIdentityProvisioning.signMessage(message);
+      console.log('[DomainService] Signature length (hex):', signature.length);
 
-      const signedTx = signingResult.signed_tx;
-      console.log('[DomainService] Transaction signed, hex length:', signedTx.length);
-
-      // Send domain registration payload (simple registration)
+      // Send domain registration payload
       const response = await this.quicFetch(
         `${this.nodeUrl}/api/v1/web4/domains/register`,
         {
@@ -106,10 +103,11 @@ class DomainService {
           body: JSON.stringify({
             domain: request.domain,
             owner: request.owner,
-            content_mappings: request.content_mappings ?? {},
-            signature: signedTx,
-            timestamp: Math.floor(Date.now() / 1000),
-            fee_amount: request.fee_amount,
+            content_mappings: request.content_mappings,
+            metadata: request.metadata,
+            signature,
+            timestamp,
+            fee,
           }),
         }
       );

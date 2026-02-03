@@ -8,6 +8,9 @@ final class Web4View: UIView {
   private var domain: String?
   private var nodeHost: String?
   private var nodePort: Int?
+  private var lastConfiguredDomain: String?
+  private var lastConfiguredHost: String?
+  private var lastConfiguredPort: Int?
   private var cacheLimitMb: Int = 150
   private var allowHttpsExternal: Bool = false
   private var runtime: Web4Runtime?
@@ -40,11 +43,23 @@ final class Web4View: UIView {
   }
 
   private func configureIfReady() {
-    guard webView == nil else { return }
-    guard let domain = domain,
+    guard let domainRaw = domain,
           let host = nodeHost,
           let port = nodePort,
           port > 0 else { return }
+
+    let domain = domainRaw.lowercased()
+    let isSameConfig = (lastConfiguredDomain == domain &&
+                        lastConfiguredHost == host &&
+                        lastConfiguredPort == port)
+
+    if webView != nil && isSameConfig {
+      return
+    }
+
+    if webView != nil && !isSameConfig {
+      teardownWebView()
+    }
 
     let config = WKWebViewConfiguration()
     let cacheDir = FileManager.default.urls(for: .cachesDirectory, in: .userDomainMask).first!
@@ -74,6 +89,28 @@ final class Web4View: UIView {
     wv.load(request)
     addSubview(wv)
     webView = wv
+    lastConfiguredDomain = domain
+    lastConfiguredHost = host
+    lastConfiguredPort = port
+  }
+
+  private func teardownWebView() {
+    if let wv = webView {
+      wv.configuration.userContentController.removeScriptMessageHandler(forName: "zhtpFetch")
+      wv.stopLoading()
+      wv.navigationDelegate = nil
+      wv.uiDelegate = nil
+      wv.removeFromSuperview()
+    }
+    webView = nil
+    runtime = nil
+    lastConfiguredDomain = nil
+    lastConfiguredHost = nil
+    lastConfiguredPort = nil
+  }
+
+  deinit {
+    teardownWebView()
   }
 
   private static let fetchPolyfillScript = """

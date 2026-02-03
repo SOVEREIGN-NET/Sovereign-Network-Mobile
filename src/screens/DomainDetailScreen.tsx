@@ -14,7 +14,6 @@ import {
   LoadingView,
   Column,
   FormField,
-  HeaderBar,
   ScreenLayout,
   DetailRow,
   SectionLabel,
@@ -74,6 +73,25 @@ const DomainDetailScreen = ({ route, navigation }: any) => {
 
     loadDomainData();
   }, [domainName, navigation]);
+
+  React.useEffect(() => {
+    const refreshStatus = async () => {
+      if (!domainName) return;
+      try {
+        const status = await domainService.getDomainStatus(domainName);
+        const expiresAt = status?.expires_at;
+        if (!expiresAt) return;
+        const expiryDate = typeof expiresAt === 'number'
+          ? new Date(expiresAt * 1000)
+          : new Date(expiresAt);
+        if (!Number.isFinite(expiryDate.getTime())) return;
+        setDomain(prev => prev ? { ...prev, expires_at: expiryDate.toISOString() } : prev);
+      } catch (error) {
+        console.warn('[DomainDetailScreen] Failed to refresh domain status:', error);
+      }
+    };
+    refreshStatus();
+  }, [domainName]);
 
   // Handle update domain content
   const handleUpdateContent = async () => {
@@ -153,10 +171,14 @@ const DomainDetailScreen = ({ route, navigation }: any) => {
     return <LoadingView />;
   }
 
-  const expiryDate = new Date(domain.expires_at);
+  const expiryDate = domain.expires_at ? new Date(domain.expires_at) : null;
+  const expiryTime = expiryDate ? expiryDate.getTime() : NaN;
   const now = new Date();
-  const isExpired = now > expiryDate;
-  const daysUntilExpiry = Math.ceil((expiryDate.getTime() - now.getTime()) / (1000 * 60 * 60 * 24));
+  const isExpiryValid = Number.isFinite(expiryTime);
+  const isExpired = isExpiryValid ? now.getTime() > expiryTime : false;
+  const daysUntilExpiry = isExpiryValid
+    ? Math.ceil((expiryTime - now.getTime()) / (1000 * 60 * 60 * 24))
+    : null;
 
   return (
     <KeyboardAvoidingView
@@ -164,7 +186,43 @@ const DomainDetailScreen = ({ route, navigation }: any) => {
       style={{ flex: 1, backgroundColor: colors.bg_darkest }}
     >
       <View style={{ flex: 1, backgroundColor: colors.bg_darkest }}>
-        <HeaderBar title={domainName} onBackPress={() => navigation?.goBack()} />
+        <View
+          style={{
+            flexDirection: 'row',
+            justifyContent: 'space-between',
+            alignItems: 'center',
+            paddingHorizontal: spacing.md,
+            paddingVertical: spacing.md,
+            paddingTop: insets.top + spacing.md,
+            borderBottomWidth: 1,
+            borderBottomColor: colors.border,
+            backgroundColor: colors.bg_dark,
+          }}
+        >
+          <Text
+            style={{
+              fontSize: typography.size.lg,
+              fontWeight: typography.weight.semibold,
+              color: colors.text_primary,
+            }}
+          >
+            {domainName}
+          </Text>
+          <TouchableOpacity
+            onPress={() => navigation?.goBack()}
+            hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
+          >
+            <Text
+              style={{
+                fontSize: typography.size.lg,
+                color: colors.text_secondary,
+                fontWeight: typography.weight.light,
+              }}
+            >
+              ✕
+            </Text>
+          </TouchableOpacity>
+        </View>
 
         <ScreenLayout paddingTop={spacing.md}>
           <ScrollView showsVerticalScrollIndicator={false}>
@@ -219,15 +277,19 @@ const DomainDetailScreen = ({ route, navigation }: any) => {
                     <DetailRow
                       label="Status"
                       value={
-                        isExpired ? 'Expired' : `${daysUntilExpiry} days remaining`
+                        !isExpiryValid
+                          ? 'Unknown'
+                          : isExpired
+                          ? 'Expired'
+                          : `${Math.max(0, daysUntilExpiry ?? 0)} days remaining`
                       }
                     />
-                    <DetailRow label="Owner" value={domain.owner.substring(0, 16) + '...'} />
-                    <DetailRow label="Expires" value={expiryDate.toLocaleDateString()} />
+                    <DetailRow label="Owner" value={domain.owner ? `${domain.owner.substring(0, 16)}...` : '—'} />
+                    <DetailRow label="Expires" value={isExpiryValid ? expiryDate!.toLocaleDateString() : '—'} />
                     <DetailRow label="Registered" value={new Date(domain.registered_at).toLocaleDateString()} />
                     <DetailRow
                       label="TX Hash"
-                      value={domain.tx_hash.substring(0, 12) + '...'}
+                      value={domain.tx_hash ? `${domain.tx_hash.substring(0, 12)}...` : '—'}
                     />
                   </Column>
                 </Card>

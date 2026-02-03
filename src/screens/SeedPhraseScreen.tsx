@@ -187,12 +187,13 @@ const SeedPhraseScreen = ({ navigation, route }: SeedPhraseScreenProps) => {
                       {t.auth.seedPhrase.secureSave.description}
                     </Text>
                     <Button
-                      label={t.auth.seedPhrase.secureSave.button}
                       onPress={handleSecureSave}
                       variant="secondary"
                       loading={vaultState === 'saving'}
                       disabled={vaultState === 'saving' || vaultState === 'saved'}
-                    />
+                    >
+                      {t.auth.seedPhrase.secureSave.button}
+                    </Button>
                   </Column>
                 </Card>
               )}

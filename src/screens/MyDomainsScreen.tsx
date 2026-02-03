@@ -7,15 +7,16 @@ import React, { useState } from 'react';
 import { View, ScrollView, TouchableOpacity, Alert } from 'react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useFocusEffect } from '@react-navigation/native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import {
   Card,
   Text,
   LoadingView,
   Column,
-  HeaderBar,
   ScreenLayout,
 } from '../components';
 import { colors, spacing, typography, borderRadius } from '../theme';
+import domainService from '../services/DomainService';
 
 // Storage keys
 const REGISTERED_DOMAINS_KEY = 'sov:registered_domains';
@@ -34,6 +35,7 @@ interface DomainWithStatus extends StoredDomain {
 }
 
 const MyDomainsScreen = ({ navigation }: any) => {
+  const insets = useSafeAreaInsets();
   const [domains, setDomains] = useState<DomainWithStatus[]>([]);
   const [loading, setLoading] = useState(false);
 
@@ -48,13 +50,27 @@ const MyDomainsScreen = ({ navigation }: any) => {
       const domainsWithStatus: DomainWithStatus[] = await Promise.all(
         storedDomains.map(async (domain: StoredDomain) => {
           try {
-            const expiryDate = new Date(domain.expires_at);
+            const status = await domainService.getDomainStatus(domain.domain).catch(() => null);
+            const expiresAt = status?.expires_at ?? domain.expires_at;
+            const expiryDate = typeof expiresAt === 'number'
+              ? new Date(expiresAt * 1000)
+              : expiresAt
+              ? new Date(expiresAt)
+              : null;
+            const expiryTime = expiryDate ? expiryDate.getTime() : NaN;
+            if (!Number.isFinite(expiryTime)) {
+              return {
+                ...domain,
+                status: 'unknown',
+              };
+            }
             const now = new Date();
-            const isExpired = now > expiryDate;
-            const daysUntilExpiry = Math.ceil((expiryDate.getTime() - now.getTime()) / (1000 * 60 * 60 * 24));
+            const isExpired = now.getTime() > expiryTime;
+            const daysUntilExpiry = Math.ceil((expiryTime - now.getTime()) / (1000 * 60 * 60 * 24));
 
             return {
               ...domain,
+              expires_at: expiryDate?.toISOString() || domain.expires_at,
               status: isExpired ? 'expired' : 'active',
               daysUntilExpiry: Math.max(0, daysUntilExpiry),
             };
@@ -96,7 +112,43 @@ const MyDomainsScreen = ({ navigation }: any) => {
 
   return (
     <View style={{ flex: 1, backgroundColor: colors.bg_darkest }}>
-      <HeaderBar title="My Domains" onBackPress={() => navigation?.goBack()} />
+      <View
+        style={{
+          flexDirection: 'row',
+          justifyContent: 'space-between',
+          alignItems: 'center',
+          paddingHorizontal: spacing.md,
+          paddingVertical: spacing.md,
+          paddingTop: insets.top + spacing.md,
+          borderBottomWidth: 1,
+          borderBottomColor: colors.border,
+          backgroundColor: colors.bg_dark,
+        }}
+      >
+        <Text
+          style={{
+            fontSize: typography.size.lg,
+            fontWeight: typography.weight.semibold,
+            color: colors.text_primary,
+          }}
+        >
+          My Domains
+        </Text>
+        <TouchableOpacity
+          onPress={() => navigation?.goBack()}
+          hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
+        >
+          <Text
+            style={{
+              fontSize: typography.size.lg,
+              color: colors.text_secondary,
+              fontWeight: typography.weight.light,
+            }}
+          >
+            ✕
+          </Text>
+        </TouchableOpacity>
+      </View>
 
       <ScreenLayout paddingTop={spacing.md}>
         <ScrollView showsVerticalScrollIndicator={false}>
@@ -198,7 +250,9 @@ const MyDomainsScreen = ({ navigation }: any) => {
                                 color: colors.success,
                               }}
                             >
-                              {domain.daysUntilExpiry} days left
+                              {Number.isFinite(domain.daysUntilExpiry ?? NaN)
+                                ? `${domain.daysUntilExpiry} days left`
+                                : 'Days left: —'}
                             </Text>
                             <Text
                               style={{

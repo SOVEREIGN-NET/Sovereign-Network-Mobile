@@ -18,32 +18,14 @@ import {
 import { useAuth, useAsyncData } from '../hooks';
 import { useTranslation } from '../i18n';
 import { colors, spacing, typography, borderRadius } from '../theme';
-import appService from '../services/AppService';
 
 const ProfileScreen = ({ navigation }: any) => {
   const { t } = useTranslation();
   const { currentIdentity, signOut, isLoading } = useAuth();
   const [loggingOut, setLoggingOut] = useState(false);
 
-  // Fetch wallet data for stats
-  const { data: walletData } = useAsyncData(
-    async () => {
-      if (!currentIdentity?.did) {
-        return null;
-      }
-
-      try {
-        const walletList = await appService.getWalletList(currentIdentity.did);
-        return {
-          wallets: walletList.wallets || [],
-        };
-      } catch (error) {
-        console.warn('⚠️ Profile: Failed to fetch wallet data:', error);
-        return null;
-      }
-    },
-    [currentIdentity?.did],
-  );
+  // Keep hook order stable without triggering any network requests.
+  useAsyncData(async () => null, [currentIdentity?.did]);
 
   // Fetch UBI data for stats
   const { data: ubiData } = useAsyncData(
@@ -59,28 +41,6 @@ const ProfileScreen = ({ navigation }: any) => {
     [currentIdentity?.did],
   );
 
-  // Fetch DAO stats
-  const { data: daoStats } = useAsyncData(
-    async () => {
-      if (!api || !isInitialized || !currentIdentity?.did) {
-        return null;
-      }
-
-      try {
-        const voteHistory = await api.request(`/api/v1/dao/vote/history/${currentIdentity.did}`).catch(() => null);
-
-        return {
-          voting_power: voteHistory?.voting_power || 0,
-          votes_cast: voteHistory?.votes?.length || 0,
-          reputation_score: voteHistory?.reputation_score || 0,
-        };
-      } catch (error) {
-        console.warn('⚠️ Profile: Failed to fetch DAO stats:', error);
-        return null;
-      }
-    },
-    [api, isInitialized, currentIdentity?.did],
-  );
 
   const handleLogout = () => {
     Alert.alert(
@@ -151,13 +111,13 @@ const ProfileScreen = ({ navigation }: any) => {
   };
 
   // Stats values
-  const votingPower = daoStats?.voting_power || 0;
+  const votingPower = 0;
   const votingPowerFormatted = votingPower.toLocaleString();
   const ubiEarned = ubiData?.total_earned || 0;
   const ubiEarnedFormatted = ubiEarned.toFixed(2);
-  const walletCount = walletData?.wallets?.length || 0;
-  const votesCast = daoStats?.votes_cast || 0;
-  const reputationScore = daoStats?.reputation_score || 0;
+  const walletCount = 0;
+  const votesCast = 0;
+  const reputationScore = 0;
   const authLoading = isLoading || loggingOut;
 
   return (
@@ -286,10 +246,6 @@ const ProfileScreen = ({ navigation }: any) => {
                   label={t.identity.stats.ubiEarned}
                   value={`${ubiEarnedFormatted} SOV`}
                 />
-                <DetailRow
-                  label={t.identity.stats.wallets}
-                  value={walletCount.toString()}
-                />
               </Column>
             </Card>
           </View>
@@ -299,44 +255,6 @@ const ProfileScreen = ({ navigation }: any) => {
             <Card style={{ marginHorizontal: 0 }}>
               <SectionLabel>My Assets</SectionLabel>
               <Column gap="sm">
-                <TouchableOpacity
-                  onPress={() => navigation?.navigate('MyTokens')}
-                  style={{
-                    paddingVertical: spacing.md,
-                    paddingHorizontal: spacing.md,
-                    backgroundColor: colors.bg_darker,
-                    borderRadius: borderRadius.md,
-                    flexDirection: 'row',
-                    justifyContent: 'space-between',
-                    alignItems: 'center',
-                  }}
-                >
-                  <View style={{ flexDirection: 'row', alignItems: 'center', gap: spacing.md }}>
-                    <Text style={{ fontSize: typography.size.lg }}>◆</Text>
-                    <View>
-                      <Text
-                        style={{
-                          fontSize: typography.size.sm,
-                          fontWeight: typography.weight.semibold,
-                          color: colors.text_primary,
-                        }}
-                      >
-                        My Tokens
-                      </Text>
-                      <Text
-                        style={{
-                          fontSize: typography.size.xs,
-                          color: colors.text_secondary,
-                          marginTop: spacing.xs,
-                        }}
-                      >
-                        View & manage your tokens
-                      </Text>
-                    </View>
-                  </View>
-                  <Text style={{ fontSize: typography.size.lg, color: colors.text_secondary }}>›</Text>
-                </TouchableOpacity>
-
                 <TouchableOpacity
                   onPress={() => navigation?.navigate('MyDomains')}
                   style={{

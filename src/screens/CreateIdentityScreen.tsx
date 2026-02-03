@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import { NativeStackScreenProps } from '@react-navigation/native-stack';
 import { View } from 'react-native';
 import {
@@ -25,7 +25,7 @@ type CreateIdentityScreenProps = NativeStackScreenProps<AuthStackParamList, 'Cre
 
 const CreateIdentityScreen = ({ navigation }: CreateIdentityScreenProps) => {
   const { t } = useTranslation();
-  const { createIdentity } = useAuth();
+  const { createIdentity, checkUsernameAvailability } = useAuth();
   const { isConnected, hasChecked } = useNodeConnection(true);
 
   // Form state
@@ -45,10 +45,14 @@ const CreateIdentityScreen = ({ navigation }: CreateIdentityScreenProps) => {
   });
   const [fieldErrors, setFieldErrors] = useState<{
     displayName?: string;
+    username?: string;
     password?: string;
     confirmPassword?: string;
     terms?: string;
   }>({});
+  const [usernameStatus, setUsernameStatus] = useState<'idle' | 'checking' | 'available' | 'taken' | 'invalid'>('idle');
+  const [usernameValue, setUsernameValue] = useState('');
+  const usernameCheckIdRef = useRef(0);
 
   const identityTypes = [
     { id: 'citizen' as const, label: 'Citizen (Human)', disabled: false },
@@ -57,6 +61,48 @@ const CreateIdentityScreen = ({ navigation }: CreateIdentityScreenProps) => {
     { id: 'agent' as const, label: 'Agent', disabled: true, badge: 'Soon' },
     { id: 'contract' as const, label: 'Contract', disabled: true, badge: 'Soon' },
   ];
+
+  useEffect(() => {
+    const trimmed = displayName.trim();
+    if (!trimmed) {
+      setUsernameValue('');
+      setUsernameStatus('idle');
+      return;
+    }
+
+    const normalized = trimmed.toLowerCase().replaceAll(/\s+/g, '_');
+    const isValid = /^[a-z0-9_]+$/.test(normalized) && normalized.length >= 3;
+
+    setUsernameValue(normalized);
+    if (!isValid) {
+      setUsernameStatus('invalid');
+      return;
+    }
+
+    const checkId = usernameCheckIdRef.current + 1;
+    usernameCheckIdRef.current = checkId;
+    setUsernameStatus('checking');
+
+    const timer = setTimeout(() => {
+      checkUsernameAvailability(normalized)
+        .then((available) => {
+          if (usernameCheckIdRef.current !== checkId) {
+            return;
+          }
+          setUsernameStatus(available ? 'available' : 'taken');
+        })
+        .catch(() => {
+          if (usernameCheckIdRef.current !== checkId) {
+            return;
+          }
+          setUsernameStatus('taken');
+        });
+    }, 400);
+
+    return () => {
+      clearTimeout(timer);
+    };
+  }, [displayName, checkUsernameAvailability]);
 
   // SECURITY: Real-time password validation
   const handlePasswordChange = (newPassword: string) => {
@@ -83,6 +129,13 @@ const CreateIdentityScreen = ({ navigation }: CreateIdentityScreenProps) => {
       errors.displayName = t.auth.createIdentity.validation.displayNameRequired;
     } else if (displayName.trim().length < 2) {
       errors.displayName = t.auth.createIdentity.validation.displayNameTooShort;
+    }
+    if (usernameStatus === 'invalid') {
+      errors.username = t.auth.createIdentity.validation.usernameInvalid;
+    } else if (usernameStatus === 'taken') {
+      errors.username = t.auth.createIdentity.validation.usernameUnavailable;
+    } else if (displayName.trim() && usernameValue.length < 3) {
+      errors.username = t.auth.createIdentity.validation.usernameTooShort;
     }
 
     // Password validation - SECURITY: Use strong policy
@@ -291,6 +344,38 @@ const CreateIdentityScreen = ({ navigation }: CreateIdentityScreenProps) => {
             autoCorrect={false}
             spellCheck={false}
           />
+          {usernameValue ? (
+            <Text style={{ fontSize: typography.size.xs, color: colors.text_secondary }}>
+              {t.auth.createIdentity.usernameWillBe.replace('{username}', usernameValue)}
+            </Text>
+          ) : null}
+          {usernameStatus !== 'idle' && (
+            <Text
+              style={{
+                fontSize: typography.size.xs,
+                color:
+                  usernameStatus === 'available'
+                    ? colors.success
+                    : usernameStatus === 'checking'
+                    ? colors.text_secondary
+                    : colors.error,
+                marginTop: spacing.xs,
+              }}
+            >
+              {usernameStatus === 'checking'
+                ? t.auth.createIdentity.usernameChecking
+                : usernameStatus === 'available'
+                ? t.auth.createIdentity.usernameAvailable
+                : usernameStatus === 'taken'
+                ? t.auth.createIdentity.usernameTaken
+                : t.auth.createIdentity.validation.usernameInvalid}
+            </Text>
+          )}
+          {fieldErrors.username && (
+            <Text style={{ fontSize: typography.size.xs, color: colors.error, marginTop: spacing.xs }}>
+              {fieldErrors.username}
+            </Text>
+          )}
         </Card>
 
         {/* Terms & Conditions */}

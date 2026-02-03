@@ -12,6 +12,7 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import { Identity } from './MockAuthService';
 
 const IDENTITY_KEYCHAIN_SERVICE = 'sovnet_identity_secure';
+const SESSION_TOKEN_KEYCHAIN_SERVICE = 'sovnet_session_token';
 const IDENTITY_ID_ASYNC_STORAGE = 'sovnet_identity_id'; // Non-sensitive, used for UI state only
 const IDENTITY_BACKUP_STORAGE = 'sovnet_identity_backup'; // Unencrypted fallback backup (survives Keystore resets)
 
@@ -98,6 +99,21 @@ export const SecureIdentityStorage = {
       console.error('❌ Failed to store identity securely:', error);
       throw new Error('Failed to store identity in secure storage');
     }
+  },
+
+  /**
+   * Store session token securely in Keychain
+   */
+  async setSessionToken(token: string): Promise<void> {
+    if (!token) {
+      throw new Error('Invalid session token');
+    }
+    const keychainOptions: Keychain.Options = {
+      service: SESSION_TOKEN_KEYCHAIN_SERVICE,
+      accessible: Keychain.ACCESSIBLE.WHEN_UNLOCKED_THIS_DEVICE_ONLY,
+      securityLevel: Keychain.SECURITY_LEVEL.SECURE_HARDWARE,
+    };
+    await Keychain.setGenericPassword('session_token', token, keychainOptions);
   },
 
   /**

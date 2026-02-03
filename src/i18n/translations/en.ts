@@ -230,7 +230,7 @@ export const en = {
         description: '24-word recovery phrase',
         title: '24-Word Recovery Phrase',
         placeholder: 'word1 word2 word3 ... word24',
-        hint: 'Enter your 24-word seed phrase separated by spaces. This phrase can be used to restore your identity and wallets.',
+        hint: 'Enter your 24-word recovery phrase separated by spaces. This phrase can be used to restore your identity and wallets.',
         securityTitle: 'Security Note',
         securityWarning: 'Never share your seed phrase. Anyone with it can access your identity and funds.',
       },
@@ -266,6 +266,7 @@ export const en = {
       createNew: 'Create New Identity',
       validation: {
         seedRequired: 'Seed phrase is required',
+        seedInvalid: 'Recovery phrase must be 24 words',
         backupRequired: 'Backup file content is required',
         backupPasswordRequired: 'Password is required to decrypt backup',
         guardianCodeRequired: 'Guardian code is required',

@@ -25,6 +25,9 @@ class Web4ReactWebView(context: Context) : WebView(context) {
     private var cacheLimitMb: Int = 150
     private var runtime: Web4Runtime? = null
     private var configured = false
+    private var lastConfiguredDomain: String? = null
+    private var lastConfiguredHost: String? = null
+    private var lastConfiguredPort: Int? = null
     private val fetchExecutor = Executors.newCachedThreadPool()
 
     init {
@@ -44,6 +47,7 @@ class Web4ReactWebView(context: Context) : WebView(context) {
 
             override fun onPageFinished(view: WebView?, url: String?) {
                 super.onPageFinished(view, url)
+                injectFetchPolyfill()
                 sendEvent("onLoadEnd", url ?: "")
             }
 
@@ -58,14 +62,14 @@ class Web4ReactWebView(context: Context) : WebView(context) {
         val script = """
             (function() {
                 'use strict';
-                if (window.__web4Runtime) return;
-
-                // Web4 runtime context - explicit marker for Web4 environment
-                window.__web4Runtime = Object.freeze({
-                    version: '1.0',
-                    schemes: ['zhtp'],
-                    installed: Date.now()
-                });
+                if (!window.__web4Runtime) {
+                    // Web4 runtime context - explicit marker for Web4 environment
+                    window.__web4Runtime = Object.freeze({
+                        version: '1.0',
+                        schemes: ['zhtp'],
+                        installed: Date.now()
+                    });
+                }
 
                 const originalFetch = window.fetch;
                 if (typeof originalFetch !== 'function') {
@@ -138,6 +142,73 @@ class Web4ReactWebView(context: Context) : WebView(context) {
                     // Pass through to original fetch unchanged for all non-zhtp URLs
                     return originalFetch.apply(this, arguments);
                 };
+
+                // Patch history for custom scheme on Android WebView
+                function normalizeHistoryUrl(url) {
+                    if (typeof url !== 'string') return url;
+                    if (url.startsWith('zhtp://')) {
+                        try {
+                            const parsed = new URL(url);
+                            return (parsed.pathname || '/') + (parsed.search || '') + (parsed.hash || '');
+                        } catch (e) {
+                            const withoutScheme = url.replace(/^zhtp:\/\//, '');
+                            const slashIndex = withoutScheme.indexOf('/');
+                            if (slashIndex >= 0) {
+                                return withoutScheme.slice(slashIndex) || '/';
+                            }
+                            return '/';
+                        }
+                    }
+                    return url;
+                }
+
+                if (!window.__web4HistoryPatched) {
+                    const originalPushState = history.pushState;
+                    history.pushState = function(state, title, url) {
+                        const normalized = normalizeHistoryUrl(url);
+                        try {
+                            return originalPushState.call(this, state, title, normalized);
+                        } catch (e) {
+                            return originalPushState.call(this, state, title);
+                        }
+                    };
+
+                    const originalReplaceState = history.replaceState;
+                    history.replaceState = function(state, title, url) {
+                        const normalized = normalizeHistoryUrl(url);
+                        try {
+                            return originalReplaceState.call(this, state, title, normalized);
+                        } catch (e) {
+                            return originalReplaceState.call(this, state, title);
+                        }
+                    };
+                    window.__web4HistoryPatched = true;
+                }
+
+                // Storage shim for opaque/custom scheme origins (avoid DOMException)
+                function makeStorage() {
+                    const store = {};
+                    return {
+                        getItem: (k) => Object.prototype.hasOwnProperty.call(store, k) ? store[k] : null,
+                        setItem: (k, v) => { store[k] = String(v); },
+                        removeItem: (k) => { delete store[k]; },
+                        clear: () => { Object.keys(store).forEach(k => delete store[k]); }
+                    };
+                }
+
+                try {
+                    window.localStorage.setItem('__web4_test__', '1');
+                    window.localStorage.removeItem('__web4_test__');
+                } catch (e) {
+                    Object.defineProperty(window, 'localStorage', { value: makeStorage() });
+                }
+
+                try {
+                    window.sessionStorage.setItem('__web4_test__', '1');
+                    window.sessionStorage.removeItem('__web4_test__');
+                } catch (e) {
+                    Object.defineProperty(window, 'sessionStorage', { value: makeStorage() });
+                }
 
                 console.log('[Web4] Runtime initialized (v1.0)');
             })();
@@ -225,15 +296,27 @@ class Web4ReactWebView(context: Context) : WebView(context) {
     }
 
     private fun applyConfigIfReady() {
-        if (configured) return
         val domain = this.domain ?: return
         val host = this.nodeHost ?: return
         if (nodePort == 0) return
+        val isSameConfig = (configured &&
+            lastConfiguredDomain == domain &&
+            lastConfiguredHost == host &&
+            lastConfiguredPort == nodePort)
+        if (isSameConfig) return
+
+        if (configured && !isSameConfig) {
+            teardownRuntime()
+        }
+
         configured = true
         val baseUrl = "quic://$host:$nodePort"
         val client = Web4Client(baseUrl, timeoutSecs = 30, insecure = true)
         runtime = Web4Runtime(context, cacheLimitMb.toLong() * 1024 * 1024, client)
         loadUrl("zhtp://${domain}/")
+        lastConfiguredDomain = domain
+        lastConfiguredHost = host
+        lastConfiguredPort = nodePort
     }
 
     private fun intercept(uri: Uri): WebResourceResponse? {
@@ -250,13 +333,36 @@ class Web4ReactWebView(context: Context) : WebView(context) {
         return try {
             val resolved = runtime.resolveFile(domain, path) ?: return errorResponse("Not Found", 404)
             val stream = FileInputStream(resolved.file)
-            WebResourceResponse(resolved.mime, "utf-8", stream).apply {
+            val (mime, encoding) = parseMime(resolved.mime)
+            val contentTypeHeader = if (encoding != null) "$mime; charset=$encoding" else mime
+            WebResourceResponse(mime, encoding, stream).apply {
                 setStatusCodeAndReasonPhrase(200, "OK")
+                responseHeaders = mapOf(
+                    "Content-Type" to contentTypeHeader,
+                    "Access-Control-Allow-Origin" to "*",
+                    "Access-Control-Allow-Methods" to "GET, POST, OPTIONS",
+                    "Access-Control-Allow-Headers" to "*",
+                    "Cache-Control" to "public, max-age=31536000"
+                )
             }
         } catch (e: Exception) {
             android.util.Log.e("Web4ReactWebView", "Failed to load $path: ${e.message}")
             errorResponse("Error: ${e.message}", 500)
         }
+    }
+
+    private fun parseMime(rawMime: String): Pair<String, String?> {
+        val parts = rawMime.split(";").map { it.trim() }.filter { it.isNotEmpty() }
+        if (parts.isEmpty()) {
+            return "application/octet-stream" to null
+        }
+        val mime = parts.first()
+        val charset = parts.drop(1)
+            .firstOrNull { it.startsWith("charset=", ignoreCase = true) }
+            ?.substringAfter("=")
+            ?.trim()
+            ?.ifEmpty { null }
+        return mime to charset
     }
 
     private fun handleExternal(uri: Uri): WebResourceResponse? {
@@ -359,5 +465,22 @@ class Web4ReactWebView(context: Context) : WebView(context) {
             </body>
             </html>
         """.trimIndent()
+    }
+
+    private fun teardownRuntime() {
+        runtime = null
+        configured = false
+        lastConfiguredDomain = null
+        lastConfiguredHost = null
+        lastConfiguredPort = null
+        stopLoading()
+        loadUrl("about:blank")
+    }
+
+    override fun onDetachedFromWindow() {
+        super.onDetachedFromWindow()
+        teardownRuntime()
+        fetchExecutor.shutdownNow()
+        destroy()
     }
 }

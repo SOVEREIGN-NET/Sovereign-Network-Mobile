@@ -9,8 +9,19 @@
 export interface DomainRegisterRequest {
   domain: string;
   owner: string;
-  fee_amount: number;
-  content_mappings?: Record<string, string>;
+  fee: number;
+  content_mappings: Record<
+    string,
+    {
+      content: string;
+      content_type: string;
+    }
+  >;
+  metadata?: {
+    title?: string;
+    description?: string;
+    tags?: string[];
+  };
 }
 
 export interface DomainRegisterResponse {
@@ -51,7 +62,7 @@ export interface DomainStatusResponse {
   domain: string;
   available: boolean;
   owner?: string;
-  expires_at?: string;
+  expires_at?: number | string;
   classification: 'commercial' | 'welfare_delegated' | 'reserved_welfare' | 'reserved_meta';
   registrar_fee?: number;
 }

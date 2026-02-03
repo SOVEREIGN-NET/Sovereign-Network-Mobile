@@ -413,6 +413,10 @@ class NativeQuicModule(reactContext: ReactApplicationContext) :
                 if (identityId.isNotEmpty()) {
                     return normalizeIdentityId(identityId)
                 }
+                val did = json.optString("did", "")
+                if (did.isNotEmpty()) {
+                    return normalizeIdentityId(did)
+                }
             } catch (_: Exception) {
             }
         }

@@ -495,41 +495,25 @@ const SIDScreen = ({ navigation }: any) => {
             {ubiData && (
               <View style={{ paddingHorizontal: spacing.sm }}>
                 <Card style={{ marginHorizontal: 0, backgroundColor: colors.success + '15', borderWidth: 1, borderColor: colors.success + '40' }}>
-                  <Row style={{ justifyContent: 'space-between', alignItems: 'flex-start' }}>
-                    <Column gap="xs" style={{ flex: 1 }}>
-                      <Row style={{ alignItems: 'center', gap: spacing.sm }}>
-                        <Text style={{ fontSize: typography.size.xl }}>🌱</Text>
-                        <Text style={{ fontSize: typography.size.base, fontWeight: typography.weight.bold, color: colors.success }}>
-                          Universal Basic Income
-                        </Text>
-                      </Row>
-                      <Text style={{ fontSize: typography.size.xs, color: colors.text_secondary, marginTop: spacing.xs }}>
-                        Daily SOV income deposited to your UBI wallet
+                  <Column gap="xs">
+                    <Row style={{ alignItems: 'center', gap: spacing.sm }}>
+                      <Text style={{ fontSize: typography.size.xl }}>🌱</Text>
+                      <Text style={{ fontSize: typography.size.base, fontWeight: typography.weight.bold, color: colors.success }}>
+                        Universal Basic Income
                       </Text>
-                    </Column>
-                    <Badge label={ubiData.eligible !== false ? 'Active' : 'Pending'} variant={ubiData.eligible !== false ? 'success' : 'warning'} />
-                  </Row>
+                    </Row>
+                    <Row style={{ alignItems: 'center', gap: spacing.sm }}>
+                      <Badge label="Coming soon" variant="info" size="sm" />
+                      <Text style={{ fontSize: typography.size.xs, color: colors.text_secondary }}>
+                        Coming soon
+                      </Text>
+                    </Row>
+                  </Column>
 
                   <View style={{ marginTop: spacing.md, backgroundColor: colors.bg_dark, padding: spacing.sm, borderRadius: borderRadius.sm }}>
-                    <Row style={{ justifyContent: 'space-around' }}>
-                      <Column style={{ alignItems: 'center' }}>
-                        <Text style={{ fontSize: typography.size.lg, fontWeight: typography.weight.bold, color: colors.success }}>
-                          {ubiData.daily_amount || 33}
-                        </Text>
-                        <Text style={{ fontSize: typography.size.xs, color: colors.text_secondary }}>
-                          SOV/day
-                        </Text>
-                      </Column>
-                      <View style={{ width: 1, backgroundColor: colors.border }} />
-                      <Column style={{ alignItems: 'center' }}>
-                        <Text style={{ fontSize: typography.size.lg, fontWeight: typography.weight.bold, color: colors.success }}>
-                          {ubiData.monthly_amount || 1000}
-                        </Text>
-                        <Text style={{ fontSize: typography.size.xs, color: colors.text_secondary }}>
-                          SOV/month
-                        </Text>
-                      </Column>
-                    </Row>
+                    <Text style={{ fontSize: typography.size.xs, color: colors.text_secondary, lineHeight: 16 }}>
+                      UBI is calculated as an equal per-citizen share of 45% of all protocol transaction fees collected during the distribution period.
+                    </Text>
                   </View>
                 </Card>
               </View>

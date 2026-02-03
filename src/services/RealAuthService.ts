@@ -13,6 +13,7 @@
 import { NativeModules, Platform } from 'react-native';
 import { nativeIdentityProvisioning } from './NativeIdentityProvisioning';
 import { walletKeychainService } from './WalletKeychainService';
+import SecureIdentityStorage from './SecureIdentityStorage';
 import { DEFAULT_SOV_NODE_URL, DEFAULT_NODE_HOST, DEFAULT_NODE_PORT, QUIC_CONFIG } from '../config';
 import { isQuicSupported, testQuicConnection } from './QuicClient';
 import { createQuicFetchAdapterSync, FetchAdapter } from './QuicFetchAdapter';
@@ -124,6 +125,27 @@ class RealAuthService {
       console.error('[RealAuthService] createIdentity failed:', error);
       throw error;
     }
+  }
+
+  /**
+   * Check if a username is available (public endpoint)
+   */
+  async checkUsernameAvailability(username: string): Promise<boolean> {
+    const normalized = username.trim();
+    if (!normalized) {
+      throw new Error('Username is required');
+    }
+
+    const encoded = encodeURIComponent(normalized);
+    const url = `quic://${DEFAULT_NODE_HOST}:${DEFAULT_NODE_PORT}/api/v1/identity/username/available/${encoded}`;
+    const response = await this.quicFetch(url, { method: 'GET' });
+
+    if (!response.ok) {
+      throw new Error(`HTTP ${response.status}: Failed to check username availability`);
+    }
+
+    const data = await response.json();
+    return Boolean(data?.available);
   }
 
   /**
@@ -307,18 +329,57 @@ class RealAuthService {
     try {
       console.log('[RealAuthService] recoverWithSeed called');
 
-      const restored = await nativeIdentityProvisioning.restoreIdentityFromPhrase(
-        seedPhrase
-      );
+      const normalized = seedPhrase
+        .toLowerCase()
+        .trim()
+        .split(/\s+/)
+        .filter(Boolean);
 
-      const identityId = restored.did.startsWith('did:zhtp:')
-        ? restored.did.substring('did:zhtp:'.length)
-        : restored.did;
+      if (normalized.length !== 24) {
+        throw new Error('Recovery phrase must be 24 words');
+      }
+
+      const phrase = normalized.join(' ');
+      const url = `quic://${DEFAULT_NODE_HOST}:${DEFAULT_NODE_PORT}/api/v1/identity/recover`;
+      const response = await this.quicFetch(url, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ recovery_phrase: phrase }),
+      });
+
+      const payload = await response.json().catch(() => ({}));
+
+      if (!response.ok) {
+        const message = payload?.message || `HTTP ${response.status}: Recovery failed`;
+        throw new Error(message);
+      }
+
+      if (payload?.session_token) {
+        try {
+          await SecureIdentityStorage.setSessionToken(payload.session_token);
+        } catch (tokenError) {
+          console.warn('[RealAuthService] Failed to store session token:', tokenError);
+        }
+      }
+
+      const restored = await nativeIdentityProvisioning.restoreIdentityFromPhrase(phrase);
+
+      const serverIdentityId = payload?.identity?.identity_id;
+      const didFromServer = payload?.identity?.did;
+      const identityDid = restored?.did || didFromServer;
+      const identityId = identityDid
+        ? identityDid.startsWith('did:zhtp:')
+          ? identityDid.substring('did:zhtp:'.length)
+          : identityDid
+        : serverIdentityId;
+      if (!identityId) {
+        throw new Error('Recovery failed: missing identity id');
+      }
 
       try {
         await nativeIdentityProvisioning.storeProvisionedIdentity(
           identityId,
-          { did: restored.did }
+          { did: identityDid }
         );
       } catch (storeError: any) {
         console.error('[RealAuthService] ⚠️ Keychain storage failed:', storeError);
@@ -331,13 +392,13 @@ class RealAuthService {
       }
 
       const identity: Identity = {
-        did: restored.did,
+        did: identityDid,
         displayName: restored.displayName || 'Recovered Identity',
         identityId,
         identityType: restored.identityType || 'human',
         deviceId: restored.deviceId,
         createdAt: restored.createdAt,
-        masterSeedPhrase: seedPhrase,
+        masterSeedPhrase: phrase,
       };
 
       await this.storeIdentity(identity);

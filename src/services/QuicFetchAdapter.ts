@@ -103,8 +103,9 @@ function createResponseFromQuic(quicResponse: QuicResponse): Response {
     return text;
   };
 
+  const ok = quicResponse.status >= 200 && quicResponse.status < 300;
   const response = {
-    ok: quicResponse.ok,
+    ok,
     status: quicResponse.status,
     statusText: quicResponse.statusText,
     headers,
@@ -168,6 +169,8 @@ const PUBLIC_ENDPOINTS: PublicEndpointRule[] = [
   { method: 'GET', path: '/api/v1/protocol/info' },
   { method: 'GET', path: '/api/v1/blockchain/balance/:address' },
   { method: 'GET', path: '/api/v1/web4/domains/status/:domain' },
+  { method: 'GET', path: '/api/v1/identity/username/available/:username' },
+  { method: 'POST', path: '/api/v1/identity/recover' },
 ];
 
 /**

@@ -120,6 +120,7 @@ const translations = {
       createNew: 'Create New Identity',
       validation: {
         seedRequired: 'Seed phrase is required',
+        seedInvalid: 'Recovery phrase must be 24 words',
         backupRequired: 'Backup file is required',
         backupPasswordRequired: 'Backup password is required',
         guardianCodeRequired: 'Guardian code is required',
@@ -130,9 +131,9 @@ const translations = {
       },
       seed: {
         label: 'Seed Phrase',
-        description: 'Recover using your 24-word seed phrase',
-        title: 'Enter Seed Phrase',
-        placeholder: 'Enter your 24-word seed phrase separated by spaces',
+        description: 'Recover using your 24-word recovery phrase',
+        title: 'Enter Recovery Phrase',
+        placeholder: 'Enter your 24-word recovery phrase separated by spaces',
         hint: 'Your seed phrase is case-insensitive',
         securityTitle: 'Security Warning',
         securityWarning: 'Never share your seed phrase with anyone',

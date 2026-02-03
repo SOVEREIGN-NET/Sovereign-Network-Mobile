@@ -1002,6 +1002,34 @@ class NativeIdentityProvisioning: NSObject {
         self.signDomainTransaction("domain_update", params: params, resolve: resolve, reject: reject)
     }
 
+    // MARK: - Generic Message Signing (Dilithium)
+
+    /// Sign an arbitrary message and return hex signature
+    @objc
+    func signMessage(
+        _ message: String,
+        resolve: @escaping RCTPromiseResolveBlock,
+        reject: @escaping RCTPromiseRejectBlock
+    ) {
+        queue.async { [weak self] in
+            _ = self
+            do {
+                guard let identityAny = IdentityHandleStore.shared.getLatestIdentity(),
+                      let identity = identityAny as? Identity else {
+                    reject("NO_IDENTITY", "No active identity for signing", nil)
+                    return
+                }
+
+                let data = Data(message.utf8)
+                let signature = try ZhtpClient.signData(data, using: identity)
+                let hex = signature.map { String(format: "%02x", $0) }.joined()
+                resolve(["signature": hex])
+            } catch {
+                reject("SIGNING_ERROR", "Failed to sign message: \(error)", nil)
+            }
+        }
+    }
+
     // MARK: - Module Configuration
 
     @objc

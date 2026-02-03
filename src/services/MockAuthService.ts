@@ -295,7 +295,7 @@ class MockAuthService {
 
   /**
    * Simulate recovering identity with seed phrase
-   * @param seedPhrase - 24-word seed
+   * @param seedPhrase - 24-word recovery phrase
    * @returns Recovered identity
    */
   async recoverWithSeed(seedPhrase: string): Promise<Identity> {
@@ -307,7 +307,7 @@ class MockAuthService {
 
     const words = seedPhrase.trim().split(/\s+/);
     if (words.length !== 24) {
-      throw new Error('Seed phrase must be exactly 24 words');
+      throw new Error('Recovery phrase must be 24 words');
     }
 
     // Mock recovery - use first word to map to a demo identity

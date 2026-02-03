@@ -108,6 +108,7 @@ export interface AuthContextType {
   error: string | null;
   signIn: (identity_id: string, password: string) => Promise<Identity>;
   createIdentity: (data: CreateIdentityData) => Promise<Identity>;
+  checkUsernameAvailability: (username: string) => Promise<boolean>;
   recoverIdentity: (method: string, data: string) => Promise<Identity>;
   signOut: () => Promise<void>;
   clearError: () => void;
@@ -287,6 +288,16 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
     } finally {
       setIsLoading(false);
     }
+  }, []);
+
+  /**
+   * Check if a username is available
+   */
+  const checkUsernameAvailability = useCallback(async (username: string): Promise<boolean> => {
+    if (getUseMockService()) {
+      return MockAuthService.checkUsernameAvailability(username);
+    }
+    return RealAuthService.checkUsernameAvailability(username);
   }, []);
 
   /**
@@ -567,14 +578,12 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
   }, []);
 
   const getMasterSeedPhrase = useCallback(async (): Promise<string | null> => {
-    if (!currentIdentity?.identityId) {
-      console.warn('[AuthContext] Cannot retrieve master seed - no current identity');
-      return null;
-    }
     try {
-      const stored = await walletKeychainService.retrieveMasterSeedPhrase(currentIdentity.identityId);
-      if (stored) {
-        return stored;
+      if (currentIdentity?.identityId) {
+        const stored = await walletKeychainService.retrieveMasterSeedPhrase(currentIdentity.identityId);
+        if (stored) {
+          return stored;
+        }
       }
       const vault = await SeedVaultService.getSeedPhraseWithBiometric();
       return vault ? vault.join(' ') : null;
@@ -592,6 +601,7 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
     error,
     signIn,
     createIdentity,
+    checkUsernameAvailability,
     recoverIdentity,
     signOut,
     clearError,
@@ -603,7 +613,7 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
     isBiometricAvailable,
     getBiometryType,
     getMasterSeedPhrase,
-  }), [currentIdentity, isLoading, isBootstrapping, error, signIn, createIdentity, recoverIdentity, signOut, clearError, updateProfile, updatePassphrase, updateBiometric, setIdentity, loadIdentityOnDemand, isBiometricAvailable, getBiometryType, getMasterSeedPhrase]);
+  }), [currentIdentity, isLoading, isBootstrapping, error, signIn, createIdentity, checkUsernameAvailability, recoverIdentity, signOut, clearError, updateProfile, updatePassphrase, updateBiometric, setIdentity, loadIdentityOnDemand, isBiometricAvailable, getBiometryType, getMasterSeedPhrase]);
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
 };

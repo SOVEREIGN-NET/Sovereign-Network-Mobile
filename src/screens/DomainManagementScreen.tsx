@@ -49,13 +49,27 @@ const DomainManagementScreen = ({ navigation }: any) => {
       const domainsWithStatus: DomainWithStatus[] = await Promise.all(
         storedDomains.map(async (domain: StoredDomain) => {
           try {
-            const expiryDate = new Date(domain.expires_at);
+            const status = await domainService.getDomainStatus(domain.domain).catch(() => null);
+            const expiresAt = status?.expires_at ?? domain.expires_at;
+            const expiryDate = typeof expiresAt === 'number'
+              ? new Date(expiresAt * 1000)
+              : expiresAt
+              ? new Date(expiresAt)
+              : null;
+            const expiryTime = expiryDate ? expiryDate.getTime() : NaN;
+            if (!Number.isFinite(expiryTime)) {
+              return {
+                ...domain,
+                status: 'unknown',
+              };
+            }
             const now = new Date();
-            const isExpired = now > expiryDate;
-            const daysUntilExpiry = Math.ceil((expiryDate.getTime() - now.getTime()) / (1000 * 60 * 60 * 24));
+            const isExpired = now.getTime() > expiryTime;
+            const daysUntilExpiry = Math.ceil((expiryTime - now.getTime()) / (1000 * 60 * 60 * 24));
 
             return {
               ...domain,
+              expires_at: expiryDate?.toISOString() || domain.expires_at,
               status: isExpired ? 'expired' : 'active',
               daysUntilExpiry: Math.max(0, daysUntilExpiry),
             };
@@ -286,7 +300,9 @@ const DomainManagementScreen = ({ navigation }: any) => {
                               color: colors.success,
                             }}
                           >
-                            {domain.daysUntilExpiry} days left
+                            {Number.isFinite(domain.daysUntilExpiry ?? NaN)
+                              ? `${domain.daysUntilExpiry} days left`
+                              : 'Days left: —'}
                           </Text>
                           <Text
                             style={{
