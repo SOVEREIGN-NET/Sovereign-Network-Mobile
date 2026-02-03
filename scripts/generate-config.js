@@ -66,12 +66,14 @@ function parseNodeUrl(url) {
 const envConfig = parseEnv(envPath);
 const nodeUrl = envConfig.ZHTP_NODE_URL || 'http://77.42.37.161:9334';
 const { host: nodeHost, port: nodePort } = parseNodeUrl(nodeUrl);
+const certificatePin = envConfig.CERTIFICATE_PIN || 'd21aa1f13cea799f96588a274c210c6de46786f098dc321477d8e04b7d87e058'; // Default testnet pin
 
 // 1. Generate JSON config for React Native
 const generatedConfig = {
   ZHTP_NODE_URL: nodeUrl,
   ZHTP_NODE_HOST: nodeHost,
   ZHTP_NODE_PORT: nodePort,
+  CERTIFICATE_PIN: certificatePin,
 };
 
 fs.writeFileSync(
@@ -84,6 +86,7 @@ console.log(`✓ Generated React Native config at ${generatedJsonPath}`);
 console.log(`  ZHTP_NODE_URL: ${generatedConfig.ZHTP_NODE_URL}`);
 console.log(`  ZHTP_NODE_HOST: ${generatedConfig.ZHTP_NODE_HOST}`);
 console.log(`  ZHTP_NODE_PORT: ${generatedConfig.ZHTP_NODE_PORT}`);
+console.log(`  CERTIFICATE_PIN: ${certificatePin}`);
 
 // 2. Generate iOS Swift config
 const iosConfig = `import Foundation
@@ -107,7 +110,7 @@ struct GeneratedConfig {
 
     // SPKI Pin (this should match your server certificate)
     // This is used for certificate pinning in QUIC connections
-    static let quinnSpkiPinHex = "d21aa1f13cea799f96588a274c210c6de46786f098dc321477d8e04b7d87e058"
+    static let quinnSpkiPinHex = "${certificatePin}"
 }
 `;
 
@@ -142,7 +145,7 @@ object GeneratedConfig {
 
     // SPKI Pin (this should match your server certificate)
     // This is used for certificate pinning in QUIC connections
-    const val QUINN_SPKI_PIN_HEX = "d21aa1f13cea799f96588a274c210c6de46786f098dc321477d8e04b7d87e058"
+    const val QUINN_SPKI_PIN_HEX = "${certificatePin}"
 }
 `;
 

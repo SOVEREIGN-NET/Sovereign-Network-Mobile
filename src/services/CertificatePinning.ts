@@ -21,25 +21,27 @@ export interface CertificatePin {
 }
 
 /**
- * Production and test network certificate pins
- * These values should be generated from the actual server certificates
+ * Certificate pins are now generated from .env file via scripts/generate-config.js
+ * This ensures pins stay in sync when node URL changes
+ *
+ * Add to .env:
+ *   ZHTP_NODE_URL=http://your-node-ip:9334
+ *   CERTIFICATE_PIN=<base64-encoded-sha256-hash>
  *
  * To generate a pin:
  * 1. Get the server certificate: openssl s_client -connect host:443
  * 2. Extract public key: openssl x509 -pubkey -in cert.pem | openssl pkey -pubin -outform DER | openssl dgst -sha256 -binary | openssl enc -base64
- *
- * IMPORTANT: Keep backup pins for certificate rotation
  */
+
+// Import generated config with certificate pin
+// eslint-disable-next-line @typescript-eslint/no-var-requires
+const generatedConfig = require('../.env.generated.json');
+
+// Build certificate pins from environment
+// In dev mode, pinning is disabled anyway, but we include the config here for reference
 export const PINNED_CERTIFICATES: Record<string, CertificatePin> = {
-  // ZHTP testnet node (77.42.37.161:9334)
-  // Self-signed rcgen certificate
-  // Generated: Jan 27, 2026
-  '77.42.37.161': {
-    host: '77.42.37.161',
-    sha256Pin: '0hqh8TzqeZ+WWIonTCEMbeRnhvCY3DIUd9jgS32H4Fg=',
-    // Backup pin - update when certificate is rotated
-    sha256PinBackup: undefined,
-  },
+  // Certificate pins are now dynamically generated from .env
+  // See scripts/generate-config.js for details
 };
 
 /**

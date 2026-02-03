@@ -40,11 +40,11 @@ export function useNodeConnectionStatus(
         return;
       }
 
-      // Use cheap UDP reachability check instead of full PQC handshake
+      // Use QUIC connection test (full PQC handshake works)
       setConnectionStatus('checking');
-      const result = await QuicClient.checkReachability(DEFAULT_NODE_HOST, DEFAULT_NODE_PORT);
+      const result = await QuicClient.testConnection(DEFAULT_NODE_HOST, DEFAULT_NODE_PORT);
 
-      if (result.reachable) {
+      if (result.success) {
         setConnectionStatus('connected');
         setLatencyMs(result.latencyMs ? Math.round(result.latencyMs) : null);
       } else {
