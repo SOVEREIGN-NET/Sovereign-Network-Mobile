@@ -147,7 +147,7 @@ class NativeIdentityProvisioningBridge {
    */
   async signDomainRegisterTransaction(params: {
     domain: string;
-    durationDays: number;
+    contentCid?: string | null;
   }): Promise<{ signed_tx: string }> {
     if (!this.nativeModule) {
       throw new Error('NativeIdentityProvisioning not available on this platform');

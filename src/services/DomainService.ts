@@ -95,21 +95,25 @@ class DomainService {
       console.log('[DomainService] Registering domain:', request.domain);
       console.log('[DomainService] Signing domain register transaction with Dilithium keypair');
 
+      // Sign transaction (duration is handled at API level, not encoded in tx)
       const signingResult = await nativeIdentityProvisioning.signDomainRegisterTransaction({
         domain: request.domain,
-        durationDays: request.duration_days,
+        contentCid: undefined, // Optional content CID for initial registration
       });
 
       const signedTx = signingResult.signed_tx;
       console.log('[DomainService] Transaction signed, hex length:', signedTx.length);
 
-      // Send signed transaction to API
+      // Send signed transaction + duration to API
       const response = await this.quicFetch(
         `${this.nodeUrl}/api/v1/web4/domains/register`,
         {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ signed_tx: signedTx }),
+          body: JSON.stringify({
+            signed_tx: signedTx,
+            duration_days: request.duration_days, // Duration sent as separate parameter
+          }),
         }
       );
 
