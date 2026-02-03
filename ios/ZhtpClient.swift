@@ -129,7 +129,7 @@ private func cBuildTokenBurn(
 private func cBuildDomainRegister(
     _ handle: UnsafePointer<UInt8>?,
     _ domain: UnsafePointer<CChar>?,
-    _ durationDays: UInt32,
+    _ contentCid: UnsafePointer<CChar>?,
     _ chainId: UInt8
 ) -> UnsafeMutablePointer<CChar>?
 
@@ -139,6 +139,15 @@ private func cBuildDomainUpdate(
     _ handle: UnsafePointer<UInt8>?,
     _ domain: UnsafePointer<CChar>?,
     _ contentCid: UnsafePointer<CChar>?,
+    _ chainId: UInt8
+) -> UnsafeMutablePointer<CChar>?
+
+/// Build signed domain transfer transaction
+@_silgen_name("zhtp_client_build_domain_transfer")
+private func cBuildDomainTransfer(
+    _ handle: UnsafePointer<UInt8>?,
+    _ domain: UnsafePointer<CChar>?,
+    _ toPubkey: UnsafePointer<UInt8>?,
     _ chainId: UInt8
 ) -> UnsafeMutablePointer<CChar>?
 
@@ -449,22 +458,39 @@ public class ZhtpClient {
     /// Build signed domain registration transaction (returns hex-encoded string ready for API)
     public static func buildDomainRegister(
         domain: String,
-        durationDays: UInt32,
+        contentCid: String? = nil,
         using identity: Identity,
         chainId: UInt8 = 0x02  // testnet
     ) throws -> String {
-        guard let hexPtr = domain.withCString({ domainPtr in
-            cBuildDomainRegister(
-                identity.getHandle().assumingMemoryBound(to: UInt8.self),
-                domainPtr,
-                durationDays,
-                chainId
-            )
-        }) else {
+        let hexPtr: UnsafeMutablePointer<CChar>?
+
+        if let cid = contentCid {
+            hexPtr = domain.withCString { domainPtr in
+                cid.withCString { cidPtr in
+                    cBuildDomainRegister(
+                        identity.getHandle().assumingMemoryBound(to: UInt8.self),
+                        domainPtr,
+                        cidPtr,
+                        chainId
+                    )
+                }
+            }
+        } else {
+            hexPtr = domain.withCString { domainPtr in
+                cBuildDomainRegister(
+                    identity.getHandle().assumingMemoryBound(to: UInt8.self),
+                    domainPtr,
+                    nil,
+                    chainId
+                )
+            }
+        }
+
+        guard let ptr = hexPtr else {
             throw ClientError.signingError("Failed to build domain register transaction")
         }
-        defer { cFreeString(hexPtr) }
-        return String(cString: hexPtr)
+        defer { cFreeString(ptr) }
+        return String(cString: ptr)
     }
 
     /// Build signed domain update transaction (returns hex-encoded string ready for API)
@@ -485,6 +511,27 @@ public class ZhtpClient {
             }
         }) else {
             throw ClientError.signingError("Failed to build domain update transaction")
+        }
+        defer { cFreeString(hexPtr) }
+        return String(cString: hexPtr)
+    }
+
+    /// Build signed domain transfer transaction (returns hex-encoded string ready for API)
+    public static func buildDomainTransfer(
+        domain: String,
+        toPubkey: [UInt8],
+        using identity: Identity,
+        chainId: UInt8 = 0x02  // testnet
+    ) throws -> String {
+        guard let hexPtr = domain.withCString({ domainPtr in
+            cBuildDomainTransfer(
+                identity.getHandle().assumingMemoryBound(to: UInt8.self),
+                domainPtr,
+                toPubkey,
+                chainId
+            )
+        }) else {
+            throw ClientError.signingError("Failed to build domain transfer transaction")
         }
         defer { cFreeString(hexPtr) }
         return String(cString: hexPtr)

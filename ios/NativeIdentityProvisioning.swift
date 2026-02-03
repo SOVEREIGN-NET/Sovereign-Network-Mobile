@@ -843,14 +843,14 @@ class NativeIdentityProvisioning: NSObject {
 
                 switch txType {
                 case "domain_register":
-                    guard let domain = params["domain"] as? String,
-                          let durationDays = params["durationDays"] as? NSNumber else {
-                        reject("INVALID_PARAMS", "Missing domain register parameters", nil)
+                    guard let domain = params["domain"] as? String else {
+                        reject("INVALID_PARAMS", "Missing domain parameter", nil)
                         return
                     }
+                    let contentCid = params["contentCid"] as? String
                     hexSignedTx = try ZhtpClient.buildDomainRegister(
                         domain: domain,
-                        durationDays: UInt32(durationDays.uint32Value),
+                        contentCid: contentCid,
                         using: identity,
                         chainId: 0x02
                     )

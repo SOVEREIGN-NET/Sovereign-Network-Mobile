@@ -458,7 +458,7 @@ class NativeIdentityProvisioning(reactContext: ReactApplicationContext) :
     private external fun nativeBuildDomainRegister(
         identityJson: String,
         domain: String,
-        durationDays: Int,
+        contentCid: String?,
         chainId: Int
     ): String?
 
@@ -469,12 +469,19 @@ class NativeIdentityProvisioning(reactContext: ReactApplicationContext) :
         chainId: Int
     ): String?
 
+    private external fun nativeBuildDomainTransfer(
+        identityJson: String,
+        domain: String,
+        toPubkeyJson: String,
+        chainId: Int
+    ): String?
+
     @ReactMethod
     fun signDomainRegisterTransaction(params: ReadableMap, promise: Promise) {
         executor.execute {
             try {
                 val domain = params.getString("domain") ?: ""
-                val durationDays = params.getInt("durationDays")
+                val contentCid = params.getString("contentCid")
 
                 if (domain.isEmpty()) {
                     promise.reject("INVALID_PARAMS", "domain parameter is required")
@@ -487,13 +494,13 @@ class NativeIdentityProvisioning(reactContext: ReactApplicationContext) :
                     return@execute
                 }
 
-                Log.d(TAG, "Building domain register transaction: $domain for $durationDays days")
+                Log.d(TAG, "Building domain register transaction: $domain")
 
                 // Use lib-client JNI to build and sign the full transaction
                 val hexSignedTx = nativeBuildDomainRegister(
                     identity.identityJson,
                     domain,
-                    durationDays,
+                    contentCid,
                     0x02  // testnet
                 )
 
