@@ -1,14 +1,29 @@
 import Foundation
-import Network
-import Security
 import React
 import Dispatch
-import CryptoKit
 
 /**
  * Native QUIC Module for iOS
- * Implements pure QUIC transport using Apple's Network.framework (iOS 15+)
+ * Implements pure QUIC transport using Rust Quinn FFI (no Network.framework)
  * Provides HTTP-like request/response semantics over QUIC streams
+ *
+ * ALPN ROUTING (DO NOT DRIFT):
+ * - PUBLIC (read-only, no auth) → zhtp-public/1 (no UHP handshake)
+ *   Examples:
+ *     GET /api/v1/web4/domains/status/{domain}
+ *     GET /api/v1/blockchain/balance/{address}
+ *     GET /api/v1/protocol/info
+ *     GET /health
+ * - AUTHENTICATED (write / identity / proof) → zhtp-uhp/2 (UHP handshake required)
+ *   Examples:
+ *     POST /api/v1/identity/register
+ *     POST /api/v1/web4/domains/register
+ *     POST /api/v1/blockchain/transaction
+ *     POST /api/v1/wallet/\\*
+ *
+ * Rule of thumb:
+ * - Reading public data → zhtp-public/1
+ * - Writing anything or proving identity → zhtp-uhp/2
  */
 @objc(NativeQuic)
 class NativeQuic: NSObject {
@@ -16,8 +31,6 @@ class NativeQuic: NSObject {
   // MARK: - Properties
 
   private let queue = DispatchQueue(label: "com.sovereignnetwork.quic", qos: .userInitiated)
-  private var activeConnections: [String: NWConnection] = [:]
-  private var activeChannelBindings: [String: Data] = [:]
   private let connectionLock = NSLock()
   private var quinnRequestQueue: [String: [QuinnQueuedRequest]] = [:]
   private var quinnHandshakeInProgress: Set<String> = []
@@ -28,6 +41,17 @@ class NativeQuic: NSObject {
       self.session = session
     }
   }
+  private struct QuinnHandshakeSession {
+    let sessionKey: Data
+    let sessionId: Data
+    let handshakeHash: Data
+    let peerDid: String
+    let clientDid: String
+  }
+  private struct QuinnHandshakeResult {
+    let handle: UInt64
+    let session: QuinnHandshakeSession
+  }
 
   // Default configuration
   // These values are loaded from GeneratedConfig.swift which is generated from .env file
@@ -37,13 +61,14 @@ class NativeQuic: NSObject {
   private let quinnControlPlanePort = GeneratedConfig.quinnControlPlanePort
   private let quinnControlPlaneServerName = GeneratedConfig.quinnControlPlaneServerName
   private let quinnSpkiPinHex = GeneratedConfig.quinnSpkiPinHex
+  private let alpnPublic = "zhtp-public/1"
+  private let alpnAuthenticated = "zhtp-uhp/2"
 
   // ALPN profiles
   enum QuicAlpnProfile {
     case publicContent   // zhtp-public/1
     case controlPlane    // zhtp-uhp/2
   }
-  private typealias SafeComplete = (Bool, Any?, String?, Error?) -> Void
   private struct QuinnQueuedRequest {
     let parsedUrl: (host: String, port: Int, path: String)
     let method: String
@@ -78,95 +103,42 @@ class NativeQuic: NSObject {
     }
 
     let startTime = Date()
-    let parameters = createQuicParameters(insecure: true, serverName: nil, profile: .controlPlane)
 
-    let endpoint = NWEndpoint.hostPort(
-      host: NWEndpoint.Host(host),
-      port: NWEndpoint.Port(integerLiteral: UInt16(port))
-    )
+    guard let spkiPin = dataFromHex(quinnSpkiPinHex), spkiPin.count == 32 else {
+      reject("QUIC_ERROR", "Invalid SPKI pin configuration", nil)
+      return
+    }
 
-    let connection = NWConnection(to: endpoint, using: parameters)
-    var hasResolved = false
-    let resolveLock = NSLock()
+    let serverName = quinnControlPlaneServerName.isEmpty ? host : quinnControlPlaneServerName
+    var handle: UInt64 = 0
 
-    // Helper to safely resolve/reject only once and cleanup
-    func safeComplete(success: Bool, result: Any?, error: String? = nil, nativeError: Error? = nil) {
-      resolveLock.lock()
-      defer { resolveLock.unlock() }
-      guard !hasResolved else { return }
-      hasResolved = true
-      connection.stateUpdateHandler = nil
-      connection.cancel()
-
-      if success, let res = result {
-        resolve(res)
-      } else {
-        reject("QUIC_ERROR", error ?? "Unknown error", nativeError)
+    let rc = host.withCString { hostPtr in
+      serverName.withCString { serverNamePtr in
+        spkiPin.withUnsafeBytes { spkiBuf -> Int32 in
+          guard let spkiPtr = spkiBuf.baseAddress?.assumingMemoryBound(to: UInt8.self) else {
+            return -1
+          }
+          return uhp_quic_connect_public(hostPtr, UInt16(port), serverNamePtr, spkiPtr, &handle)
+        }
       }
     }
 
-    print("[NativeQuic] 🔍 QUIC Connection Debug:")
-    print("[NativeQuic]   Host: \(host)")
-    print("[NativeQuic]   Port: \(port)")
-    print("[NativeQuic]   Endpoint: \(endpoint)")
-
-    // Monitor network path changes
-    connection.pathUpdateHandler = { path in
-      print("[NativeQuic] 📡 Path Update:")
-      print("[NativeQuic]    Status: \(path.status)")
-      print("[NativeQuic]    IsExpensive: \(path.isExpensive)")
-      print("[NativeQuic]    IsConstrained: \(path.isConstrained)")
-      print("[NativeQuic]    SupportsIPv4: \(path.supportsIPv4)")
-      print("[NativeQuic]    SupportsIPv6: \(path.supportsIPv6)")
-      print("[NativeQuic]    AvailableInterfaces: \(path.availableInterfaces)")
+    if rc != 0 {
+      let message = uhp_quinn_last_error_message().flatMap { String(cString: $0) } ?? "unknown error"
+      reject("QUIC_ERROR", "Public QUIC connect failed: \(message)", nil)
+      return
     }
 
-    connection.stateUpdateHandler = { state in
-      print("[NativeQuic] ➡️  State: \(state)")
+    uhp_quic_close(handle)
 
-      switch state {
-      case .setup:
-        print("[NativeQuic]    └─ Preparing connection setup...")
-
-      case .preparing:
-        print("[NativeQuic]    └─ Starting TLS 1.3 + QUIC handshake...")
-        print("[NativeQuic]       This is where QUIC Initial packets should be sent")
-
-      case .ready:
-        let latency = Date().timeIntervalSince(startTime) * 1000
-        print("[NativeQuic]    └─ ✅ Connection READY after \(latency)ms")
-        safeComplete(success: true, result: [
-          "success": true,
-          "latencyMs": latency,
-          "protocol": "QUIC",
-          "host": host,
-          "port": port
-        ])
-
-      case .waiting(let error):
-        print("[NativeQuic]    └─ ⏳ Waiting: \(error.localizedDescription)")
-        print("[NativeQuic]       (Connection temporarily blocked, will retry)")
-
-      case .failed(let error):
-        print("[NativeQuic]    └─ ❌ FAILED: \(error.localizedDescription)")
-        safeComplete(success: false, result: nil, error: "QUIC handshake failed: \(error.localizedDescription)", nativeError: error)
-
-      case .cancelled:
-        print("[NativeQuic]    └─ Connection was cancelled")
-
-      @unknown default:
-        print("[NativeQuic]    └─ Unknown state: \(state)")
-      }
-    }
-
-    print("[NativeQuic] 🚀 Starting connection on queue: \(self.queue)")
-    connection.start(queue: self.queue)
-    print("[NativeQuic] ⏱️  Timeout set to \(defaultTimeout)s - waiting for handshake...")
-
-    // Timeout after 30 seconds
-    self.queue.asyncAfter(deadline: .now() + defaultTimeout) {
-      safeComplete(success: false, result: nil, error: "Connection timed out after \(self.defaultTimeout) seconds")
-    }
+    let latency = Date().timeIntervalSince(startTime) * 1000
+    resolve([
+      "success": true,
+      "latencyMs": latency,
+      "protocol": "QUIC",
+      "host": host,
+      "port": port
+    ])
   }
 
   /**
@@ -199,7 +171,7 @@ class NativeQuic: NSObject {
     print("[NativeQuic] 🔑 ALPN: '\(alpnOption)' -> \(profile == .publicContent ? "zhtp-public/1" : "zhtp-uhp/2")")
 
     if profile == .controlPlane {
-      print("[NativeQuic] ✅ Quinn control-plane path selected (bypassing Network.framework)")
+      print("[NativeQuic] ✅ Quinn control-plane path selected")
       handleQuinnControlPlaneRequest(
         parsedUrl: parsedUrl,
         method: method,
@@ -208,154 +180,16 @@ class NativeQuic: NSObject {
         resolve: resolve,
         reject: reject
       )
-      return
-    }
-
-    // Determine server name for TLS
-    // TLS SNI requires a hostname, not an IP address
-    var serverNameForTls: String? = headers["Host"]
-
-    // If no explicit Host header, check if parsedUrl.host is a hostname or IP
-    if serverNameForTls == nil {
-      let hostValue = parsedUrl.host
-      // Check if it looks like an IP address (simplified check)
-      let isIPAddress = hostValue.contains(".") && hostValue.allSatisfy { $0.isNumber || $0 == "." }
-      if !isIPAddress {
-        serverNameForTls = hostValue
-      }
-      // If it IS an IP address, leave serverNameForTls as nil (no SNI for IPs)
-    }
-
-    print("[NativeQuic] TLS Server Name for SNI: \(serverNameForTls ?? "(no SNI - IP-based connection)")")
-
-    let parameters = createQuicParameters(
-      insecure: insecure,
-      serverName: serverNameForTls,
-      profile: profile
-    )
-
-    let endpoint = NWEndpoint.hostPort(
-      host: NWEndpoint.Host(parsedUrl.host),
-      port: NWEndpoint.Port(integerLiteral: UInt16(parsedUrl.port))
-    )
-
-    print("[NativeQuic] 🔗 Creating NWConnectionGroup for RFC 9000 bidirectional streams...")
-
-    // Create multiplexed group - this creates the QUIC connection
-    let descriptor = NWMultiplexGroup(to: endpoint)
-    let group = NWConnectionGroup(with: descriptor, using: parameters)
-    let connectionId = UUID().uuidString
-
-    var hasResolved = false
-    let resolveLock = NSLock()
-    var groupReady = false
-
-    let doSafeComplete: SafeComplete = { success, result, error, nativeError in
-      resolveLock.lock()
-      defer { resolveLock.unlock() }
-      guard !hasResolved else { return }
-      hasResolved = true
-
-      self.cleanupConnection(connectionId)
-
-      if success, let res = result {
-        resolve(res)
-      } else {
-        reject("QUIC_ERROR", error ?? "Unknown error", nativeError)
-      }
-    }
-
-    // Handle group state - wait for ready, then create explicit stream
-    group.stateUpdateHandler = { [weak self] state in
-      print("[NativeQuic] 🔗 Group State: \(state)")
-      switch state {
-      case .ready:
-        resolveLock.lock()
-        if groupReady {
-          resolveLock.unlock()
-          return
-        }
-        groupReady = true
-        resolveLock.unlock()
-
-        print("[NativeQuic] 📱 Group ready, creating explicit bidirectional stream...")
-
-        // Create explicit stream from group - this matches Quinn's accept_bi() expectation
-        guard let streamConnection = NWConnection(from: group) else {
-          doSafeComplete(false, nil, "Failed to create stream from group", nil)
-          return
-        }
-
-        if let binding = self?.exportQuicChannelBinding(from: group) {
-          self?.connectionLock.lock()
-          self?.activeChannelBindings[connectionId] = binding
-          self?.connectionLock.unlock()
-          let digest = SHA256.hash(data: binding)
-          let hashPrefix = digest.prefix(8).map { String(format: "%02x", $0) }.joined()
-          let hexPrefix = binding.prefix(8).map { String(format: "%02x", $0) }.joined()
-          print("[NativeQuic] 🔐 Stored QUIC channel binding: sha256[0..8]=\(hashPrefix), hex[0..8]=\(hexPrefix)")
-        } else {
-          doSafeComplete(false, nil, "Failed to export QUIC channel binding", nil)
-          return
-        }
-
-        // Store stream connection
-        self?.connectionLock.lock()
-        self?.activeConnections[connectionId] = streamConnection
-        self?.connectionLock.unlock()
-
-        print("[NativeQuic] 📡 Stream created, waiting for stream ready state...")
-
-        // Handle stream state
-        streamConnection.stateUpdateHandler = { [weak self] streamState in
-          print("[NativeQuic] 📡 Stream State: \(streamState)")
-          self?.handleRequestState(
-            streamState,
-            connection: streamConnection,
-            connectionId: connectionId,
-            profile: profile,
-            parsedUrl: parsedUrl,
-            method: method,
-            headers: headers,
-            body: body,
-            doSafeComplete: doSafeComplete
-          )
-        }
-
-        // Start the stream
-        let streamQueue = self?.queue ?? DispatchQueue.global(qos: .userInitiated)
-        streamConnection.start(queue: streamQueue)
-
-      case .failed(let error):
-        resolveLock.lock()
-        defer { resolveLock.unlock() }
-        guard !hasResolved else { return }
-        hasResolved = true
-        doSafeComplete(false, nil, "Group failed: \(error.localizedDescription)", error)
-
-      case .cancelled:
-        resolveLock.lock()
-        defer { resolveLock.unlock() }
-        guard !hasResolved else { return }
-        hasResolved = true
-        doSafeComplete(false, nil, "Group cancelled", nil)
-
-      @unknown default:
-        break
-      }
-    }
-
-    // Set receive handler (required for group to start)
-    group.setReceiveHandler(handler: { message, content, isComplete in
-      print("[NativeQuic] 📥 Group received: \(content?.count ?? 0) bytes, complete=\(isComplete)")
-    })
-
-    print("[NativeQuic] 🚀 Starting group on queue...")
-    group.start(queue: queue)
-
-    // Timeout handler
-    queue.asyncAfter(deadline: .now() + timeout) {
-      doSafeComplete(false, nil, "Request timed out after \(timeout) seconds", nil)
+    } else {
+      print("[NativeQuic] ✅ Quinn public path selected")
+      handleQuinnPublicRequest(
+        parsedUrl: parsedUrl,
+        method: method,
+        headers: headers,
+        body: body,
+        resolve: resolve,
+        reject: reject
+      )
     }
   }
 
@@ -395,6 +229,36 @@ class NativeQuic: NSObject {
     )
   }
 
+  private func handleQuinnPublicRequest(
+    parsedUrl: (host: String, port: Int, path: String),
+    method: String,
+    headers: [String: String],
+    body: String?,
+    resolve: @escaping RCTPromiseResolveBlock,
+    reject: @escaping RCTPromiseRejectBlock
+  ) {
+    do {
+      let requestBody = body?.data(using: .utf8)
+      let response = try quinnPublicRequest(
+        parsedUrl: parsedUrl,
+        method: method,
+        headers: headers,
+        body: requestBody
+      )
+
+      let bodyString = String(data: response.body, encoding: .utf8) ?? ""
+      resolve([
+        "status": response.status,
+        "statusText": response.statusText,
+        "headers": response.headers,
+        "body": bodyString,
+        "ok": response.status >= 200 && response.status < 300
+      ])
+    } catch {
+      reject("QUIC_ERROR", error.localizedDescription, error)
+    }
+  }
+
   private func enqueueQuinnRequest(
     identityId: String,
     parsedUrl: (host: String, port: Int, path: String),
@@ -426,13 +290,12 @@ class NativeQuic: NSObject {
     guard shouldStart else { return }
 
     DispatchQueue.global(qos: .userInitiated).async {
-      let handshakeResult = performUhpHandshakeQuinnFfiWithHandle(
+      let handshakeResult = self.performQuinnHandshakeWithHandle(
         host: self.quinnControlPlaneHost,
-        port: self.quinnControlPlanePort,
+        port: Int(self.quinnControlPlanePort),
         serverName: self.quinnControlPlaneServerName,
         spkiPin: spkiPin,
         identityId: identityId,
-        identity: nil,
         chainId: 0
       )
 
@@ -550,134 +413,245 @@ class NativeQuic: NSObject {
     return buffer.isEmpty ? data : nil
   }
 
-  private func handleRequestState(
-    _ state: NWConnection.State,
-    connection: NWConnection,
-    connectionId: String,
-    profile: QuicAlpnProfile,
-    parsedUrl: (host: String, port: Int, path: String),
-    method: String,
-    headers: [String: String],
-    body: String?,
-    doSafeComplete: @escaping SafeComplete
-  ) {
-    // Placeholder - state handler
-    switch state {
-    case .setup:
-      print("[NativeQuic] Request: Connection setup...")
+  private func performQuinnHandshakeWithHandle(
+    host: String,
+    port: Int,
+    serverName: String,
+    spkiPin: Data,
+    identityId: String,
+    chainId: UInt8
+  ) -> Result<QuinnHandshakeResult, Error> {
+    guard spkiPin.count == 32 else {
+      return .failure(NSError(domain: "NativeQuic", code: -1, userInfo: [NSLocalizedDescriptionKey: "Invalid SPKI pin length"]))
+    }
 
-    case .preparing:
-      print("[NativeQuic] Request: Connection preparing (QUIC/TLS handshake)...")
-
-    case .waiting(let error):
-      print("[NativeQuic] Request: Connection waiting - \(error.localizedDescription)")
-      // Check for specific QUIC errors
-      print("[NativeQuic] Request: NWError details - \(error)")
-
-    case .ready:
-      if profile == .controlPlane {
-        guard let identityId = extractIdentityId(path: parsedUrl.path, body: body, headers: headers) else {
-          doSafeComplete(false, nil, "Missing identity_id for authenticated request", nil)
-          return
+    let materials: (identityJson: Data, identityDid: String, dilithiumSk: Data, kyberSk: Data, masterSeed: Data)
+    if let stored = UhpKeystore.loadIdentityForHandshake(identityId: identityId) {
+      materials = (
+        identityJson: stored.identityJson,
+        identityDid: stored.identityDid,
+        dilithiumSk: stored.privateKey.dilithiumSk,
+        kyberSk: stored.privateKey.kyberSk,
+        masterSeed: stored.privateKey.masterSeed
+      )
+    } else {
+      let didCandidates = identityId.hasPrefix("did:zhtp:")
+        ? [identityId]
+        : [identityId, "did:zhtp:\(identityId)"]
+      var identityHandle: Identity? = nil
+      for candidate in didCandidates {
+        if let found = IdentityHandleStore.shared.retrieve(by: candidate) as? Identity {
+          identityHandle = found
+          break
         }
+      }
+      guard let identityHandle else {
+        return .failure(NSError(domain: "NativeQuic", code: -1, userInfo: [NSLocalizedDescriptionKey: "Failed to load identity materials"]))
+      }
+      do {
+        let identityJson = try ZhtpClient.serializeIdentityToHandshakeJson(identityHandle)
+        let dilithiumSk = try ZhtpClient.getDilithiumSecretKey(identityHandle)
+        let kyberSk = try ZhtpClient.getKyberSecretKey(identityHandle)
+        let masterSeed = try ZhtpClient.getMasterSeed(identityHandle)
+        materials = (
+          identityJson: Data(identityJson.utf8),
+          identityDid: identityHandle.did,
+          dilithiumSk: Data(dilithiumSk),
+          kyberSk: Data(kyberSk),
+          masterSeed: Data(masterSeed)
+        )
+      } catch {
+        return .failure(error)
+      }
+    }
 
-        // CRITICAL: Run handshake on background queue to avoid deadlock
-        // Connection callbacks must fire on the queue the connection was started on
-        // If we block that queue here, callbacks will never fire and semaphores will deadlock
-        print("[NativeQuic] 🔄 Dispatching UHP handshake to background queue...")
-        DispatchQueue.global(qos: .userInitiated).async { [weak self] in
-          guard let self else { return }
-          print("[NativeQuic] 🤝 Starting UHP handshake on background queue...")
-          var channelBinding: Data?
-          self.connectionLock.lock()
-          channelBinding = self.activeChannelBindings[connectionId]
-          self.connectionLock.unlock()
-          switch performUhpHandshake(connection: connection, identityId: identityId, channelBindingOverride: channelBinding) {
-          case .failure(let error):
-            doSafeComplete(false, nil, "UHP handshake failed: \(error.localizedDescription)", error)
-          case .success(let sessionInfo):
-          do {
-            // Session ID is now enforced to be exactly 32 bytes in UhpHandshake.swift
-            print("[NativeQuic] ✓ Session ID: \(sessionInfo.sessionId.count) bytes (UHP v2 compliant)")
-            let macKey = try deriveMacKey(sessionKey: sessionInfo.sessionKey, handshakeHash: sessionInfo.handshakeHash)
-            var session = AuthSession(
-              sessionId: sessionInfo.sessionId,
-              macKey: macKey,
-              sequence: 1,
-              clientDid: sessionInfo.clientDid,
-              serverDid: sessionInfo.peerDid,
-              createdAt: Date(),
-              lastActivity: Date()
-            )
+    var session = UhpSession()
+    var handle: UInt64 = 0
 
-            let requestBody = body?.data(using: .utf8) ?? Data()
-            let zhtpMethod = self.httpMethodToZhtpMethod(method)
+    let rc = host.withCString { hostPtr in
+      serverName.withCString { serverNamePtr in
+        spkiPin.withUnsafeBytes { spkiBuf -> Int32 in
+          guard let spkiPtr = spkiBuf.baseAddress?.assumingMemoryBound(to: UInt8.self) else {
+            return -1
+          }
+          return materials.identityJson.withUnsafeBytes { identityBuf -> Int32 in
+            guard let identityPtr = identityBuf.baseAddress?.assumingMemoryBound(to: UInt8.self) else {
+              return -1
+            }
+            return materials.dilithiumSk.withUnsafeBytes { dilBuf -> Int32 in
+              guard let dilPtr = dilBuf.baseAddress?.assumingMemoryBound(to: UInt8.self) else {
+                return -1
+              }
+              return materials.kyberSk.withUnsafeBytes { kybBuf -> Int32 in
+                guard let kybPtr = kybBuf.baseAddress?.assumingMemoryBound(to: UInt8.self) else {
+                  return -1
+                }
+                return materials.masterSeed.withUnsafeBytes { seedBuf -> Int32 in
+                  guard let seedPtr = seedBuf.baseAddress?.assumingMemoryBound(to: UInt8.self) else {
+                    return -1
+                  }
 
-            sendAuthenticatedZhtpRequest(
-              connection: connection,
-              session: &session,
-              method: zhtpMethod,
-              path: parsedUrl.path,
-              headers: headers,
-              body: requestBody,
-              requester: sessionInfo.clientDid
-            ) { result in
-              switch result {
-              case .success(let (status, responseBody)):
-                let bodyString = String(data: responseBody, encoding: .utf8) ?? ""
-                let response: [String: Any] = [
-                  "status": Int(status),
-                  "statusText": status >= 200 && status < 300 ? "OK" : "Error",
-                  "headers": [:],
-                  "body": bodyString,
-                  "ok": status >= 200 && status < 300
-                ]
-                doSafeComplete(true, response, nil, nil)
-              case .failure(let error):
-                doSafeComplete(false, nil, error.localizedDescription, error)
+                  let keyBytes = UhpPrivateKeyBytes(
+                    dilithium_sk_ptr: dilPtr,
+                    dilithium_sk_len: materials.dilithiumSk.count,
+                    kyber_sk_ptr: kybPtr,
+                    kyber_sk_len: materials.kyberSk.count,
+                    master_seed_ptr: seedPtr,
+                    master_seed_len: materials.masterSeed.count
+                  )
+
+                  return uhp_quic_connect_and_handshake(
+                    hostPtr,
+                    UInt16(port),
+                    serverNamePtr,
+                    spkiPtr,
+                    identityPtr,
+                    materials.identityJson.count,
+                    keyBytes,
+                    chainId,
+                    &handle,
+                    &session
+                  )
+                }
               }
             }
-          } catch {
-            doSafeComplete(false, nil, "MAC key derivation failed: \(error.localizedDescription)", error)
-          }
-          }
-        }
-      } else {
-        // Public mode: use native ZHTP format
-        let requestBody = body?.data(using: .utf8)
-        sendZhtpRequest(
-          connection: connection,
-          method: method,
-          path: parsedUrl.path,
-          headers: headers,
-          body: requestBody
-        ) { result in
-          switch result {
-          case .success(let (status, body)):
-            let bodyString = String(data: body, encoding: .utf8) ?? ""
-            let response: [String: Any] = [
-              "status": Int(status),
-              "statusText": status >= 200 && status < 300 ? "OK" : "Error",
-              "headers": [:],
-              "body": bodyString,
-              "ok": status >= 200 && status < 300
-            ]
-            doSafeComplete(true, response, nil, nil)
-          case .failure(let error):
-            doSafeComplete(false, nil, error.localizedDescription, error)
           }
         }
       }
-
-    case .failed(let error):
-      doSafeComplete(false, nil, "Connection failed: \(error.localizedDescription)", error)
-
-    case .cancelled:
-      doSafeComplete(false, nil, "Connection was cancelled", nil)
-
-    @unknown default:
-      break
     }
+
+    if rc != 0 {
+      let message = uhp_quinn_last_error_message().flatMap { String(cString: $0) } ?? "unknown error"
+      return .failure(NSError(domain: "NativeQuic", code: -1, userInfo: [NSLocalizedDescriptionKey: message]))
+    }
+
+    guard let peerDidPtr = session.peer_did else {
+      return .failure(NSError(domain: "NativeQuic", code: -1, userInfo: [NSLocalizedDescriptionKey: "Server DID missing"]))
+    }
+
+    let peerDid = String(cString: peerDidPtr)
+    uhp_quinn_free_string(peerDidPtr)
+
+    let sessionIdFull = withUnsafeBytes(of: session.session_id) { Data($0) }
+    let sessionId = Data(sessionIdFull.prefix(32))
+    guard sessionId.count == 32 else {
+      return .failure(NSError(domain: "NativeQuic", code: -1, userInfo: [NSLocalizedDescriptionKey: "Invalid session ID length"]))
+    }
+
+    let sessionKey = withUnsafeBytes(of: session.session_key) { Data($0) }
+    guard sessionKey.count == 32 else {
+      return .failure(NSError(domain: "NativeQuic", code: -1, userInfo: [NSLocalizedDescriptionKey: "Invalid session key length"]))
+    }
+
+    let handshakeHash = withUnsafeBytes(of: session.handshake_hash) { Data($0) }
+    guard handshakeHash.count == 32 else {
+      return .failure(NSError(domain: "NativeQuic", code: -1, userInfo: [NSLocalizedDescriptionKey: "Invalid handshake hash length"]))
+    }
+
+    guard session.pqc_hybrid_enabled == 1 else {
+      return .failure(NSError(domain: "NativeQuic", code: -1, userInfo: [NSLocalizedDescriptionKey: "Server did not enable PQC hybrid key exchange"]))
+    }
+
+    let sessionInfo = QuinnHandshakeSession(
+      sessionKey: sessionKey,
+      sessionId: sessionId,
+      handshakeHash: handshakeHash,
+      peerDid: peerDid,
+      clientDid: materials.identityDid
+    )
+
+    return .success(QuinnHandshakeResult(handle: handle, session: sessionInfo))
+  }
+
+  private func resolveServerName(host: String, headers: [String: String]) -> String {
+    if let hostHeader = headers["Host"], !hostHeader.isEmpty {
+      return hostHeader
+    }
+    if !quinnControlPlaneServerName.isEmpty {
+      return quinnControlPlaneServerName
+    }
+    return host
+  }
+
+  private func quinnRequest(handle: UInt64, requestData: Data) throws -> Data {
+    var responsePtr: UnsafeMutablePointer<UInt8>?
+    var responseLen: Int = 0
+
+    let rc = requestData.withUnsafeBytes { reqBuf -> Int32 in
+      guard let reqPtr = reqBuf.baseAddress?.assumingMemoryBound(to: UInt8.self) else {
+        return -1
+      }
+      return uhp_quic_request(handle, reqPtr, requestData.count, &responsePtr, &responseLen)
+    }
+
+    if rc != 0 {
+      let message = uhp_quinn_last_error_message().flatMap { String(cString: $0) } ?? "unknown error"
+      throw NSError(domain: "NativeQuic", code: -1, userInfo: [NSLocalizedDescriptionKey: message])
+    }
+
+    guard let ptr = responsePtr, responseLen > 0 else {
+      return Data()
+    }
+
+    let data = Data(bytes: ptr, count: responseLen)
+    uhp_quic_free_buffer(ptr, responseLen)
+    return data
+  }
+
+  private func quinnPublicRequest(
+    parsedUrl: (host: String, port: Int, path: String),
+    method: String,
+    headers: [String: String],
+    body: Data?
+  ) throws -> (status: Int, headers: [String: String], body: Data, statusText: String) {
+    uhp_quinn_init()
+
+    guard let spkiPin = dataFromHex(quinnSpkiPinHex), spkiPin.count == 32 else {
+      throw NSError(domain: "NativeQuic", code: -1, userInfo: [NSLocalizedDescriptionKey: "Invalid SPKI pin configuration"])
+    }
+
+    let serverName = resolveServerName(host: parsedUrl.host, headers: headers)
+    var handle: UInt64 = 0
+
+    let connectRc = parsedUrl.host.withCString { hostPtr in
+      serverName.withCString { serverNamePtr in
+        spkiPin.withUnsafeBytes { spkiBuf -> Int32 in
+          guard let spkiPtr = spkiBuf.baseAddress?.assumingMemoryBound(to: UInt8.self) else {
+            return -1
+          }
+          return uhp_quic_connect_public(hostPtr, UInt16(parsedUrl.port), serverNamePtr, spkiPtr, &handle)
+        }
+      }
+    }
+
+    if connectRc != 0 {
+      let message = uhp_quinn_last_error_message().flatMap { String(cString: $0) } ?? "unknown error"
+      throw NSError(domain: "NativeQuic", code: -1, userInfo: [NSLocalizedDescriptionKey: "Public QUIC connect failed: \(message)"])
+    }
+
+    defer { uhp_quic_close(handle) }
+
+    let requestBody = body ?? Data()
+    let timestamp = UInt64(Date().timeIntervalSince1970)
+    let requestData = try zhtp_encode_sdk_request(
+      method: method,
+      path: parsedUrl.path,
+      timestamp: timestamp,
+      body: requestBody
+    )
+
+    let responseData = try quinnRequest(handle: handle, requestData: requestData)
+    let zhtpResponse = try zhtp_decode_response(responseData)
+    let responseHeaders: [String: String] = [
+      "content-type": zhtpResponse.response.headers.content_type
+    ]
+
+    return (
+      status: Int(zhtpResponse.status),
+      headers: responseHeaders,
+      body: zhtpResponse.response.body,
+      statusText: zhtpResponse.error_message ?? "OK"
+    )
   }
 
   /**
@@ -723,14 +697,9 @@ class NativeQuic: NSObject {
   @objc
   func cancelAll(_ resolve: @escaping RCTPromiseResolveBlock, reject: @escaping RCTPromiseRejectBlock) {
     connectionLock.lock()
-    let connections = activeConnections
-    activeConnections.removeAll()
+    quinnRequestQueue.removeAll()
+    quinnHandshakeInProgress.removeAll()
     connectionLock.unlock()
-
-    for (_, connection) in connections {
-      connection.stateUpdateHandler = nil
-      connection.cancel()
-    }
 
     resolve(true)
   }
@@ -751,102 +720,6 @@ class NativeQuic: NSObject {
     case "TRACE": return .trace
     default: return .get
     }
-  }
-
-  @available(iOS 15.0, *)
-  private func createQuicParameters(
-    insecure: Bool,
-    serverName: String?,
-    profile: QuicAlpnProfile
-  ) -> NWParameters {
-    let alpnList: [String]
-    switch profile {
-    case .publicContent:
-      alpnList = ["zhtp-public/1"]
-    case .controlPlane:
-      alpnList = ["zhtp-uhp/2"]
-    }
-    print("[NativeQuic] 🔧 QUIC Config:")
-    print("[NativeQuic]    ALPN: \(alpnList.joined(separator: ", "))")
-
-    let quicOptions = NWProtocolQUIC.Options(alpn: alpnList)
-
-    // Bidirectional stream configuration for explicit stream creation
-    // This ensures streams created from groups are properly opened
-    quicOptions.direction = .bidirectional
-    print("[NativeQuic]    Direction: Bidirectional")
-
-    // Allow multiple concurrent streams
-    quicOptions.initialMaxStreamsBidirectional = 10
-    print("[NativeQuic]    Initial Max Bi Streams: 10")
-
-    // Flow control for large payloads (UHP identity JSON is ~24KB)
-    // Set to 2MB per stream to safely handle large handshake payloads
-    quicOptions.initialMaxStreamDataBidirectionalLocal = 2_000_000
-    quicOptions.initialMaxStreamDataBidirectionalRemote = 2_000_000
-    print("[NativeQuic]    Stream Flow Control: 2MB local / 2MB remote")
-
-    // Connection-level flow control (10MB total)
-    quicOptions.initialMaxData = 10_000_000
-    print("[NativeQuic]    Connection Flow Control: 10MB")
-
-    // QUIC idle timeout in milliseconds (60 seconds)
-    quicOptions.idleTimeout = 60_000
-    print("[NativeQuic]    Idle Timeout: 60000ms (60 seconds)")
-
-    // Try to enable multipath quic if available (iOS 16+)
-    if #available(iOS 16.0, *) {
-      quicOptions.maxDatagramFrameSize = 1200
-      print("[NativeQuic]    Max Datagram Size: 1200 bytes")
-    }
-
-    // Create parameters with QUIC
-    let parameters = NWParameters(quic: quicOptions)
-
-    // Set TLS server name if provided (hostname only, not IP)
-    if let serverName = serverName, !serverName.isEmpty {
-      print("[NativeQuic]    TLS SNI: \(serverName)")
-      sec_protocol_options_set_tls_server_name(
-        quicOptions.securityProtocolOptions,
-        serverName
-      )
-    } else {
-      print("[NativeQuic]    TLS SNI: disabled (IP-based connection)")
-    }
-
-    // Configure TLS for self-signed certificates
-    print("[NativeQuic]    TLS Mode: Self-signed certificates enabled")
-
-    // Set verify block to accept all certs (security is via ZHTP layer, not TLS)
-    sec_protocol_options_set_verify_block(
-      quicOptions.securityProtocolOptions,
-      { (metadata, trust, completion) in
-        print("[NativeQuic]    📋 TLS Verify Block called")
-        print("[NativeQuic]       → Accepting certificate (ZHTP layer handles auth)")
-        completion(true)
-      },
-      self.queue
-    )
-
-    // Require TLS 1.3 (mandatory for QUIC)
-    sec_protocol_options_set_min_tls_protocol_version(
-      quicOptions.securityProtocolOptions,
-      .TLSv13
-    )
-    print("[NativeQuic]    TLS Version: 1.3+ required")
-
-    // Set challenge block for client auth (if needed)
-    sec_protocol_options_set_challenge_block(
-      quicOptions.securityProtocolOptions,
-      { (metadata, completion) in
-        print("[NativeQuic]    📋 TLS Challenge Block called")
-        print("[NativeQuic]       → No client authentication required")
-        completion(nil)
-      },
-      self.queue
-    )
-
-    return parameters
   }
 
   private func parseQuicUrl(_ urlString: String) -> (host: String, port: Int, path: String)? {
@@ -901,6 +774,16 @@ class NativeQuic: NSObject {
       return normalized.isEmpty ? nil : normalized
     }
 
+    // Allow identity/register to use DID for handshake lookup before identity_id exists
+    if path == "/api/v1/identity/register",
+       let body = body,
+       let bodyData = body.data(using: .utf8),
+       let json = try? JSONSerialization.jsonObject(with: bodyData) as? [String: Any],
+       let did = json["did"] as? String {
+      print("[NativeQuic]    ✓ Found in request body did for register: \(did)")
+      return did.isEmpty ? nil : did
+    }
+
     // Try URL path patterns
     let components = path.split(separator: "/").map(String.init)
     print("[NativeQuic]    Path components: \(components)")
@@ -931,175 +814,6 @@ class NativeQuic: NSObject {
     return nil
   }
 
-  @available(iOS 15.0, *)
-  private func sendHttpRequest(
-    connection: NWConnection,
-    method: String,
-    path: String,
-    host: String,
-    port: Int,
-    headers: [String: String],
-    body: String?,
-    completion: @escaping (Result<[String: Any], Error>) -> Void
-  ) {
-    do {
-      // Encode body as Data
-      let bodyData = body?.data(using: .utf8) ?? Data()
-      let timestamp = UInt64(Date().timeIntervalSince1970)
-
-      // Build SDK CBOR request (public mode - no authentication, no length prefix)
-      let requestData = try zhtp_encode_sdk_request(
-        method: method,
-        path: path,
-        timestamp: timestamp,
-        body: bodyData
-      )
-
-      print("[NativeQuic] Sending \(method) \(path) (\(requestData.count) bytes CBOR)")
-      let hexPreview = requestData.prefix(100).map({ String(format: "%02x", $0) }).joined(separator: " ")
-      print("[NativeQuic] Request hex (first 100 bytes): \(hexPreview)")
-
-      // Send CBOR-encoded ZHTP request over QUIC
-      connection.send(content: requestData, contentContext: .finalMessage, isComplete: true, completion: .contentProcessed { [weak self] error in
-        if let error = error {
-          print("[NativeQuic] Send failed: \(error.localizedDescription)")
-          completion(.failure(error))
-          return
-        }
-        print("[NativeQuic] Send succeeded (stream write closed), waiting for response...")
-        self?.receiveHttpResponse(connection: connection, completion: completion)
-      })
-    } catch {
-      print("[NativeQuic] Failed to encode ZHTP request: \(error)")
-      completion(.failure(error))
-    }
-  }
-
-  @available(iOS 15.0, *)
-  private func receiveHttpResponse(
-    connection: NWConnection,
-    completion: @escaping (Result<[String: Any], Error>) -> Void
-  ) {
-    var responseData = Data()
-    var hasCompleted = false
-    let completionLock = NSLock()
-
-    func safeComplete(_ result: Result<[String: Any], Error>) {
-      completionLock.lock()
-      defer { completionLock.unlock() }
-      guard !hasCompleted else { return }
-      hasCompleted = true
-      print("[NativeQuic] Receive completing with \(responseData.count) total bytes")
-      completion(result)
-    }
-
-    func receiveMore() {
-      print("[NativeQuic] Calling receive() on connection...")
-      connection.receive(minimumIncompleteLength: 1, maximumLength: 65536) { [weak self] content, context, isComplete, error in
-        print("[NativeQuic] Receive callback: content=\(content?.count ?? 0) bytes, isComplete=\(isComplete), error=\(error?.localizedDescription ?? "nil")")
-
-        if let error = error {
-          print("[NativeQuic] Receive error: \(error)")
-          safeComplete(.failure(error))
-          return
-        }
-
-        if let content = content {
-          responseData.append(content)
-          print("[NativeQuic] Received \(content.count) bytes, total: \(responseData.count)")
-          if let preview = String(data: content.prefix(200), encoding: .utf8) {
-            print("[NativeQuic] Data preview: \(preview)")
-          }
-        }
-
-        if isComplete {
-          print("[NativeQuic] Stream complete, parsing response...")
-          self?.parseHttpResponse(data: responseData) { result in
-            safeComplete(result)
-          }
-        } else if content == nil && !isComplete {
-          // No data and not complete - might be waiting
-          print("[NativeQuic] No data received yet, continuing to wait...")
-          receiveMore()
-        } else {
-          receiveMore()
-        }
-      }
-    }
-
-    receiveMore()
-  }
-
-  private func parseHttpResponse(
-    data: Data,
-    completion: @escaping (Result<[String: Any], Error>) -> Void
-  ) {
-    // First, try to parse as CBOR ZHTP response
-    do {
-      print("[NativeQuic] Attempting to parse response as CBOR ZHTP...")
-      let zhtpResponse = try zhtp_decode_response(data)
-
-      // Extract body as string
-      let bodyString = String(data: zhtpResponse.response.body, encoding: .utf8) ?? ""
-
-      // Extract headers as [String: String]
-      var responseHeaders: [String: String] = [:]
-      // Headers are in the ZHTP response structure (if available)
-      responseHeaders["content-type"] = zhtpResponse.response.headers.content_type
-
-      let response: [String: Any] = [
-        "status": zhtpResponse.status,
-        "statusText": zhtpResponse.error_message ?? "OK",
-        "headers": responseHeaders,
-        "body": bodyString,
-        "ok": zhtpResponse.status >= 200 && zhtpResponse.status < 300
-      ]
-
-      print("[NativeQuic] ✅ Parsed as CBOR ZHTP response: status=\(zhtpResponse.status)")
-      completion(.success(response))
-    } catch {
-      // Fall back to parsing as plain HTTP response
-      print("[NativeQuic] ⚠️ CBOR parsing failed, attempting HTTP fallback...")
-      if let httpText = String(data: data, encoding: .utf8), httpText.contains("HTTP/1.1") {
-        print("[NativeQuic] Parsed as HTTP response")
-        // Parse HTTP response
-        let lines = httpText.components(separatedBy: "\r\n")
-        if let statusLine = lines.first {
-          let statusParts = statusLine.split(separator: " ", maxSplits: 2)
-          if statusParts.count >= 2, let statusCode = Int(statusParts[1]) {
-            var responseHeaders: [String: String] = [:]
-            var bodyStartIndex = 0
-            for (index, line) in lines.enumerated() {
-              if line.isEmpty {
-                bodyStartIndex = index + 1
-                break
-              }
-              let headerParts = line.split(separator: ":", maxSplits: 1)
-              if headerParts.count == 2 {
-                let key = String(headerParts[0]).trimmingCharacters(in: .whitespaces)
-                let value = String(headerParts[1]).trimmingCharacters(in: .whitespaces)
-                responseHeaders[key] = value
-              }
-            }
-            let body = lines[bodyStartIndex...].joined(separator: "\r\n")
-            let response: [String: Any] = [
-              "status": statusCode,
-              "statusText": String(statusParts[statusParts.count - 1]),
-              "headers": responseHeaders,
-              "body": body,
-              "ok": statusCode >= 200 && statusCode < 300
-            ]
-            completion(.success(response))
-            return
-          }
-        }
-      }
-
-      print("[NativeQuic] ❌ Failed to decode response: \(error)")
-      completion(.failure(NSError(domain: "NativeQuic", code: -2, userInfo: [NSLocalizedDescriptionKey: "Failed to decode response: \(error.localizedDescription)"])))
-    }
-  }
-
   // MARK: - Internal helpers for raw bytes (for Web4 runtime)
 
   @available(iOS 15.0, *)
@@ -1116,267 +830,20 @@ class NativeQuic: NSObject {
       throw NSError(domain: "NativeQuic", code: -1, userInfo: [NSLocalizedDescriptionKey: "Invalid URL"])
     }
 
-    print("[NativeQuic] requestBytes: \(method) \(url) with ALPN: \(alpn == .publicContent ? "zhtp-public/1" : "zhtp-uhp/2")")
+    print("[NativeQuic] requestBytes: \(method) \(url) with ALPN: \(alpn == .publicContent ? alpnPublic : alpnAuthenticated)")
 
-    let parameters = createQuicParameters(
-      insecure: insecure,
-      serverName: headers["Host"] ?? parsedUrl.host,
-      profile: alpn
+    if alpn != .publicContent {
+      throw NSError(domain: "NativeQuic", code: -1, userInfo: [NSLocalizedDescriptionKey: "requestBytes only supports public ALPN"])
+    }
+
+    let response = try quinnPublicRequest(
+      parsedUrl: parsedUrl,
+      method: method,
+      headers: headers,
+      body: body
     )
-    let endpoint = NWEndpoint.hostPort(
-      host: NWEndpoint.Host(parsedUrl.host),
-      port: NWEndpoint.Port(integerLiteral: UInt16(parsedUrl.port))
-    )
 
-    return try await withCheckedThrowingContinuation { continuation in
-      var didFinish = false
-      let finishLock = NSLock()
-
-      let connection = NWConnection(to: endpoint, using: parameters)
-      let connectionId = UUID().uuidString
-
-      connectionLock.lock()
-      activeConnections[connectionId] = connection
-      connectionLock.unlock()
-
-      func finish(_ result: Result<(status: Int, headers: [String: String], body: Data, statusText: String), Error>) {
-        finishLock.lock()
-        if didFinish {
-          finishLock.unlock()
-          return
-        }
-        didFinish = true
-        finishLock.unlock()
-        connectionLock.lock()
-        activeConnections.removeValue(forKey: connectionId)
-        connectionLock.unlock()
-        connection.stateUpdateHandler = nil
-        connection.cancel()
-        continuation.resume(with: result)
-      }
-
-      connection.stateUpdateHandler = { state in
-        print("[NativeQuic] requestBytes connection state: \(state)")
-        switch state {
-        case .ready:
-          print("[NativeQuic] requestBytes: connection READY, sending ZHTP request...")
-          // Convert HTTP method string to ZhtpMethod
-          sendZhtpRequest(
-            connection: connection,
-            method: method,
-            path: parsedUrl.path,
-            headers: headers,
-            body: body
-          ) { result in
-            switch result {
-            case .success(let (status, body)):
-              finish(.success((status: Int(status), headers: [:], body: body, statusText: "")))
-            case .failure(let error):
-              finish(.failure(error))
-            }
-          }
-        case .waiting(let error):
-          print("[NativeQuic] requestBytes: connection WAITING - \(error.localizedDescription)")
-        case .failed(let error):
-          print("[NativeQuic] requestBytes: connection FAILED - \(error.localizedDescription)")
-          finish(.failure(error))
-        case .cancelled:
-          print("[NativeQuic] requestBytes: connection CANCELLED")
-          finish(.failure(NSError(domain: "NativeQuic", code: -2, userInfo: [NSLocalizedDescriptionKey: "Cancelled"])))
-        default:
-          break
-        }
-      }
-
-      connection.start(queue: queue)
-
-      queue.asyncAfter(deadline: .now() + timeout) {
-        finish(.failure(NSError(domain: "NativeQuic", code: -3, userInfo: [NSLocalizedDescriptionKey: "Timeout"])))
-      }
-    }
-  }
-
-  @available(iOS 15.0, *)
-  private func sendHttpRequestBytes(
-    connection: NWConnection,
-    method: String,
-    path: String,
-    host: String,
-    port: Int,
-    headers: [String: String],
-    body: Data?,
-    completion: @escaping (Result<Data, Error>) -> Void
-  ) {
-    var httpRequest = "\(method) \(path) HTTP/1.1\r\n"
-    httpRequest += "Host: \(host):\(port)\r\n"
-    httpRequest += "Connection: close\r\n"
-    httpRequest += "User-Agent: SovereignNetwork-iOS/1.0 QUIC\r\n"
-
-    for (key, value) in headers {
-      httpRequest += "\(key): \(value)\r\n"
-    }
-
-    if let body = body {
-      httpRequest += "Content-Length: \(body.count)\r\n"
-      httpRequest += "Content-Type: application/octet-stream\r\n"
-      httpRequest += "\r\n"
-      // Combine headers and body into single data for atomic send
-      var requestData = httpRequest.data(using: .utf8) ?? Data()
-      requestData.append(body)
-      // Use .finalMessage and isComplete: true to signal end of request
-      connection.send(content: requestData, contentContext: .finalMessage, isComplete: true, completion: .contentProcessed { [weak self] error in
-        if let error = error {
-          print("[NativeQuic] sendHttpRequestBytes: send failed - \(error)")
-          completion(.failure(error))
-          return
-        }
-        print("[NativeQuic] sendHttpRequestBytes: send succeeded, waiting for response...")
-        self?.receiveHttpResponseBytes(connection: connection, completion: completion)
-      })
-    } else {
-      httpRequest += "\r\n"
-      // Use .finalMessage and isComplete: true to signal end of request
-      connection.send(content: httpRequest.data(using: .utf8), contentContext: .finalMessage, isComplete: true, completion: .contentProcessed { [weak self] error in
-        if let error = error {
-          print("[NativeQuic] sendHttpRequestBytes: send failed - \(error)")
-          completion(.failure(error))
-          return
-        }
-        print("[NativeQuic] sendHttpRequestBytes: send succeeded, waiting for response...")
-        self?.receiveHttpResponseBytes(connection: connection, completion: completion)
-      })
-    }
-  }
-
-  @available(iOS 15.0, *)
-  private func receiveHttpResponseBytes(
-    connection: NWConnection,
-    completion: @escaping (Result<Data, Error>) -> Void
-  ) {
-    var responseData = Data()
-    var hasCompleted = false
-    let completionLock = NSLock()
-
-    func safeComplete(_ result: Result<Data, Error>) {
-      completionLock.lock()
-      defer { completionLock.unlock() }
-      guard !hasCompleted else { return }
-      hasCompleted = true
-      print("[NativeQuic] receiveHttpResponseBytes completing with \(responseData.count) bytes")
-      completion(result)
-    }
-
-    func receiveMore() {
-      print("[NativeQuic] receiveHttpResponseBytes: calling receive(), connection state=\(connection.state)")
-      connection.receive(minimumIncompleteLength: 1, maximumLength: 65536) { content, context, isComplete, error in
-        print("[NativeQuic] receiveHttpResponseBytes callback: content=\(content?.count ?? 0) bytes, isComplete=\(isComplete), error=\(error?.localizedDescription ?? "nil")")
-
-        if let error = error {
-          print("[NativeQuic] receiveHttpResponseBytes: ERROR - \(error)")
-          safeComplete(.failure(error))
-          return
-        }
-
-        if let content = content {
-          responseData.append(content)
-          print("[NativeQuic] receiveHttpResponseBytes: received \(content.count) bytes, total=\(responseData.count)")
-        }
-
-        if isComplete {
-          print("[NativeQuic] receiveHttpResponseBytes: stream complete")
-          safeComplete(.success(responseData))
-        } else {
-          receiveMore()
-        }
-      }
-    }
-
-    receiveMore()
-  }
-
-  private func parseHttpResponseBytes(data: Data) throws -> (status: Int, headers: [String: String], body: Data, statusText: String) {
-    guard let separatorRange = data.range(of: Data([13, 10, 13, 10])) else { // \r\n\r\n
-      throw NSError(domain: "NativeQuic", code: -4, userInfo: [NSLocalizedDescriptionKey: "Invalid HTTP response"])
-    }
-
-    let headerData = data[..<separatorRange.lowerBound]
-    let body = data[separatorRange.upperBound...]
-
-    guard let headerString = String(data: headerData, encoding: .utf8) else {
-      throw NSError(domain: "NativeQuic", code: -5, userInfo: [NSLocalizedDescriptionKey: "Invalid header encoding"])
-      }
-
-    let headerLines = headerString.components(separatedBy: "\r\n")
-    guard let statusLine = headerLines.first else {
-      throw NSError(domain: "NativeQuic", code: -6, userInfo: [NSLocalizedDescriptionKey: "Missing status line"])
-    }
-
-    let statusParts = statusLine.split(separator: " ", maxSplits: 2)
-    let statusCode = statusParts.count > 1 ? Int(statusParts[1]) ?? 0 : 0
-    let statusText = statusParts.count > 2 ? String(statusParts[2]) : ""
-
-    var responseHeaders: [String: String] = [:]
-    for line in headerLines.dropFirst() {
-      let headerParts = line.split(separator: ":", maxSplits: 1)
-      if headerParts.count == 2 {
-        let key = String(headerParts[0]).trimmingCharacters(in: .whitespaces)
-        let value = String(headerParts[1]).trimmingCharacters(in: .whitespaces)
-        responseHeaders[key] = value
-      }
-    }
-
-    return (
-      status: statusCode,
-      headers: responseHeaders,
-      body: Data(body),
-      statusText: statusText
-    )
-  }
-
-  private func cleanupConnection(_ connectionId: String) {
-    connectionLock.lock()
-    if let connection = activeConnections.removeValue(forKey: connectionId) {
-      connection.stateUpdateHandler = nil
-      connection.cancel()
-    }
-    activeChannelBindings.removeValue(forKey: connectionId)
-    connectionLock.unlock()
-  }
-
-  @available(iOS 15.0, *)
-  private func exportQuicChannelBinding(from group: NWConnectionGroup) -> Data? {
-    guard let quicMetadata = group.metadata(definition: NWProtocolQUIC.definition) as? NWProtocolQUIC.Metadata else {
-      print("[NativeQuic] ⚠️ QUIC metadata unavailable for channel binding")
-      return nil
-    }
-
-    let secMetadata = quicMetadata.securityProtocolMetadata
-    let label = "zhtp-uhp-channel-binding"
-    guard let secret = sec_protocol_metadata_create_secret(
-      secMetadata,
-      label.utf8.count,
-      label,
-      32
-    ) else {
-      print("[NativeQuic] ⚠️ Failed to export QUIC channel binding")
-      return nil
-    }
-
-    let secretData = secret as DispatchData
-    var data = Data()
-    secretData.enumerateBytes { buffer, _, _ in
-      data.append(buffer)
-    }
-
-    guard data.count == 32 else {
-      print("[NativeQuic] ⚠️ Invalid channel binding length: \(data.count) bytes")
-      return nil
-    }
-
-    let digest = SHA256.hash(data: data)
-    let hashPrefix = digest.prefix(8).map { String(format: "%02x", $0) }.joined()
-    print("[NativeQuic] 🔐 Channel binding via group QUIC metadata: sha256[0..8]=\(hashPrefix)")
-    return data
+    return response
   }
 
   // MARK: - React Native Setup
@@ -1389,7 +856,7 @@ class NativeQuic: NSObject {
   @objc
   func constantsToExport() -> [AnyHashable: Any]! {
     return [
-      "ALPN_PROTOCOL": "zhtp-uhp/2",
+      "ALPN_PROTOCOL": alpnAuthenticated,
       "DEFAULT_TIMEOUT": defaultTimeout,
       "MIN_IOS_VERSION": 15.0
     ]

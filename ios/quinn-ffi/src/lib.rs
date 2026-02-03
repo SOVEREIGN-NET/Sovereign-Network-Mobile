@@ -36,6 +36,8 @@ use lib_network::handshake::orchestrator::extract_payload;
 const NONCE_TTL_SECS: u64 = 300;
 const NONCE_MAX_ENTRIES: usize = 10_000;
 const QUINN_FFI_VERSION: &str = "quinn-ffi-v1.0.0-runtime";
+const ALPN_PUBLIC: &[u8] = b"zhtp-public/1";
+const ALPN_AUTH: &[u8] = b"zhtp-uhp/2";
 
 static CLIENTS: OnceLock<Mutex<HashMap<u64, QuinnClient>>> = OnceLock::new();
 static NEXT_ID: AtomicU64 = AtomicU64::new(1);
@@ -106,6 +108,16 @@ fn ensure_crypto_provider() {
             rustls::crypto::ring::default_provider(),
         );
     });
+}
+
+fn parse_spki_pin(spki_pin_32: *const u8) -> Result<[u8; 32], String> {
+    if spki_pin_32.is_null() {
+        return Err("missing SPKI pin".to_string());
+    }
+    let spki = unsafe { std::slice::from_raw_parts(spki_pin_32, 32) };
+    let mut spki_pin = [0u8; 32];
+    spki_pin.copy_from_slice(spki);
+    Ok(spki_pin)
 }
 
 #[no_mangle]
@@ -383,6 +395,10 @@ fn apply_deterministic_node_id(identity: &mut ZhtpIdentity) {
 }
 
 fn make_client_config(spki_pin: [u8; 32]) -> ClientConfig {
+    make_client_config_with_alpn(spki_pin, ALPN_AUTH)
+}
+
+fn make_client_config_with_alpn(spki_pin: [u8; 32], alpn: &[u8]) -> ClientConfig {
     let verifier = Arc::new(SpkiPinVerifier::new(spki_pin));
     let provider = Arc::new(rustls::crypto::ring::default_provider());
     let mut tls = rustls::ClientConfig::builder_with_provider(provider)
@@ -392,7 +408,7 @@ fn make_client_config(spki_pin: [u8; 32]) -> ClientConfig {
         .with_custom_certificate_verifier(verifier)
         .with_no_client_auth();
 
-    tls.alpn_protocols = vec![b"zhtp-uhp/2".to_vec()];
+    tls.alpn_protocols = vec![alpn.to_vec()];
 
     let mut transport = TransportConfig::default();
     transport.max_idle_timeout(Some(Duration::from_secs(60).try_into().unwrap()));
@@ -628,10 +644,6 @@ pub extern "C" fn uhp_handshake_quic(
         return -1;
     }
 
-    if spki_pin_32.is_null() {
-        set_last_error("missing SPKI pin");
-        return -1;
-    }
 
     if identity_json_ptr.is_null() || identity_json_len == 0 {
         set_last_error("missing identity JSON");
@@ -650,9 +662,13 @@ pub extern "C" fn uhp_handshake_quic(
         }
     };
 
-    let spki = unsafe { std::slice::from_raw_parts(spki_pin_32, 32) };
-    let mut spki_pin = [0u8; 32];
-    spki_pin.copy_from_slice(spki);
+    let spki_pin = match parse_spki_pin(spki_pin_32) {
+        Ok(val) => val,
+        Err(err) => {
+            set_last_error(err);
+            return -1;
+        }
+    };
 
     let nonce_cache_path = match unique_nonce_cache_path() {
         Ok(path) => path,
@@ -753,10 +769,6 @@ pub extern "C" fn uhp_quic_connect_and_handshake(
         return -1;
     }
 
-    if spki_pin_32.is_null() {
-        set_last_error("missing SPKI pin");
-        return -1;
-    }
 
     if identity_json_ptr.is_null() || identity_json_len == 0 {
         set_last_error("missing identity JSON");
@@ -775,9 +787,13 @@ pub extern "C" fn uhp_quic_connect_and_handshake(
         }
     };
 
-    let spki = unsafe { std::slice::from_raw_parts(spki_pin_32, 32) };
-    let mut spki_pin = [0u8; 32];
-    spki_pin.copy_from_slice(spki);
+    let spki_pin = match parse_spki_pin(spki_pin_32) {
+        Ok(val) => val,
+        Err(err) => {
+            set_last_error(err);
+            return -1;
+        }
+    };
 
     let nonce_cache_path = match unique_nonce_cache_path() {
         Ok(path) => path,
@@ -874,6 +890,61 @@ fn store_client(client: QuinnClient) -> u64 {
 fn take_client(id: u64) -> Option<QuinnClient> {
     let mut map = clients().lock().expect("quinn client map poisoned");
     map.remove(&id)
+}
+
+#[no_mangle]
+pub extern "C" fn uhp_quic_connect_public(
+    host: *const c_char,
+    port: u16,
+    server_name: *const c_char,
+    spki_pin_32: *const u8,
+    out_handle: *mut u64,
+) -> c_int {
+    ensure_crypto_provider();
+
+    if out_handle.is_null() {
+        set_last_error("null output handle pointer");
+        return -1;
+    }
+
+    if host.is_null() || server_name.is_null() {
+        set_last_error("missing host or server name");
+        return -1;
+    }
+
+    let spki_pin = match parse_spki_pin(spki_pin_32) {
+        Ok(val) => val,
+        Err(err) => {
+            set_last_error(err);
+            return -1;
+        }
+    };
+
+    let host = unsafe { CStr::from_ptr(host) }.to_string_lossy().to_string();
+    let server_name = unsafe { CStr::from_ptr(server_name) }.to_string_lossy().to_string();
+
+    let result = block_on_with_runtime(async {
+        let cfg = make_client_config_with_alpn(spki_pin, ALPN_PUBLIC);
+        let (endpoint, conn) = quic_connect_with_endpoint(&host, port, &server_name, cfg).await?;
+        Ok::<QuinnClient, anyhow::Error>(QuinnClient {
+            _endpoint: endpoint,
+            connection: conn,
+        })
+    });
+
+    match result {
+        Ok(client) => {
+            let handle = store_client(client);
+            unsafe {
+                *out_handle = handle;
+            }
+            0
+        }
+        Err(err) => {
+            set_last_error(format!("public connect failed: {err}"));
+            -1
+        }
+    }
 }
 
 #[no_mangle]
