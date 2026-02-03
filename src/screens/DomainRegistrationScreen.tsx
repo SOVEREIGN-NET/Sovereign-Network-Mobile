@@ -50,6 +50,7 @@ const DomainRegistrationScreen: React.FC<DomainRegistrationScreenProps> = ({ onC
   const [availabilityStatus, setAvailabilityStatus] = useState<{
     available: boolean | null;
     checking: boolean;
+    registrarFee?: number;
   }>({
     available: null,
     checking: false,
@@ -94,6 +95,7 @@ const DomainRegistrationScreen: React.FC<DomainRegistrationScreenProps> = ({ onC
       setAvailabilityStatus({
         available: result.available,
         checking: false,
+        registrarFee: result.registrar_fee,
       });
       console.log(`[DomainRegistrationScreen] Domain "${domainToCheck}" is ${result.available ? 'available' : 'taken'}`);
     } catch (error) {
@@ -174,8 +176,9 @@ const DomainRegistrationScreen: React.FC<DomainRegistrationScreenProps> = ({ onC
     try {
       const fullDomain = `${domain}.sov`;
       const durationDays = yearsToDays(parseInt(years, 10));
+      const feeAmount = availabilityStatus.registrarFee ?? 0;
 
-      console.log('[DomainRegistrationScreen] Registering domain:', { domain: fullDomain, durationDays });
+      console.log('[DomainRegistrationScreen] Registering domain:', { domain: fullDomain, durationDays, feeAmount });
 
       setStatus({
         type: null,
@@ -184,7 +187,9 @@ const DomainRegistrationScreen: React.FC<DomainRegistrationScreenProps> = ({ onC
 
       const response = await domainService.registerDomain({
         domain: fullDomain,
-        duration_days: durationDays,
+        owner: currentIdentity.did,
+        fee_amount: feeAmount,
+        content_mappings: {},
       });
 
       console.log('[DomainRegistrationScreen] Domain registered:', response.tx_hash);

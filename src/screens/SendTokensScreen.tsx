@@ -12,7 +12,7 @@ import {
   FormField,
   LoadingView,
 } from '../components';
-import { useAuth, useWalletList, useApi } from '../hooks';
+import { useAuth, useWalletList } from '../hooks';
 import { useTranslation } from '../i18n';
 import { colors, spacing, typography, borderRadius } from '../theme';
 import tokenService from '../services/TokenService';
@@ -46,7 +46,6 @@ const SendTokensScreen = ({ navigation }: any) => {
   const { t } = useTranslation();
   const { currentIdentity } = useAuth();
   const { wallets } = useWalletList();
-  const { isInitialized } = useApi();
 
   // Token list and balance state
   const [allTokens, setAllTokens] = useState<SendableToken[]>([]);

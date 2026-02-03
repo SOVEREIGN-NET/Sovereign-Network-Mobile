@@ -4,8 +4,7 @@
  * Uses native QUIC transport via QuicFetchAdapter - no HTTP fallback
  */
 
-import { FetchAdapter } from '@sovereign-net/api-client/react-native';
-import { createQuicFetchAdapterSync } from './QuicFetchAdapter';
+import { createQuicFetchAdapterSync, FetchAdapter } from './QuicFetchAdapter';
 import { QUIC_CONFIG } from '../config';
 import SecureIdentityStorage from './SecureIdentityStorage';
 import { nativeIdentityProvisioning } from './NativeIdentityProvisioning';
@@ -45,13 +44,6 @@ class TokenService {
     this.quicFetch = createQuicFetchAdapterSync({
       insecure: QUIC_CONFIG.insecure,
       timeout: QUIC_CONFIG.defaultTimeout,
-      fallbackToHttp: QUIC_CONFIG.fallbackToHttp,
-      onFallback: (url, reason) => {
-        throw new Error(
-          `QUIC connection required but failed: ${reason}. ` +
-          `HTTP fallback is disabled for security.`
-        );
-      },
     });
 
     console.log('[TokenService] QUIC adapter configured for token operations');

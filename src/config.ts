@@ -161,9 +161,6 @@ export const QUIC_CONFIG = {
    */
   insecure: __DEV__ || isTestnetWithSelfSignedCerts(),
 
-  /** Fallback to HTTP if QUIC unavailable - disabled since server is pure QUIC */
-  fallbackToHttp: false,
-
   /** Maximum response size in bytes (1MB) */
   maxResponseSize: 1024 * 1024,
 

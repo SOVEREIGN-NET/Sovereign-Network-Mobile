@@ -5,6 +5,8 @@
 
 import { useState, useCallback, useEffect } from 'react';
 import RealAuthService from '../services/RealAuthService';
+import { isQuicSupported, testQuicConnection } from '../services/QuicClient';
+import { DEFAULT_NODE_HOST, DEFAULT_NODE_PORT } from '../config';
 import { useTranslation } from '../i18n';
 
 export interface ProtocolInfo {
@@ -37,6 +39,7 @@ export interface ProtocolInfo {
 export interface UseNodeConnectionState {
   isConnected: boolean;
   isLoading: boolean;
+  hasChecked: boolean;
   error: string | null;
   protocolInfo: ProtocolInfo | null;
   nodeUrl: string | null;
@@ -64,7 +67,8 @@ export function useNodeConnection(
 
   const [state, setState] = useState<UseNodeConnectionState>({
     isConnected: false,
-    isLoading: true,
+    isLoading: autoCheck,
+    hasChecked: false,
     error: null,
     protocolInfo: null,
     nodeUrl: RealAuthService.getNodeUrl(),
@@ -76,21 +80,41 @@ export function useNodeConnection(
    */
   const checkConnection = useCallback(async () => {
     try {
+      console.log('[👆 SignIn:checkConnection] SINGLE PRESS - QUIC reachability check');
       setState(prev => ({ ...prev, isLoading: true, error: null }));
-      const connected = await RealAuthService.testConnection();
+      const supported = await isQuicSupported();
+      console.log(`[👆 SignIn:checkConnection] QUIC supported: ${supported}`);
+
+      if (!supported) {
+        setState(prev => ({
+          ...prev,
+          isConnected: false,
+          isLoading: false,
+          hasChecked: true,
+          error: t.app.errors.nodeUnreachable,
+        }));
+        return;
+      }
+
+      const result = await testQuicConnection(DEFAULT_NODE_HOST, DEFAULT_NODE_PORT);
+      const connected = !!result.success;
+      console.log(`[👆 SignIn:checkConnection] Result: ${connected ? 'CONNECTED' : 'DISCONNECTED'}`);
 
       setState(prev => ({
         ...prev,
         isConnected: connected,
         isLoading: false,
+        hasChecked: true,
         error: connected ? null : t.app.errors.nodeUnreachable,
       }));
     } catch (err: unknown) {
       const message = err instanceof Error ? err.message : 'Unknown error';
+      console.error('[❌ SignIn:checkConnection] Error:', message);
       setState(prev => ({
         ...prev,
         isConnected: false,
         isLoading: false,
+        hasChecked: true,
         error: message || t.app.errors.connectionCheckFailed,
       }));
     }
@@ -102,20 +126,25 @@ export function useNodeConnection(
    */
   const getProtocol = useCallback(async () => {
     try {
+      console.log('[👆👆 SignIn:getProtocol] LONG PRESS - Full QUIC protocol health check');
       setState(prev => ({ ...prev, isLoading: true, error: null }));
       const protocolInfo = await RealAuthService.getProtocolInfo();
+      console.log('[👆👆 SignIn:getProtocol] Protocol info received:', protocolInfo);
 
       setState(prev => ({
         ...prev,
         protocolInfo: (protocolInfo as ProtocolInfo) || null,
         isConnected: true,
         isLoading: false,
+        hasChecked: true,
       }));
     } catch (err: unknown) {
       const message = err instanceof Error ? err.message : 'Unknown error';
+      console.error('[❌ SignIn:getProtocol] Error:', message);
       setState(prev => ({
         ...prev,
         isLoading: false,
+        hasChecked: true,
         error: message || t.app.errors.protocolInfoFailed,
       }));
     }
@@ -131,6 +160,7 @@ export function useNodeConnection(
       setState(prev => ({
         ...prev,
         isConnected: connected,
+        hasChecked: true,
         error: connected ? null : t.app.errors.failedToEstablishConnection,
       }));
       return connected;
@@ -139,6 +169,7 @@ export function useNodeConnection(
       setState(prev => ({
         ...prev,
         isConnected: false,
+        hasChecked: true,
         error: message || t.app.errors.ensureConnectionFailed,
       }));
       return false;

@@ -5,6 +5,22 @@
  */
 
 const translations = {
+  app: {
+    nodeStatus: 'Node Status',
+    retryConnection: 'Retry Connection',
+    connected: 'Connected',
+    disconnected: 'Disconnected',
+    notChecked: 'Not checked',
+    notCheckedHint: 'Connection has not been checked yet',
+    tapToCheck: 'Tap to check connection',
+    errors: {
+      nodeUnreachable: 'Node is not reachable',
+      connectionCheckFailed: 'Failed to check connection',
+      protocolInfoFailed: 'Failed to get protocol info',
+      failedToEstablishConnection: 'Failed to establish connection',
+      ensureConnectionFailed: 'Failed to ensure connection',
+    },
+  },
   auth: {
     signIn: {
       didLabel: 'ZK-DID Address',
@@ -114,9 +130,9 @@ const translations = {
       },
       seed: {
         label: 'Seed Phrase',
-        description: 'Recover using your 12-word seed phrase',
+        description: 'Recover using your 24-word seed phrase',
         title: 'Enter Seed Phrase',
-        placeholder: 'Enter your 12-word seed phrase separated by spaces',
+        placeholder: 'Enter your 24-word seed phrase separated by spaces',
         hint: 'Your seed phrase is case-insensitive',
         securityTitle: 'Security Warning',
         securityWarning: 'Never share your seed phrase with anyone',
@@ -150,10 +166,9 @@ const translations = {
     },
     seedPhrase: {
       screenTitle: 'Save Your Seed Phrase',
-      title: 'Your 20-Word Seed Phrase',
-      wallet: 'Wallet',
+      title: 'Your 24-Word Seed Phrase',
       warning: 'Important: Save Your Seed Phrase',
-      warningDescription: 'This 20-word phrase is the ONLY way to recover your identity and funds.',
+      warningDescription: 'This 24-word phrase is the ONLY way to recover your identity and funds.',
       show: 'Show',
       hide: 'Hide',
       hidden: 'Tap "Show" to display your seed phrase',
@@ -173,7 +188,7 @@ const translations = {
       confirmSavedDescription: 'Confirm you have written down your seed phrase.',
       continueButton: 'I\'ve Saved My Seed Phrase',
       errors: {
-        invalidPhrases: 'Invalid seed phrases received from server',
+        invalidPhrases: 'Invalid seed phrase received from server',
         vaultSaveFailed: 'Failed to store your seed phrase securely',
       },
     },
@@ -220,6 +235,13 @@ const translations = {
       buttonLoading: 'Signing out...',
       hint: 'You will be signed out from all devices',
     },
+  },
+  headerbar: {
+    ble: 'Start BLE',
+    connected: 'Connected',
+    offline: 'Offline',
+    checking: 'Checking...',
+    notChecked: 'Not checked',
   },
 };
 

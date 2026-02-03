@@ -43,7 +43,7 @@ export const SecureIdentityStorage = {
     }
 
     const {
-      requireBiometric = true,
+      requireBiometric = false,
       accessibleAfterFirstUnlock = true
     } = options;
 

@@ -515,6 +515,52 @@ pub extern "system" fn Java_com_sovereignnetworkmobile_NativeIdentityProvisionin
     create_signature_map(&mut env, result)
 }
 
+#[no_mangle]
+pub extern "system" fn Java_com_sovereignnetworkmobile_NativeIdentityProvisioning_nativeGetSeedPhrase<'local>(
+    mut env: JNIEnv<'local>,
+    _class: JClass<'local>,
+    identity_json: JString<'local>,
+) -> JString<'local> {
+    let identity_json_str: String = match env.get_string(&identity_json) {
+        Ok(s) => s.into(),
+        Err(_) => return env.new_string("").unwrap_or_default(),
+    };
+
+    match identity_bridge::get_seed_phrase_from_identity(&identity_json_str) {
+        Ok(phrase) => env.new_string(&phrase).unwrap_or_default(),
+        Err(e) => {
+            log::error!("Failed to get seed phrase: {}", e);
+            env.new_string("").unwrap_or_default()
+        }
+    }
+}
+
+#[no_mangle]
+pub extern "system" fn Java_com_sovereignnetworkmobile_NativeIdentityProvisioning_nativeRestoreIdentityFromPhrase<'local>(
+    mut env: JNIEnv<'local>,
+    _class: JClass<'local>,
+    phrase: JString<'local>,
+    device_id: JString<'local>,
+) -> jobject {
+    let phrase_str: String = match env.get_string(&phrase) {
+        Ok(s) => s.into(),
+        Err(e) => {
+            log::error!("Failed to get phrase: {}", e);
+            return std::ptr::null_mut();
+        }
+    };
+    let device_id_str: String = match env.get_string(&device_id) {
+        Ok(s) => s.into(),
+        Err(e) => {
+            log::error!("Failed to get device id: {}", e);
+            return std::ptr::null_mut();
+        }
+    };
+
+    let result = identity_bridge::restore_identity_bundle_from_phrase(&phrase_str, &device_id_str);
+    create_identity_bundle_map(&mut env, result)
+}
+
 /// Build signed token create transaction
 #[no_mangle]
 pub extern "system" fn Java_com_sovereignnetworkmobile_NativeIdentityProvisioning_nativeBuildTokenCreate<'local>(

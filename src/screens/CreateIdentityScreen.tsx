@@ -26,7 +26,7 @@ type CreateIdentityScreenProps = NativeStackScreenProps<AuthStackParamList, 'Cre
 const CreateIdentityScreen = ({ navigation }: CreateIdentityScreenProps) => {
   const { t } = useTranslation();
   const { createIdentity } = useAuth();
-  const { isConnected, isLoading: nodeLoading } = useNodeConnection(false);
+  const { isConnected, hasChecked } = useNodeConnection(true);
 
   // Form state
   const [identityType, setIdentityType] = useState<
@@ -122,37 +122,17 @@ const CreateIdentityScreen = ({ navigation }: CreateIdentityScreenProps) => {
         console.log('✅ Identity created successfully');
       }
 
-      // Check if we have seed phrases for all 3 wallets (server-generated)
-      const hasPrimary = identity?.walletSeedPhrases?.primary?.length > 0;
-      const hasUbi = identity?.walletSeedPhrases?.ubi?.length > 0;
-      const hasSavings = identity?.walletSeedPhrases?.savings?.length > 0;
-
-      if (hasPrimary) {
-        if (__DEV__) {
-          console.log(`📊 Identity created with wallets: Primary=${hasPrimary}, UBI=${hasUbi}, Savings=${hasSavings}`);
-        }
-
-        // Navigate to seed phrase screen with all wallets
-        // For citizens, we have 3 wallets to show
-        const totalSteps = (hasPrimary ? 1 : 0) + (hasUbi ? 1 : 0) + (hasSavings ? 1 : 0);
-
+      const phrase = identity?.masterSeedPhrase?.trim();
+      if (phrase) {
+        const words = phrase.split(/\s+/);
         navigation.navigate('SeedPhrase', {
-          seedPhrases: identity.walletSeedPhrases?.primary?.split(' ') || [],
-          walletType: 'primary',
+          seedPhrases: words,
           identity,
-          allSeedPhrases: {
-            primary: identity.walletSeedPhrases?.primary?.split(' '),
-            ubi: identity.walletSeedPhrases?.ubi?.split(' '),
-            savings: identity.walletSeedPhrases?.savings?.split(' '),
-          },
-          currentStep: 1,
-          totalSteps,
         });
       } else {
-        console.warn('⚠️ Identity created but no wallet seed phrases available');
-        // SECURITY: Do not log full identity object as it contains sensitive data
+        console.warn('⚠️ Identity created but no master seed phrase available');
         setFieldErrors({
-          displayName: 'Wallet seed phrases are not available. Please contact support.',
+          displayName: 'Master seed phrase is not available. Please contact support.',
         });
       }
     }).catch((err) => {
@@ -165,7 +145,7 @@ const CreateIdentityScreen = ({ navigation }: CreateIdentityScreenProps) => {
     });
   };
 
-  const isCreateDisabled = isCreatingIdentity || nodeLoading || !isConnected;
+  const isCreateDisabled = isCreatingIdentity;
   // SECURITY: Password must be valid AND confirmed to enable create button
   const isPassphraseSet = passwordStrength.valid && password === confirmPassword;
 
@@ -185,8 +165,8 @@ const CreateIdentityScreen = ({ navigation }: CreateIdentityScreenProps) => {
               </Text>
             </Column>
             <Badge
-              label={isConnected ? t.app.connected : t.app.disconnected}
-              variant={isConnected ? 'success' : 'error'}
+              label={hasChecked ? (isConnected ? t.app.connected : t.app.disconnected) : t.app.notChecked}
+              variant={hasChecked ? (isConnected ? 'success' : 'error') : 'default'}
             />
           </Row>
         </Card>

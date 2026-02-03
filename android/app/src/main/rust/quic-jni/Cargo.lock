@@ -1814,9 +1814,11 @@ dependencies = [
  "lib-consensus",
  "lib-crypto",
  "lib-economy",
+ "lib-fees",
  "lib-identity",
  "lib-proofs",
  "lib-storage",
+ "lib-types",
  "log",
  "rand 0.8.5",
  "serde",
@@ -1875,6 +1877,7 @@ dependencies = [
  "lib-identity",
  "lib-proofs",
  "lib-storage",
+ "lib-types",
  "rand 0.8.5",
  "serde",
  "serde_json",
@@ -1923,6 +1926,13 @@ dependencies = [
 ]
 
 [[package]]
+name = "lib-fees"
+version = "0.1.0"
+dependencies = [
+ "serde",
+]
+
+[[package]]
 name = "lib-identity"
 version = "0.1.0"
 dependencies = [
@@ -1934,10 +1944,13 @@ dependencies = [
  "chrono",
  "getrandom 0.2.17",
  "hex",
+ "hkdf",
+ "hmac",
  "lib-crypto",
  "lib-proofs",
  "md5",
  "names",
+ "pbkdf2",
  "rand 0.8.5",
  "serde",
  "serde_json",
@@ -2614,6 +2627,16 @@ name = "paste"
 version = "1.0.15"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "57c0d7b74b563b49d38dae00a0c37d4d6de9b432382b2892f0574ddcae73fd0a"
+
+[[package]]
+name = "pbkdf2"
+version = "0.12.2"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "f8ed6a7761f76e3b9f92dfb0a60a6a6477c61024b775147ff0973a02653abaf2"
+dependencies = [
+ "digest",
+ "hmac",
+]
 
 [[package]]
 name = "pem"

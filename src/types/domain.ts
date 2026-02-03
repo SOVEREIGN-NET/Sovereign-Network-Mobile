@@ -8,7 +8,9 @@
 
 export interface DomainRegisterRequest {
   domain: string;
-  duration_days: number;
+  owner: string;
+  fee_amount: number;
+  content_mappings?: Record<string, string>;
 }
 
 export interface DomainRegisterResponse {
@@ -40,6 +42,7 @@ export interface DomainAvailabilityResult {
   available: boolean;
   classification?: string;
   reason?: string;
+  registrar_fee?: number;
 }
 
 // ============ DOMAIN STATUS ============

@@ -633,12 +633,38 @@ class NativeQuic: NSObject {
 
     let requestBody = body ?? Data()
     let timestamp = UInt64(Date().timeIntervalSince1970)
-    let requestData = try zhtp_encode_sdk_request(
-      method: method,
-      path: parsedUrl.path,
-      timestamp: timestamp,
-      body: requestBody
+
+    // Build ZhtpRequest (public mode expects this, not SDK wire format)
+    let contentType = headers["content-type"] ?? "application/json"
+    let contentLength = UInt64(requestBody.count)
+    let zhtpHeaders = ZhtpHeaders(
+      content_type: contentType,
+      content_length: contentLength,
+      dao_fee: 0,
+      total_fees: 0
     )
+    let zhtpRequest = ZhtpRequest(
+      method: ZhtpMethod.from(string: method),
+      uri: parsedUrl.path,
+      version: "1.0",
+      headers: zhtpHeaders,
+      body: requestBody,
+      timestamp: timestamp,
+      requester: nil,
+      auth_proof: nil
+    )
+
+    // Encode ZhtpRequest directly, then wrap with ZHTP wire header
+    let cborData = try encodeRequest(zhtpRequest)
+    var wireData = Data()
+    wireData.append(contentsOf: [0x5A, 0x48, 0x54, 0x50]) // "ZHTP"
+    wireData.append(0x01) // version 1
+    var length = UInt32(cborData.count).bigEndian
+    withUnsafeBytes(of: &length) { buffer in
+      wireData.append(contentsOf: buffer)
+    }
+    wireData.append(cborData)
+    let requestData = wireData
 
     let responseData = try quinnRequest(handle: handle, requestData: requestData)
     let zhtpResponse = try zhtp_decode_response(responseData)

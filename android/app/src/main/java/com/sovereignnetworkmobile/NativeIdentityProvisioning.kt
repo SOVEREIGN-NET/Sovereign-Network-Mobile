@@ -188,6 +188,83 @@ class NativeIdentityProvisioning(reactContext: ReactApplicationContext) :
     }
 
     @ReactMethod
+    fun getSeedPhraseForBackup(did: String, promise: Promise) {
+        executor.execute {
+            try {
+                val cached = cachedIdentities[did]
+                if (cached == null) {
+                    promise.reject("IDENTITY_ERROR", "Identity not found for seed phrase")
+                    return@execute
+                }
+
+                val phrase = nativeGetSeedPhrase(cached.identityJson)
+                if (phrase.isNullOrBlank()) {
+                    promise.reject("IDENTITY_ERROR", "Failed to get seed phrase")
+                    return@execute
+                }
+
+                promise.resolve(phrase)
+            } catch (e: Exception) {
+                Log.e(TAG, "Failed to get seed phrase", e)
+                promise.reject("IDENTITY_ERROR", "Failed to get seed phrase: ${e.message}", e)
+            }
+        }
+    }
+
+    @ReactMethod
+    fun restoreIdentityFromPhrase(phrase: String, promise: Promise) {
+        executor.execute {
+            try {
+                val deviceId = getDeviceId()
+                val result = nativeRestoreIdentityFromPhrase(phrase, deviceId) as? Map<*, *>
+                if (result == null || result["ok"] != true) {
+                    val error = result?.get("error")?.toString() ?: "Identity restore failed"
+                    promise.reject("IDENTITY_ERROR", error)
+                    return@execute
+                }
+
+                val did = result["did"] as? String ?: ""
+                val publicKey = result["publicKey"] as? ByteArray ?: ByteArray(0)
+                val kyberPublicKey = result["kyberPublicKey"] as? ByteArray ?: ByteArray(0)
+                val nodeId = result["nodeId"] as? ByteArray ?: ByteArray(0)
+                val createdAt = (result["createdAt"] as? Number)?.toLong() ?: 0L
+                val identityJson = result["identityJson"] as? String ?: ""
+                val handshakeJson = result["handshakeJson"] as? String ?: ""
+                val dilithiumSk = result["dilithiumSk"] as? ByteArray ?: ByteArray(0)
+                val kyberSk = result["kyberSk"] as? ByteArray ?: ByteArray(0)
+                val masterSeed = result["masterSeed"] as? ByteArray ?: ByteArray(0)
+
+                val cached = CachedIdentity(
+                    did = did,
+                    deviceId = deviceId,
+                    publicKey = publicKey,
+                    kyberPublicKey = kyberPublicKey,
+                    nodeId = nodeId,
+                    createdAt = createdAt,
+                    identityJson = identityJson,
+                    handshakeJson = handshakeJson,
+                    dilithiumSk = dilithiumSk,
+                    kyberSk = kyberSk,
+                    masterSeed = masterSeed
+                )
+                cachedIdentities[did] = cached
+
+                val response = WritableNativeMap().apply {
+                    putString("status", "restored")
+                    putString("did", did)
+                    putString("deviceId", deviceId)
+                    putDouble("createdAt", createdAt.toDouble())
+                    putString("identityType", "human")
+                }
+                promise.resolve(response)
+            } catch (e: Exception) {
+                Log.e(TAG, "Failed to restore identity", e)
+                promise.reject("IDENTITY_ERROR", "Failed to restore identity: ${e.message}", e)
+            }
+        }
+    }
+
+    @ReactMethod
     fun cleanKeystoreDirectory(promise: Promise) {
         executor.execute {
             try {
@@ -420,6 +497,8 @@ class NativeIdentityProvisioning(reactContext: ReactApplicationContext) :
     private external fun nativeGenerateIdentity(deviceId: String): Any?
     private external fun nativeSignRegistrationProof(identityJson: String, timestamp: Long): Any?
     private external fun nativeSignMessage(identityJson: String, messageData: ByteArray): Any?
+    private external fun nativeGetSeedPhrase(identityJson: String): String?
+    private external fun nativeRestoreIdentityFromPhrase(phrase: String, deviceId: String): Any?
 
     // Token transaction building (returns hex-encoded signed transaction)
     private external fun nativeBuildTokenCreate(

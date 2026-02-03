@@ -13,10 +13,9 @@ import {
   DrawerItem,
   Badge,
 } from '../components';
-import { useAuth, useApi, useAsyncData, useWalletList } from '../hooks';
+import { useAuth, useAsyncData, useWalletList } from '../hooks';
 import { useTranslation } from '../i18n';
 import { colors, spacing, typography, borderRadius } from '../theme';
-import TokenCreatorScreen from './TokenCreatorScreen';
 import DomainRegistrationScreen from './DomainRegistrationScreen';
 
 // Wallet type info for display
@@ -37,11 +36,9 @@ const formatBalance = (balance: number): string => {
 const SIDScreen = ({ navigation }: any) => {
   const { t } = useTranslation();
   const { currentIdentity, isLoading } = useAuth();
-  const { api, isInitialized } = useApi();
   const { wallets, walletByType, totalBalance, loading: walletsLoading, refresh } = useWalletList();
   const [drawerVisible, setDrawerVisible] = useState(false);
   const [activeWalletTab, setActiveWalletTab] = useState('Tokens');
-  const [tokenCreatorModalVisible, setTokenCreatorModalVisible] = useState(false);
   const [domainRegistrationModalVisible, setDomainRegistrationModalVisible] = useState(false);
 
   React.useEffect(() => {
@@ -190,21 +187,7 @@ const SIDScreen = ({ navigation }: any) => {
                   </Text>
                 </View>
                 <Row style={{ gap: spacing.sm }}>
-                  <TouchableOpacity
-                    style={{
-                      width: 36,
-                      height: 36,
-                      borderRadius: borderRadius.full,
-                      backgroundColor: colors.bg_darker,
-                      justifyContent: 'center',
-                      alignItems: 'center',
-                      borderWidth: 1,
-                      borderColor: colors.border,
-                    }}
-                    onPress={() => setTokenCreatorModalVisible(true)}
-                  >
-                    <Text style={{ fontSize: typography.size.xl }}>◆</Text>
-                  </TouchableOpacity>
+                  {/* Token create hidden for now */}
                   <TouchableOpacity
                     style={{
                       width: 36,
@@ -555,18 +538,6 @@ const SIDScreen = ({ navigation }: any) => {
           </Column>
         </ScrollView>
       </ScreenLayout>
-
-      <Modal
-        visible={tokenCreatorModalVisible}
-        animationType="slide"
-        presentationStyle="formSheet"
-      >
-        <View style={{ flex: 1, backgroundColor: colors.bg_darkest }}>
-          <TokenCreatorScreen
-            onClose={() => setTokenCreatorModalVisible(false)}
-          />
-        </View>
-      </Modal>
 
       <Modal
         visible={domainRegistrationModalVisible}

@@ -14,6 +14,7 @@ export const useAuth = jest.fn();
   signIn: jest.fn(),
   createIdentity: jest.fn(),
   recoverIdentity: jest.fn(),
+  getMasterSeedPhrase: jest.fn(),
   signOut: jest.fn(),
   clearError: jest.fn(),
 });

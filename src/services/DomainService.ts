@@ -5,8 +5,7 @@
  * Follows TokenService pattern exactly
  */
 
-import { FetchAdapter } from '@sovereign-net/api-client/react-native';
-import { createQuicFetchAdapterSync } from './QuicFetchAdapter';
+import { createQuicFetchAdapterSync, FetchAdapter } from './QuicFetchAdapter';
 import { QUIC_CONFIG } from '../config';
 import { nativeIdentityProvisioning } from './NativeIdentityProvisioning';
 import {
@@ -37,13 +36,6 @@ class DomainService {
     this.quicFetch = createQuicFetchAdapterSync({
       insecure: QUIC_CONFIG.insecure,
       timeout: QUIC_CONFIG.defaultTimeout,
-      fallbackToHttp: QUIC_CONFIG.fallbackToHttp,
-      onFallback: (url, reason) => {
-        throw new Error(
-          `QUIC connection required but failed: ${reason}. ` +
-          `HTTP fallback is disabled for security.`
-        );
-      },
     });
 
     console.log('[DomainService] QUIC adapter configured for domain operations');
@@ -79,6 +71,7 @@ class DomainService {
         available: !data.found, // found: false means available, found: true means taken
         classification: data.classification,
         reason: data.found ? `Domain is already registered by ${data.owner_did}` : undefined,
+        registrar_fee: data.registrar_fee,
       };
     } catch (error: any) {
       console.error('[DomainService] Availability check failed:', error.message);
@@ -104,15 +97,19 @@ class DomainService {
       const signedTx = signingResult.signed_tx;
       console.log('[DomainService] Transaction signed, hex length:', signedTx.length);
 
-      // Send signed transaction + duration to API
+      // Send domain registration payload (simple registration)
       const response = await this.quicFetch(
         `${this.nodeUrl}/api/v1/web4/domains/register`,
         {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
-            signed_tx: signedTx,
-            duration_days: request.duration_days, // Duration sent as separate parameter
+            domain: request.domain,
+            owner: request.owner,
+            content_mappings: request.content_mappings ?? {},
+            signature: signedTx,
+            timestamp: Math.floor(Date.now() / 1000),
+            fee_amount: request.fee_amount,
           }),
         }
       );

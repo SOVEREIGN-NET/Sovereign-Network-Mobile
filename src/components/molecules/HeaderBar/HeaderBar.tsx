@@ -32,8 +32,8 @@ const HeaderBar: React.FC<HeaderBarProps> = ({
   // SOV reward counter - slow drip
   const { displayBalance } = useRewardCounter();
 
-  // Connection status from hook
-  const { connectionStatus, latencyMs } = useNodeConnectionStatus(isConnectedProp === undefined);
+  // Connection status from hook - auto-check on startup
+  const { connectionStatus, latencyMs } = useNodeConnectionStatus(true);
 
   // Use prop if provided, otherwise use hook state
   const isConnected = isConnectedProp ?? connectionStatus === 'connected';
@@ -46,7 +46,10 @@ const HeaderBar: React.FC<HeaderBarProps> = ({
   // Get status text
   const getStatusText = () => {
     if (connectionStatus === 'checking') {
-      return 'Checking...';
+      return t.headerbar.checking;
+    }
+    if (connectionStatus === 'idle') {
+      return t.headerbar.notChecked;
     }
     if (isConnected && latencyMs !== null) {
       return `${latencyMs}ms`;
@@ -119,6 +122,9 @@ const HeaderBar: React.FC<HeaderBarProps> = ({
     statusChecking: {
       backgroundColor: colors.warning,
     },
+    statusIdle: {
+      backgroundColor: colors.text_secondary,
+    },
     rightSection: {
       padding: spacing.sm,
       marginRight: -spacing.sm,
@@ -153,9 +159,11 @@ const HeaderBar: React.FC<HeaderBarProps> = ({
               styles.statusIndicator,
               connectionStatus === 'checking'
                 ? styles.statusChecking
-                : isConnected
-                  ? styles.statusConnected
-                  : styles.statusDisconnected,
+                : connectionStatus === 'idle'
+                  ? styles.statusIdle
+                  : isConnected
+                    ? styles.statusConnected
+                    : styles.statusDisconnected,
             ]}
           />
           <Text style={{ color: colors.text_secondary }}>{getStatusText()}</Text>

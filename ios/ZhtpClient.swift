@@ -46,6 +46,10 @@ private func cIdentityGetKyberSecretKey(_ handle: UnsafeMutableRawPointer) -> By
 @_silgen_name("zhtp_client_identity_get_master_seed")
 private func cIdentityGetMasterSeed(_ handle: UnsafeMutableRawPointer) -> ByteBuffer
 
+// Get master seed phrase (BIP39) from identity handle
+@_silgen_name("zhtp_client_identity_get_seed_phrase")
+private func cIdentityGetSeedPhrase(_ handle: UnsafeMutableRawPointer) -> UnsafeMutablePointer<CChar>?
+
 // Sign registration proof
 @_silgen_name("zhtp_client_sign_registration_proof")
 private func cSignRegistrationProof(_ handle: UnsafeMutableRawPointer, _ timestamp: UInt64) -> ByteBuffer
@@ -65,6 +69,10 @@ private func cSerializeIdentityToHandshakeJson(_ handle: UnsafeMutableRawPointer
 // Deserialize identity from JSON
 @_silgen_name("zhtp_client_identity_deserialize")
 private func cDeserializeIdentity(_ json: UnsafePointer<CChar>) -> UnsafeMutableRawPointer?
+
+// Restore identity from 24-word seed phrase
+@_silgen_name("zhtp_client_restore_identity_from_phrase")
+private func cRestoreIdentityFromPhrase(_ phrase: UnsafePointer<CChar>, _ deviceId: UnsafePointer<CChar>) -> UnsafeMutableRawPointer?
 
 // Free identity handle
 @_silgen_name("zhtp_client_identity_free")
@@ -308,6 +316,15 @@ public class ZhtpClient {
         return Array(UnsafeBufferPointer(start: ptr, count: buf.len))
     }
 
+    /// Get 24-word seed phrase (BIP39) derived from the identity master seed
+    public static func getSeedPhrase(_ identity: Identity) throws -> String {
+        guard let phrasePtr = cIdentityGetSeedPhrase(identity.getHandle()) else {
+            throw ClientError.identityError("Failed to get seed phrase")
+        }
+        defer { cFreeString(phrasePtr) }
+        return String(cString: phrasePtr)
+    }
+
     /// Deserialize an Identity from JSON string
     public static func deserializeIdentity(_ json: String) throws -> Identity {
         let handle = try json.withCString { jsonCStr in
@@ -318,6 +335,35 @@ public class ZhtpClient {
         }
 
         // Extract fields from the handle
+        let did = extractString(cIdentityGetDid(handle))
+        let devId = extractString(cIdentityGetDeviceId(handle))
+        let pubKey = extractBuffer(cIdentityGetPublicKey(handle))
+        let kyberPubKey = extractBuffer(cIdentityGetKyberPublicKey(handle))
+        let nId = extractBuffer(cIdentityGetNodeId(handle))
+        let createdAt = cIdentityGetCreatedAt(handle)
+
+        return Identity(
+            did: did,
+            publicKey: pubKey,
+            kyberPublicKey: kyberPubKey,
+            nodeId: nId,
+            deviceId: devId,
+            createdAt: createdAt,
+            handle: handle
+        )
+    }
+
+    /// Restore an Identity from a 24-word master seed phrase
+    public static func restoreIdentityFromPhrase(_ phrase: String, deviceId: String) throws -> Identity {
+        let handle = try phrase.withCString { phraseCStr in
+            try deviceId.withCString { deviceIdCStr in
+                guard let h = cRestoreIdentityFromPhrase(phraseCStr, deviceIdCStr) else {
+                    throw ClientError.identityError("Failed to restore identity from seed phrase")
+                }
+                return h
+            }
+        }
+
         let did = extractString(cIdentityGetDid(handle))
         let devId = extractString(cIdentityGetDeviceId(handle))
         let pubKey = extractBuffer(cIdentityGetPublicKey(handle))

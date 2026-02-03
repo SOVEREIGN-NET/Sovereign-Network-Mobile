@@ -13,14 +13,14 @@ import {
   DrawerItem,
   SectionLabel,
 } from '../components';
-import { useAuth, useApi, useAsyncData } from '../hooks';
+import { useAuth, useAsyncData } from '../hooks';
 import { useTranslation } from '../i18n';
 import { colors, spacing, typography, borderRadius } from '../theme';
+import appService from '../services/AppService';
 
 const IdentityScreen = ({ navigation }: any) => {
   const { t } = useTranslation();
   const { currentIdentity, signOut, isLoading: authLoading } = useAuth();
-  const { api, isInitialized } = useApi();
   const [loggingOut, setLoggingOut] = useState(false);
   const [drawerVisible, setDrawerVisible] = useState(false);
 
@@ -28,8 +28,8 @@ const IdentityScreen = ({ navigation }: any) => {
   useAsyncData(
     async () => {
       try {
-        if (api && isInitialized && currentIdentity) {
-          const identity = await api.getIdentity(currentIdentity.did);
+        if (currentIdentity) {
+          const identity = await appService.getIdentity(currentIdentity.did);
           return identity;
         }
       } catch (error) {
@@ -37,7 +37,7 @@ const IdentityScreen = ({ navigation }: any) => {
       }
       return null;
     },
-    [api, isInitialized, currentIdentity],
+    [currentIdentity],
   );
 
   const drawerItems: DrawerItem[] = [

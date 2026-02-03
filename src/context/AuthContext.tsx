@@ -121,8 +121,7 @@ export interface AuthContextType {
   isBiometricAvailable: () => Promise<boolean>;
   getBiometryType: () => Promise<string | null>;
   // Wallet seed management (server-generated, stored securely in Keychain)
-  getWalletSeedPhrase: (walletType: 'primary' | 'ubi' | 'savings') => Promise<string | null>;
-  getAllWalletSeeds: () => Promise<{ primary?: string; ubi?: string; savings?: string }>;
+  getMasterSeedPhrase: () => Promise<string | null>;
 }
 
 export const AuthContext = createContext<AuthContextType | undefined>(undefined);
@@ -222,7 +221,7 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
       rateLimiter.clearAttempts(normalizedIdentityId);
 
       // Save to secure storage (Keychain) instead of plaintext AsyncStorage
-      await SecureIdentityStorage.setIdentity(identity, { requireBiometric: true });
+      await SecureIdentityStorage.setIdentity(identity, { requireBiometric: false });
 
       setCurrentIdentity(identity);
 
@@ -278,7 +277,7 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
       }
 
       // Don't save to storage or set as currentIdentity yet
-      // The CreateIdentityScreen will show seed phrases first
+      // The CreateIdentityScreen will show the master seed phrase first
       // Only save to storage after user confirms via SeedPhraseScreen
       return identity;
     } catch (err: any) {
@@ -327,7 +326,7 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
       }
 
       // Save to secure storage (Keychain) instead of plaintext AsyncStorage
-      await SecureIdentityStorage.setIdentity(identity, { requireBiometric: true });
+      await SecureIdentityStorage.setIdentity(identity, { requireBiometric: false });
 
       setCurrentIdentity(identity);
 
@@ -492,7 +491,7 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
         console.log('🔐 AuthContext.setIdentity: Saving identity:', identity.did);
       }
       // Save to secure storage (Keychain) instead of plaintext AsyncStorage
-      await SecureIdentityStorage.setIdentity(identity);
+      await SecureIdentityStorage.setIdentity(identity, { requireBiometric: false });
       setCurrentIdentity(identity);
 
       // SECURITY: Restore lib-client Identity to handle store for UHP signing
@@ -567,32 +566,21 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
     return SeedVaultService.getBiometryType();
   }, []);
 
-  // Wallet seed management - retrieve from Keychain (server-generated)
-  const getWalletSeedPhrase = useCallback(async (walletType: 'primary' | 'ubi' | 'savings'): Promise<string | null> => {
+  const getMasterSeedPhrase = useCallback(async (): Promise<string | null> => {
     if (!currentIdentity?.identityId) {
-      console.warn('[AuthContext] Cannot retrieve wallet seed - no current identity');
+      console.warn('[AuthContext] Cannot retrieve master seed - no current identity');
       return null;
     }
     try {
-      const seed = await walletKeychainService.retrieveSeedPhrase(walletType, currentIdentity.identityId);
-      return seed;
+      const stored = await walletKeychainService.retrieveMasterSeedPhrase(currentIdentity.identityId);
+      if (stored) {
+        return stored;
+      }
+      const vault = await SeedVaultService.getSeedPhraseWithBiometric();
+      return vault ? vault.join(' ') : null;
     } catch (error: any) {
-      console.error(`[AuthContext] Failed to retrieve ${walletType} wallet seed:`, error);
+      console.error('[AuthContext] Failed to retrieve master seed phrase:', error);
       return null;
-    }
-  }, [currentIdentity?.identityId]);
-
-  const getAllWalletSeeds = useCallback(async () => {
-    if (!currentIdentity?.identityId) {
-      console.warn('[AuthContext] Cannot retrieve wallet seeds - no current identity');
-      return {};
-    }
-    try {
-      const seeds = await walletKeychainService.retrieveAllSeeds(currentIdentity.identityId);
-      return seeds;
-    } catch (error: any) {
-      console.error('[AuthContext] Failed to retrieve all wallet seeds:', error);
-      return {};
     }
   }, [currentIdentity?.identityId]);
 
@@ -614,9 +602,8 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
     loadIdentityOnDemand,
     isBiometricAvailable,
     getBiometryType,
-    getWalletSeedPhrase,
-    getAllWalletSeeds,
-  }), [currentIdentity, isLoading, isBootstrapping, error, signIn, createIdentity, recoverIdentity, signOut, clearError, updateProfile, updatePassphrase, updateBiometric, setIdentity, loadIdentityOnDemand, isBiometricAvailable, getBiometryType, getWalletSeedPhrase, getAllWalletSeeds]);
+    getMasterSeedPhrase,
+  }), [currentIdentity, isLoading, isBootstrapping, error, signIn, createIdentity, recoverIdentity, signOut, clearError, updateProfile, updatePassphrase, updateBiometric, setIdentity, loadIdentityOnDemand, isBiometricAvailable, getBiometryType, getMasterSeedPhrase]);
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
 };

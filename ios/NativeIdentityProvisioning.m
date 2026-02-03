@@ -25,6 +25,14 @@ RCT_EXTERN_METHOD(restoreIdentityToHandleStore:(NSString *)identityId
                   resolve:(RCTPromiseResolveBlock)resolve
                   reject:(RCTPromiseRejectBlock)reject)
 
+RCT_EXTERN_METHOD(getSeedPhraseForBackup:(NSString *)did
+                  resolve:(RCTPromiseResolveBlock)resolve
+                  reject:(RCTPromiseRejectBlock)reject)
+
+RCT_EXTERN_METHOD(restoreIdentityFromPhrase:(NSString *)phrase
+                  resolve:(RCTPromiseResolveBlock)resolve
+                  reject:(RCTPromiseRejectBlock)reject)
+
 RCT_EXTERN_METHOD(cleanKeystoreDirectory)
 
 RCT_EXTERN_METHOD(signTokenCreateTransaction:(NSDictionary *)params
@@ -36,6 +44,14 @@ RCT_EXTERN_METHOD(signTokenMintTransaction:(NSDictionary *)params
                   reject:(RCTPromiseRejectBlock)reject)
 
 RCT_EXTERN_METHOD(signTokenTransferTransaction:(NSDictionary *)params
+                  resolve:(RCTPromiseResolveBlock)resolve
+                  reject:(RCTPromiseRejectBlock)reject)
+
+RCT_EXTERN_METHOD(signDomainRegisterTransaction:(NSDictionary *)params
+                  resolve:(RCTPromiseResolveBlock)resolve
+                  reject:(RCTPromiseRejectBlock)reject)
+
+RCT_EXTERN_METHOD(signDomainUpdateTransaction:(NSDictionary *)params
                   resolve:(RCTPromiseResolveBlock)resolve
                   reject:(RCTPromiseRejectBlock)reject)
 

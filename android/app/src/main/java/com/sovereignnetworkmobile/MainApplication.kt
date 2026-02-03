@@ -20,6 +20,7 @@ class MainApplication : Application(), ReactApplication {
           add(NativeStoragePackage())
           add(NativeSettingsPackage())
           add(NativeQuicPackage())
+          add(NativeZhtpApiPackage())
           add(NativeIdentityProvisioningPackage())
           add(Web4Package())
         },

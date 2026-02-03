@@ -35,6 +35,8 @@
 		<key>NSAllowsLocalNetworking</key>
 		<true/>
 	</dict>
+	<key>NSFaceIDUsageDescription</key>
+	<string>We use Face ID to secure access to your identity and wallet keys</string>
 	<key>NSLocationWhenInUseUsageDescription</key>
 	<string>We use location to provide the user better alternatives to configure the app</string>
 	<key>RCTNewArchEnabled</key>

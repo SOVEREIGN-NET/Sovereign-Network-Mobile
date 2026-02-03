@@ -4,6 +4,22 @@
  * Bridges TypeScript to iOS native identity provisioning
  * Handles device-based key generation, server registration, and local storage
  *
+ * LIB-CLIENT CRYPTO (DO NOT DRIFT):
+ * - Identity (identity.rs):
+ *   generate_identity(device_id) -> Identity        // Dilithium5 keypair
+ *   restore_identity_from_seed(seed, device_id)
+ *   sign_message(identity, message) -> Vec<u8>
+ *   verify_signature(pk, message, sig) -> bool
+ *   serialize_identity(identity) -> String
+ *   deserialize_identity(json) -> Identity
+ * - Handshake (handshake.rs):
+ *   HandshakeState::new(identity, channel_binding)
+ *     .create_client_hello() -> Vec<u8>
+ *     .process_server_hello(data) -> Vec<u8>
+ *     .finalize() -> HandshakeResult
+ * - Channel binding (if used by transport):
+ *   compute_channel_binding(local_addr, peer_addr) -> Vec<u8>
+ *
  * SECURITY: Private keys NEVER leave device or reach JavaScript
  */
 
@@ -91,6 +107,41 @@ class NativeIdentityProvisioningBridge {
   }
 
   /**
+   * Restore identity to native handle store (for UHP signing)
+   */
+  async restoreIdentityToHandleStore(identityId: string): Promise<any> {
+    if (!this.nativeModule) {
+      throw new Error('NativeIdentityProvisioning not available on this platform');
+    }
+
+    return await this.nativeModule.restoreIdentityToHandleStore(identityId);
+  }
+
+  /**
+   * Get 24-word master seed phrase for backup
+   * Derived locally from lib-client master seed
+   */
+  async getSeedPhraseForBackup(did: string): Promise<string> {
+    if (!this.nativeModule) {
+      throw new Error('NativeIdentityProvisioning not available on this platform');
+    }
+
+    return await this.nativeModule.getSeedPhraseForBackup(did);
+  }
+
+  /**
+   * Restore identity from 24-word master seed phrase
+   * Returns a locally restored identity (must be registered/saved by caller)
+   */
+  async restoreIdentityFromPhrase(phrase: string): Promise<any> {
+    if (!this.nativeModule) {
+      throw new Error('NativeIdentityProvisioning not available on this platform');
+    }
+
+    return await this.nativeModule.restoreIdentityFromPhrase(phrase);
+  }
+
+  /**
    * Sign a token creation transaction with Dilithium keypair
    * Private key remains in device Keychain - never reaches JavaScript
    * Returns hex-encoded signed transaction ready for API
@@ -153,7 +204,11 @@ class NativeIdentityProvisioningBridge {
       throw new Error('NativeIdentityProvisioning not available on this platform');
     }
 
-    return await this.nativeModule.signDomainTransaction('domain_register', params);
+    if (!this.nativeModule.signDomainRegisterTransaction) {
+      throw new Error('NativeIdentityProvisioning.signDomainRegisterTransaction not available');
+    }
+
+    return await this.nativeModule.signDomainRegisterTransaction(params);
   }
 
   /**
@@ -168,7 +223,11 @@ class NativeIdentityProvisioningBridge {
       throw new Error('NativeIdentityProvisioning not available on this platform');
     }
 
-    return await this.nativeModule.signDomainTransaction('domain_update', params);
+    if (!this.nativeModule.signDomainUpdateTransaction) {
+      throw new Error('NativeIdentityProvisioning.signDomainUpdateTransaction not available');
+    }
+
+    return await this.nativeModule.signDomainUpdateTransaction(params);
   }
 }
 

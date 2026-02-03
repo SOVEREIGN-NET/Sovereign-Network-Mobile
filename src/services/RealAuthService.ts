@@ -38,11 +38,7 @@ export interface Identity {
   identityType: string;
   deviceId?: string;
   createdAt?: number;
-  walletSeedPhrases?: {
-    primary?: string;
-    ubi?: string;
-    savings?: string;
-  };
+  masterSeedPhrase?: string;
 }
 
 /**
@@ -104,7 +100,7 @@ class RealAuthService {
    * Create a new citizen identity
    * Delegates to NativeIdentityProvisioning for device-based provisioning
    * @param data - Identity creation data
-   * @returns Newly created identity with seed phrases
+   * @returns Newly created identity with master seed phrase (if available)
    */
   async createIdentity(data: CreateIdentityData): Promise<Identity> {
     try {
@@ -170,7 +166,7 @@ class RealAuthService {
       console.log('[RealAuthService] ✅ Registration proof created');
 
       let identityId = '';
-      let walletSeedPhrases: { primary?: string; ubi?: string; savings?: string } = {};
+      let masterSeedPhrase = '';
       try {
         console.log('[RealAuthService] 🔐 Registering identity via /api/v1/identity/register...');
         const registerRequest = {
@@ -205,9 +201,7 @@ class RealAuthService {
           const registrationResponse = await registerResponse.json();
           identityId = registrationResponse.identity_id || '';
 
-          if (registrationResponse.wallet_seed_phrases) {
-            walletSeedPhrases = registrationResponse.wallet_seed_phrases;
-          }
+          // Mobile flow derives seed phrase locally; ignore server phrases.
 
           console.log('[RealAuthService] ✅ Server registration succeeded');
           console.log('[RealAuthService]    Identity ID: ' + identityId);
@@ -228,6 +222,14 @@ class RealAuthService {
       }
 
       try {
+        masterSeedPhrase = await nativeIdentityProvisioning.getSeedPhraseForBackup(
+          generatedIdentity.did
+        );
+      } catch (phraseError: any) {
+        console.warn('[RealAuthService] ⚠️ Failed to fetch master seed phrase:', phraseError);
+      }
+
+      try {
         await nativeIdentityProvisioning.restoreIdentityToHandleStore(identityId);
       } catch (err) {
         console.warn('[RealAuthService] Failed to restore identity to handle store:', err);
@@ -240,7 +242,7 @@ class RealAuthService {
         identityType: 'human',
         deviceId: generatedIdentity.deviceId,
         createdAt: generatedIdentity.timestamp,
-        walletSeedPhrases: walletSeedPhrases,
+        masterSeedPhrase: masterSeedPhrase || undefined,
       };
 
       await this.storeIdentity(identity);
@@ -298,22 +300,47 @@ class RealAuthService {
 
   /**
    * Recover identity with seed phrase
-   * @param seedPhrase - 20-word seed phrase
+   * @param seedPhrase - 24-word master seed phrase
    * @returns Recovered identity or throws error
    */
   async recoverWithSeed(seedPhrase: string): Promise<Identity> {
     try {
-      if (!NativeZhtpApi) {
-        throw new Error('NativeZhtpApi module not available');
-      }
-
       console.log('[RealAuthService] recoverWithSeed called');
 
-      const identity = await NativeZhtpApi.recoverWithSeed(seedPhrase, this.nodeUrl);
+      const restored = await nativeIdentityProvisioning.restoreIdentityFromPhrase(
+        seedPhrase
+      );
 
-      // Store identity in Keychain
+      const identityId = restored.did.startsWith('did:zhtp:')
+        ? restored.did.substring('did:zhtp:'.length)
+        : restored.did;
+
+      try {
+        await nativeIdentityProvisioning.storeProvisionedIdentity(
+          identityId,
+          { did: restored.did }
+        );
+      } catch (storeError: any) {
+        console.error('[RealAuthService] ⚠️ Keychain storage failed:', storeError);
+      }
+
+      try {
+        await nativeIdentityProvisioning.restoreIdentityToHandleStore(identityId);
+      } catch (err) {
+        console.warn('[RealAuthService] Failed to restore identity to handle store:', err);
+      }
+
+      const identity: Identity = {
+        did: restored.did,
+        displayName: restored.displayName || 'Recovered Identity',
+        identityId,
+        identityType: restored.identityType || 'human',
+        deviceId: restored.deviceId,
+        createdAt: restored.createdAt,
+        masterSeedPhrase: seedPhrase,
+      };
+
       await this.storeIdentity(identity);
-
       return identity;
     } catch (error: any) {
       console.error('[RealAuthService] recoverWithSeed failed:', error);
@@ -398,10 +425,9 @@ class RealAuthService {
    */
   private async storeIdentity(identity: Identity): Promise<void> {
     try {
-      // Store wallet seed phrases in Keychain if available
-      if (identity.walletSeedPhrases) {
-        await walletKeychainService.storeAllSeeds(
-          identity.walletSeedPhrases,
+      if (identity.masterSeedPhrase) {
+        await walletKeychainService.storeMasterSeedPhrase(
+          identity.masterSeedPhrase,
           identity.identityId
         );
       }

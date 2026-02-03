@@ -392,6 +392,101 @@ class NativeIdentityProvisioning: NSObject {
         }
     }
 
+    // MARK: - Master Seed Phrase (Backup/Recovery)
+
+    /// Get 24-word master seed phrase for backup (derived locally from lib-client)
+    /// JavaScript API: await NativeIdentityProvisioning.getSeedPhraseForBackup(did)
+    @objc
+    func getSeedPhraseForBackup(
+        _ did: String,
+        resolve: @escaping RCTPromiseResolveBlock,
+        reject: @escaping RCTPromiseRejectBlock
+    ) {
+        queue.async { [weak self] in
+            guard self != nil else {
+                reject("IDENTITY_ERROR", "Module deallocated", nil)
+                return
+            }
+
+            if let cached = self?.cachedIdentities[did], let libIdentity = cached.libClientIdentity as? Identity {
+                do {
+                    let phrase = try ZhtpClient.getSeedPhrase(libIdentity)
+                    resolve(phrase)
+                    return
+                } catch {
+                    reject("IDENTITY_ERROR", "Failed to get seed phrase: \(error)", nil)
+                    return
+                }
+            }
+
+            if let stored = IdentityHandleStore.shared.retrieve(by: did) as? Identity {
+                do {
+                    let phrase = try ZhtpClient.getSeedPhrase(stored)
+                    resolve(phrase)
+                    return
+                } catch {
+                    reject("IDENTITY_ERROR", "Failed to get seed phrase: \(error)", nil)
+                    return
+                }
+            }
+
+            reject("IDENTITY_ERROR", "Identity not found for seed phrase", nil)
+        }
+    }
+
+    /// Restore identity from a 24-word master seed phrase
+    /// JavaScript API: await NativeIdentityProvisioning.restoreIdentityFromPhrase(phrase)
+    @objc
+    func restoreIdentityFromPhrase(
+        _ phrase: String,
+        resolve: @escaping RCTPromiseResolveBlock,
+        reject: @escaping RCTPromiseRejectBlock
+    ) {
+        queue.async { [weak self] in
+            guard self != nil else {
+                reject("IDENTITY_ERROR", "Module deallocated", nil)
+                return
+            }
+
+            do {
+                let deviceId = UIDevice.current.identifierForVendor?.uuidString ?? UUID().uuidString
+                let identity = try ZhtpClient.restoreIdentityFromPhrase(phrase, deviceId: deviceId)
+
+                let generatedIdentity = GeneratedIdentity(
+                    did: identity.did,
+                    publicKey: identity.publicKey,
+                    privateKey: [],
+                    kyberPublicKey: identity.kyberPublicKey,
+                    kyberSecretKey: [],
+                    nodeId: identity.nodeId,
+                    deviceId: identity.deviceId,
+                    masterSeed: [],
+                    createdAt: identity.createdAt,
+                    timestamp: UInt64(Date().timeIntervalSince1970),
+                    libClientIdentity: identity
+                )
+
+                self?.cachedIdentities[identity.did] = generatedIdentity
+
+                do {
+                    try IdentityHandleStore.shared.store(identity: identity)
+                } catch {
+                    print("[NativeIdentityProvisioning] ⚠️ Failed to store restored identity in handle store: \(error)")
+                }
+
+                resolve([
+                    "status": "restored",
+                    "did": identity.did,
+                    "deviceId": identity.deviceId,
+                    "createdAt": identity.createdAt,
+                    "identityType": "human"
+                ])
+            } catch {
+                reject("IDENTITY_ERROR", "Failed to restore identity from seed phrase: \(error)", nil)
+            }
+        }
+    }
+
     // MARK: - Cleanup Functions
 
     /// Clean all identity data (Documents keystore + Keychain + cached identities)
@@ -883,6 +978,28 @@ class NativeIdentityProvisioning: NSObject {
                 reject("SIGNING_ERROR", "Failed to sign \(txType) transaction: \(error)", nil)
             }
         }
+    }
+
+    // MARK: - Domain Signing (RN-friendly wrappers)
+
+    /// Sign domain register transaction (RN)
+    @objc
+    func signDomainRegisterTransaction(
+        _ params: NSDictionary,
+        resolve: @escaping RCTPromiseResolveBlock,
+        reject: @escaping RCTPromiseRejectBlock
+    ) {
+        self.signDomainTransaction("domain_register", params: params, resolve: resolve, reject: reject)
+    }
+
+    /// Sign domain update transaction (RN)
+    @objc
+    func signDomainUpdateTransaction(
+        _ params: NSDictionary,
+        resolve: @escaping RCTPromiseResolveBlock,
+        reject: @escaping RCTPromiseRejectBlock
+    ) {
+        self.signDomainTransaction("domain_update", params: params, resolve: resolve, reject: reject)
     }
 
     // MARK: - Module Configuration

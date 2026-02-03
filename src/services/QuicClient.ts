@@ -35,14 +35,6 @@ export interface QuicConnectionTestResult {
   port: number;
 }
 
-export interface QuicReachabilityResult {
-  reachable: boolean;
-  latencyMs?: number;
-  host: string;
-  port: number;
-  error?: string;
-  note?: string;
-}
 
 export interface QuicConstants {
   ALPN_PROTOCOL: string;
@@ -65,22 +57,6 @@ export async function isQuicSupported(): Promise<boolean> {
     if (__DEV__) console.error('Failed to check QUIC support:', error);
     return false;
   }
-}
-
-/**
- * Check if a QUIC node is reachable via UDP
- * This is a simple reachability check that doesn't require full QUIC/PQC handshake
- * Useful for showing node status on UI without complex protocol negotiation
- */
-export async function checkNodeReachability(
-  host: string,
-  port: number
-): Promise<QuicReachabilityResult> {
-  if (!NativeQuic) {
-    throw new Error('NativeQuic module not available');
-  }
-
-  return await NativeQuic.checkReachability(host, port);
 }
 
 /**
@@ -264,7 +240,6 @@ export async function testQuicHealthCheck(
 // Default export for convenience
 const QuicClient = {
   isSupported: isQuicSupported,
-  checkReachability: checkNodeReachability,
   testConnection: testQuicConnection,
   testHealthCheck: testQuicHealthCheck,
   request: quicRequest,
