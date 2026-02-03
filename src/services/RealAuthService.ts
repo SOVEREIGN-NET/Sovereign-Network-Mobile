@@ -440,25 +440,16 @@ class RealAuthService {
    * @returns True if node is reachable
    */
   async testConnection(): Promise<boolean> {
-    // console.log('[RealAuthService] 🔍 testConnection() - UDP Reachability Check');
+    // console.log('[RealAuthService] 🔍 testConnection() - QUIC Handshake Test');
     try {
-      // Always prefer the configured default node URL for reachability checks
-      const baseUrl = DEFAULT_SOV_NODE_URL;
-      const url = new URL(baseUrl);
-      const host = url.hostname;
-      const port = parseInt(url.port, 10) || 9334;
-
-      // console.log(`[RealAuthService] Checking UDP reachability: ${host}:${port}`);
-
-      // Use UDP reachability check (doesn't require PQC handshake)
-      const result = await QuicClient.checkReachability(host, port);
-      const connected = result.reachable;
+      // Use QUIC connection test (does full PQC handshake)
+      const connected = await QuicClient.testQuicHealthCheck();
       // console.log(connected
-      //   ? `[RealAuthService] ✅ UDP reachable at ${host}:${port} (${result.latencyMs ? Math.round(result.latencyMs) + 'ms' : 'unknown latency'})`
-      //   : `[RealAuthService] ❌ UDP not reachable: ${result.error}`);
+      //   ? `[RealAuthService] ✅ QUIC connection successful`
+      //   : `[RealAuthService] ❌ QUIC connection failed`);
       return connected;
     } catch (error: any) {
-      console.error('[RealAuthService] ❌ UDP reachability check failed:', error.message);
+      console.error('[RealAuthService] ❌ QUIC health check failed:', error.message);
       return false;
     }
   }
