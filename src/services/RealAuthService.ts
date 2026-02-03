@@ -20,7 +20,7 @@ import { createQuicFetchAdapterSync } from './QuicFetchAdapter';
 import CertificatePinning from './CertificatePinning';
 import { nativeIdentityProvisioning } from './NativeIdentityProvisioning';
 import { walletKeychainService } from './WalletKeychainService';
-import { QUIC_CONFIG } from '../config';
+import { QUIC_CONFIG, DEFAULT_NODE_HOST, DEFAULT_NODE_PORT } from '../config';
 
 export interface SignInCredentials {
   identity_id: string;
@@ -443,11 +443,11 @@ class RealAuthService {
     // console.log('[RealAuthService] 🔍 testConnection() - QUIC Handshake Test');
     try {
       // Use QUIC connection test (does full PQC handshake)
-      const connected = await testQuicHealthCheck();
-      // console.log(connected
+      const result = await testQuicHealthCheck(DEFAULT_NODE_HOST, DEFAULT_NODE_PORT);
+      // console.log(result.success
       //   ? `[RealAuthService] ✅ QUIC connection successful`
       //   : `[RealAuthService] ❌ QUIC connection failed`);
-      return connected;
+      return result.success;
     } catch (error: any) {
       console.error('[RealAuthService] ❌ QUIC health check failed:', error.message);
       return false;
