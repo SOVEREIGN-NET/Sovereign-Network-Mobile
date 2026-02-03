@@ -15,7 +15,7 @@
 import { Platform } from 'react-native';
 import { ZhtpApi, ReactNativeConfigProvider, Identity, SignupRequest, LoginRequest } from '@sovereign-net/api-client/react-native';
 import type { FetchAdapter } from '@sovereign-net/api-client/react-native';
-import QuicClient from './QuicClient';
+import { testQuicHealthCheck, quicRequest } from './QuicClient';
 import { createQuicFetchAdapterSync } from './QuicFetchAdapter';
 import CertificatePinning from './CertificatePinning';
 import { nativeIdentityProvisioning } from './NativeIdentityProvisioning';
@@ -443,7 +443,7 @@ class RealAuthService {
     // console.log('[RealAuthService] 🔍 testConnection() - QUIC Handshake Test');
     try {
       // Use QUIC connection test (does full PQC handshake)
-      const connected = await QuicClient.testQuicHealthCheck();
+      const connected = await testQuicHealthCheck();
       // console.log(connected
       //   ? `[RealAuthService] ✅ QUIC connection successful`
       //   : `[RealAuthService] ❌ QUIC connection failed`);
@@ -465,7 +465,7 @@ class RealAuthService {
       const healthUrl = `${baseUrl}/api/v1/protocol/health`;
       // console.log(`[RealAuthService] Requesting: ${healthUrl}`);
 
-      const response = await QuicClient.request(healthUrl, {
+      const response = await quicRequest(healthUrl, {
         method: 'GET',
         timeout: 10,
         alpn: 'public', // Health check is unauthenticated

@@ -4,7 +4,7 @@
  */
 
 import { useState, useEffect, useCallback } from 'react';
-import QuicClient from '../services/QuicClient';
+import { isQuicSupported, testQuicConnection } from '../services/QuicClient';
 import { DEFAULT_NODE_HOST, DEFAULT_NODE_PORT } from '../config';
 
 export interface UseNodeConnectionStatusReturn {
@@ -33,7 +33,7 @@ export function useNodeConnectionStatus(
   const checkNodeConnection = useCallback(async () => {
     try {
       // First check if QUIC is supported
-      const supported = await QuicClient.isSupported();
+      const supported = await isQuicSupported();
       if (!supported) {
         if (__DEV__) console.warn('QUIC not supported on this device');
         setConnectionStatus('disconnected');
@@ -42,7 +42,7 @@ export function useNodeConnectionStatus(
 
       // Use QUIC connection test (full PQC handshake works)
       setConnectionStatus('checking');
-      const result = await QuicClient.testConnection(DEFAULT_NODE_HOST, DEFAULT_NODE_PORT);
+      const result = await testQuicConnection(DEFAULT_NODE_HOST, DEFAULT_NODE_PORT);
 
       if (result.success) {
         setConnectionStatus('connected');

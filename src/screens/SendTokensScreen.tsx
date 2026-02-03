@@ -17,7 +17,7 @@ import { useTranslation } from '../i18n';
 import { colors, spacing, typography, borderRadius } from '../theme';
 import tokenService from '../services/TokenService';
 import { TokenTransferRequest } from '../types/token';
-import QuicClient from '../services/QuicClient';
+import { quicRequest } from '../services/QuicClient';
 
 // Storage keys
 const CREATED_TOKENS_KEY = 'sov:created_tokens';
@@ -250,7 +250,7 @@ const SendTokensScreen = ({ navigation }: any) => {
         console.log('[SendTokensScreen] SOV transfer request:', sovTransferRequest);
 
         const nodeUrl = require('../config').DEFAULT_SOV_NODE_URL;
-        const response = await QuicClient.request(
+        const response = await quicRequest(
           `${nodeUrl}/api/v1/wallet/send`,
           {
             method: 'POST',

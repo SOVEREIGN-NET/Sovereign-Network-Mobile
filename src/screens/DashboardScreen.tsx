@@ -19,7 +19,6 @@ import { useTranslation } from '../i18n';
 import { borderRadius, colors, spacing, typography } from '../theme';
 import { FEATURE_FLAGS } from '../config';
 import SShieldLogo from '../components/atoms/Logo';
-import QuicClient from '../services/QuicClient';
 
 const getTrendColor = (trend: TokenData['trend']) => {
   if (trend === 'up') return colors.success;
