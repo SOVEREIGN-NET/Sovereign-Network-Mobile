@@ -3,7 +3,7 @@
  * Screen for backing up identity (seed phrase + encrypted backup file)
  */
 
-import React, { useState, useCallback } from 'react';
+import React, { useState, useCallback, useEffect } from 'react';
 import { View, Pressable, Share, Alert } from 'react-native';
 import { NativeStackScreenProps } from '@react-navigation/native-stack';
 import {
@@ -31,7 +31,7 @@ type BackupIdentityScreenProps = NativeStackScreenProps<
 
 const BackupIdentityScreen = ({ navigation }: BackupIdentityScreenProps) => {
   const { t } = useTranslation();
-  const { currentIdentity, isLoading } = useAuth();
+  const { currentIdentity, isLoading, getMasterSeedPhrase } = useAuth();
 
   // State
   const [backupMethod, setBackupMethod] = useState<'seed' | 'file'>('seed');
@@ -45,17 +45,21 @@ const BackupIdentityScreen = ({ navigation }: BackupIdentityScreenProps) => {
   const [creating, setCreating] = useState(false);
   const [backupError, setBackupError] = useState<string | null>(null);
 
-  // Get seed phrases from identity (24 words from server or 20 from mock)
-  const seedPhrase = currentIdentity?.walletSeedPhrases?.primary
-    ? currentIdentity.walletSeedPhrases.primary
-    : currentIdentity?.seedPhrases?.primary
-    ? currentIdentity.seedPhrases.primary.join(' ')
-    : // Fallback mock seed phrase for demo (20 words)
-      [
-        'abandon', 'ability', 'able', 'about', 'above', 'absent', 'absorb',
-        'abstract', 'abuse', 'access', 'accident', 'account', 'achieve', 'acid',
-        'acoustic', 'acquire', 'across', 'act', 'action', 'activate',
-      ].join(' ');
+  const [seedPhrase, setSeedPhrase] = useState<string>('');
+
+  useEffect(() => {
+    const loadSeedPhrase = async () => {
+      if (currentIdentity?.masterSeedPhrase) {
+        setSeedPhrase(currentIdentity.masterSeedPhrase);
+        return;
+      }
+      const stored = await getMasterSeedPhrase();
+      if (stored) {
+        setSeedPhrase(stored);
+      }
+    };
+    loadSeedPhrase().catch(() => {});
+  }, [currentIdentity?.masterSeedPhrase, getMasterSeedPhrase]);
 
   const handleCopySeed = useCallback(async () => {
     try {

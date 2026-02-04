@@ -22,23 +22,13 @@ import SeedPhraseScreen from '../screens/SeedPhraseScreen';
 
 const Stack = createNativeStackNavigator();
 
-export type AllSeedPhrases = {
-  primary: string[];
-  ubi: string[];
-  savings: string[];
-};
-
 export type AuthStackParamList = {
   SignIn: undefined;
   CreateIdentity: undefined;
   RecoverIdentity: undefined;
   SeedPhrase: {
     seedPhrases: string[];
-    walletType: 'primary' | 'ubi' | 'savings';
     identity?: Identity;
-    allSeedPhrases?: AllSeedPhrases;
-    currentStep?: number; // 1, 2, or 3
-    totalSteps?: number; // always 3 for citizens
   };
 };
 

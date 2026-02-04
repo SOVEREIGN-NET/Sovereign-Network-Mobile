@@ -14,7 +14,7 @@ import {
   Badge,
   Row,
 } from '../components';
-import { useAsyncData, useApi } from '../hooks';
+import { useAsyncData } from '../hooks';
 import { useDAOStats, formatTreasury } from '../hooks/useDAOStats';
 import { useTranslation } from '../i18n';
 import MockDataService from '../services/MockDataService';
@@ -22,7 +22,6 @@ import { colors, spacing, typography } from '../theme';
 
 const DAOScreen = ({ navigation }: any) => {
   const { t } = useTranslation();
-  const { api, isInitialized } = useApi();
   const [drawerVisible, setDrawerVisible] = useState(false);
   const daoStats = useDAOStats();
 
@@ -82,7 +81,7 @@ const DAOScreen = ({ navigation }: any) => {
         daoStats: MockDataService.getDAOStats(),
       };
     },
-    [api, isInitialized],
+    [],
   );
 
   if (loading) {

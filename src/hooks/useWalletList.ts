@@ -1,8 +1,8 @@
 import { useMemo } from 'react';
-import { useApi } from './useApi';
 import { useAuth } from './useAuth';
 import { useAsyncData } from './useAsyncData';
 import { getUseMockService } from '../context/AuthContext';
+import appService from '../services/AppService';
 
 export interface WalletPermissions {
   can_transfer_external: boolean;
@@ -44,8 +44,15 @@ const normalizeIdentityId = (identityId?: string | null): string | null => {
 
 const normalizeWalletType = (walletType: string): string => walletType.toLowerCase();
 
+const resolveWalletId = (wallet: any): string => {
+  if (wallet.wallet_id) return wallet.wallet_id;
+  if (wallet.id) return wallet.id;
+  const summaryId = wallet?.summary?.id?.[0];
+  return summaryId ?? '';
+};
+
 const toWalletDisplay = (wallet: any): WalletDisplay => ({
-  id: wallet.wallet_id ?? wallet.id ?? '',
+  id: resolveWalletId(wallet),
   name: wallet.name ?? `${wallet.wallet_type} Wallet`,
   wallet_type: wallet.wallet_type ?? 'Unknown',
   available_balance: wallet.available_balance ?? 0,
@@ -58,7 +65,6 @@ const toWalletDisplay = (wallet: any): WalletDisplay => ({
 });
 
 export const useWalletList = () => {
-  const { api, isInitialized } = useApi();
   const { currentIdentity } = useAuth();
   const identityId = normalizeIdentityId(currentIdentity?.did);
   const useMock = getUseMockService();
@@ -76,26 +82,27 @@ export const useWalletList = () => {
         };
       }
 
-      if (!api || !isInitialized || !identityId) {
-        console.log('[useWalletList] ⚠️ Cannot fetch wallet list:', {
-          hasApi: !!api,
-          isInitialized,
-          identityId,
-        });
+      if (!identityId) {
+        console.log('[useWalletList] ⚠️ Cannot fetch wallet list: no identity ID');
         return null;
       }
 
-      console.log('[useWalletList] 📡 Fetching wallet list for identity:', identityId);
-      const response = await api.getWalletList(identityId);
-      console.log('[useWalletList] ✅ Received wallet list response:', {
-        identityId: response?.identity_id,
-        totalBalance: response?.total_balance,
-        walletCount: response?.wallets?.length || 0,
-        firstWallet: response?.wallets?.[0],
-      });
-      return response;
+      try {
+        console.log('[useWalletList] 📡 Fetching wallet list for identity:', identityId);
+        const response = await appService.getWalletList(identityId);
+        console.log('[useWalletList] ✅ Received wallet list response:', {
+          identityId: response?.identity_id,
+          totalBalance: response?.total_balance,
+          walletCount: response?.wallets?.length || 0,
+          firstWallet: response?.wallets?.[0],
+        });
+        return response;
+      } catch (err) {
+        console.error('[useWalletList] ❌ Failed to fetch wallet list:', err);
+        throw err;
+      }
     },
-    [api, isInitialized, identityId, useMock, currentIdentity?.wallets],
+    [identityId, useMock, currentIdentity?.wallets],
     null,
   );
 

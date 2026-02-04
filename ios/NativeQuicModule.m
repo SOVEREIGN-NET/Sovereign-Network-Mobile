@@ -5,11 +5,6 @@
 RCT_EXTERN_METHOD(isSupported:(RCTPromiseResolveBlock)resolve
                   reject:(RCTPromiseRejectBlock)reject)
 
-RCT_EXTERN_METHOD(checkReachability:(NSString *)host
-                  port:(NSInteger)port
-                  resolve:(RCTPromiseResolveBlock)resolve
-                  reject:(RCTPromiseRejectBlock)reject)
-
 RCT_EXTERN_METHOD(testConnection:(NSString *)host
                   port:(NSInteger)port
                   resolve:(RCTPromiseResolveBlock)resolve

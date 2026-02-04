@@ -40,11 +40,12 @@ x509-parser = "0.16"
 once_cell = "1.19"
 hex = "0.4"
 
-# UHP handshake dependencies (shared with iOS quinn-ffi)
-lib-network = { path = "../../../../../../vendor/lib-network" }
-lib-identity = { path = "../../../../../../vendor/lib-identity" }
-lib-crypto = { path = "../../../../../../vendor/lib-crypto" }
-zhtp_client = { package = "lib-client", path = "../../../../../../../SOVN/lib-client" }
+# UHP handshake dependencies - use The-Sovereign-Network versions for consistency with lib-client
+lib-network = { path = "../../../../../../../The-Sovereign-Network/lib-network" }
+lib-identity = { path = "../../../../../../../The-Sovereign-Network/lib-identity" }
+lib-crypto = { path = "../../../../../../../The-Sovereign-Network/lib-crypto" }
+lib-blockchain = { path = "../../../../../../../The-Sovereign-Network/lib-blockchain" }
+zhtp_client = { package = "lib-client", path = "../../../../../../../The-Sovereign-Network/lib-client" }
 
 [profile.release]
 lto = true

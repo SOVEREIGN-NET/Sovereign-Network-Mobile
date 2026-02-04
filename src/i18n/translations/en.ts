@@ -13,6 +13,9 @@ export const en = {
     retryConnection: 'Retry Connection',
     connected: 'Connected',
     disconnected: 'Disconnected',
+    notChecked: 'Not checked',
+    notCheckedHint: 'Connection has not been checked yet',
+    tapToCheck: 'Tap to check connection',
     back: 'Back',
     errors: {
       nodeUnreachable: 'Node is not reachable',
@@ -224,10 +227,10 @@ export const en = {
       method: 'Recovery Method',
       seed: {
         label: 'Seed Phrase',
-        description: '20-word recovery phrase',
-        title: '20-Word Recovery Phrase',
-        placeholder: 'word1 word2 word3 ... word20',
-        hint: 'Enter your 20-word seed phrase separated by spaces. This phrase can be used to restore your identity and wallets.',
+        description: '24-word recovery phrase',
+        title: '24-Word Recovery Phrase',
+        placeholder: 'word1 word2 word3 ... word24',
+        hint: 'Enter your 24-word recovery phrase separated by spaces. This phrase can be used to restore your identity and wallets.',
         securityTitle: 'Security Note',
         securityWarning: 'Never share your seed phrase. Anyone with it can access your identity and funds.',
       },
@@ -263,6 +266,7 @@ export const en = {
       createNew: 'Create New Identity',
       validation: {
         seedRequired: 'Seed phrase is required',
+        seedInvalid: 'Recovery phrase must be 24 words',
         backupRequired: 'Backup file content is required',
         backupPasswordRequired: 'Password is required to decrypt backup',
         guardianCodeRequired: 'Guardian code is required',
@@ -274,10 +278,9 @@ export const en = {
     },
     seedPhrase: {
       screenTitle: 'Save Your Seed Phrase',
-      title: 'Your 20-Word Seed Phrase',
-      wallet: 'Wallet',
+      title: 'Your 24-Word Seed Phrase',
       warning: 'Important: Save Your Seed Phrase',
-      warningDescription: 'This 20-word phrase is the ONLY way to recover your identity and funds. Write it down securely and keep it in a safe place. Never share it with anyone.',
+      warningDescription: 'This 24-word phrase is the ONLY way to recover your identity and funds. Write it down securely and keep it in a safe place. Never share it with anyone.',
       show: 'Show',
       hide: 'Hide',
       hidden: 'Tap "Show" to display your seed phrase',
@@ -297,7 +300,7 @@ export const en = {
       confirmSavedDescription: 'Check this box to confirm you have written down and safely stored your seed phrase. You will need it if you need to recover your identity.',
       continueButton: 'I\'ve Saved My Seed Phrase',
       errors: {
-        invalidPhrases: 'Invalid seed phrases received from server',
+        invalidPhrases: 'Invalid seed phrase received from server',
         vaultSaveFailed: 'Failed to store your seed phrase securely',
       },
     },
@@ -309,8 +312,8 @@ export const en = {
       securityWarning: 'Never share your backup. Anyone with it can access your identity.',
       seed: {
         label: 'Seed Phrase',
-        description: '20-word recovery phrase',
-        title: 'Your 20-Word Seed Phrase',
+        description: '24-word recovery phrase',
+        title: 'Your 24-Word Seed Phrase',
       },
       file: {
         label: 'Encrypted File',
@@ -867,6 +870,8 @@ export const en = {
     ble: 'Start BLE',
     connected: 'Connected',
     offline: 'Offline',
+    checking: 'Checking...',
+    notChecked: 'Not checked',
   },
 
   // History Screen

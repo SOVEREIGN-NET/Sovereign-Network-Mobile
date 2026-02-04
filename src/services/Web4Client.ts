@@ -3,7 +3,7 @@
  * Matches iOS implementation: uses public ALPN for Web4 content endpoints
  */
 
-import QuicClient from './QuicClient';
+import { quicRequest } from './QuicClient';
 
 export interface Web4ResolveResponse {
   domain: string;
@@ -33,7 +33,7 @@ class Web4Client {
     const body = JSON.stringify({ domain, version: null });
 
     try {
-      const response = await QuicClient.request(url, {
+      const response = await quicRequest(url, {
         method: 'POST',
         body,
         headers: {
@@ -67,7 +67,7 @@ class Web4Client {
     const body = JSON.stringify({ cid: manifestCid });
 
     try {
-      const response = await QuicClient.request(url, {
+      const response = await quicRequest(url, {
         method: 'POST',
         body,
         headers: {
@@ -101,7 +101,7 @@ class Web4Client {
     const body = JSON.stringify({ cid });
 
     try {
-      const response = await QuicClient.request(url, {
+      const response = await quicRequest(url, {
         method: 'POST',
         body,
         headers: {

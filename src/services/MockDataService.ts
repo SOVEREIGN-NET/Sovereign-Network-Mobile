@@ -224,7 +224,7 @@ class MockDataService {
   }
 
   /**
-   * Generate mock seed phrase (20 words)
+   * Generate mock seed phrase (24 words)
    */
   static generateSeedPhrase(): string[] {
     const wordList = [
@@ -236,7 +236,7 @@ class MockDataService {
     ];
 
     const shuffled = [...wordList].sort(() => Math.random() - 0.5);
-    return shuffled.slice(0, 20);
+    return shuffled.slice(0, 24);
   }
 
   /**

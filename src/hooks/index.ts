@@ -31,3 +31,9 @@ export { useTrendingDapps, formatUserCount, getActivityColor } from './useTrendi
 export type { DappData } from './useTrendingDapps';
 
 export { useRewardCounter } from './useRewardCounter';
+
+export { useTokenOperations } from './useTokenOperations';
+export type { UseTokenOperationsReturn, TokenOperationState } from './useTokenOperations';
+
+export { useUserTokenBalances } from './useUserTokenBalances';
+export type { UserTokenBalancesData, TokenDisplay } from './useUserTokenBalances';

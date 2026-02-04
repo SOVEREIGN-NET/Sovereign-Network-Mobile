@@ -17,8 +17,8 @@ import {
 } from '../components';
 import { useTranslation } from '../i18n';
 import { borderRadius, colors, spacing, typography } from '../theme';
+import { FEATURE_FLAGS } from '../config';
 import SShieldLogo from '../components/atoms/Logo';
-import QuicClient from '../services/QuicClient';
 
 const getTrendColor = (trend: TokenData['trend']) => {
   if (trend === 'up') return colors.success;
@@ -39,12 +39,12 @@ const DashboardScreen: React.FC<any> = ({ navigation }) => {
   const trendingTokensData = useTrendingTokens();
   const trendingDappsData = useTrendingDapps();
 
-  const drawerItems: DrawerItem[] = useMemo(
-    () => [
+  const drawerItems: DrawerItem[] = useMemo(() => {
+    const items: DrawerItem[] = [
       {
         id: 'history',
         label: 'History',
-        icon: '🕑',
+        icon: '',
         onPress: () => {
           setDrawerVisible(false);
           navigation.navigate('SIDTab', { screen: 'History' });
@@ -53,7 +53,7 @@ const DashboardScreen: React.FC<any> = ({ navigation }) => {
       {
         id: 'bookmarks',
         label: 'Bookmarks',
-        icon: '📑',
+        icon: '',
         onPress: () => {
           setDrawerVisible(false);
           navigation.navigate('SIDTab', { screen: 'Bookmarks' });
@@ -62,24 +62,26 @@ const DashboardScreen: React.FC<any> = ({ navigation }) => {
       {
         id: 'favorites',
         label: 'Favorites',
-        icon: '⭐',
+        icon: '',
         onPress: () => {
           setDrawerVisible(false);
           navigation.navigate('SIDTab', { screen: 'Favorites' });
         },
       },
-      {
-        id: 'settings',
-        label: 'Settings',
-        icon: '⚙️',
-        onPress: () => {
-          setDrawerVisible(false);
-          navigation.navigate('SIDTab', { screen: 'AppSettings' });
-        },
+    ];
+
+    items.push({
+      id: 'settings',
+      label: 'Settings',
+      icon: '',
+      onPress: () => {
+        setDrawerVisible(false);
+        navigation.navigate('SIDTab', { screen: 'AppSettings' });
       },
-    ],
-    [navigation],
-  );
+    });
+
+    return items;
+  }, [navigation]);
 
   const openBrowser = (url?: string) => {
     const targetUrl = url || urlInput;

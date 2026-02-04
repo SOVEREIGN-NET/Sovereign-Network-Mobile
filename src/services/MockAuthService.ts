@@ -32,17 +32,7 @@ export interface Identity {
     votingPower: number;
     soulboundNftIssued: boolean;
   };
-  seedPhrases?: {
-    primary: string[];
-    ubi: string[];
-    savings: string[];
-  };
-  // Server-generated wallet seeds (24-word phrases as strings)
-  walletSeedPhrases?: {
-    primary?: string;
-    ubi?: string;
-    savings?: string;
-  };
+  masterSeedPhrase?: string;
   votingPower?: number;
   ubiEarned?: number;
 }
@@ -118,6 +108,7 @@ const MOCK_IDENTITIES: Record<string, Identity> = {
     },
     votingPower: 1000,
     ubiEarned: 150.5,
+    masterSeedPhrase: 'abandon ability able about above absent absorb abstract abuse access accident account achieve acid acoustic acquire across act action activate adapt add addict',
   },
   'did:zhtp:demo002': {
     did: 'did:zhtp:demo002',
@@ -290,11 +281,7 @@ class MockAuthService {
         votingPower: 1,
         soulboundNftIssued: true,
       } : undefined,
-      seedPhrases: {
-        primary: this.generateSeedPhrase(),
-        ubi: this.generateSeedPhrase(),
-        savings: this.generateSeedPhrase(),
-      },
+      masterSeedPhrase: this.generateSeedPhrase().join(' '),
       votingPower: data.identityType === 'citizen' ? 1 : 0,
       ubiEarned: 0,
     };
@@ -308,7 +295,7 @@ class MockAuthService {
 
   /**
    * Simulate recovering identity with seed phrase
-   * @param seedPhrase - 12-word seed
+   * @param seedPhrase - 24-word recovery phrase
    * @returns Recovered identity
    */
   async recoverWithSeed(seedPhrase: string): Promise<Identity> {
@@ -319,8 +306,8 @@ class MockAuthService {
     }
 
     const words = seedPhrase.trim().split(/\s+/);
-    if (words.length !== 12) {
-      throw new Error('Seed phrase must be exactly 12 words');
+    if (words.length !== 24) {
+      throw new Error('Recovery phrase must be 24 words');
     }
 
     // Mock recovery - use first word to map to a demo identity
@@ -437,7 +424,7 @@ class MockAuthService {
   }
 
   /**
-   * Generate mock seed phrase (20 words)
+   * Generate mock seed phrase (24 words)
    */
   private generateSeedPhrase(): string[] {
     const words = [
@@ -446,7 +433,7 @@ class MockAuthService {
       'activate', 'active', 'actor', 'acts', 'actual', 'acute', 'addition', 'address', 'adjacent', 'adjust',
     ];
     const phrase: string[] = [];
-    for (let i = 0; i < 20; i++) {
+    for (let i = 0; i < 24; i++) {
       phrase.push(words[Math.floor(Math.random() * words.length)]);
     }
     return phrase;

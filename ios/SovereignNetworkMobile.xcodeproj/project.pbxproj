@@ -10,16 +10,19 @@
 		00000000208CE7D8131E4E77 /* libuhp_ffi.a in Frameworks */ = {isa = PBXBuildFile; fileRef = 00000000DFBB620A95174C73 /* libuhp_ffi.a */; };
 		00000000624DE005C8944040 /* ZhtpAuth.swift in Resources */ = {isa = PBXBuildFile; fileRef = 00000000528835908967466C /* ZhtpAuth.swift */; };
 		00000000990ADA84688E4EE8 /* ZhtpAuthRequest.swift in Resources */ = {isa = PBXBuildFile; fileRef = 000000004A767CC3E71F4EEB /* ZhtpAuthRequest.swift */; };
-		00000000A4BFFB50CA034807 /* UhpHandshake.swift in Resources */ = {isa = PBXBuildFile; fileRef = 000000002C80BB129F894103 /* UhpHandshake.swift */; };
-		013FDF50305A839F2A8A1F49 /* libPods-SovereignNetworkMobile.a in Frameworks */ = {isa = PBXBuildFile; fileRef = 8D24FC999DA153288045F4D3 /* libPods-SovereignNetworkMobile.a */; };
 		13B07FBF1A68108700A75B9A /* Images.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = 13B07FB51A68108700A75B9A /* Images.xcassets */; };
+		2FE9C2514425A6A35163CF83 /* libPods-SovereignNetworkMobile.a in Frameworks */ = {isa = PBXBuildFile; fileRef = FCA6F018BBA568BD79705FCD /* libPods-SovereignNetworkMobile.a */; };
 		301BAC732EB4C924003807B5 /* GoogleService-Info.plist in Resources */ = {isa = PBXBuildFile; fileRef = 301BAC722EB4C924003807B5 /* GoogleService-Info.plist */; };
+		303D4B5C2F31637F00647354 /* NativeIdentityProvisioningModule+Domain.swift in Sources */ = {isa = PBXBuildFile; fileRef = 303D4B5B2F31637F00647354 /* NativeIdentityProvisioningModule+Domain.swift */; };
+		303D4B5F2F31D5CF00647354 /* NativeZhtpApi.swift in Sources */ = {isa = PBXBuildFile; fileRef = 303D4B5D2F31D5CF00647354 /* NativeZhtpApi.swift */; };
+		303D4B602F31D5CF00647354 /* NativeZhtpApiModule.m in Sources */ = {isa = PBXBuildFile; fileRef = 303D4B5E2F31D5CF00647354 /* NativeZhtpApiModule.m */; };
 		30481B5F2F1E700300418F99 /* NativeIdentityProvisioning.m in Sources */ = {isa = PBXBuildFile; fileRef = 30481B5D2F1E700300418F99 /* NativeIdentityProvisioning.m */; };
 		30481B602F1E700300418F99 /* NativeIdentityProvisioning.swift in Sources */ = {isa = PBXBuildFile; fileRef = 30481B5E2F1E700300418F99 /* NativeIdentityProvisioning.swift */; };
 		3049D7D02F1ECD73002C2DE5 /* ZhtpClient.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3049D7CD2F1ECBDF002C2DE5 /* ZhtpClient.swift */; };
 		3049D7D32F1EFD6E002C2DE5 /* WalletKeychain.m in Sources */ = {isa = PBXBuildFile; fileRef = 3049D7D12F1EFD6E002C2DE5 /* WalletKeychain.m */; };
 		3049D7D42F1EFD6E002C2DE5 /* WalletKeychain.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3049D7D22F1EFD6E002C2DE5 /* WalletKeychain.swift */; };
 		3049D7D62F1F083C002C2DE5 /* IdentityHandleStore.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3049D7D52F1F083C002C2DE5 /* IdentityHandleStore.swift */; };
+		307F67BF2F30AFA5002F6C7D /* GeneratedConfig.swift in Sources */ = {isa = PBXBuildFile; fileRef = 307F67BE2F30AFA5002F6C7D /* GeneratedConfig.swift */; };
 		30CB596B2EE88A1D00D6B4B7 /* Settings.bundle in Resources */ = {isa = PBXBuildFile; fileRef = 30CB596A2EE88A1D00D6B4B7 /* Settings.bundle */; };
 		30CB596C2EE88A1D00D6B4B7 /* NativeSettings.swift in Sources */ = {isa = PBXBuildFile; fileRef = 30CB59692EE88A1D00D6B4B7 /* NativeSettings.swift */; };
 		30CB596D2EE88A1D00D6B4B7 /* NativeQuicModule.m in Sources */ = {isa = PBXBuildFile; fileRef = 30CB59662EE88A1D00D6B4B7 /* NativeQuicModule.m */; };
@@ -33,14 +36,12 @@
 		30E39C482F07364A004BA6A5 /* LibOQSTypes.swift in Sources */ = {isa = PBXBuildFile; fileRef = 30E39C412F07364A004BA6A5 /* LibOQSTypes.swift */; };
 		30E39C4A2F073687004BA6A5 /* liboqs.xcframework in Frameworks */ = {isa = PBXBuildFile; fileRef = 30E39C492F073687004BA6A5 /* liboqs.xcframework */; };
 		30E39C5B2F073A1A004BA6A5 /* ZhtpCodec.swift in Sources */ = {isa = PBXBuildFile; fileRef = 30E39C572F073A1A004BA6A5 /* ZhtpCodec.swift */; };
-		30E39C5C2F073A1A004BA6A5 /* ZhtpRequest.swift in Sources */ = {isa = PBXBuildFile; fileRef = 30E39C582F073A1A004BA6A5 /* ZhtpRequest.swift */; };
 		30E39C5D2F073A1A004BA6A5 /* ZhtpTypes.swift in Sources */ = {isa = PBXBuildFile; fileRef = 30E39C592F073A1A004BA6A5 /* ZhtpTypes.swift */; };
 		30E39C5E2F073A1A004BA6A5 /* ZhtpWireFraming.swift in Sources */ = {isa = PBXBuildFile; fileRef = 30E39C5A2F073A1A004BA6A5 /* ZhtpWireFraming.swift */; };
 		30E671212F216BAA00115EAD /* QuinnFFI.xcframework in Frameworks */ = {isa = PBXBuildFile; fileRef = 30E671182F215FB900115EAD /* QuinnFFI.xcframework */; };
 		30E671222F216BAA00115EAD /* QuinnFFI.xcframework in Embed Frameworks */ = {isa = PBXBuildFile; fileRef = 30E671182F215FB900115EAD /* QuinnFFI.xcframework */; settings = {ATTRIBUTES = (CodeSignOnCopy, RemoveHeadersOnCopy, ); }; };
 		30F1A0A12F1A0001 /* ZhtpAuth.swift in Sources */ = {isa = PBXBuildFile; fileRef = 30F1A1A12F1A0001 /* ZhtpAuth.swift */; };
 		30F1A0A22F1A0001 /* ZhtpAuthRequest.swift in Sources */ = {isa = PBXBuildFile; fileRef = 30F1A1A22F1A0001 /* ZhtpAuthRequest.swift */; };
-		30F1A0A32F1A0001 /* UhpHandshake.swift in Sources */ = {isa = PBXBuildFile; fileRef = 30F1A1A32F1A0001 /* UhpHandshake.swift */; };
 		761780ED2CA45674006654EE /* AppDelegate.swift in Sources */ = {isa = PBXBuildFile; fileRef = 761780EC2CA45674006654EE /* AppDelegate.swift */; };
 		7B9CBBBC6C3C0DDFC7CD0808 /* PrivacyInfo.xcprivacy in Resources */ = {isa = PBXBuildFile; fileRef = 13B07FB81A68108700A75B9A /* PrivacyInfo.xcprivacy */; };
 		81AB9BB82411601600AC10FF /* LaunchScreen.storyboard in Resources */ = {isa = PBXBuildFile; fileRef = 81AB9BB72411601600AC10FF /* LaunchScreen.storyboard */; };
@@ -79,12 +80,16 @@
 		13B07FB61A68108700A75B9A /* Info.plist */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = text.plist.xml; name = Info.plist; path = SovereignNetworkMobile/Info.plist; sourceTree = "<group>"; };
 		13B07FB81A68108700A75B9A /* PrivacyInfo.xcprivacy */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = text.plist.xml; name = PrivacyInfo.xcprivacy; path = SovereignNetworkMobile/PrivacyInfo.xcprivacy; sourceTree = "<group>"; };
 		301BAC722EB4C924003807B5 /* GoogleService-Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist.xml; path = "GoogleService-Info.plist"; sourceTree = "<group>"; };
+		303D4B5B2F31637F00647354 /* NativeIdentityProvisioningModule+Domain.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "NativeIdentityProvisioningModule+Domain.swift"; sourceTree = "<group>"; };
+		303D4B5D2F31D5CF00647354 /* NativeZhtpApi.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = NativeZhtpApi.swift; sourceTree = "<group>"; };
+		303D4B5E2F31D5CF00647354 /* NativeZhtpApiModule.m */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.objc; path = NativeZhtpApiModule.m; sourceTree = "<group>"; };
 		30481B5D2F1E700300418F99 /* NativeIdentityProvisioning.m */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.objc; path = NativeIdentityProvisioning.m; sourceTree = "<group>"; };
 		30481B5E2F1E700300418F99 /* NativeIdentityProvisioning.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = NativeIdentityProvisioning.swift; sourceTree = "<group>"; };
 		3049D7CD2F1ECBDF002C2DE5 /* ZhtpClient.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ZhtpClient.swift; sourceTree = "<group>"; };
 		3049D7D12F1EFD6E002C2DE5 /* WalletKeychain.m */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.objc; path = WalletKeychain.m; sourceTree = "<group>"; };
 		3049D7D22F1EFD6E002C2DE5 /* WalletKeychain.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WalletKeychain.swift; sourceTree = "<group>"; };
 		3049D7D52F1F083C002C2DE5 /* IdentityHandleStore.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = IdentityHandleStore.swift; sourceTree = "<group>"; };
+		307F67BE2F30AFA5002F6C7D /* GeneratedConfig.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = GeneratedConfig.swift; sourceTree = "<group>"; };
 		30CB59662EE88A1D00D6B4B7 /* NativeQuicModule.m */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.objc; path = NativeQuicModule.m; sourceTree = "<group>"; };
 		30CB59672EE88A1D00D6B4B7 /* NativeQuicModule.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = NativeQuicModule.swift; sourceTree = "<group>"; };
 		30CB59682EE88A1D00D6B4B7 /* NativeSettings.m */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.objc; path = NativeSettings.m; sourceTree = "<group>"; };
@@ -106,11 +111,10 @@
 		30F1A1A12F1A0001 /* ZhtpAuth.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ZhtpAuth.swift; sourceTree = "<group>"; };
 		30F1A1A22F1A0001 /* ZhtpAuthRequest.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ZhtpAuthRequest.swift; sourceTree = "<group>"; };
 		30F1A1A32F1A0001 /* UhpHandshake.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = UhpHandshake.swift; sourceTree = "<group>"; };
+		68F3C403295743DBD0DC4BED /* Pods-SovereignNetworkMobile.debug.xcconfig */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = text.xcconfig; name = "Pods-SovereignNetworkMobile.debug.xcconfig"; path = "Target Support Files/Pods-SovereignNetworkMobile/Pods-SovereignNetworkMobile.debug.xcconfig"; sourceTree = "<group>"; };
 		761780EC2CA45674006654EE /* AppDelegate.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; name = AppDelegate.swift; path = SovereignNetworkMobile/AppDelegate.swift; sourceTree = "<group>"; };
-		7C1DF059E1FB07F63F66F2B5 /* Pods-SovereignNetworkMobile.debug.xcconfig */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = text.xcconfig; name = "Pods-SovereignNetworkMobile.debug.xcconfig"; path = "Target Support Files/Pods-SovereignNetworkMobile/Pods-SovereignNetworkMobile.debug.xcconfig"; sourceTree = "<group>"; };
 		81AB9BB72411601600AC10FF /* LaunchScreen.storyboard */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = file.storyboard; name = LaunchScreen.storyboard; path = SovereignNetworkMobile/LaunchScreen.storyboard; sourceTree = "<group>"; };
-		8D24FC999DA153288045F4D3 /* libPods-SovereignNetworkMobile.a */ = {isa = PBXFileReference; explicitFileType = archive.ar; includeInIndex = 0; path = "libPods-SovereignNetworkMobile.a"; sourceTree = BUILT_PRODUCTS_DIR; };
-		8E86F6E67F7803368F640904 /* Pods-SovereignNetworkMobile.release.xcconfig */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = text.xcconfig; name = "Pods-SovereignNetworkMobile.release.xcconfig"; path = "Target Support Files/Pods-SovereignNetworkMobile/Pods-SovereignNetworkMobile.release.xcconfig"; sourceTree = "<group>"; };
+		9E4997CF8BA243436E042959 /* Pods-SovereignNetworkMobile.release.xcconfig */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = text.xcconfig; name = "Pods-SovereignNetworkMobile.release.xcconfig"; path = "Target Support Files/Pods-SovereignNetworkMobile/Pods-SovereignNetworkMobile.release.xcconfig"; sourceTree = "<group>"; };
 		A1001F0012B4D5A500A1F001 /* Web4BlobCache.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Web4BlobCache.swift; sourceTree = "<group>"; };
 		A1001F0212B4D5A500A1F001 /* Web4ManifestCache.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Web4ManifestCache.swift; sourceTree = "<group>"; };
 		A1001F0312B4D5A500A1F001 /* Web4Types.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Web4Types.swift; sourceTree = "<group>"; };
@@ -121,6 +125,7 @@
 		A1001F0912B4D5A500A1F001 /* Web4ViewManager.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Web4ViewManager.swift; sourceTree = "<group>"; };
 		A1001F0A12B4D5A500A1F001 /* Web4ViewManager.m */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.objc; path = Web4ViewManager.m; sourceTree = "<group>"; };
 		ED297162215061F000B7C4FE /* JavaScriptCore.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = JavaScriptCore.framework; path = System/Library/Frameworks/JavaScriptCore.framework; sourceTree = SDKROOT; };
+		FCA6F018BBA568BD79705FCD /* libPods-SovereignNetworkMobile.a */ = {isa = PBXFileReference; explicitFileType = archive.ar; includeInIndex = 0; path = "libPods-SovereignNetworkMobile.a"; sourceTree = BUILT_PRODUCTS_DIR; };
 /* End PBXFileReference section */
 
 /* Begin PBXFrameworksBuildPhase section */
@@ -129,9 +134,9 @@
 			buildActionMask = 2147483647;
 			files = (
 				30E39C4A2F073687004BA6A5 /* liboqs.xcframework in Frameworks */,
-				013FDF50305A839F2A8A1F49 /* libPods-SovereignNetworkMobile.a in Frameworks */,
 				00000000208CE7D8131E4E77 /* libuhp_ffi.a in Frameworks */,
 				30E671212F216BAA00115EAD /* QuinnFFI.xcframework in Frameworks */,
+				2FE9C2514425A6A35163CF83 /* libPods-SovereignNetworkMobile.a in Frameworks */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -141,41 +146,45 @@
 		13B07FAE1A68108700A75B9A /* SovereignNetworkMobile */ = {
 			isa = PBXGroup;
 			children = (
+				761780EC2CA45674006654EE /* AppDelegate.swift */,
+				307F67BE2F30AFA5002F6C7D /* GeneratedConfig.swift */,
+				301BAC722EB4C924003807B5 /* GoogleService-Info.plist */,
 				3049D7D52F1F083C002C2DE5 /* IdentityHandleStore.swift */,
-				3049D7D12F1EFD6E002C2DE5 /* WalletKeychain.m */,
-				3049D7D22F1EFD6E002C2DE5 /* WalletKeychain.swift */,
-				3049D7CD2F1ECBDF002C2DE5 /* ZhtpClient.swift */,
+				13B07FB51A68108700A75B9A /* Images.xcassets */,
+				13B07FB61A68108700A75B9A /* Info.plist */,
+				81AB9BB72411601600AC10FF /* LaunchScreen.storyboard */,
+				30E39C422F07364A004BA6A5 /* liboqs */,
 				30481B5D2F1E700300418F99 /* NativeIdentityProvisioning.m */,
 				30481B5E2F1E700300418F99 /* NativeIdentityProvisioning.swift */,
-				30E39C422F07364A004BA6A5 /* liboqs */,
-				A1001F0012B4D5A500A1F001 /* Web4BlobCache.swift */,
-				A1001F0212B4D5A500A1F001 /* Web4ManifestCache.swift */,
-				A1001F0312B4D5A500A1F001 /* Web4Types.swift */,
-				A1001F0412B4D5A500A1F001 /* Web4Client.swift */,
-				A1001F0512B4D5A500A1F001 /* Web4Runtime.swift */,
-				A1001F0612B4D5A500A1F001 /* Web4SchemeHandler.swift */,
-				A1001F0712B4D5A500A1F001 /* Web4View.swift */,
-				A1001F0912B4D5A500A1F001 /* Web4ViewManager.swift */,
-				A1001F0A12B4D5A500A1F001 /* Web4ViewManager.m */,
-				30E39C572F073A1A004BA6A5 /* ZhtpCodec.swift */,
-				30E39C582F073A1A004BA6A5 /* ZhtpRequest.swift */,
-				30E39C592F073A1A004BA6A5 /* ZhtpTypes.swift */,
-				30E39C5A2F073A1A004BA6A5 /* ZhtpWireFraming.swift */,
-				30F1A1A12F1A0001 /* ZhtpAuth.swift */,
-				30F1A1A22F1A0001 /* ZhtpAuthRequest.swift */,
-				30F1A1A32F1A0001 /* UhpHandshake.swift */,
+				303D4B5B2F31637F00647354 /* NativeIdentityProvisioningModule+Domain.swift */,
 				30CB59662EE88A1D00D6B4B7 /* NativeQuicModule.m */,
 				30CB59672EE88A1D00D6B4B7 /* NativeQuicModule.swift */,
 				30CB59682EE88A1D00D6B4B7 /* NativeSettings.m */,
 				30CB59692EE88A1D00D6B4B7 /* NativeSettings.swift */,
-				30CB596A2EE88A1D00D6B4B7 /* Settings.bundle */,
-				301BAC722EB4C924003807B5 /* GoogleService-Info.plist */,
-				13B07FB51A68108700A75B9A /* Images.xcassets */,
-				761780EC2CA45674006654EE /* AppDelegate.swift */,
-				13B07FB61A68108700A75B9A /* Info.plist */,
-				81AB9BB72411601600AC10FF /* LaunchScreen.storyboard */,
+				303D4B5D2F31D5CF00647354 /* NativeZhtpApi.swift */,
+				303D4B5E2F31D5CF00647354 /* NativeZhtpApiModule.m */,
 				13B07FB81A68108700A75B9A /* PrivacyInfo.xcprivacy */,
+				30CB596A2EE88A1D00D6B4B7 /* Settings.bundle */,
 				30CB59702EE88A1F00D6B4B7 /* SovereignNetworkMobile-Bridging-Header.h */,
+				30F1A1A32F1A0001 /* UhpHandshake.swift */,
+				3049D7D12F1EFD6E002C2DE5 /* WalletKeychain.m */,
+				3049D7D22F1EFD6E002C2DE5 /* WalletKeychain.swift */,
+				A1001F0012B4D5A500A1F001 /* Web4BlobCache.swift */,
+				A1001F0412B4D5A500A1F001 /* Web4Client.swift */,
+				A1001F0212B4D5A500A1F001 /* Web4ManifestCache.swift */,
+				A1001F0512B4D5A500A1F001 /* Web4Runtime.swift */,
+				A1001F0612B4D5A500A1F001 /* Web4SchemeHandler.swift */,
+				A1001F0312B4D5A500A1F001 /* Web4Types.swift */,
+				A1001F0712B4D5A500A1F001 /* Web4View.swift */,
+				A1001F0A12B4D5A500A1F001 /* Web4ViewManager.m */,
+				A1001F0912B4D5A500A1F001 /* Web4ViewManager.swift */,
+				30F1A1A12F1A0001 /* ZhtpAuth.swift */,
+				30F1A1A22F1A0001 /* ZhtpAuthRequest.swift */,
+				3049D7CD2F1ECBDF002C2DE5 /* ZhtpClient.swift */,
+				30E39C572F073A1A004BA6A5 /* ZhtpCodec.swift */,
+				30E39C582F073A1A004BA6A5 /* ZhtpRequest.swift */,
+				30E39C592F073A1A004BA6A5 /* ZhtpTypes.swift */,
+				30E39C5A2F073A1A004BA6A5 /* ZhtpWireFraming.swift */,
 			);
 			name = SovereignNetworkMobile;
 			sourceTree = "<group>";
@@ -186,7 +195,7 @@
 				30E671182F215FB900115EAD /* QuinnFFI.xcframework */,
 				30E39C492F073687004BA6A5 /* liboqs.xcframework */,
 				ED297162215061F000B7C4FE /* JavaScriptCore.framework */,
-				8D24FC999DA153288045F4D3 /* libPods-SovereignNetworkMobile.a */,
+				FCA6F018BBA568BD79705FCD /* libPods-SovereignNetworkMobile.a */,
 			);
 			name = Frameworks;
 			sourceTree = "<group>";
@@ -248,8 +257,8 @@
 		BBD78D7AC51CEA395F1C20DB /* Pods */ = {
 			isa = PBXGroup;
 			children = (
-				7C1DF059E1FB07F63F66F2B5 /* Pods-SovereignNetworkMobile.debug.xcconfig */,
-				8E86F6E67F7803368F640904 /* Pods-SovereignNetworkMobile.release.xcconfig */,
+				68F3C403295743DBD0DC4BED /* Pods-SovereignNetworkMobile.debug.xcconfig */,
+				9E4997CF8BA243436E042959 /* Pods-SovereignNetworkMobile.release.xcconfig */,
 			);
 			path = Pods;
 			sourceTree = "<group>";
@@ -261,16 +270,16 @@
 			isa = PBXNativeTarget;
 			buildConfigurationList = 13B07F931A680F5B00A75B9A /* Build configuration list for PBXNativeTarget "SovereignNetworkMobile" */;
 			buildPhases = (
-				9B5E41E5D69589E591FFC88A /* [CP] Check Pods Manifest.lock */,
+				28B9F3FDA17217F5D130C299 /* [CP] Check Pods Manifest.lock */,
 				13B07F871A680F5B00A75B9A /* Sources */,
 				13B07F8C1A680F5B00A75B9A /* Frameworks */,
 				13B07F8E1A680F5B00A75B9A /* Resources */,
 				00DD1BFF1BD5951E006B06BC /* Bundle React Native code and images */,
-				65916815123D0848F0E44199 /* [CP] Embed Pods Frameworks */,
-				98F5B260D936A89AA0E42699 /* [CP] Copy Pods Resources */,
-				D7525F5DA4DED1B9CD760D74 /* [CP-User] [RNFB] Core Configuration */,
-				85F9909D87E5776A532DD3B1 /* [CP-User] [RNFB] Crashlytics Configuration */,
 				30E671232F216BAA00115EAD /* Embed Frameworks */,
+				D5875F3B22D17F6439D2C64A /* [CP] Embed Pods Frameworks */,
+				15B40791EE5D22E05B8BBD36 /* [CP] Copy Pods Resources */,
+				F03D0E4C21126E0EDA9B48F0 /* [CP-User] [RNFB] Core Configuration */,
+				D5CAD6EA8B9BFCDDB06B4411 /* [CP-User] [RNFB] Crashlytics Configuration */,
 			);
 			buildRules = (
 			);
@@ -322,7 +331,6 @@
 				30CB596B2EE88A1D00D6B4B7 /* Settings.bundle in Resources */,
 				13B07FBF1A68108700A75B9A /* Images.xcassets in Resources */,
 				7B9CBBBC6C3C0DDFC7CD0808 /* PrivacyInfo.xcprivacy in Resources */,
-				00000000A4BFFB50CA034807 /* UhpHandshake.swift in Resources */,
 				00000000624DE005C8944040 /* ZhtpAuth.swift in Resources */,
 				00000000990ADA84688E4EE8 /* ZhtpAuthRequest.swift in Resources */,
 			);
@@ -347,38 +355,7 @@
 			shellPath = /bin/sh;
 			shellScript = "set -e\n\nWITH_ENVIRONMENT=\"$REACT_NATIVE_PATH/scripts/xcode/with-environment.sh\"\nREACT_NATIVE_XCODE=\"$REACT_NATIVE_PATH/scripts/react-native-xcode.sh\"\n\n/bin/sh -c \"$WITH_ENVIRONMENT $REACT_NATIVE_XCODE\"\n";
 		};
-		65916815123D0848F0E44199 /* [CP] Embed Pods Frameworks */ = {
-			isa = PBXShellScriptBuildPhase;
-			buildActionMask = 2147483647;
-			files = (
-			);
-			inputFileListPaths = (
-				"${PODS_ROOT}/Target Support Files/Pods-SovereignNetworkMobile/Pods-SovereignNetworkMobile-frameworks-${CONFIGURATION}-input-files.xcfilelist",
-			);
-			name = "[CP] Embed Pods Frameworks";
-			outputFileListPaths = (
-				"${PODS_ROOT}/Target Support Files/Pods-SovereignNetworkMobile/Pods-SovereignNetworkMobile-frameworks-${CONFIGURATION}-output-files.xcfilelist",
-			);
-			runOnlyForDeploymentPostprocessing = 0;
-			shellPath = /bin/sh;
-			shellScript = "\"${PODS_ROOT}/Target Support Files/Pods-SovereignNetworkMobile/Pods-SovereignNetworkMobile-frameworks.sh\"\n";
-			showEnvVarsInLog = 0;
-		};
-		85F9909D87E5776A532DD3B1 /* [CP-User] [RNFB] Crashlytics Configuration */ = {
-			isa = PBXShellScriptBuildPhase;
-			buildActionMask = 2147483647;
-			files = (
-			);
-			inputPaths = (
-				"${DWARF_DSYM_FOLDER_PATH}/${DWARF_DSYM_FILE_NAME}/Contents/Resources/DWARF/${TARGET_NAME}",
-				"$(BUILT_PRODUCTS_DIR)/$(INFOPLIST_PATH)",
-			);
-			name = "[CP-User] [RNFB] Crashlytics Configuration";
-			runOnlyForDeploymentPostprocessing = 0;
-			shellPath = /bin/sh;
-			shellScript = "#!/usr/bin/env bash\n#\n# Copyright (c) 2016-present Invertase Limited & Contributors\n#\n# Licensed under the Apache License, Version 2.0 (the \"License\");\n# you may not use this library except in compliance with the License.\n# You may obtain a copy of the License at\n#\n#   http://www.apache.org/licenses/LICENSE-2.0\n#\n# Unless required by applicable law or agreed to in writing, software\n# distributed under the License is distributed on an \"AS IS\" BASIS,\n# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.\n# See the License for the specific language governing permissions and\n# limitations under the License.\n#\nset -e\n\nif [[ ${PODS_ROOT} ]]; then\n  echo \"info: Exec FirebaseCrashlytics Run from Pods\"\n  \"${PODS_ROOT}/FirebaseCrashlytics/run\"\nelse\n  echo \"info: Exec FirebaseCrashlytics Run from framework\"\n  \"${PROJECT_DIR}/FirebaseCrashlytics.framework/run\"\nfi\n";
-		};
-		98F5B260D936A89AA0E42699 /* [CP] Copy Pods Resources */ = {
+		15B40791EE5D22E05B8BBD36 /* [CP] Copy Pods Resources */ = {
 			isa = PBXShellScriptBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
@@ -395,7 +372,7 @@
 			shellScript = "\"${PODS_ROOT}/Target Support Files/Pods-SovereignNetworkMobile/Pods-SovereignNetworkMobile-resources.sh\"\n";
 			showEnvVarsInLog = 0;
 		};
-		9B5E41E5D69589E591FFC88A /* [CP] Check Pods Manifest.lock */ = {
+		28B9F3FDA17217F5D130C299 /* [CP] Check Pods Manifest.lock */ = {
 			isa = PBXShellScriptBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
@@ -417,7 +394,38 @@
 			shellScript = "diff \"${PODS_PODFILE_DIR_PATH}/Podfile.lock\" \"${PODS_ROOT}/Manifest.lock\" > /dev/null\nif [ $? != 0 ] ; then\n    # print error to STDERR\n    echo \"error: The sandbox is not in sync with the Podfile.lock. Run 'pod install' or update your CocoaPods installation.\" >&2\n    exit 1\nfi\n# This output is used by Xcode 'outputs' to avoid re-running this script phase.\necho \"SUCCESS\" > \"${SCRIPT_OUTPUT_FILE_0}\"\n";
 			showEnvVarsInLog = 0;
 		};
-		D7525F5DA4DED1B9CD760D74 /* [CP-User] [RNFB] Core Configuration */ = {
+		D5875F3B22D17F6439D2C64A /* [CP] Embed Pods Frameworks */ = {
+			isa = PBXShellScriptBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			inputFileListPaths = (
+				"${PODS_ROOT}/Target Support Files/Pods-SovereignNetworkMobile/Pods-SovereignNetworkMobile-frameworks-${CONFIGURATION}-input-files.xcfilelist",
+			);
+			name = "[CP] Embed Pods Frameworks";
+			outputFileListPaths = (
+				"${PODS_ROOT}/Target Support Files/Pods-SovereignNetworkMobile/Pods-SovereignNetworkMobile-frameworks-${CONFIGURATION}-output-files.xcfilelist",
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+			shellPath = /bin/sh;
+			shellScript = "\"${PODS_ROOT}/Target Support Files/Pods-SovereignNetworkMobile/Pods-SovereignNetworkMobile-frameworks.sh\"\n";
+			showEnvVarsInLog = 0;
+		};
+		D5CAD6EA8B9BFCDDB06B4411 /* [CP-User] [RNFB] Crashlytics Configuration */ = {
+			isa = PBXShellScriptBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			inputPaths = (
+				"${DWARF_DSYM_FOLDER_PATH}/${DWARF_DSYM_FILE_NAME}/Contents/Resources/DWARF/${TARGET_NAME}",
+				"$(BUILT_PRODUCTS_DIR)/$(INFOPLIST_PATH)",
+			);
+			name = "[CP-User] [RNFB] Crashlytics Configuration";
+			runOnlyForDeploymentPostprocessing = 0;
+			shellPath = /bin/sh;
+			shellScript = "#!/usr/bin/env bash\n#\n# Copyright (c) 2016-present Invertase Limited & Contributors\n#\n# Licensed under the Apache License, Version 2.0 (the \"License\");\n# you may not use this library except in compliance with the License.\n# You may obtain a copy of the License at\n#\n#   http://www.apache.org/licenses/LICENSE-2.0\n#\n# Unless required by applicable law or agreed to in writing, software\n# distributed under the License is distributed on an \"AS IS\" BASIS,\n# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.\n# See the License for the specific language governing permissions and\n# limitations under the License.\n#\nset -e\n\nif [[ ${PODS_ROOT} ]]; then\n  echo \"info: Exec FirebaseCrashlytics Run from Pods\"\n  \"${PODS_ROOT}/FirebaseCrashlytics/run\"\nelse\n  echo \"info: Exec FirebaseCrashlytics Run from framework\"\n  \"${PROJECT_DIR}/FirebaseCrashlytics.framework/run\"\nfi\n";
+		};
+		F03D0E4C21126E0EDA9B48F0 /* [CP-User] [RNFB] Core Configuration */ = {
 			isa = PBXShellScriptBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
@@ -447,6 +455,8 @@
 				3049D7D32F1EFD6E002C2DE5 /* WalletKeychain.m in Sources */,
 				3049D7D42F1EFD6E002C2DE5 /* WalletKeychain.swift in Sources */,
 				A1001F1912B4D5A500A1F001 /* Web4ViewManager.swift in Sources */,
+				303D4B5F2F31D5CF00647354 /* NativeZhtpApi.swift in Sources */,
+				303D4B602F31D5CF00647354 /* NativeZhtpApiModule.m in Sources */,
 				A1001F1A12B4D5A500A1F001 /* Web4ViewManager.m in Sources */,
 				30CB596C2EE88A1D00D6B4B7 /* NativeSettings.swift in Sources */,
 				30CB596D2EE88A1D00D6B4B7 /* NativeQuicModule.m in Sources */,
@@ -462,14 +472,14 @@
 				30E39C472F07364A004BA6A5 /* LibOQSMemory.swift in Sources */,
 				30E39C482F07364A004BA6A5 /* LibOQSTypes.swift in Sources */,
 				30E39C5B2F073A1A004BA6A5 /* ZhtpCodec.swift in Sources */,
-				30E39C5C2F073A1A004BA6A5 /* ZhtpRequest.swift in Sources */,
 				30E39C5D2F073A1A004BA6A5 /* ZhtpTypes.swift in Sources */,
 				30E39C5E2F073A1A004BA6A5 /* ZhtpWireFraming.swift in Sources */,
 				30F1A0A12F1A0001 /* ZhtpAuth.swift in Sources */,
 				30F1A0A22F1A0001 /* ZhtpAuthRequest.swift in Sources */,
 				3049D7D62F1F083C002C2DE5 /* IdentityHandleStore.swift in Sources */,
-				30F1A0A32F1A0001 /* UhpHandshake.swift in Sources */,
 				761780ED2CA45674006654EE /* AppDelegate.swift in Sources */,
+				303D4B5C2F31637F00647354 /* NativeIdentityProvisioningModule+Domain.swift in Sources */,
+				307F67BF2F30AFA5002F6C7D /* GeneratedConfig.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -478,12 +488,12 @@
 /* Begin XCBuildConfiguration section */
 		13B07F941A680F5B00A75B9A /* Debug */ = {
 			isa = XCBuildConfiguration;
-			baseConfigurationReference = 7C1DF059E1FB07F63F66F2B5 /* Pods-SovereignNetworkMobile.debug.xcconfig */;
+			baseConfigurationReference = 68F3C403295743DBD0DC4BED /* Pods-SovereignNetworkMobile.debug.xcconfig */;
 			buildSettings = {
 				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
 				ASSETCATALOG_COMPILER_INCLUDE_ALL_APPICON_ASSETS = YES;
 				CLANG_ENABLE_MODULES = YES;
-				CURRENT_PROJECT_VERSION = 23;
+				CURRENT_PROJECT_VERSION = 26;
 				DEVELOPMENT_TEAM = 7GX9WC4VQY;
 				ENABLE_BITCODE = NO;
 				HEADER_SEARCH_PATHS = (
@@ -618,12 +628,12 @@
 		};
 		13B07F951A680F5B00A75B9A /* Release */ = {
 			isa = XCBuildConfiguration;
-			baseConfigurationReference = 8E86F6E67F7803368F640904 /* Pods-SovereignNetworkMobile.release.xcconfig */;
+			baseConfigurationReference = 9E4997CF8BA243436E042959 /* Pods-SovereignNetworkMobile.release.xcconfig */;
 			buildSettings = {
 				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
 				ASSETCATALOG_COMPILER_INCLUDE_ALL_APPICON_ASSETS = YES;
 				CLANG_ENABLE_MODULES = YES;
-				CURRENT_PROJECT_VERSION = 23;
+				CURRENT_PROJECT_VERSION = 26;
 				DEVELOPMENT_TEAM = 7GX9WC4VQY;
 				HEADER_SEARCH_PATHS = (
 					"$(inherited)",

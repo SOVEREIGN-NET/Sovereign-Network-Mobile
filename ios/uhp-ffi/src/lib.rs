@@ -165,13 +165,35 @@ fn load_identity(identity_json: &str, key_bytes: &UhpPrivateKeyBytes) -> Result<
     let kyber_sk = unsafe { vec_from_raw(key_bytes.kyber_sk_ptr, key_bytes.kyber_sk_len) }?;
     let master_seed = unsafe { vec_from_raw(key_bytes.master_seed_ptr, key_bytes.master_seed_len) }?;
 
+    // Extract dilithium_pk from the identity JSON
+    let dilithium_pk = extract_dilithium_pk_from_identity(identity_json)
+        .unwrap_or_else(|_| {
+            // If we can't extract from JSON, use empty vector (will fail in from_serialized)
+            Vec::new()
+        });
+
     let private_key = PrivateKey {
         dilithium_sk,
+        dilithium_pk,
         kyber_sk,
         master_seed,
     };
 
     ZhtpIdentity::from_serialized(identity_json, &private_key)
+}
+
+fn extract_dilithium_pk_from_identity(identity_json: &str) -> Result<Vec<u8>> {
+    let raw: serde_json::Value = serde_json::from_str(identity_json)
+        .map_err(|e| anyhow::anyhow!("Failed to parse identity JSON: {}", e))?;
+
+    // Extract the public key from the JSON
+    let pk_hex = raw.get("public_key")
+        .and_then(|v| v.as_str())
+        .or_else(|| raw.get("dilithium_pk").and_then(|v| v.as_str()))
+        .ok_or_else(|| anyhow::anyhow!("No public key found in identity JSON"))?;
+
+    hex::decode(pk_hex)
+        .map_err(|e| anyhow::anyhow!("Failed to decode public key: {}", e))
 }
 
 fn build_capabilities() -> HandshakeCapabilities {

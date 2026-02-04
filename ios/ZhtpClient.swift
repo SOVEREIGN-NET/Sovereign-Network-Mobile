@@ -46,6 +46,10 @@ private func cIdentityGetKyberSecretKey(_ handle: UnsafeMutableRawPointer) -> By
 @_silgen_name("zhtp_client_identity_get_master_seed")
 private func cIdentityGetMasterSeed(_ handle: UnsafeMutableRawPointer) -> ByteBuffer
 
+// Get master seed phrase (BIP39) from identity handle
+@_silgen_name("zhtp_client_identity_get_seed_phrase")
+private func cIdentityGetSeedPhrase(_ handle: UnsafeMutableRawPointer) -> UnsafeMutablePointer<CChar>?
+
 // Sign registration proof
 @_silgen_name("zhtp_client_sign_registration_proof")
 private func cSignRegistrationProof(_ handle: UnsafeMutableRawPointer, _ timestamp: UInt64) -> ByteBuffer
@@ -66,6 +70,10 @@ private func cSerializeIdentityToHandshakeJson(_ handle: UnsafeMutableRawPointer
 @_silgen_name("zhtp_client_identity_deserialize")
 private func cDeserializeIdentity(_ json: UnsafePointer<CChar>) -> UnsafeMutableRawPointer?
 
+// Restore identity from 24-word seed phrase
+@_silgen_name("zhtp_client_restore_identity_from_phrase")
+private func cRestoreIdentityFromPhrase(_ phrase: UnsafePointer<CChar>, _ deviceId: UnsafePointer<CChar>) -> UnsafeMutableRawPointer?
+
 // Free identity handle
 @_silgen_name("zhtp_client_identity_free")
 private func cIdentityFree(_ handle: UnsafeMutableRawPointer)
@@ -77,6 +85,79 @@ private func cFreeString(_ ptr: UnsafeMutablePointer<CChar>)
 // Free buffer
 @_silgen_name("zhtp_client_free_bytes")
 private func cFreeBytes(_ buf: ByteBuffer)
+
+// Token transaction building functions (return hex-encoded signed transaction)
+
+/// Build signed token transfer transaction
+@_silgen_name("zhtp_client_build_token_transfer")
+private func cBuildTokenTransfer(
+    _ handle: UnsafePointer<UInt8>?,
+    _ tokenId: UnsafePointer<UInt8>?,
+    _ toPubkey: UnsafePointer<UInt8>?,
+    _ toPubkeyLen: Int,
+    _ amount: UInt64,
+    _ chainId: UInt8
+) -> UnsafeMutablePointer<CChar>?
+
+/// Build signed token mint transaction
+@_silgen_name("zhtp_client_build_token_mint")
+private func cBuildTokenMint(
+    _ handle: UnsafePointer<UInt8>?,
+    _ tokenId: UnsafePointer<UInt8>?,
+    _ toPubkey: UnsafePointer<UInt8>?,
+    _ toPubkeyLen: Int,
+    _ amount: UInt64,
+    _ chainId: UInt8
+) -> UnsafeMutablePointer<CChar>?
+
+/// Build signed token create transaction
+@_silgen_name("zhtp_client_build_token_create")
+private func cBuildTokenCreate(
+    _ handle: UnsafePointer<UInt8>?,
+    _ name: UnsafePointer<CChar>?,
+    _ symbol: UnsafePointer<CChar>?,
+    _ initialSupply: UInt64,
+    _ decimals: UInt8,
+    _ chainId: UInt8
+) -> UnsafeMutablePointer<CChar>?
+
+/// Build signed token burn transaction
+@_silgen_name("zhtp_client_build_token_burn")
+private func cBuildTokenBurn(
+    _ handle: UnsafePointer<UInt8>?,
+    _ tokenId: UnsafePointer<UInt8>?,
+    _ amount: UInt64,
+    _ chainId: UInt8
+) -> UnsafeMutablePointer<CChar>?
+
+// Domain transaction building functions (return hex-encoded signed transaction)
+
+/// Build signed domain registration transaction
+@_silgen_name("zhtp_client_build_domain_register")
+private func cBuildDomainRegister(
+    _ handle: UnsafePointer<UInt8>?,
+    _ domain: UnsafePointer<CChar>?,
+    _ contentCid: UnsafePointer<CChar>?,
+    _ chainId: UInt8
+) -> UnsafeMutablePointer<CChar>?
+
+/// Build signed domain update transaction
+@_silgen_name("zhtp_client_build_domain_update")
+private func cBuildDomainUpdate(
+    _ handle: UnsafePointer<UInt8>?,
+    _ domain: UnsafePointer<CChar>?,
+    _ contentCid: UnsafePointer<CChar>?,
+    _ chainId: UInt8
+) -> UnsafeMutablePointer<CChar>?
+
+/// Build signed domain transfer transaction
+@_silgen_name("zhtp_client_build_domain_transfer")
+private func cBuildDomainTransfer(
+    _ handle: UnsafePointer<UInt8>?,
+    _ domain: UnsafePointer<CChar>?,
+    _ toPubkey: UnsafePointer<UInt8>?,
+    _ chainId: UInt8
+) -> UnsafeMutablePointer<CChar>?
 
 // MARK: - C Types
 
@@ -235,6 +316,15 @@ public class ZhtpClient {
         return Array(UnsafeBufferPointer(start: ptr, count: buf.len))
     }
 
+    /// Get 24-word seed phrase (BIP39) derived from the identity master seed
+    public static func getSeedPhrase(_ identity: Identity) throws -> String {
+        guard let phrasePtr = cIdentityGetSeedPhrase(identity.getHandle()) else {
+            throw ClientError.identityError("Failed to get seed phrase")
+        }
+        defer { cFreeString(phrasePtr) }
+        return String(cString: phrasePtr)
+    }
+
     /// Deserialize an Identity from JSON string
     public static func deserializeIdentity(_ json: String) throws -> Identity {
         let handle = try json.withCString { jsonCStr in
@@ -261,6 +351,236 @@ public class ZhtpClient {
             createdAt: createdAt,
             handle: handle
         )
+    }
+
+    /// Restore an Identity from a 24-word master seed phrase
+    public static func restoreIdentityFromPhrase(_ phrase: String, deviceId: String) throws -> Identity {
+        let handle = try phrase.withCString { phraseCStr in
+            try deviceId.withCString { deviceIdCStr in
+                guard let h = cRestoreIdentityFromPhrase(phraseCStr, deviceIdCStr) else {
+                    throw ClientError.identityError("Failed to restore identity from seed phrase")
+                }
+                return h
+            }
+        }
+
+        let did = extractString(cIdentityGetDid(handle))
+        let devId = extractString(cIdentityGetDeviceId(handle))
+        let pubKey = extractBuffer(cIdentityGetPublicKey(handle))
+        let kyberPubKey = extractBuffer(cIdentityGetKyberPublicKey(handle))
+        let nId = extractBuffer(cIdentityGetNodeId(handle))
+        let createdAt = cIdentityGetCreatedAt(handle)
+
+        return Identity(
+            did: did,
+            publicKey: pubKey,
+            kyberPublicKey: kyberPubKey,
+            nodeId: nId,
+            deviceId: devId,
+            createdAt: createdAt,
+            handle: handle
+        )
+    }
+
+    /// Sign arbitrary data (transaction, message, etc.) with identity's Dilithium keypair
+    /// - Parameters:
+    ///   - data: Data to sign
+    ///   - identity: Identity with Dilithium secret key
+    /// - Returns: Dilithium signature bytes
+    /// - Throws: ClientError if signing fails
+    public static func signData(_ data: Data, using identity: Identity) throws -> [UInt8] {
+        let buf = data.withUnsafeBytes { dataPtr in
+            cSignUhpChallenge(identity.getHandle(), dataPtr.baseAddress ?? UnsafeRawPointer(bitPattern: 0)!, data.count)
+        }
+        defer { cFreeBytes(buf) }
+
+        guard let sigData = buf.data, buf.len > 0 else {
+            throw ClientError.signingError("Failed to sign data")
+        }
+
+        return Array(UnsafeBufferPointer(start: sigData.assumingMemoryBound(to: UInt8.self), count: buf.len))
+    }
+
+    /// Build signed token transfer transaction (returns hex-encoded string ready for API)
+    public static func buildTokenTransfer(
+        tokenId: Data,
+        toPublicKey: Data,
+        amount: UInt64,
+        using identity: Identity,
+        chainId: UInt8 = 0x02  // testnet
+    ) throws -> String {
+        guard let hexPtr = tokenId.withUnsafeBytes({ tokenIdPtr in
+            toPublicKey.withUnsafeBytes { toPubkeyPtr in
+                cBuildTokenTransfer(
+                    identity.getHandle().assumingMemoryBound(to: UInt8.self),
+                    tokenIdPtr.baseAddress?.assumingMemoryBound(to: UInt8.self),
+                    toPubkeyPtr.baseAddress?.assumingMemoryBound(to: UInt8.self),
+                    toPublicKey.count,
+                    amount,
+                    chainId
+                )
+            }
+        }) else {
+            throw ClientError.signingError("Failed to build token transfer transaction")
+        }
+        defer { cFreeString(hexPtr) }
+        return String(cString: hexPtr)
+    }
+
+    /// Build signed token mint transaction (returns hex-encoded string ready for API)
+    public static func buildTokenMint(
+        tokenId: Data,
+        toPublicKey: Data,
+        amount: UInt64,
+        using identity: Identity,
+        chainId: UInt8 = 0x02  // testnet
+    ) throws -> String {
+        guard let hexPtr = tokenId.withUnsafeBytes({ tokenIdPtr in
+            toPublicKey.withUnsafeBytes { toPubkeyPtr in
+                cBuildTokenMint(
+                    identity.getHandle().assumingMemoryBound(to: UInt8.self),
+                    tokenIdPtr.baseAddress?.assumingMemoryBound(to: UInt8.self),
+                    toPubkeyPtr.baseAddress?.assumingMemoryBound(to: UInt8.self),
+                    toPublicKey.count,
+                    amount,
+                    chainId
+                )
+            }
+        }) else {
+            throw ClientError.signingError("Failed to build token mint transaction")
+        }
+        defer { cFreeString(hexPtr) }
+        return String(cString: hexPtr)
+    }
+
+    /// Build signed token create transaction (returns hex-encoded string ready for API)
+    public static func buildTokenCreate(
+        name: String,
+        symbol: String,
+        initialSupply: UInt64,
+        decimals: UInt8,
+        using identity: Identity,
+        chainId: UInt8 = 0x02  // testnet
+    ) throws -> String {
+        guard let hexPtr = name.withCString({ namePtr in
+            symbol.withCString { symbolPtr in
+                cBuildTokenCreate(
+                    identity.getHandle().assumingMemoryBound(to: UInt8.self),
+                    namePtr,
+                    symbolPtr,
+                    initialSupply,
+                    decimals,
+                    chainId
+                )
+            }
+        }) else {
+            throw ClientError.signingError("Failed to build token create transaction")
+        }
+        defer { cFreeString(hexPtr) }
+        return String(cString: hexPtr)
+    }
+
+    /// Build signed token burn transaction (returns hex-encoded string ready for API)
+    public static func buildTokenBurn(
+        tokenId: Data,
+        amount: UInt64,
+        using identity: Identity,
+        chainId: UInt8 = 0x02  // testnet
+    ) throws -> String {
+        guard let hexPtr = tokenId.withUnsafeBytes({ tokenIdPtr in
+            cBuildTokenBurn(
+                identity.getHandle().assumingMemoryBound(to: UInt8.self),
+                tokenIdPtr.baseAddress?.assumingMemoryBound(to: UInt8.self),
+                amount,
+                chainId
+            )
+        }) else {
+            throw ClientError.signingError("Failed to build token burn transaction")
+        }
+        defer { cFreeString(hexPtr) }
+        return String(cString: hexPtr)
+    }
+
+    /// Build signed domain registration transaction (returns hex-encoded string ready for API)
+    public static func buildDomainRegister(
+        domain: String,
+        contentCid: String? = nil,
+        using identity: Identity,
+        chainId: UInt8 = 0x02  // testnet
+    ) throws -> String {
+        let hexPtr: UnsafeMutablePointer<CChar>?
+
+        if let cid = contentCid {
+            hexPtr = domain.withCString { domainPtr in
+                cid.withCString { cidPtr in
+                    cBuildDomainRegister(
+                        identity.getHandle().assumingMemoryBound(to: UInt8.self),
+                        domainPtr,
+                        cidPtr,
+                        chainId
+                    )
+                }
+            }
+        } else {
+            hexPtr = domain.withCString { domainPtr in
+                cBuildDomainRegister(
+                    identity.getHandle().assumingMemoryBound(to: UInt8.self),
+                    domainPtr,
+                    nil,
+                    chainId
+                )
+            }
+        }
+
+        guard let ptr = hexPtr else {
+            throw ClientError.signingError("Failed to build domain register transaction")
+        }
+        defer { cFreeString(ptr) }
+        return String(cString: ptr)
+    }
+
+    /// Build signed domain update transaction (returns hex-encoded string ready for API)
+    public static func buildDomainUpdate(
+        domain: String,
+        contentCid: String,
+        using identity: Identity,
+        chainId: UInt8 = 0x02  // testnet
+    ) throws -> String {
+        guard let hexPtr = domain.withCString({ domainPtr in
+            contentCid.withCString { cidPtr in
+                cBuildDomainUpdate(
+                    identity.getHandle().assumingMemoryBound(to: UInt8.self),
+                    domainPtr,
+                    cidPtr,
+                    chainId
+                )
+            }
+        }) else {
+            throw ClientError.signingError("Failed to build domain update transaction")
+        }
+        defer { cFreeString(hexPtr) }
+        return String(cString: hexPtr)
+    }
+
+    /// Build signed domain transfer transaction (returns hex-encoded string ready for API)
+    public static func buildDomainTransfer(
+        domain: String,
+        toPubkey: [UInt8],
+        using identity: Identity,
+        chainId: UInt8 = 0x02  // testnet
+    ) throws -> String {
+        guard let hexPtr = domain.withCString({ domainPtr in
+            cBuildDomainTransfer(
+                identity.getHandle().assumingMemoryBound(to: UInt8.self),
+                domainPtr,
+                toPubkey,
+                chainId
+            )
+        }) else {
+            throw ClientError.signingError("Failed to build domain transfer transaction")
+        }
+        defer { cFreeString(hexPtr) }
+        return String(cString: hexPtr)
     }
 }
 

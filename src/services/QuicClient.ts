@@ -5,6 +5,7 @@
  */
 
 import { NativeModules, Platform } from 'react-native';
+import { QUIC_CONFIG } from '../config';
 
 const { NativeQuic } = NativeModules;
 
@@ -34,14 +35,6 @@ export interface QuicConnectionTestResult {
   port: number;
 }
 
-export interface QuicReachabilityResult {
-  reachable: boolean;
-  latencyMs?: number;
-  host: string;
-  port: number;
-  error?: string;
-  note?: string;
-}
 
 export interface QuicConstants {
   ALPN_PROTOCOL: string;
@@ -54,32 +47,16 @@ export interface QuicConstants {
  */
 export async function isQuicSupported(): Promise<boolean> {
   if (!NativeQuic) {
-    console.warn('NativeQuic module not available');
+    if (__DEV__) console.warn('NativeQuic module not available');
     return false;
   }
 
   try {
     return await NativeQuic.isSupported();
   } catch (error) {
-    console.error('Failed to check QUIC support:', error);
+    if (__DEV__) console.error('Failed to check QUIC support:', error);
     return false;
   }
-}
-
-/**
- * Check if a QUIC node is reachable via UDP
- * This is a simple reachability check that doesn't require full QUIC/PQC handshake
- * Useful for showing node status on UI without complex protocol negotiation
- */
-export async function checkNodeReachability(
-  host: string,
-  port: number
-): Promise<QuicReachabilityResult> {
-  if (!NativeQuic) {
-    throw new Error('NativeQuic module not available');
-  }
-
-  return await NativeQuic.checkReachability(host, port);
 }
 
 /**
@@ -118,22 +95,27 @@ export async function quicRequest(
     alpn: options.alpn || 'authenticated', // Default to authenticated (zhtp-uhp/2)
   };
 
-  console.log('[🌐 Web4] QuicClient: Making QUIC request:');
-  console.log('[🌐 Web4] QuicClient:   URL:', url);
-  console.log('[🌐 Web4] QuicClient:   Method:', requestOptions.method);
-  console.log('[🌐 Web4] QuicClient:   ALPN:', requestOptions.alpn);
-  console.log('[🌐 Web4] QuicClient:   Timeout:', requestOptions.timeout, 'seconds');
-  if (options.body) {
-    console.log('[🌐 Web4] QuicClient:   Body:', options.body);
+  if (__DEV__) {
+    console.log('[🌐 Web4] QuicClient: Making QUIC request:');
+    console.log('[🌐 Web4] QuicClient:   URL:', url);
+    console.log('[🌐 Web4] QuicClient:   Method:', requestOptions.method);
+    console.log('[🌐 Web4] QuicClient:   ALPN:', requestOptions.alpn);
+    console.log('[🌐 Web4] QuicClient:   Timeout:', requestOptions.timeout, 'seconds');
+    console.log('[🌐 Web4] QuicClient:   Insecure:', requestOptions.insecure);
+    if (options.body) {
+      console.log('[🌐 Web4] QuicClient:   Body:', options.body);
+    }
   }
 
   try {
     const response = await NativeQuic.request(url, requestOptions);
-    console.log('[🌐 Web4] QuicClient: Response received:');
-    console.log('[🌐 Web4] QuicClient:   Status:', response.status, response.statusText);
-    console.log('[🌐 Web4] QuicClient:   Body length:', response.body?.length || 0, 'bytes');
-    if (!response.ok) {
-      console.log('[🌐 Web4] QuicClient:   Body preview:', response.body?.substring(0, 300) || '');
+    if (__DEV__) {
+      console.log('[🌐 Web4] QuicClient: Response received:');
+      console.log('[🌐 Web4] QuicClient:   Status:', response.status, response.statusText);
+      console.log('[🌐 Web4] QuicClient:   Body length:', response.body?.length || 0, 'bytes');
+      if (!response.ok) {
+        console.log('[🌐 Web4] QuicClient:   Body preview:', response.body?.substring(0, 300) || '');
+      }
     }
     return response;
   } catch (error) {
@@ -209,23 +191,25 @@ export async function testQuicHealthCheck(
 
   try {
     const url = `quic://${host}:${port}/api/v1/protocol/health`;
-    console.log(`[QuicClient] Testing health endpoint: ${url}`);
+    if (__DEV__) console.log(`[QuicClient] Testing health endpoint: ${url}`);
 
     const response = await quicRequest(url, {
       method: 'GET',
       timeout: 10,
-      insecure: true,
+      insecure: QUIC_CONFIG.insecure,  // From config - allows self-signed certs for testnet
       alpn: 'public',
     });
 
     const latencyMs = Date.now() - startTime;
 
-    console.log(`[QuicClient] Health response:`, {
-      status: response.status,
-      ok: response.ok,
-      body: response.body?.substring(0, 200),
-      latencyMs,
-    });
+    if (__DEV__) {
+      console.log(`[QuicClient] Health response:`, {
+        status: response.status,
+        ok: response.ok,
+        body: response.body?.substring(0, 200),
+        latencyMs,
+      });
+    }
 
     if (response.ok) {
       let data;
@@ -244,7 +228,7 @@ export async function testQuicHealthCheck(
     }
   } catch (error: any) {
     const latencyMs = Date.now() - startTime;
-    console.error(`[QuicClient] Health check failed:`, error);
+    if (__DEV__) console.error(`[QuicClient] Health check failed:`, error);
     return {
       success: false,
       error: error.message || String(error),
@@ -256,7 +240,6 @@ export async function testQuicHealthCheck(
 // Default export for convenience
 const QuicClient = {
   isSupported: isQuicSupported,
-  checkReachability: checkNodeReachability,
   testConnection: testQuicConnection,
   testHealthCheck: testQuicHealthCheck,
   request: quicRequest,

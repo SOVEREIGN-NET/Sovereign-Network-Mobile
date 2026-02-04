@@ -1,5 +1,6 @@
 #!/bin/bash
-# Build Quinn QUIC JNI library for Android
+# Build Android native libraries (quic-jni wrapper + lib-client)
+# This builds the quic-jni JNI wrapper which uses lib-client from The-Sovereign-Network
 # Requires: Rust with Android targets, Android NDK
 
 set -e
@@ -13,6 +14,7 @@ TOOLCHAIN="$NDK_HOME/toolchains/llvm/prebuilt/darwin-x86_64"
 
 if [ ! -d "$TOOLCHAIN" ]; then
     echo "Error: NDK toolchain not found at $TOOLCHAIN"
+    echo "Set ANDROID_NDK_HOME or NDK_HOME environment variable"
     exit 1
 fi
 
@@ -24,10 +26,12 @@ TARGETS=(
     "aarch64-linux-android:arm64-v8a:aarch64-linux-android:24"
     "armv7-linux-androideabi:armeabi-v7a:armv7a-linux-androideabi:24"
     "x86_64-linux-android:x86_64:x86_64-linux-android:24"
-    "i686-linux-android:x86:i686-linux-android:24"
 )
 
-echo "Building quic-jni for Android using NDK at: $NDK_HOME"
+echo "📱 Building quic-jni for Android"
+echo "   NDK: $NDK_HOME"
+echo "   Output: $OUTPUT_DIR"
+echo ""
 
 if [ -n "$ANDROID_ABIS" ]; then
     IFS=',' read -r -a ABI_LIST <<< "$ANDROID_ABIS"
@@ -46,8 +50,7 @@ fi
 for target_info in "${TARGETS[@]}"; do
     IFS=':' read -r rust_target android_abi clang_prefix api_level <<< "$target_info"
 
-    echo ""
-    echo "=== Building for $rust_target ($android_abi) ==="
+    echo "🔨 Building for $rust_target ($android_abi)..."
 
     # Set environment for cross-compilation
     export CC="$TOOLCHAIN/bin/${clang_prefix}${api_level}-clang"
@@ -57,18 +60,17 @@ for target_info in "${TARGETS[@]}"; do
     export CARGO_TARGET_AARCH64_LINUX_ANDROID_LINKER="$TOOLCHAIN/bin/${clang_prefix}${api_level}-clang"
     export CARGO_TARGET_ARMV7_LINUX_ANDROIDEABI_LINKER="$TOOLCHAIN/bin/${clang_prefix}${api_level}-clang"
     export CARGO_TARGET_X86_64_LINUX_ANDROID_LINKER="$TOOLCHAIN/bin/${clang_prefix}${api_level}-clang"
-    export CARGO_TARGET_I686_LINUX_ANDROID_LINKER="$TOOLCHAIN/bin/${clang_prefix}${api_level}-clang"
 
-    # Build
-    cargo build --release --target "$rust_target"
+    # Build quic-jni (which depends on lib-client from node code)
+    cargo build --release --target "$rust_target" 2>&1 | tail -5
 
     # Copy .so to jniLibs
     mkdir -p "$OUTPUT_DIR/$android_abi"
     cp "target/$rust_target/release/libquic_jni.so" "$OUTPUT_DIR/$android_abi/"
 
-    echo "✅ Built $android_abi/libquic_jni.so"
+    echo "✅ $android_abi/libquic_jni.so"
 done
 
 echo ""
-echo "=== Build complete ==="
-ls -la "$OUTPUT_DIR"/*/libquic_jni.so
+echo "✨ Build complete"
+du -h "$OUTPUT_DIR"/*/libquic_jni.so

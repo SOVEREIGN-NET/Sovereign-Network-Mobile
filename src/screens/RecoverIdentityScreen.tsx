@@ -3,19 +3,18 @@
  * Screen for recovering a lost ZK-DID identity using seed phrase, backup file, or social recovery
  */
 
-import React, { useState } from 'react';
-import { View, Pressable } from 'react-native';
+import React, { useRef, useState } from 'react';
+import { View, TextInput } from 'react-native';
 import { NativeStackScreenProps } from '@react-navigation/native-stack';
 import {
   Card,
+  Button,
   Text,
   Column,
-  Row,
   LoadingView,
   ScreenLayout,
   ErrorAlert,
   SelectableOptionCard,
-  FormField,
   ActionFooter,
 } from '../components';
 import { useAuth } from '../hooks';
@@ -25,19 +24,40 @@ import { AuthStackParamList } from '../navigation/AuthNavigator';
 
 type RecoverIdentityScreenProps = NativeStackScreenProps<AuthStackParamList, 'RecoverIdentity'>;
 
-type RecoveryMethod = 'seed' | 'backup' | 'social';
+type RecoveryMethod = 'seed';
 
-const RecoverIdentityScreen = ({ navigation }: RecoverIdentityScreenProps) => {
+const RecoverIdentityScreen = (_props: RecoverIdentityScreenProps) => {
   const { t } = useTranslation();
-  const { recoverIdentity, isLoading, error } = useAuth();
+  const { recoverIdentity, getMasterSeedPhrase, isLoading, error } = useAuth();
 
   const [recoveryMethod, setRecoveryMethod] = useState<RecoveryMethod>('seed');
-  const [seedPhrase, setSeedPhrase] = useState('');
-  const [backupJson, setBackupJson] = useState('');
-  const [backupPassword, setBackupPassword] = useState('');
-  const [guardianIds, setGuardianIds] = useState('');
-  const [showPassword, setShowPassword] = useState(false);
+  const [seedWords, setSeedWords] = useState<string[]>(Array(24).fill(''));
   const [localError, setLocalError] = useState<string | null>(null);
+  const inputRefs = useRef<Array<TextInput | null>>([]);
+  const [isFillingFromKeychain, setIsFillingFromKeychain] = useState(false);
+
+  const handleFillFromKeychain = async () => {
+    setLocalError(null);
+    setIsFillingFromKeychain(true);
+    try {
+      const phrase = await getMasterSeedPhrase();
+      if (!phrase) {
+        setLocalError('No seed phrase found in Keychain for this device.');
+        return;
+      }
+      const words = phrase.trim().split(/\s+/).filter(Boolean);
+      if (words.length !== 24) {
+        setLocalError('Stored seed phrase must be 24 words.');
+        return;
+      }
+      setSeedWords(words);
+      inputRefs.current[0]?.focus();
+    } catch (err: any) {
+      setLocalError(err?.message || 'Failed to load seed phrase from Keychain.');
+    } finally {
+      setIsFillingFromKeychain(false);
+    }
+  };
 
   const handleRecover = async () => {
     setLocalError(null);
@@ -47,46 +67,17 @@ const RecoverIdentityScreen = ({ navigation }: RecoverIdentityScreenProps) => {
 
     switch (recoveryMethod) {
       case 'seed':
-        if (!seedPhrase.trim()) {
+        const normalized = seedWords.map(word => word.trim().toLowerCase()).filter(Boolean);
+        if (normalized.length === 0) {
           setLocalError(t.auth.recoverIdentity.validation.seedRequired);
           return;
         }
-        data = seedPhrase;
+        if (normalized.length !== 24) {
+          setLocalError(t.auth.recoverIdentity.validation.seedInvalid);
+          return;
+        }
+        data = normalized.join(' ');
         method = 'seed';
-        break;
-
-      case 'backup':
-        if (!backupJson.trim()) {
-          setLocalError(t.auth.recoverIdentity.validation.backupRequired);
-          return;
-        }
-        if (!backupPassword.trim()) {
-          setLocalError(t.auth.recoverIdentity.validation.backupPasswordRequired);
-          return;
-        }
-        data = `${backupJson}|||${backupPassword}`;
-        method = 'backup';
-        break;
-
-      case 'social':
-        if (!guardianIds.trim()) {
-          setLocalError(t.auth.recoverIdentity.validation.guardianCodeRequired);
-          return;
-        }
-        // Convert comma-separated guardian IDs to array
-        const ids = guardianIds
-          .split(',')
-          .map((id) => id.trim())
-          .filter((id) => id.length > 0);
-
-        if (ids.length === 0) {
-          setLocalError(t.auth.recoverIdentity.validation.guardianCodeRequired);
-          return;
-        }
-
-        // Pass as JSON string since recoverIdentity expects string data
-        data = JSON.stringify(ids);
-        method = 'social';
         break;
 
       default:
@@ -98,10 +89,7 @@ const RecoverIdentityScreen = ({ navigation }: RecoverIdentityScreenProps) => {
       await recoverIdentity(method, data);
 
       // Reset form
-      setSeedPhrase('');
-      setBackupJson('');
-      setBackupPassword('');
-      setGuardianIds('');
+      setSeedWords(Array(24).fill(''));
 
       // App.tsx will detect authenticated state and switch to RootNavigator
     } catch (err: any) {
@@ -120,16 +108,6 @@ const RecoverIdentityScreen = ({ navigation }: RecoverIdentityScreenProps) => {
       value: 'seed' as const,
       label: t.auth.recoverIdentity.seed.label,
       description: t.auth.recoverIdentity.seed.description,
-    },
-    {
-      value: 'backup' as const,
-      label: t.auth.recoverIdentity.backup.label,
-      description: t.auth.recoverIdentity.backup.description,
-    },
-    {
-      value: 'social' as const,
-      label: t.auth.recoverIdentity.social.label,
-      description: t.auth.recoverIdentity.social.description,
     },
   ];
 
@@ -171,17 +149,104 @@ const RecoverIdentityScreen = ({ navigation }: RecoverIdentityScreenProps) => {
         {recoveryMethod === 'seed' && (
           <Card>
             <Column gap="sm">
-              <FormField
-                label={t.auth.recoverIdentity.seed.title}
-                placeholder={t.auth.recoverIdentity.seed.placeholder}
-                value={seedPhrase}
-                onChangeText={setSeedPhrase}
-                multiline
-                numberOfLines={4}
-                editable={!isLoading}
-                helperText={t.auth.recoverIdentity.seed.hint}
-                containerStyle={{ marginBottom: 0 }}
-              />
+              <Text
+                style={{
+                  fontSize: typography.size.sm,
+                  fontWeight: typography.weight.semibold,
+                  color: colors.text_primary,
+                }}
+              >
+                {t.auth.recoverIdentity.seed.title}
+              </Text>
+              <Button
+                onPress={() => { handleFillFromKeychain().catch(() => {}); }}
+                variant="secondary"
+                size="sm"
+                loading={isFillingFromKeychain}
+                disabled={isLoading || isFillingFromKeychain}
+                style={{ alignSelf: 'flex-start' }}
+              >
+                Use saved seed from this device
+              </Button>
+              <Text style={{ fontSize: typography.size.xs, color: colors.text_secondary }}>
+                {t.auth.recoverIdentity.seed.hint}
+              </Text>
+              <View
+                style={{
+                  flexDirection: 'row',
+                  flexWrap: 'wrap',
+                  gap: spacing.sm,
+                  marginTop: spacing.sm,
+                }}
+              >
+                {seedWords.map((word, index) => (
+                  <View
+                    key={`seed-word-${index}`}
+                    style={{
+                      width: '30%',
+                      minWidth: 90,
+                      flexGrow: 1,
+                    }}
+                  >
+                    <Text style={{ fontSize: typography.size.xs, color: colors.text_secondary, marginBottom: 4 }}>
+                      {index + 1}
+                    </Text>
+                    <TextInput
+                      ref={(ref) => {
+                        inputRefs.current[index] = ref;
+                      }}
+                      style={{
+                        backgroundColor: colors.bg_darker,
+                        borderRadius: borderRadius.base,
+                        borderWidth: 1,
+                        borderColor: colors.border,
+                        color: colors.text_primary,
+                        fontSize: typography.size.sm,
+                        paddingVertical: spacing.sm,
+                        paddingHorizontal: spacing.sm,
+                      }}
+                      editable={!isLoading}
+                      autoCapitalize="none"
+                      autoCorrect={false}
+                      spellCheck={false}
+                      value={word}
+                      placeholder="word"
+                      placeholderTextColor={colors.text_tertiary}
+                      returnKeyType={index === 23 ? 'done' : 'next'}
+                      onSubmitEditing={() => {
+                        if (index < 23) {
+                          inputRefs.current[index + 1]?.focus();
+                        }
+                      }}
+                      onChangeText={(text) => {
+                        const lower = text.toLowerCase();
+                        const parts = lower.trim().split(/\s+/).filter(Boolean);
+                        if (parts.length <= 1) {
+                          setSeedWords(prev => {
+                            const next = [...prev];
+                            next[index] = lower.replace(/\s+/g, '');
+                            return next;
+                          });
+                          return;
+                        }
+                        setSeedWords(prev => {
+                          const next = [...prev];
+                          let cursor = index;
+                          parts.forEach((part) => {
+                            if (cursor < next.length) {
+                              next[cursor] = part;
+                              cursor += 1;
+                            }
+                          });
+                          return next;
+                        });
+                        const nextIndex = Math.min(index + parts.length, 23);
+                        inputRefs.current[nextIndex]?.focus();
+                      }}
+                    />
+                  </View>
+                ))}
+              </View>
 
               <View
                 style={{
@@ -216,155 +281,6 @@ const RecoverIdentityScreen = ({ navigation }: RecoverIdentityScreenProps) => {
           </Card>
         )}
 
-        {/* Backup File Recovery */}
-        {recoveryMethod === 'backup' && (
-          <Card>
-            <Column gap="sm">
-              <FormField
-                label={t.auth.recoverIdentity.backup.title}
-                placeholder={t.auth.recoverIdentity.backup.placeholder}
-                value={backupJson}
-                onChangeText={setBackupJson}
-                multiline
-                numberOfLines={4}
-                editable={!isLoading}
-                containerStyle={{ marginBottom: spacing.md }}
-              />
-
-              <Row
-                style={{
-                  justifyContent: 'space-between',
-                  alignItems: 'center',
-                  marginBottom: spacing.sm,
-                }}
-              >
-                <Text
-                  style={{
-                    fontSize: typography.size.sm,
-                    fontWeight: typography.weight.semibold,
-                    color: colors.text_primary,
-                  }}
-                >
-                  {t.auth.recoverIdentity.backup.passwordLabel}
-                </Text>
-                <Pressable onPress={() => setShowPassword(!showPassword)}>
-                  <Text
-                    style={{
-                      fontSize: typography.size.xs,
-                      color: colors.primary,
-                    }}
-                  >
-                    {showPassword ? t.auth.recoverIdentity.backup.passwordShowHide.hide : t.auth.recoverIdentity.backup.passwordShowHide.show}
-                  </Text>
-                </Pressable>
-              </Row>
-
-              <FormField
-                label=""
-                placeholder={t.auth.recoverIdentity.backup.passwordPlaceholder}
-                value={backupPassword}
-                onChangeText={setBackupPassword}
-                secureTextEntry={!showPassword}
-                editable={!isLoading}
-                helperText={t.auth.recoverIdentity.backup.hint}
-                containerStyle={{ marginBottom: 0 }}
-              />
-            </Column>
-          </Card>
-        )}
-
-        {/* Social Recovery */}
-        {recoveryMethod === 'social' && (
-          <Card>
-            <Column gap="sm">
-              <FormField
-                label={t.auth.recoverIdentity.social.title}
-                placeholder={t.auth.recoverIdentity.social.placeholder}
-                value={guardianIds}
-                onChangeText={setGuardianIds}
-                editable={!isLoading}
-                containerStyle={{ marginBottom: spacing.md }}
-                helperText="Enter guardian IDs separated by commas (e.g., guardian-1, guardian-2, guardian-3)"
-              />
-
-              <Text
-                style={{
-                  fontSize: typography.size.xs,
-                  color: colors.text_tertiary,
-                }}
-              >
-                {t.auth.recoverIdentity.social.processTitle}
-              </Text>
-
-              <View
-                style={{
-                  backgroundColor: colors.bg_darker,
-                  padding: spacing.md,
-                  borderRadius: borderRadius.base,
-                  gap: spacing.sm,
-                }}
-              >
-                <Row>
-                  <Text style={{ color: colors.primary, marginRight: spacing.sm }}>1.</Text>
-                  <Text style={{ color: colors.text_secondary, flex: 1 }}>
-                    {t.auth.recoverIdentity.social.step1}
-                  </Text>
-                </Row>
-
-                <Row>
-                  <Text style={{ color: colors.primary, marginRight: spacing.sm }}>2.</Text>
-                  <Text style={{ color: colors.text_secondary, flex: 1 }}>
-                    {t.auth.recoverIdentity.social.step2}
-                  </Text>
-                </Row>
-
-                <Row>
-                  <Text style={{ color: colors.primary, marginRight: spacing.sm }}>3.</Text>
-                  <Text style={{ color: colors.text_secondary, flex: 1 }}>
-                    {t.auth.recoverIdentity.social.step3}
-                  </Text>
-                </Row>
-
-                <Row>
-                  <Text style={{ color: colors.primary, marginRight: spacing.sm }}>4.</Text>
-                  <Text style={{ color: colors.text_secondary, flex: 1 }}>
-                    {t.auth.recoverIdentity.social.step4}
-                  </Text>
-                </Row>
-              </View>
-
-              <View
-                style={{
-                  backgroundColor: colors.bg_darker,
-                  padding: spacing.md,
-                  borderRadius: borderRadius.base,
-                  borderLeftWidth: 4,
-                  borderLeftColor: colors.info,
-                  marginTop: spacing.md,
-                }}
-              >
-                <Text
-                  style={{
-                    fontSize: typography.size.xs,
-                    color: colors.info,
-                    fontWeight: typography.weight.semibold,
-                  }}
-                >
-                  {t.auth.recoverIdentity.social.testTitle}
-                </Text>
-                <Text
-                  style={{
-                    fontSize: typography.size.xs,
-                    color: colors.text_secondary,
-                    marginTop: spacing.xs,
-                  }}
-                >
-                  {t.auth.recoverIdentity.social.testCode}
-                </Text>
-              </View>
-            </Column>
-          </Card>
-        )}
 
         {/* Action Buttons */}
         <ActionFooter

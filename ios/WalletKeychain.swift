@@ -1,6 +1,6 @@
 /**
  * WalletKeychain.swift
- * Secure storage for wallet seed phrases in iOS Keychain
+ * Secure storage for the master seed phrase in iOS Keychain
  * Each wallet seed (primary, ubi, savings) stored encrypted separately
  */
 
@@ -17,7 +17,7 @@ class WalletKeychain: NSObject {
     // MARK: - Keychain Storage
 
     /**
-     * Store seed phrase securely in Keychain
+     * Store master seed phrase securely in Keychain
      * @param key - Unique key (e.g., "wallet_{identityId}_{walletType}")
      * @param value - 24-word seed phrase
      * @return true if successful
@@ -65,7 +65,7 @@ class WalletKeychain: NSObject {
     }
 
     /**
-     * Retrieve seed phrase from Keychain
+     * Retrieve master seed phrase from Keychain
      * @param key - Unique key (e.g., "wallet_{identityId}_{walletType}")
      * @return Seed phrase string or null if not found
      */
@@ -105,7 +105,7 @@ class WalletKeychain: NSObject {
     }
 
     /**
-     * Delete seed phrase from Keychain
+     * Delete master seed phrase from Keychain
      * @param key - Unique key
      * @return true if successful or not found
      */

@@ -29,7 +29,7 @@ type SignInScreenProps = NativeStackScreenProps<AuthStackParamList, 'SignIn'>;
 const SignInScreen = ({ navigation }: SignInScreenProps) => {
   const { t } = useTranslation();
   const { signIn, isLoading, error, setCurrentIdentity } = useAuth();
-  const { isConnected, isLoading: nodeLoading, checkConnection, getProtocol } = useNodeConnection(true);
+  const { isConnected, hasChecked } = useNodeConnection(true);
 
   const [did, setDid] = useState('');
   const [passphrase, setPassphrase] = useState('');
@@ -65,7 +65,7 @@ const SignInScreen = ({ navigation }: SignInScreenProps) => {
   // SECURITY: Dev bypass removed for security reasons
   // To test development flows, use the mock identity service in AuthContext instead
 
-  const isSignInDisabled = isLoading || nodeLoading || !isConnected;
+  const isSignInDisabled = isLoading;
 
   const displayError = localError || error;
 
@@ -136,22 +136,7 @@ const SignInScreen = ({ navigation }: SignInScreenProps) => {
         </View>
 
         {/* Node Connection Status - Tap to retry, Long press for full protocol check */}
-        <Pressable
-          onPress={() => {
-            console.log('='.repeat(60));
-            console.log('[SignIn] 👆 SHORT PRESS - UDP Reachability Check');
-            console.log('='.repeat(60));
-            checkConnection();
-          }}
-          onLongPress={() => {
-            console.log('='.repeat(60));
-            console.log('[SignIn] 👆👆 LONG PRESS - Full QUIC Protocol Health Check');
-            console.log('='.repeat(60));
-            getProtocol();
-          }}
-          delayLongPress={500}
-          hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
-        >
+        <View>
           <Card>
             <Row style={{ justifyContent: 'space-between', alignItems: 'center' }}>
               <Column gap="xs" style={{ flex: 1 }}>
@@ -175,34 +160,12 @@ const SignInScreen = ({ navigation }: SignInScreenProps) => {
                 </Text>
               </Column>
               <Badge
-                label={isConnected ? t.app.connected : t.app.disconnected}
-                variant={isConnected ? 'success' : 'error'}
+                label={hasChecked ? (isConnected ? t.app.connected : t.app.disconnected) : t.app.notChecked}
+                variant={hasChecked ? (isConnected ? 'success' : 'error') : 'default'}
               />
             </Row>
-            {!isConnected && !nodeLoading && (
-              <View
-                style={{
-                  marginTop: spacing.sm,
-                  paddingVertical: spacing.xs,
-                  paddingHorizontal: spacing.sm,
-                  backgroundColor: colors.bg_light,
-                  borderRadius: 6,
-                }}
-              >
-                <Text
-                  style={{
-                    fontSize: typography.size.xs,
-                    color: colors.primary,
-                    fontWeight: typography.weight.semibold,
-                    textAlign: 'center',
-                  }}
-                >
-                  {t.app.retryConnection}
-                </Text>
-              </View>
-            )}
           </Card>
-        </Pressable>
+        </View>
 
         {/* Error Message */}
         {displayError && <ErrorAlert message={displayError} icon="❌" />}
@@ -278,13 +241,13 @@ const SignInScreen = ({ navigation }: SignInScreenProps) => {
               label: t.auth.signIn.createNew,
               onPress: () => navigation.navigate('CreateIdentity'),
               variant: 'secondary',
-              disabled: isLoading || !isConnected,
+              disabled: isLoading,
             },
             {
               label: t.auth.signIn.recover,
               onPress: () => navigation.navigate('RecoverIdentity'),
               variant: 'secondary',
-              disabled: isLoading || !isConnected,
+              disabled: isLoading,
             },
             ...__DEV__ ? [{
               label: '🧹 Clean Identities',

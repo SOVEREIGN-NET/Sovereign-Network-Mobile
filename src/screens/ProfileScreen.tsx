@@ -4,8 +4,7 @@
  */
 
 import React, { useState } from 'react';
-import { View, ScrollView, TouchableOpacity, Alert } from 'react-native';
-// import Clipboard from '@react-native-clipboard/clipboard';
+import { View, ScrollView, TouchableOpacity, Alert, Clipboard } from 'react-native';
 import {
   Card,
   Text,
@@ -16,84 +15,32 @@ import {
   DetailRow,
   SectionLabel,
 } from '../components';
-import { useAuth, useApi, useAsyncData } from '../hooks';
+import { useAuth, useAsyncData } from '../hooks';
 import { useTranslation } from '../i18n';
 import { colors, spacing, typography, borderRadius } from '../theme';
 
 const ProfileScreen = ({ navigation }: any) => {
   const { t } = useTranslation();
   const { currentIdentity, signOut, isLoading } = useAuth();
-  const { api, isInitialized } = useApi();
   const [loggingOut, setLoggingOut] = useState(false);
 
-  // Fetch wallet data for stats
-  const { data: walletData } = useAsyncData(
-    async () => {
-      if (!api || !isInitialized || !currentIdentity?.did) {
-        return null;
-      }
-
-      try {
-        const walletList = await api.getWalletList(currentIdentity.did);
-        return {
-          wallets: walletList.wallets || [],
-        };
-      } catch (error) {
-        console.warn('⚠️ Profile: Failed to fetch wallet data:', error);
-        return null;
-      }
-    },
-    [api, isInitialized, currentIdentity?.did],
-  );
+  // Keep hook order stable without triggering any network requests.
+  useAsyncData(async () => null, [currentIdentity?.did]);
 
   // Fetch UBI data for stats
   const { data: ubiData } = useAsyncData(
     async () => {
-      if (!api || !isInitialized || !currentIdentity?.did) {
+      if (!currentIdentity?.did) {
         return null;
       }
 
-      try {
-        const [statusResponse, historyResponse] = await Promise.all([
-          api.request(`/api/v1/ubi/status/${currentIdentity.did}`).catch(() => null),
-          api.request(`/api/v1/ubi/history/${currentIdentity.did}`).catch(() => null),
-        ]);
-
-        const totalEarned = historyResponse?.claims?.reduce((sum: number, claim: any) => sum + (claim.amount || 0), 0) || 0;
-
-        return {
-          total_earned: totalEarned || statusResponse?.total_earned || 0,
-        };
-      } catch (error) {
-        console.warn('⚠️ Profile: Failed to fetch UBI data:', error);
-        return null;
-      }
+      return {
+        total_earned: currentIdentity.ubiEarned || 0,
+      };
     },
-    [api, isInitialized, currentIdentity?.did],
+    [currentIdentity?.did],
   );
 
-  // Fetch DAO stats
-  const { data: daoStats } = useAsyncData(
-    async () => {
-      if (!api || !isInitialized || !currentIdentity?.did) {
-        return null;
-      }
-
-      try {
-        const voteHistory = await api.request(`/api/v1/dao/vote/history/${currentIdentity.did}`).catch(() => null);
-
-        return {
-          voting_power: voteHistory?.voting_power || 0,
-          votes_cast: voteHistory?.votes?.length || 0,
-          reputation_score: voteHistory?.reputation_score || 0,
-        };
-      } catch (error) {
-        console.warn('⚠️ Profile: Failed to fetch DAO stats:', error);
-        return null;
-      }
-    },
-    [api, isInitialized, currentIdentity?.did],
-  );
 
   const handleLogout = () => {
     Alert.alert(
@@ -144,28 +91,33 @@ const ProfileScreen = ({ navigation }: any) => {
     return 'unknown';
   };
 
-  // const copyToClipboard = (id: any) => {
-  //   let textToCopy = '';
-  //   if (Array.isArray(id)) {
-  //     textToCopy = id.map(byte => byte.toString(16).padStart(2, '0')).join('');
-  //   } else if (typeof id === 'string') {
-  //     textToCopy = id;
-  //   }
-  //
-  //   if (textToCopy) {
-  //     Clipboard.setString(textToCopy);
-  //     Alert.alert('Copied', 'DID copied to clipboard');
-  //   }
-  // };
+  const copyToClipboard = async (id: any) => {
+    let textToCopy = '';
+    if (Array.isArray(id)) {
+      textToCopy = id.map(byte => byte.toString(16).padStart(2, '0')).join('');
+    } else if (typeof id === 'string') {
+      textToCopy = id;
+    }
+
+    if (textToCopy) {
+      try {
+        await Clipboard.setString(textToCopy);
+        Alert.alert('Copied', `DID copied to clipboard:\n\n${textToCopy}`);
+      } catch (error) {
+        console.error('Failed to copy DID:', error);
+        Alert.alert('Error', 'Failed to copy DID to clipboard');
+      }
+    }
+  };
 
   // Stats values
-  const votingPower = daoStats?.voting_power || 0;
+  const votingPower = 0;
   const votingPowerFormatted = votingPower.toLocaleString();
   const ubiEarned = ubiData?.total_earned || 0;
   const ubiEarnedFormatted = ubiEarned.toFixed(2);
-  const walletCount = walletData?.wallets?.length || 0;
-  const votesCast = daoStats?.votes_cast || 0;
-  const reputationScore = daoStats?.reputation_score || 0;
+  const walletCount = 0;
+  const votesCast = 0;
+  const reputationScore = 0;
   const authLoading = isLoading || loggingOut;
 
   return (
@@ -211,10 +163,52 @@ const ProfileScreen = ({ navigation }: any) => {
 
               {/* Identity Details */}
               <Column gap="sm">
-                <DetailRow
-                  label="DID"
-                  value={truncateId(currentIdentity.did)}
-                />
+                {/* Full DID with Copy */}
+                <View
+                  style={{
+                    paddingVertical: spacing.md,
+                    paddingHorizontal: spacing.md,
+                    backgroundColor: colors.bg_darker,
+                    borderRadius: borderRadius.base,
+                    borderLeftWidth: 3,
+                    borderLeftColor: colors.primary,
+                  }}
+                >
+                  <Text
+                    style={{
+                      fontSize: typography.size.xs,
+                      color: colors.text_secondary,
+                      marginBottom: spacing.sm,
+                      fontWeight: typography.weight.semibold,
+                    }}
+                  >
+                    DECENTRALIZED IDENTITY (DID)
+                  </Text>
+                  <TouchableOpacity onPress={() => copyToClipboard(currentIdentity.did)}>
+                    <Text
+                      style={{
+                        fontSize: typography.size.xs,
+                        color: colors.primary,
+                        fontFamily: 'Courier',
+                        fontWeight: '600',
+                        marginBottom: spacing.xs,
+                      }}
+                    >
+                      {typeof currentIdentity.did === 'string'
+                        ? currentIdentity.did
+                        : truncateId(currentIdentity.did)}
+                    </Text>
+                  </TouchableOpacity>
+                  <Text
+                    style={{
+                      fontSize: typography.size.xs,
+                      color: colors.text_secondary,
+                      fontStyle: 'italic',
+                    }}
+                  >
+                    Tap to copy full DID
+                  </Text>
+                </View>
                 <DetailRow
                   label={t.identity.details.identityType}
                   value={currentIdentity.identityType || 'Citizen'}
@@ -252,10 +246,52 @@ const ProfileScreen = ({ navigation }: any) => {
                   label={t.identity.stats.ubiEarned}
                   value={`${ubiEarnedFormatted} SOV`}
                 />
-                <DetailRow
-                  label={t.identity.stats.wallets}
-                  value={walletCount.toString()}
-                />
+              </Column>
+            </Card>
+          </View>
+
+          {/* Assets Card */}
+          <View style={{ paddingHorizontal: spacing.sm }}>
+            <Card style={{ marginHorizontal: 0 }}>
+              <SectionLabel>My Assets</SectionLabel>
+              <Column gap="sm">
+                <TouchableOpacity
+                  onPress={() => navigation?.navigate('MyDomains')}
+                  style={{
+                    paddingVertical: spacing.md,
+                    paddingHorizontal: spacing.md,
+                    backgroundColor: colors.bg_darker,
+                    borderRadius: borderRadius.md,
+                    flexDirection: 'row',
+                    justifyContent: 'space-between',
+                    alignItems: 'center',
+                  }}
+                >
+                  <View style={{ flexDirection: 'row', alignItems: 'center', gap: spacing.md }}>
+                    <Text style={{ fontSize: typography.size.lg }}>🌐</Text>
+                    <View>
+                      <Text
+                        style={{
+                          fontSize: typography.size.sm,
+                          fontWeight: typography.weight.semibold,
+                          color: colors.text_primary,
+                        }}
+                      >
+                        My Domains
+                      </Text>
+                      <Text
+                        style={{
+                          fontSize: typography.size.xs,
+                          color: colors.text_secondary,
+                          marginTop: spacing.xs,
+                        }}
+                      >
+                        View & manage your .sov domains
+                      </Text>
+                    </View>
+                  </View>
+                  <Text style={{ fontSize: typography.size.lg, color: colors.text_secondary }}>›</Text>
+                </TouchableOpacity>
               </Column>
             </Card>
           </View>

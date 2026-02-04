@@ -27,7 +27,6 @@ interface DappConfig {
 const DAPP_CONFIGS: DappConfig[] = [
   { id: 'central', name: 'Central.sov', desc: 'CBE applications', url: 'zhtp://central.sov', baseUsers: 342, volatility: 0.08, baseChange: 234 },
   { id: 'sovswap', name: 'SovSwap', desc: 'DAO registry - Token Swap', url: 'zhtp://sovswap.sov', baseUsers: 287, volatility: 0.12, baseChange: 189 },
-  { id: 'breakroom', name: 'Breakroom', desc: 'Employee management', url: 'zhtp://breakroom.sov', baseUsers: 156, volatility: 0.06, baseChange: 156 },
   { id: 'ballot', name: 'Ballot', desc: 'Voting Platform', url: 'zhtp://ballot.sov', baseUsers: 89, volatility: 0.1, baseChange: 143 },
 ];
 

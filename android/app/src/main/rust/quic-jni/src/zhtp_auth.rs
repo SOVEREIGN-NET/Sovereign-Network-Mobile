@@ -146,6 +146,8 @@ pub fn compute_request_mac(mac_key: &[u8], mac_input: &[u8]) -> Result<Vec<u8>> 
 }
 
 /// Build AuthContext for a request
+/// Legacy function - should use build_auth_context_with_sequence instead
+#[deprecated(since = "0.1.0", note = "Use build_auth_context_with_sequence instead")]
 pub fn build_auth_context(
     session: &AuthSession,
     method: ZhtpMethod,
@@ -154,6 +156,27 @@ pub fn build_auth_context(
 ) -> Result<AuthContext> {
     let mut session_mut = session.clone();
     let sequence = session_mut.next_sequence();
+    let mac_input = build_mac_input(method, path, body, sequence, &session.session_id)?;
+    let request_mac = compute_request_mac(&session.mac_key, &mac_input)?;
+
+    Ok(AuthContext {
+        session_id: session.session_id.clone(),
+        client_did: session.client_did.clone(),
+        sequence,
+        request_mac,
+    })
+}
+
+/// Build AuthContext for a request using a pre-incremented sequence
+/// The sequence must have been incremented on the session object before calling this
+/// This ensures the actual session object is updated, matching iOS behavior
+pub fn build_auth_context_with_sequence(
+    session: &AuthSession,
+    method: ZhtpMethod,
+    path: &str,
+    body: &[u8],
+    sequence: u64,
+) -> Result<AuthContext> {
     let mac_input = build_mac_input(method, path, body, sequence, &session.session_id)?;
     let request_mac = compute_request_mac(&session.mac_key, &mac_input)?;
 
