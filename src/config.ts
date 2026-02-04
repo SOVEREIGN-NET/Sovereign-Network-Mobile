@@ -41,6 +41,10 @@ if (!generatedConfig.ZHTP_NODE_URL) {
 
 export const DEFAULT_SOV_NODE_URL = generatedConfig.ZHTP_NODE_URL;
 export const CERTIFICATE_PIN = generatedConfig.CERTIFICATE_PIN;
+export const SOV_TOKEN_ID: string | null = generatedConfig.SOV_TOKEN_ID ?? null;
+export const CHAIN_ID: number = Number.isFinite(Number(generatedConfig.CHAIN_ID))
+  ? Number(generatedConfig.CHAIN_ID)
+  : 2;
 
 /**
  * Default node host and port (pre-parsed from URL by build script)
@@ -220,6 +224,8 @@ export const config = {
   NODE_HOST: DEFAULT_NODE_HOST,
   NODE_PORT: DEFAULT_NODE_PORT,
   CERTIFICATE_PIN,
+  SOV_TOKEN_ID,
+  CHAIN_ID,
   NETWORK_TYPE: DEFAULT_NETWORK_TYPE,
   API_ENDPOINTS,
   QUIC_CONFIG,

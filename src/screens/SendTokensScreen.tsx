@@ -17,7 +17,7 @@ import { useTranslation } from '../i18n';
 import { colors, spacing, typography, borderRadius } from '../theme';
 import tokenService from '../services/TokenService';
 import { TokenTransferRequest } from '../types/token';
-import { quicRequest } from '../services/QuicClient';
+import { SOV_TOKEN_ID } from '../config';
 
 // Storage keys
 const CREATED_TOKENS_KEY = 'sov:created_tokens';
@@ -29,6 +29,7 @@ interface SendableToken {
   balance: number;
   type: 'sov' | 'custom'; // sov = native token, custom = custom token
   token_id?: string; // Only for custom tokens
+  decimals?: number;
 }
 
 interface TransferFormState {
@@ -65,6 +66,33 @@ const SendTokensScreen = ({ navigation }: any) => {
     type: null,
     message: '',
   });
+  const [sovTokenId, setSovTokenId] = useState<string | null>(SOV_TOKEN_ID ?? null);
+
+  const isHex = (value: string) => /^[0-9a-fA-F]+$/.test(value);
+  const normalizeRecipient = (value: string) => {
+    const trimmed = value.trim();
+    if (trimmed.startsWith('did:zhtp:')) {
+      return trimmed.substring('did:zhtp:'.length);
+    }
+    return trimmed;
+  };
+
+  const isValidRecipient = (value: string) => {
+    const hex = normalizeRecipient(value);
+    if (!isHex(hex)) return false;
+    return hex.length === 64 || hex.length === 5184;
+  };
+
+  const toBaseUnits = (amountStr: string, decimals: number) => {
+    const normalized = amountStr.trim();
+    if (!normalized) return null;
+    const [whole, frac = ''] = normalized.split('.');
+    if (!/^\d+$/.test(whole) || (frac && !/^\d+$/.test(frac))) return null;
+    if (frac.length > decimals) return null;
+    const paddedFrac = frac.padEnd(decimals, '0');
+    const combined = `${whole}${paddedFrac}`.replace(/^0+/, '') || '0';
+    return combined;
+  };
 
   // Load user's tokens on focus
   useFocusEffect(
@@ -96,6 +124,7 @@ const SendTokensScreen = ({ navigation }: any) => {
             name: 'Sovereign',
             balance: totalSovBalance,
             type: 'sov',
+            decimals: 6,
           });
         }
       }
@@ -122,6 +151,7 @@ const SendTokensScreen = ({ navigation }: any) => {
               balance: humanReadableBalance,
               type: 'custom',
               token_id: token.token_id,
+              decimals,
             };
             tokenMap.set(token.token_id, sendableToken);
             tokens.push(sendableToken);
@@ -150,6 +180,7 @@ const SendTokensScreen = ({ navigation }: any) => {
                   balance: 0, // Creator's token with no balance
                   type: 'custom',
                   token_id: tokenId,
+                  decimals: tokenInfo.decimals ?? 0,
                 };
                 tokenMap.set(tokenId, sendableToken);
                 tokens.push(sendableToken);
@@ -170,6 +201,22 @@ const SendTokensScreen = ({ navigation }: any) => {
         const sovToken = tokens.find(t => t.type === 'sov');
         setSelectedToken(sovToken || tokens[0]);
       }
+
+      if (!sovTokenId) {
+        try {
+          const list = await tokenService.listTokens();
+          const matched = list.tokens?.find((token: any) => {
+            const symbol = String(token.symbol || '').toUpperCase();
+            const name = String(token.name || '').toLowerCase();
+            return symbol === 'SOV' || name.includes('sovereign');
+          });
+          if (matched?.token_id) {
+            setSovTokenId(matched.token_id);
+          }
+        } catch (tokenListError) {
+          console.warn('[SendTokensScreen] Failed to resolve SOV token ID from token list:', tokenListError);
+        }
+      }
     } catch (error: any) {
       console.error('[SendTokensScreen] Failed to load tokens:', error);
       setTokensError(error.message || 'Failed to load tokens');
@@ -183,21 +230,9 @@ const SendTokensScreen = ({ navigation }: any) => {
     const newErrors: TransferFormErrors = {};
 
     if (!transferForm.recipient.trim()) {
-      newErrors.recipient = selectedToken?.type === 'sov'
-        ? 'Recipient wallet address is required'
-        : 'Recipient DID is required';
-    } else {
-      if (selectedToken?.type === 'sov') {
-        // SOV: validate wallet address format
-        if (!transferForm.recipient.startsWith('wallet_')) {
-          newErrors.recipient = 'Wallet address must start with wallet_';
-        }
-      } else {
-        // Custom token: validate DID format
-        if (!transferForm.recipient.startsWith('did:zhtp:') && transferForm.recipient.length !== 64) {
-          newErrors.recipient = 'Must start with did:zhtp: or be a valid hex address';
-        }
-      }
+      newErrors.recipient = 'Recipient is required';
+    } else if (!isValidRecipient(transferForm.recipient)) {
+      newErrors.recipient = 'Recipient must be DID (did:zhtp:...) or hex key id/pubkey';
     }
 
     if (!transferForm.amount.trim()) {
@@ -227,67 +262,29 @@ const SendTokensScreen = ({ navigation }: any) => {
     try {
       console.log('[SendTokensScreen] Transferring:', selectedToken.symbol);
 
-      if (selectedToken.type === 'sov') {
-        // SOV transfer to wallet address via /api/v1/wallet/send
-        console.log('[SendTokensScreen] SOV transfer to wallet:', transferForm.recipient);
-
-        // Extract hex identity from DID
-        const fromIdentity = currentIdentity.did.startsWith('did:zhtp:')
-          ? currentIdentity.did.substring('did:zhtp:'.length)
-          : currentIdentity.did;
-
-        // Extract wallet address (remove wallet_ prefix if present, use as-is otherwise)
-        const toAddress = transferForm.recipient.trim();
-
-        const sovTransferRequest = {
-          from_identity: fromIdentity,
-          to_address: toAddress,
-          amount: Number.parseFloat(transferForm.amount),
-          memo: transferForm.memo || null,
-        };
-
-        console.log('[SendTokensScreen] SOV transfer request:', sovTransferRequest);
-
-        const nodeUrl = require('../config').DEFAULT_SOV_NODE_URL;
-        const response = await quicRequest(
-          `${nodeUrl}/api/v1/wallet/send`,
-          {
-            method: 'POST',
-            timeout: 30,
-            alpn: 'private',
-            body: JSON.stringify(sovTransferRequest),
-            headers: {
-              'Content-Type': 'application/json',
-            },
-          }
-        );
-
-        if (!response.ok) {
-          throw new Error(`SOV transfer failed: ${response.status} ${response.statusText}`);
-        }
-
-        const responseData = JSON.parse(response.body);
-        console.log('[SendTokensScreen] SOV transfer response:', responseData);
-
-        setTransferStatus({
-          type: 'success',
-          message: `SOV transfer successful!`,
-        });
-      } else {
-        // Custom token transfer using token service
-        const transferRequest: TokenTransferRequest = {
-          token_id: selectedToken.token_id!,
-          to: transferForm.recipient.trim(),
-          amount: Number.parseFloat(transferForm.amount),
-        };
-
-        const response = await tokenService.transferToken(transferRequest);
-
-        setTransferStatus({
-          type: 'success',
-          message: `Transfer successful!`,
-        });
+      const tokenId = selectedToken.type === 'sov' ? sovTokenId : selectedToken.token_id;
+      if (!tokenId) {
+        throw new Error('SOV token ID not resolved. Check token list or config.');
       }
+
+      const decimals = selectedToken.decimals ?? (selectedToken.type === 'sov' ? 6 : 0);
+      const baseUnits = toBaseUnits(transferForm.amount, decimals);
+      if (!baseUnits) {
+        throw new Error(`Amount must have at most ${decimals} decimals`);
+      }
+
+      const transferRequest: TokenTransferRequest = {
+        token_id: tokenId,
+        to: transferForm.recipient.trim(),
+        amount: baseUnits,
+      };
+
+      await tokenService.transferToken(transferRequest);
+
+      setTransferStatus({
+        type: 'success',
+        message: `Transfer successful!`,
+      });
 
       // Reset form
       setTimeout(() => {
@@ -344,6 +341,28 @@ const SendTokensScreen = ({ navigation }: any) => {
             >
               Transfer your tokens to another address
             </Text>
+            <View
+              style={{
+                marginTop: spacing.sm,
+                alignSelf: 'flex-start',
+                paddingHorizontal: spacing.sm,
+                paddingVertical: 4,
+                borderRadius: borderRadius.full,
+                backgroundColor: colors.warning + '22',
+                borderWidth: 1,
+                borderColor: colors.warning + '55',
+              }}
+            >
+              <Text
+                style={{
+                  fontSize: typography.size.xs,
+                  color: colors.warning,
+                  fontWeight: typography.weight.semibold,
+                }}
+              >
+                Coming soon
+              </Text>
+            </View>
           </View>
 
           {/* Error message */}
@@ -597,12 +616,8 @@ const SendTokensScreen = ({ navigation }: any) => {
 
               {/* Recipient Input - Changes based on token type */}
               <FormField
-                label={selectedToken.type === 'sov'
-                  ? 'Recipient Wallet Address'
-                  : 'Recipient DID (must start with did:zhtp:)'}
-                placeholder={selectedToken.type === 'sov'
-                  ? 'wallet_...'
-                  : 'did:zhtp:...'}
+                label="Recipient DID or Key ID"
+                placeholder="did:zhtp:... or 64/5184 hex"
                 value={transferForm.recipient}
                 onChangeText={(text) => {
                   setTransferForm((prev) => ({ ...prev, recipient: text }));
@@ -649,6 +664,7 @@ const SendTokensScreen = ({ navigation }: any) => {
                   variant="primary"
                   onPress={handleTransfer}
                   loading={isTransferring}
+                  disabled
                   style={{ flex: 1 }}
                 >
                   Send {selectedToken.symbol}

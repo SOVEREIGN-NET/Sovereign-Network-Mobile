@@ -44,8 +44,15 @@ const normalizeIdentityId = (identityId?: string | null): string | null => {
 
 const normalizeWalletType = (walletType: string): string => walletType.toLowerCase();
 
+const resolveWalletId = (wallet: any): string => {
+  if (wallet.wallet_id) return wallet.wallet_id;
+  if (wallet.id) return wallet.id;
+  const summaryId = wallet?.summary?.id?.[0];
+  return summaryId ?? '';
+};
+
 const toWalletDisplay = (wallet: any): WalletDisplay => ({
-  id: wallet.wallet_id ?? wallet.id ?? '',
+  id: resolveWalletId(wallet),
   name: wallet.name ?? `${wallet.wallet_type} Wallet`,
   wallet_type: wallet.wallet_type ?? 'Unknown',
   available_balance: wallet.available_balance ?? 0,

@@ -251,19 +251,25 @@ const SIDScreen = ({ navigation }: any) => {
                   <Text style={{ fontSize: typography.size.xs, color: colors.text_secondary, marginBottom: spacing.md }}>
                     WALLET ADDRESS (for SOV transfers)
                   </Text>
-                  <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: spacing.lg }}>
-                    <Text
-                      style={{
-                        fontSize: typography.size.sm,
-                        fontWeight: typography.weight.semibold,
-                        color: selectedWallet?.id ? colors.text_primary : colors.text_tertiary,
-                        letterSpacing: 0.5,
-                        flex: 1,
-                      }}
-                      numberOfLines={1}
+                  <View style={{ flexDirection: 'row', alignItems: 'center', marginBottom: spacing.lg }}>
+                    <ScrollView
+                      horizontal
+                      showsHorizontalScrollIndicator={false}
+                      contentContainerStyle={{ paddingRight: spacing.sm }}
+                      style={{ flex: 1 }}
                     >
-                      {selectedWallet?.id ? selectedWallet.id : '—'}
-                    </Text>
+                      <Text
+                        style={{
+                          fontSize: typography.size.sm,
+                          fontWeight: typography.weight.semibold,
+                          color: selectedWallet?.id ? colors.text_primary : colors.text_tertiary,
+                          letterSpacing: 0.5,
+                          fontFamily: 'Courier',
+                        }}
+                      >
+                        {selectedWallet?.id ? selectedWallet.id : '—'}
+                      </Text>
+                    </ScrollView>
                     {selectedWallet?.id && (
                       <TouchableOpacity onPress={() => copyToClipboard(selectedWallet.id)} style={{ marginLeft: spacing.sm }}>
                         <Text style={{ fontSize: typography.size.xs, color: colors.primary }}>{t.wallet.actions.copy}</Text>
@@ -274,19 +280,25 @@ const SIDScreen = ({ navigation }: any) => {
                   <Text style={{ fontSize: typography.size.xs, color: colors.text_secondary, marginBottom: spacing.md }}>
                     YOUR DID (for token transfers & sharing)
                   </Text>
-                  <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}>
-                    <Text
-                      style={{
-                        fontSize: typography.size.sm,
-                        fontWeight: typography.weight.semibold,
-                        color: colors.text_primary,
-                        letterSpacing: 0.5,
-                        flex: 1,
-                      }}
-                      numberOfLines={1}
+                  <View style={{ flexDirection: 'row', alignItems: 'center' }}>
+                    <ScrollView
+                      horizontal
+                      showsHorizontalScrollIndicator={false}
+                      contentContainerStyle={{ paddingRight: spacing.sm }}
+                      style={{ flex: 1 }}
                     >
-                      {currentIdentity?.did || 'Loading...'}
-                    </Text>
+                      <Text
+                        style={{
+                          fontSize: typography.size.sm,
+                          fontWeight: typography.weight.semibold,
+                          color: colors.text_primary,
+                          letterSpacing: 0.5,
+                          fontFamily: 'Courier',
+                        }}
+                      >
+                        {currentIdentity?.did || 'Loading...'}
+                      </Text>
+                    </ScrollView>
                     {currentIdentity?.did && (
                       <TouchableOpacity onPress={() => copyToClipboard(currentIdentity.did)} style={{ marginLeft: spacing.sm }}>
                         <Text style={{ fontSize: typography.size.xs, color: colors.primary }}>{t.wallet.actions.copy}</Text>

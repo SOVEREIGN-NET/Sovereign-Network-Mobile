@@ -13,6 +13,9 @@ export interface WalletListResponse {
   wallets: Array<{
     wallet_id?: string;
     id?: string;
+    summary?: {
+      id?: string[];
+    };
     name?: string;
     wallet_type: string;
     available_balance: number;
