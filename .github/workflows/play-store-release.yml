@@ -1,0 +1,117 @@
+name: Google Play Store Release
+
+on:
+  workflow_dispatch:
+    inputs:
+      track:
+        description: 'Release track'
+        required: true
+        default: 'internal'
+        type: choice
+        options:
+          - internal
+          - alpha
+          - beta
+          - production
+
+  push:
+    tags:
+      - 'v[0-9]+.[0-9]+.[0-9]+*'
+
+jobs:
+  build-and-release:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'npm'
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Set up Java
+        uses: actions/setup-java@v4
+        with:
+          distribution: 'temurin'
+          java-version: '17'
+
+      - name: Decode release keystore
+        env:
+          KEYSTORE_B64: ${{ secrets.RELEASE_KEYSTORE_FILE }}
+        run: |
+          echo "$KEYSTORE_B64" | base64 -d > android/app/release.keystore
+
+      - name: Determine track and version
+        id: version
+        env:
+          EVENT_NAME: ${{ github.event_name }}
+          REF: ${{ github.ref }}
+          INPUT_TRACK: ${{ github.event.inputs.track }}
+        run: |
+          if [[ "$EVENT_NAME" == "push" && "$REF" == refs/tags/* ]]; then
+            VERSION="${REF#refs/tags/v}"
+            TRACK="production"
+          else
+            TRACK="$INPUT_TRACK"
+            VERSION=$(grep "versionName" android/app/build.gradle | head -1 | sed 's/.*"\(.*\)".*/\1/')
+          fi
+          echo "track=$TRACK" >> "$GITHUB_OUTPUT"
+          echo "version=$VERSION" >> "$GITHUB_OUTPUT"
+          echo "Building version: $VERSION to track: $TRACK"
+
+      - name: Compute version code
+        id: versionCode
+        run: |
+          VERSION_CODE=$(date +%s | tail -c 10)
+          echo "code=$VERSION_CODE" >> "$GITHUB_OUTPUT"
+          echo "Version code: $VERSION_CODE"
+
+      - name: Build Android App Bundle
+        env:
+          VERSION_CODE: ${{ steps.versionCode.outputs.code }}
+          RELEASE_KEYSTORE_PASSWORD: ${{ secrets.RELEASE_KEYSTORE_PASSWORD }}
+          RELEASE_KEY_ALIAS: ${{ secrets.RELEASE_KEY_ALIAS }}
+          RELEASE_KEY_PASSWORD: ${{ secrets.RELEASE_KEY_PASSWORD }}
+        run: |
+          cd android
+          ./gradlew bundleRelease \
+            -PVERSION_CODE="$VERSION_CODE" \
+            -PRELEASE_KEYSTORE_PASSWORD="$RELEASE_KEYSTORE_PASSWORD" \
+            -PRELEASE_KEY_ALIAS="$RELEASE_KEY_ALIAS" \
+            -PRELEASE_KEY_PASSWORD="$RELEASE_KEY_PASSWORD"
+
+      - name: Upload to Google Play
+        env:
+          GOOGLE_PLAY_SERVICE_ACCOUNT_JSON: ${{ secrets.GOOGLE_PLAY_SERVICE_ACCOUNT_JSON }}
+          PLAY_TRACK: ${{ steps.version.outputs.track }}
+        run: |
+          cd android
+          echo "$GOOGLE_PLAY_SERVICE_ACCOUNT_JSON" > /tmp/gp-credentials.json
+
+          ./gradlew publish \
+            --artifact-dir=app/build/outputs/bundle/release/ \
+            -PplayTrack="$PLAY_TRACK" \
+            -PGOOGLE_PLAY_SERVICE_ACCOUNT_JSON="/tmp/gp-credentials.json"
+
+      - name: Create Release Notes
+        if: github.event_name == 'push'
+        uses: ncipollo/release-action@v1
+        with:
+          tag: ${{ github.ref }}
+          body: |
+            Version: ${{ steps.version.outputs.version }}
+            Build Code: ${{ steps.versionCode.outputs.code }}
+            Track: ${{ steps.version.outputs.track }}
+
+            Released to Google Play Store (${{ steps.version.outputs.track }} track)
+
+      - name: Clean up credentials
+        if: always()
+        run: |
+          rm -f /tmp/gp-credentials.json
