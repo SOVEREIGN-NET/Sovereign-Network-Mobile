@@ -130,8 +130,10 @@ android {
 }
 
 play {
-    serviceAccountCredentials.set(file(System.getenv("GOOGLE_PLAY_SERVICE_ACCOUNT_JSON") ?: ""))
-    track.set("internal")
+    serviceAccountCredentials.set(
+        file(System.getenv("GOOGLE_PLAY_SERVICE_ACCOUNT_JSON") ?: "")
+    )
+    track.set(project.findProperty("playTrack")?.toString() ?: "internal")
 }
 
 def quicJniScript = file("src/main/rust/quic-jni/build-android.sh")

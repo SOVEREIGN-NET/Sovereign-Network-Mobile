@@ -26,6 +26,11 @@ jobs:
       - name: Checkout code
         uses: actions/checkout@v4
 
+      - name: Setup Gradle
+        uses: gradle/actions/setup-gradle@v3
+        with:
+          cache-disabled: true
+
       - name: Set up Node.js
         uses: actions/setup-node@v4
         with:
@@ -52,6 +57,13 @@ jobs:
           KEYSTORE_B64: ${{ secrets.RELEASE_KEYSTORE_FILE }}
         run: |
           echo "$KEYSTORE_B64" | base64 -d > android/app/release.keystore
+
+      - name: Save Google Play service account
+        env:
+          SERVICE_ACCOUNT: ${{ secrets.GOOGLE_PLAY_SERVICE_ACCOUNT_JSON }}
+        run: |
+          mkdir -p /tmp/gp-secrets
+          echo "$SERVICE_ACCOUNT" > /tmp/gp-secrets/service-account.json
 
       - name: Determine track and version
         id: version
@@ -84,6 +96,7 @@ jobs:
           RELEASE_KEYSTORE_PASSWORD: ${{ secrets.RELEASE_KEYSTORE_PASSWORD }}
           RELEASE_KEY_ALIAS: ${{ secrets.RELEASE_KEY_ALIAS }}
           RELEASE_KEY_PASSWORD: ${{ secrets.RELEASE_KEY_PASSWORD }}
+          GOOGLE_PLAY_SERVICE_ACCOUNT_JSON: /tmp/gp-secrets/service-account.json
         run: |
           cd android
           ./gradlew bundleRelease \
@@ -94,16 +107,12 @@ jobs:
 
       - name: Upload to Google Play
         env:
-          GOOGLE_PLAY_SERVICE_ACCOUNT_JSON: ${{ secrets.GOOGLE_PLAY_SERVICE_ACCOUNT_JSON }}
           PLAY_TRACK: ${{ steps.version.outputs.track }}
+          GOOGLE_PLAY_SERVICE_ACCOUNT_JSON: /tmp/gp-secrets/service-account.json
         run: |
           cd android
-          echo "$GOOGLE_PLAY_SERVICE_ACCOUNT_JSON" > /tmp/gp-credentials.json
-
           ./gradlew publish \
-            --artifact-dir=app/build/outputs/bundle/release/ \
-            -PplayTrack="$PLAY_TRACK" \
-            -PGOOGLE_PLAY_SERVICE_ACCOUNT_JSON="/tmp/gp-credentials.json"
+            -PplayTrack="$PLAY_TRACK"
 
       - name: Create Release Notes
         if: github.event_name == 'push'
