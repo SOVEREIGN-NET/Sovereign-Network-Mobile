@@ -205,7 +205,7 @@ class NativeQuicModule(reactContext: ReactApplicationContext) :
                     return@execute
                 }
 
-                Log.d(TAG, "[🌐 Web4] Auth request identity_id=$identityId path=${parsedUrl.path}")
+                Log.d(TAG, "[🌐 Web4] Auth request identity_id=${maskIdentifier(identityId)} path=${parsedUrl.path}")
                 enqueueAuthenticatedRequest(
                     identityId = identityId,
                     parsedUrl = parsedUrl,
@@ -297,7 +297,7 @@ class NativeQuicModule(reactContext: ReactApplicationContext) :
             }
 
             val handle = (handshake?.get("handle") as? Number)?.toLong() ?: 0L
-            Log.d(TAG, "[🌐 Web4] Handshake ok handle=$handle identity_id=$identityId")
+            Log.d(TAG, "[🌐 Web4] Handshake ok handle=$handle identity_id=${maskIdentifier(identityId)}")
             drainQuinnQueue(identityId, handle)
         }
     }
@@ -450,5 +450,13 @@ class NativeQuicModule(reactContext: ReactApplicationContext) :
         } else {
             trimmed
         }
+    }
+
+    private fun maskIdentifier(value: String?): String {
+        val trimmed = value?.trim() ?: return "<empty>"
+        if (trimmed.isEmpty()) return "<empty>"
+        val core = trimmed.replace(Regex("^did:[^:]*:"), "")
+        if (core.length <= 8) return core
+        return core.substring(0, 4) + "…" + core.substring(core.length - 4)
     }
 }

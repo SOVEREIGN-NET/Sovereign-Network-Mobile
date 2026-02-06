@@ -23,7 +23,7 @@ class NativeZhtpApi(context: ReactApplicationContext) : ReactContextBaseJavaModu
   ) {
     GlobalScope.launch(Dispatchers.Default) {
       try {
-        Log.d(TAG, "signIn: identityId=$identityId")
+        Log.d(TAG, "signIn: identityId=${maskIdentifier(identityId)}")
 
         if (identityId.trim().isEmpty()) {
           promise.reject(
@@ -44,14 +44,21 @@ class NativeZhtpApi(context: ReactApplicationContext) : ReactContextBaseJavaModu
         val loginUrl = buildQuicUrl(nodeUrl, "/api/v1/identity/login")
         Log.d(TAG, "Sending login request to: $loginUrl")
 
+        val normalizedId = identityId.trim()
         val loginPayload = JSONObject().apply {
-          put("identity_id", identityId.trim())
+          if (normalizedId.startsWith("did:")) {
+            put("did", normalizedId)
+          } else {
+            put("identity_id", normalizedId)
+          }
           put("password", password)
         }
 
-        val response = makeQuicRequest(loginUrl, "POST", loginPayload.toString(), 30, "authenticated")
+        // Login should be public (password-based), not UHP-authenticated
+        val response = makeQuicRequest(loginUrl, "POST", loginPayload.toString(), 30, "public")
         val statusCode = response.first
         val responseBody = response.second
+        val responseError = response.third
 
         Log.d(TAG, "signIn response status: $statusCode")
 
@@ -67,7 +74,7 @@ class NativeZhtpApi(context: ReactApplicationContext) : ReactContextBaseJavaModu
               putDouble("createdAt", identity.optDouble("created_at", 0.0))
 
             }
-            Log.d(TAG, "✅ signIn successful: ${identity.optString("did")}")
+            Log.d(TAG, "✅ signIn successful: ${maskIdentifier(identity.optString("did"))}")
             promise.resolve(resultMap)
           }
 
@@ -84,7 +91,12 @@ class NativeZhtpApi(context: ReactApplicationContext) : ReactContextBaseJavaModu
           }
 
           else -> {
-            promise.reject("UNKNOWN", "HTTP $statusCode")
+            val message = if (statusCode == 0 && !responseError.isNullOrBlank()) {
+              "QUIC error: $responseError"
+            } else {
+              "HTTP $statusCode"
+            }
+            promise.reject("UNKNOWN", message)
           }
         }
       } catch (e: Exception) {
@@ -225,7 +237,7 @@ class NativeZhtpApi(context: ReactApplicationContext) : ReactContextBaseJavaModu
     body: String?,
     timeoutSeconds: Int,
     alpn: String
-  ): Pair<Int, String> = withContext(Dispatchers.IO) {
+  ): Triple<Int, String, String?> = withContext(Dispatchers.IO) {
     try {
       val headersJson = if (method == "POST") {
         JSONObject().apply { put("content-type", "application/json") }.toString()
@@ -245,7 +257,8 @@ class NativeZhtpApi(context: ReactApplicationContext) : ReactContextBaseJavaModu
 
       val statusCode = (result?.get("status") as? Number)?.toInt() ?: 0
       val responseBody = result?.get("body") as? String ?: ""
-      Pair(statusCode, responseBody)
+      val error = result?.get("error") as? String
+      Triple(statusCode, responseBody, error)
     } catch (e: Exception) {
       Log.e(TAG, "QUIC request error: ${e.message}", e)
       throw e
@@ -257,5 +270,13 @@ class NativeZhtpApi(context: ReactApplicationContext) : ReactContextBaseJavaModu
     val url = URL(normalized)
     val port = if (url.port != -1) url.port else 443
     return "quic://${url.host}:$port$path"
+  }
+
+  private fun maskIdentifier(value: String?): String {
+    val trimmed = value?.trim() ?: return "<empty>"
+    if (trimmed.isEmpty()) return "<empty>"
+    val core = trimmed.replace(Regex("^did:[^:]*:"), "")
+    if (core.length <= 8) return core
+    return core.substring(0, 4) + "…" + core.substring(core.length - 4)
   }
 }

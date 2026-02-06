@@ -15,14 +15,6 @@ Pod::Spec.new do |s|
     'HEADER_SEARCH_PATHS' => '$(PODS_TARGET_SRCROOT)/include'
   }
 
-  # Add the compiled Rust library directly to linker flags
-  # Try build/ first (preferred), then fall back to target/ for direct cargo builds
-  lib_path = File.expand_path("build/libuhp_ffi.a", __dir__)
-  unless File.exist?(lib_path)
-    lib_path = File.expand_path("target/aarch64-apple-ios/release/libuhp_ffi.a", __dir__)
-  end
-
-  s.user_target_xcconfig = {
-    'OTHER_LDFLAGS' => "$(inherited) #{lib_path}"
-  }
+  # Use an XCFramework so Xcode links the correct slice for device vs simulator.
+  s.vendored_frameworks = "UhpFFI.xcframework"
 end

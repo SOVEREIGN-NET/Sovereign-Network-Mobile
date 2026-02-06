@@ -146,6 +146,19 @@ echo ""
 build_slice "SIMULATOR64" "iOS Simulator (x86_64)" "sim-x86_64" "sim-x86_64"
 echo ""
 
+# Create a universal simulator slice (arm64 + x86_64) to avoid duplicate platform definitions
+log_info "Creating universal iOS Simulator library..."
+SIM_UNIVERSAL_DIR="$INSTALL_DIR/sim-universal"
+mkdir -p "$SIM_UNIVERSAL_DIR/lib" "$SIM_UNIVERSAL_DIR/include"
+cp -R "$INSTALL_DIR/sim-arm64/include/" "$SIM_UNIVERSAL_DIR/include/"
+if ! lipo -create \
+  "$INSTALL_DIR/sim-arm64/lib/liboqs.a" \
+  "$INSTALL_DIR/sim-x86_64/lib/liboqs.a" \
+  -output "$SIM_UNIVERSAL_DIR/lib/liboqs.a"; then
+  log_error "Failed to create universal simulator library"
+  exit 1
+fi
+
 # Create XCFramework
 log_info "Creating XCFramework..."
 
@@ -155,10 +168,8 @@ rm -rf "$FRAMEWORK_OUTPUT"
 xcodebuild -create-xcframework \
     -library "$INSTALL_DIR/ios-arm64/lib/liboqs.a" \
     -headers "$INSTALL_DIR/ios-arm64/include" \
-    -library "$INSTALL_DIR/sim-arm64/lib/liboqs.a" \
-    -headers "$INSTALL_DIR/sim-arm64/include" \
-    -library "$INSTALL_DIR/sim-x86_64/lib/liboqs.a" \
-    -headers "$INSTALL_DIR/sim-x86_64/include" \
+    -library "$SIM_UNIVERSAL_DIR/lib/liboqs.a" \
+    -headers "$SIM_UNIVERSAL_DIR/include" \
     -output "$FRAMEWORK_OUTPUT" > /dev/null 2>&1
 
 if [ ! -d "$FRAMEWORK_OUTPUT" ]; then

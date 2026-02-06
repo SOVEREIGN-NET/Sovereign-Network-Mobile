@@ -150,7 +150,7 @@ async function getSeedPhraseWithBiometric(): Promise<string[] | null> {
 
     if (!credentials) {
       if (__DEV__) {
-        console.warn('⚠️ User cancelled biometric authentication');
+        console.warn('⚠️ Seed phrase not found in Keychain (or auth was cancelled)');
       }
       return null;
     }
@@ -160,8 +160,16 @@ async function getSeedPhraseWithBiometric(): Promise<string[] | null> {
     }
 
     return deserialize(credentials.password);
-  } catch (error) {
+  } catch (error: any) {
+    const message = String(error?.message || error);
     console.error('❌ Biometric authentication failed:', error);
+    if (message.includes('Authentication tag verification failed') || message.includes('CryptoFailedException')) {
+      // Vault entry likely invalidated (biometrics changed / keystore reset)
+      await clearSeedPhrase();
+      throw new Error(
+        'Seed vault was invalidated on this device. Sign in locally and re-save your seed phrase.'
+      );
+    }
     return null;
   }
 }
@@ -192,8 +200,15 @@ async function getSeedPhraseWithPasscode(): Promise<string[] | null> {
     }
 
     return deserialize(credentials.password);
-  } catch (error) {
+  } catch (error: any) {
+    const message = String(error?.message || error);
     console.error('❌ Passcode authentication failed:', error);
+    if (message.includes('Authentication tag verification failed') || message.includes('CryptoFailedException')) {
+      await clearSeedPhrase();
+      throw new Error(
+        'Seed vault was invalidated on this device. Sign in locally and re-save your seed phrase.'
+      );
+    }
     return null;
   }
 }

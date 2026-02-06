@@ -115,7 +115,7 @@ class NativeZhtpApi: NSObject {
     reject: @escaping RCTPromiseRejectBlock
   ) async {
     do {
-      print("[NativeZhtpApi] signIn: identityId=\(identityId)")
+      print("[NativeZhtpApi] signIn: identityId=\(maskIdentifier(identityId))")
 
       guard !identityId.trimmingCharacters(in: .whitespaces).isEmpty else {
         throw NSError(
@@ -139,10 +139,15 @@ class NativeZhtpApi: NSObject {
         )
       }
 
-      let loginPayload = [
-        "identity_id": identityId.trimmingCharacters(in: .whitespaces),
+      let trimmedIdentity = identityId.trimmingCharacters(in: .whitespaces)
+      var loginPayload: [String: Any] = [
         "password": password
-      ] as [String: Any]
+      ]
+      if trimmedIdentity.lowercased().hasPrefix("did:") {
+        loginPayload["did"] = trimmedIdentity
+      } else {
+        loginPayload["identity_id"] = trimmedIdentity
+      }
 
       let loginUrl = try quicUrl(nodeUrl: nodeUrl, path: "/api/v1/identity/login")
       let bodyData = try JSONSerialization.data(withJSONObject: loginPayload)
@@ -169,7 +174,7 @@ class NativeZhtpApi: NSObject {
       case 200:
         let decoder = JSONDecoder()
         let identity = try decoder.decode(ZhtpIdentity.self, from: responseData)
-        print("[NativeZhtpApi] ✅ signIn successful: \(identity.did)")
+      print("[NativeZhtpApi] ✅ signIn successful: \(maskIdentifier(identity.did))")
 
         let resultMap: [String: Any] = [
           "identityId": identity.identityId,
@@ -465,5 +470,15 @@ class NativeZhtpApi: NSObject {
         continuation.resume(throwing: err)
       })
     }
+  }
+
+  private func maskIdentifier(_ value: String?) -> String {
+    let trimmed = (value ?? "").trimmingCharacters(in: .whitespaces)
+    if trimmed.isEmpty { return "<empty>" }
+    let core = trimmed.replacingOccurrences(of: "^did:[^:]*:", with: "", options: .regularExpression)
+    if core.count <= 8 { return core }
+    let start = core.prefix(4)
+    let end = core.suffix(4)
+    return "\(start)…\(end)"
   }
 }

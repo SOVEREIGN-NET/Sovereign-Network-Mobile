@@ -22,7 +22,7 @@ export const IdentityCleanup = {
       console.log('[IdentityCleanup] 🧹 Cleaning all identity data...');
 
       // Call native cleanup first (handles Documents/keystore + Keychain)
-      if (Platform.OS === 'ios') {
+      if (Platform.OS === 'ios' || Platform.OS === 'android') {
         const result = await NativeModules.NativeIdentityProvisioning.cleanKeystoreDirectory();
         console.log('[IdentityCleanup]', result);
       }
@@ -53,7 +53,7 @@ export const IdentityCleanup = {
       console.log(`[IdentityCleanup] 🧹 Cleaning identity: ${identityId}`);
 
       // Call native cleanup for specific identity
-      if (Platform.OS === 'ios') {
+      if (Platform.OS === 'ios' || Platform.OS === 'android') {
         const result = await NativeModules.NativeIdentityProvisioning.cleanKeystoreDirectoryForId(identityId);
         console.log('[IdentityCleanup]', result);
       }

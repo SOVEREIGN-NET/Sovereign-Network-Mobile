@@ -17,6 +17,9 @@ import SecureIdentityStorage from './SecureIdentityStorage';
 import { DEFAULT_SOV_NODE_URL, DEFAULT_NODE_HOST, DEFAULT_NODE_PORT, QUIC_CONFIG } from '../config';
 import { isQuicSupported, testQuicConnection } from './QuicClient';
 import { createQuicFetchAdapterSync, FetchAdapter } from './QuicFetchAdapter';
+import IdentityCleanup from './IdentityCleanup';
+import SeedVaultService from './SeedVaultService';
+import { maskIdentifier } from '../utils/maskIdentifier';
 
 const { NativeZhtpApi } = NativeModules;
 
@@ -42,13 +45,29 @@ export interface Identity {
   masterSeedPhrase?: string;
 }
 
+export interface MigrationResult {
+  identity: Identity;
+  newSeedPhrase: string[];
+}
+
 /**
  * Real auth service using native NativeZhtpApi module
  * All 4 core methods delegate to native layer
  */
+function withTimeout<T>(promise: Promise<T>, ms: number, label: string): Promise<T> {
+  let timeoutId: ReturnType<typeof setTimeout> | undefined;
+  const timeout = new Promise<never>((_, reject) => {
+    timeoutId = setTimeout(() => reject(new Error(label)), ms);
+  });
+  return Promise.race([promise, timeout]).finally(() => {
+    if (timeoutId) clearTimeout(timeoutId);
+  }) as Promise<T>;
+}
+
 class RealAuthService {
   private readonly nodeUrl: string;
   private readonly quicFetch: FetchAdapter;
+  private lastSeedRecoveryNotFound = false;
 
   constructor(nodeUrl: string) {
     this.nodeUrl = nodeUrl;
@@ -66,10 +85,36 @@ class RealAuthService {
    */
   async signIn(credentials: SignInCredentials): Promise<Identity> {
     try {
-      console.log('[RealAuthService] signIn called for:', credentials.identity_id);
+      const maskedId = maskIdentifier(credentials.identity_id);
+      console.log('[RealAuthService] signIn called for:', maskedId);
 
       if (!NativeZhtpApi) {
         throw new Error('NativeZhtpApi module not available');
+      }
+
+      // Local-first: if identity materials exist on device, restore and skip network login
+      try {
+        const local = await nativeIdentityProvisioning.getLocalIdentity(credentials.identity_id);
+        if (local?.status === 'found' && local.identity_id && local.did) {
+          const restore = await nativeIdentityProvisioning.restoreIdentityToHandleStore(local.identity_id);
+          if (restore?.status === 'restored') {
+            const identity: Identity = {
+              identityId: local.identity_id,
+              did: local.did,
+              displayName: local.did,
+              identityType: local.identity_type || 'Human',
+              deviceId: local.device_id,
+              createdAt: local.created_at,
+            };
+            console.log('[RealAuthService] ✅ Local identity restored, skipping server login');
+            await this.storeIdentity(identity);
+            return identity;
+          } else {
+            console.warn('[RealAuthService] ⚠️ Local restore skipped:', restore);
+          }
+        }
+      } catch (err) {
+        console.warn('[RealAuthService] ⚠️ Local identity check failed, falling back to server login:', err);
       }
 
       const identity = await NativeZhtpApi.signIn(
@@ -171,7 +216,7 @@ class RealAuthService {
       }
 
       console.log('[RealAuthService] ✅ Identity generated locally:');
-      console.log('[RealAuthService]    DID: ' + generatedIdentity.did);
+      console.log('[RealAuthService]    DID: ' + maskIdentifier(generatedIdentity.did));
       console.log('[RealAuthService]    Device: ' + generatedIdentity.deviceId);
 
       let registrationProof;
@@ -192,10 +237,8 @@ class RealAuthService {
       try {
         console.log('[RealAuthService] 🔐 Registering identity via /api/v1/identity/register...');
         const registerRequest = {
-          did: generatedIdentity.did,
           public_key: registrationProof.public_key,
           kyber_public_key: registrationProof.kyber_public_key,
-          node_id: registrationProof.node_id,
           device_id: registrationProof.device_id,
           display_name: data.display_name,
           identity_type: 'human',
@@ -222,11 +265,15 @@ class RealAuthService {
         } else {
           const registrationResponse = await registerResponse.json();
           identityId = registrationResponse.identity_id || '';
+          const serverDid = registrationResponse.did;
 
           // Mobile flow derives seed phrase locally; ignore server phrases.
 
           console.log('[RealAuthService] ✅ Server registration succeeded');
           console.log('[RealAuthService]    Identity ID: ' + identityId);
+          if (serverDid) {
+            generatedIdentity.did = serverDid;
+          }
         }
       } catch (serverError: any) {
         console.error('[RealAuthService] ❌ Server registration failed:', serverError);
@@ -328,6 +375,7 @@ class RealAuthService {
   async recoverWithSeed(seedPhrase: string): Promise<Identity> {
     try {
       console.log('[RealAuthService] recoverWithSeed called');
+      this.lastSeedRecoveryNotFound = false;
 
       const normalized = seedPhrase
         .toLowerCase()
@@ -340,32 +388,56 @@ class RealAuthService {
       }
 
       const phrase = normalized.join(' ');
-      const url = `quic://${DEFAULT_NODE_HOST}:${DEFAULT_NODE_PORT}/api/v1/identity/recover`;
-      const response = await this.quicFetch(url, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ recovery_phrase: phrase }),
-      });
+      const nodeUrl = this.nodeUrl.replace(/\/+$/, '');
+      const url = `${nodeUrl}/api/v1/identity/recover`;
 
-      const payload = await response.json().catch(() => ({}));
+      let payload: any = {};
+      let responseOk = false;
+      let responseStatus = 0;
 
-      if (!response.ok) {
-        const message = payload?.message || `HTTP ${response.status}: Recovery failed`;
-        throw new Error(message);
+      try {
+        const response = await this.quicFetch(url, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ recovery_phrase: phrase }),
+        });
+        responseStatus = response.status;
+        payload = await response.json().catch(() => ({}));
+        if (!payload || Object.keys(payload).length === 0) {
+          const text = await response.text().catch(() => '');
+          if (text) {
+            payload = { message: text };
+          }
+        }
+        responseOk = response.ok;
+      } catch (networkError) {
+        console.warn('[RealAuthService] Seed recovery network error, falling back to local restore:', networkError);
       }
 
-      if (payload?.session_token) {
+      const notFound =
+        responseStatus === 404 ||
+        String(payload?.message || '').toLowerCase().includes('not found') ||
+        String(payload?.error || '').toLowerCase().includes('not found');
+
+      if (responseOk && payload?.session_token) {
         try {
           await SecureIdentityStorage.setSessionToken(payload.session_token);
         } catch (tokenError) {
           console.warn('[RealAuthService] Failed to store session token:', tokenError);
         }
+      } else if (responseStatus && !responseOk && !notFound) {
+        const message = payload?.message || `HTTP ${responseStatus}: Recovery failed`;
+        throw new Error(message);
+      } else if (responseStatus && !responseOk && notFound) {
+        console.warn('[RealAuthService] Seed recovery not found on server, continuing with local restore');
+        this.lastSeedRecoveryNotFound = true;
+        throw new Error('MIGRATION_REQUIRED');
       }
 
       const restored = await nativeIdentityProvisioning.restoreIdentityFromPhrase(phrase);
 
-      const serverIdentityId = payload?.identity?.identity_id;
-      const didFromServer = payload?.identity?.did;
+      const serverIdentityId = responseOk ? payload?.identity?.identity_id : undefined;
+      const didFromServer = responseOk ? payload?.identity?.did : undefined;
       const identityDid = restored?.did || didFromServer;
       const identityId = identityDid
         ? identityDid.startsWith('did:zhtp:')
@@ -407,6 +479,141 @@ class RealAuthService {
       console.error('[RealAuthService] recoverWithSeed failed:', error);
       throw error;
     }
+  }
+
+  getLastSeedRecoveryNotFound(): boolean {
+    return this.lastSeedRecoveryNotFound;
+  }
+
+  /**
+   * Migrate identity using old seed phrase and create a new identity/seed
+   * Returns new identity and the new seed phrase words
+   */
+  async migrateIdentityFromSeed(displayName: string, seedPhrase: string): Promise<MigrationResult> {
+    if (!displayName.trim()) {
+      throw new Error('Display name is required');
+    }
+
+    const normalized = seedPhrase
+      .toLowerCase()
+      .trim()
+      .split(/\s+/)
+      .filter(Boolean);
+
+    if (normalized.length !== 24) {
+      throw new Error('Recovery phrase must be 24 words');
+    }
+
+    const phrase = normalized.join(' ');
+
+    // Restore identity deterministically from seed (this becomes the NEW identity)
+    console.log('[RealAuthService] migrateIdentityFromSeed starting');
+    const restored = await nativeIdentityProvisioning.restoreIdentityFromPhrase(phrase);
+    const restoredDid = restored?.did;
+    if (!restoredDid) {
+      throw new Error('Failed to restore identity from seed');
+    }
+    const restoredIdentityId = restoredDid.startsWith('did:zhtp:') ? restoredDid.substring('did:zhtp:'.length) : restoredDid;
+    const restoredPublicDilithium = restored?.publicDilithium;
+    if (!restoredPublicDilithium) {
+      throw new Error('Missing public key from restored identity');
+    }
+
+    const nodeUrl = this.nodeUrl.replace(/\/+$/, '');
+    const newSeedPhrase = phrase;
+    const newSeedWords = normalized;
+
+    const newPublicKeyHex = base64ToHex(restoredPublicDilithium);
+    const timestamp = Math.floor(Date.now() / 1000);
+    const message = `SEED_MIGRATE:${displayName}:${newPublicKeyHex}:${timestamp}`;
+    console.log('[RealAuthService] Signing migration message');
+    const signature = await withTimeout(
+      nativeIdentityProvisioning.signMessageFromSeed(phrase, message),
+      15000,
+      'Signing timed out (seed migration)'
+    );
+    console.log('[RealAuthService] Migration signature created');
+    console.log('[RealAuthService] Sending /identity/migrate');
+    const migrateResponse = await this.quicFetch(`${nodeUrl}/api/v1/identity/migrate`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        new_public_key: newPublicKeyHex,
+        device_id: restored.deviceId,
+        display_name: displayName,
+        timestamp,
+        signature,
+      }),
+    });
+
+    let migratePayload: any = {};
+    try {
+      migratePayload = await migrateResponse.json();
+    } catch {
+      const text = await migrateResponse.text().catch(() => '');
+      if (text) migratePayload = { message: text };
+    }
+
+    const statusMessage = String(migratePayload?.status_message || migratePayload?.message || '').toLowerCase();
+    const statusText = String(migratePayload?.status || '').toLowerCase();
+    const alreadyMigrated = statusText === 'conflict' || statusMessage.includes('already registered');
+
+    if (!migrateResponse.ok && !alreadyMigrated) {
+      const message = migratePayload?.message || `HTTP ${migrateResponse.status}: Migration failed`;
+      throw new Error(message);
+    }
+
+    if (alreadyMigrated) {
+      console.warn('[RealAuthService] ⚠️ Migration already completed on server, restoring locally');
+    }
+
+    const serverDid = !alreadyMigrated
+      ? (migratePayload?.new_did || migratePayload?.did || restoredDid)
+      : restoredDid;
+    const newIdentityId = serverDid.startsWith('did:zhtp:') ? serverDid.substring('did:zhtp:'.length) : serverDid;
+
+    // Replace all local identities/keys with new identity unless this is already migrated.
+    // Note: IdentityCleanup clears the native in-memory cache that storeProvisionedIdentity depends on.
+    // Re-restore from seed after cleanup so the identity is re-cached natively.
+    if (!alreadyMigrated) {
+      await IdentityCleanup.cleanAllIdentities();
+      await SeedVaultService.clearSeedPhrase();
+    }
+
+    try {
+      if (!alreadyMigrated) {
+        const restoredAfterCleanup = await nativeIdentityProvisioning.restoreIdentityFromPhrase(phrase);
+        const didAfterCleanup = restoredAfterCleanup?.did;
+
+        await nativeIdentityProvisioning.storeProvisionedIdentity(newIdentityId, {
+          did: didAfterCleanup || serverDid,
+        });
+      } else {
+        await nativeIdentityProvisioning.storeProvisionedIdentity(newIdentityId, {
+          did: serverDid,
+        });
+      }
+    } catch (storeError) {
+      console.warn('[RealAuthService] ⚠️ Failed to store migrated identity:', storeError);
+    }
+
+    try {
+      await nativeIdentityProvisioning.restoreIdentityToHandleStore(newIdentityId);
+    } catch (err) {
+      console.warn('[RealAuthService] Failed to restore migrated identity to handle store:', err);
+    }
+
+    const identity: Identity = {
+      identityId: newIdentityId,
+      did: serverDid,
+      displayName,
+      identityType: 'human',
+      deviceId: restored.deviceId,
+      createdAt: restored.createdAt,
+      masterSeedPhrase: newSeedPhrase,
+    };
+
+    return { identity, newSeedPhrase: newSeedWords };
   }
 
   /**
@@ -497,6 +704,13 @@ class RealAuthService {
       // Non-fatal - continue anyway
     }
   }
+}
+
+function base64ToHex(input: string): string {
+  if (!input) return '';
+  // eslint-disable-next-line @typescript-eslint/no-var-requires
+  const { Buffer } = require('buffer');
+  return Buffer.from(input, 'base64').toString('hex');
 }
 
 // Export singleton instance

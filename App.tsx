@@ -31,7 +31,7 @@ function AppContent() {
     );
   }
 
-  const { isAuthenticated, isBootstrapping } = authContext;
+  const { isAuthenticated, isBootstrapping, migrationRequired } = authContext;
 
   // Show loading indicator while checking auth state
   if (isBootstrapping) {
@@ -62,7 +62,10 @@ function AppContent() {
 
   // Show appropriate navigator based on auth state
   // Note: NavigationContainer is handled by RootNavigator and AuthNavigator
-  return isAuthenticated ? <RootNavigator /> : <AuthNavigator />;
+  if (isAuthenticated) {
+    return <RootNavigator />;
+  }
+  return <AuthNavigator initialRouteName={migrationRequired ? 'RecoverIdentity' : 'SignIn'} />;
 }
 
 /**

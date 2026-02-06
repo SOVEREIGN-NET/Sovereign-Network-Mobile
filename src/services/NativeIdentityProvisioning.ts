@@ -41,6 +41,17 @@ interface ProvisioningResult {
   did: string;
 }
 
+interface LocalIdentityResult {
+  status: 'found' | 'missing';
+  identity_id?: string;
+  did?: string;
+  device_id?: string;
+  created_at?: number;
+  identity_type?: string;
+  reason?: string;
+  error?: string;
+}
+
 /**
  * Native bridge to iOS identity provisioning
  * Only available on iOS platform
@@ -53,6 +64,11 @@ class NativeIdentityProvisioningBridge {
       this.nativeModule = NativeModules.NativeIdentityProvisioning;
       if (!this.nativeModule) {
         console.warn('⚠️ NativeIdentityProvisioning module not found');
+      } else if (__DEV__) {
+        const hasSignForDid = typeof this.nativeModule.signMessageForDid === 'function';
+        const hasSignFromSeed = typeof this.nativeModule.signMessageFromSeed === 'function';
+        console.log('[NativeIdentityProvisioning] signMessageForDid available:', hasSignForDid);
+        console.log('[NativeIdentityProvisioning] signMessageFromSeed available:', hasSignFromSeed);
       }
     }
   }
@@ -118,6 +134,21 @@ class NativeIdentityProvisioningBridge {
   }
 
   /**
+   * Check for local identity materials without server access
+   */
+  async getLocalIdentity(identityIdOrDid: string): Promise<LocalIdentityResult> {
+    if (!this.nativeModule) {
+      throw new Error('NativeIdentityProvisioning not available on this platform');
+    }
+
+    if (!this.nativeModule.getLocalIdentity) {
+      return { status: 'missing', reason: 'not_supported' };
+    }
+
+    return await this.nativeModule.getLocalIdentity(identityIdOrDid);
+  }
+
+  /**
    * Get 24-word master seed phrase for backup
    * Derived locally from lib-client master seed
    */
@@ -127,6 +158,21 @@ class NativeIdentityProvisioningBridge {
     }
 
     return await this.nativeModule.getSeedPhraseForBackup(did);
+  }
+
+  /**
+   * Get 24-word seed phrase from locally stored identity materials
+   */
+  async getSeedPhraseFromStoredIdentity(identityIdOrDid: string): Promise<string> {
+    if (!this.nativeModule) {
+      throw new Error('NativeIdentityProvisioning not available on this platform');
+    }
+
+    if (!this.nativeModule.getSeedPhraseFromStoredIdentity) {
+      throw new Error('NativeIdentityProvisioning.getSeedPhraseFromStoredIdentity not available');
+    }
+
+    return await this.nativeModule.getSeedPhraseFromStoredIdentity(identityIdOrDid);
   }
 
   /**
@@ -246,6 +292,52 @@ class NativeIdentityProvisioningBridge {
     const result = await this.nativeModule.signMessage(message);
     if (!result?.signature) {
       throw new Error('NativeIdentityProvisioning.signMessage returned no signature');
+    }
+    return result.signature;
+  }
+
+  /**
+   * Sign an arbitrary message with a specific cached identity (by DID)
+   * Returns hex-encoded signature
+   */
+  async signMessageForDid(did: string, message: string): Promise<string> {
+    if (!this.nativeModule) {
+      throw new Error('NativeIdentityProvisioning not available on this platform');
+    }
+    if (!this.nativeModule.signMessageForDid) {
+      throw new Error('NativeIdentityProvisioning.signMessageForDid not available');
+    }
+    const result = await this.nativeModule.signMessageForDid(did, message);
+    if (!result?.signature) {
+      throw new Error('NativeIdentityProvisioning.signMessageForDid returned no signature');
+    }
+    return result.signature;
+  }
+
+  /**
+   * Sign an arbitrary message using a seed phrase (restores identity internally)
+   * Returns hex-encoded signature
+   */
+  async signMessageFromSeed(phrase: string, message: string): Promise<string> {
+    if (!this.nativeModule) {
+      throw new Error('NativeIdentityProvisioning not available on this platform');
+    }
+    if (!this.nativeModule.signMessageFromSeed) {
+      throw new Error('NativeIdentityProvisioning.signMessageFromSeed not available');
+    }
+    const startedAt = Date.now();
+    // Avoid logging sensitive values (seed phrase / message contents).
+    console.log('[NativeIdentityProvisioning] signMessageFromSeed calling native', {
+      phraseWordCount: phrase.trim().split(/\s+/).filter(Boolean).length,
+      messageLen: message.length,
+    });
+    const result = await this.nativeModule.signMessageFromSeed(phrase, message);
+    console.log('[NativeIdentityProvisioning] signMessageFromSeed native returned', {
+      elapsedMs: Date.now() - startedAt,
+      hasSignature: Boolean(result?.signature),
+    });
+    if (!result?.signature) {
+      throw new Error('NativeIdentityProvisioning.signMessageFromSeed returned no signature');
     }
     return result.signature;
   }

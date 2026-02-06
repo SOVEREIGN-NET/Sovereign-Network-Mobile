@@ -8,6 +8,7 @@
 import { createQuicFetchAdapterSync, FetchAdapter } from './QuicFetchAdapter';
 import { QUIC_CONFIG } from '../config';
 import { nativeIdentityProvisioning } from './NativeIdentityProvisioning';
+import { maskIdentifier } from '../utils/maskIdentifier';
 import {
   DomainRegisterRequest,
   DomainRegisterResponse,
@@ -65,7 +66,11 @@ class DomainService {
       }
 
       const data = await response.json();
-      console.log('[DomainService] Domain status response:', { domain, found: data.found, owner_did: data.owner_did });
+      console.log('[DomainService] Domain status response:', {
+        domain,
+        found: data.found,
+        owner_did: maskIdentifier(data.owner_did),
+      });
 
       return {
         available: !data.found, // found: false means available, found: true means taken

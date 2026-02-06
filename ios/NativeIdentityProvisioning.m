@@ -59,4 +59,14 @@ RCT_EXTERN_METHOD(signMessage:(NSString *)message
                   resolve:(RCTPromiseResolveBlock)resolve
                   reject:(RCTPromiseRejectBlock)reject)
 
+RCT_EXTERN_METHOD(signMessageForDid:(NSString *)did
+                  message:(NSString *)message
+                  resolve:(RCTPromiseResolveBlock)resolve
+                  reject:(RCTPromiseRejectBlock)reject)
+
+RCT_EXTERN_METHOD(signMessageFromSeed:(NSString *)phrase
+                  message:(NSString *)message
+                  resolve:(RCTPromiseResolveBlock)resolve
+                  reject:(RCTPromiseRejectBlock)reject)
+
 @end

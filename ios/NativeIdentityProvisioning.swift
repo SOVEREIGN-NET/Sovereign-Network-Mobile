@@ -478,6 +478,8 @@ class NativeIdentityProvisioning: NSObject {
                     "status": "restored",
                     "did": identity.did,
                     "deviceId": identity.deviceId,
+                    "publicDilithium": Data(identity.publicKey).base64EncodedString(),
+                    "publicKyber": Data(identity.kyberPublicKey).base64EncodedString(),
                     "createdAt": identity.createdAt,
                     "identityType": "human"
                 ])
@@ -1026,6 +1028,71 @@ class NativeIdentityProvisioning: NSObject {
                 resolve(["signature": hex])
             } catch {
                 reject("SIGNING_ERROR", "Failed to sign message: \(error)", nil)
+            }
+        }
+    }
+
+    /// Sign an arbitrary message using a cached identity by DID
+    @objc
+    func signMessageForDid(
+        _ did: String,
+        message: String,
+        resolve: @escaping RCTPromiseResolveBlock,
+        reject: @escaping RCTPromiseRejectBlock
+    ) {
+        queue.async { [weak self] in
+            guard let identity = self?.cachedIdentities[did]?.libClientIdentity as? Identity else {
+                reject("NO_IDENTITY", "Cached identity not found for DID", nil)
+                return
+            }
+            do {
+                let data = Data(message.utf8)
+                let signature = try ZhtpClient.signData(data, using: identity)
+                let hex = signature.map { String(format: "%02x", $0) }.joined()
+                resolve(["signature": hex])
+            } catch {
+                reject("SIGNING_ERROR", "Failed to sign message for DID: \(error)", nil)
+            }
+        }
+    }
+
+    /// Sign a message using a seed phrase (restores identity internally)
+    /// This path is used for one-time seed migration. Do not log seed or message contents.
+    @objc
+    func signMessageFromSeed(
+        _ phrase: String,
+        message: String,
+        resolve: @escaping RCTPromiseResolveBlock,
+        reject: @escaping RCTPromiseRejectBlock
+    ) {
+        queue.async {
+            do {
+                let startedAt = Date()
+                let wordCount = phrase.split(whereSeparator: { $0.isWhitespace }).count
+                NSLog("[NativeIdentityProvisioning] signMessageFromSeed start (words=%d messageLen=%d)", wordCount, message.count)
+
+                let deviceId = UIDevice.current.identifierForVendor?.uuidString ?? UUID().uuidString
+                let identity = try ZhtpClient.restoreIdentityFromPhrase(phrase, deviceId: deviceId)
+                NSLog("[NativeIdentityProvisioning] signMessageFromSeed restored identity")
+
+#if DEBUG
+                // Preflight: prove signing works at all (without logging sensitive data).
+                // If this hangs, the issue is inside the Rust signing path, not the message size.
+                NSLog("[NativeIdentityProvisioning] signMessageFromSeed probe signing (len=1)")
+                let probeSig = try ZhtpClient.signData(Data([0x01]), using: identity)
+                NSLog("[NativeIdentityProvisioning] signMessageFromSeed probe signed (sigLen=%d)", probeSig.count)
+#endif
+
+                let data = Data(message.utf8)
+                NSLog("[NativeIdentityProvisioning] signMessageFromSeed signing")
+
+                let signature = try ZhtpClient.signData(data, using: identity)
+                NSLog("[NativeIdentityProvisioning] signMessageFromSeed signed (sigLen=%d elapsedMs=%d)", signature.count, Int(Date().timeIntervalSince(startedAt) * 1000))
+
+                let hex = signature.map { String(format: "%02x", $0) }.joined()
+                resolve(["signature": hex])
+            } catch {
+                reject("SIGNING_ERROR", "Failed to sign message from seed: \(error)", nil)
             }
         }
     }

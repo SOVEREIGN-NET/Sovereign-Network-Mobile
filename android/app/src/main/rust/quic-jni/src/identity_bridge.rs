@@ -51,6 +51,11 @@ pub fn sign_message_from_identity(identity_json: &str, message: &[u8]) -> Result
     Ok(sign_message(&identity, message)?)
 }
 
+pub fn validate_identity_json(identity_json: &str) -> Result<()> {
+    let _identity = deserialize_identity(identity_json)?;
+    Ok(())
+}
+
 pub fn get_seed_phrase_from_identity(identity_json: &str) -> Result<String> {
     let identity = deserialize_identity(identity_json)?;
     Ok(get_seed_phrase(&identity)?)

@@ -3,8 +3,8 @@
  * Screen for recovering a lost ZK-DID identity using seed phrase, backup file, or social recovery
  */
 
-import React, { useRef, useState } from 'react';
-import { View, TextInput } from 'react-native';
+import React, { useRef, useState, useEffect } from 'react';
+import { View, TextInput, Pressable } from 'react-native';
 import { NativeStackScreenProps } from '@react-navigation/native-stack';
 import {
   Card,
@@ -16,11 +16,14 @@ import {
   ErrorAlert,
   SelectableOptionCard,
   ActionFooter,
+  Switch,
 } from '../components';
 import { useAuth } from '../hooks';
 import { useTranslation } from '../i18n';
 import { colors, spacing, typography, borderRadius } from '../theme';
 import { AuthStackParamList } from '../navigation/AuthNavigator';
+import SeedVaultService from '../services/SeedVaultService';
+import RealAuthService from '../services/RealAuthService';
 
 type RecoverIdentityScreenProps = NativeStackScreenProps<AuthStackParamList, 'RecoverIdentity'>;
 
@@ -28,13 +31,23 @@ type RecoveryMethod = 'seed';
 
 const RecoverIdentityScreen = (_props: RecoverIdentityScreenProps) => {
   const { t } = useTranslation();
-  const { recoverIdentity, getMasterSeedPhrase, isLoading, error } = useAuth();
+  const { recoverIdentity, getMasterSeedPhrase, isLoading, error, migrationRequired } = useAuth();
 
   const [recoveryMethod, setRecoveryMethod] = useState<RecoveryMethod>('seed');
   const [seedWords, setSeedWords] = useState<string[]>(Array(24).fill(''));
   const [localError, setLocalError] = useState<string | null>(null);
   const inputRefs = useRef<Array<TextInput | null>>([]);
   const [isFillingFromKeychain, setIsFillingFromKeychain] = useState(false);
+  const [persistSeed, setPersistSeed] = useState(true);
+  const [showMigration, setShowMigration] = useState(false);
+  const [showMigrationBanner, setShowMigrationBanner] = useState(false);
+
+  useEffect(() => {
+    if (migrationRequired) {
+      setShowMigration(true);
+      setShowMigrationBanner(true);
+    }
+  }, [migrationRequired]);
 
   const handleFillFromKeychain = async () => {
     setLocalError(null);
@@ -88,12 +101,41 @@ const RecoverIdentityScreen = (_props: RecoverIdentityScreenProps) => {
     try {
       await recoverIdentity(method, data);
 
+      if (method === 'seed' && RealAuthService.getLastSeedRecoveryNotFound()) {
+        setShowMigrationBanner(true);
+        setShowMigration(true);
+        return;
+      }
+
+      if (method === 'seed' && persistSeed) {
+        try {
+          await SeedVaultService.saveSeedPhrase(data.split(/\s+/));
+        } catch (saveError: any) {
+          console.warn('[RecoverIdentity] Failed to persist seed phrase:', saveError);
+          setLocalError(saveError?.message || 'Recovered, but failed to persist seed phrase.');
+        }
+      }
+
       // Reset form
       setSeedWords(Array(24).fill(''));
+      setShowMigration(false);
+      setShowMigrationBanner(false);
 
       // App.tsx will detect authenticated state and switch to RootNavigator
     } catch (err: any) {
-      setLocalError(err.message || t.auth.recoverIdentity.errors.recoveryFailed);
+      const message = err.message || t.auth.recoverIdentity.errors.recoveryFailed;
+      if (message === 'MIGRATION_REQUIRED') {
+        setShowMigration(true);
+        setShowMigrationBanner(true);
+        setLocalError(null);
+        return;
+      }
+      setLocalError(message);
+      const msgLower = String(message).toLowerCase();
+      if (msgLower.includes('not found') || msgLower.includes('identity not found')) {
+        setShowMigration(true);
+        setShowMigrationBanner(true);
+      }
     }
   };
 
@@ -116,6 +158,24 @@ const RecoverIdentityScreen = (_props: RecoverIdentityScreenProps) => {
       <Column gap="xl">
         {/* Error Message */}
         {displayError && <ErrorAlert message={displayError} icon="❌" />}
+        {showMigrationBanner && (
+          <Card
+            style={{
+              backgroundColor: colors.bg_darker,
+              borderLeftWidth: 4,
+              borderLeftColor: colors.warning,
+            }}
+          >
+            <Column gap="xs">
+              <Text style={{ fontSize: typography.size.sm, fontWeight: typography.weight.semibold, color: colors.warning_dark }}>
+                Migration required
+              </Text>
+              <Text style={{ fontSize: typography.size.xs, color: colors.text_secondary }}>
+                This identity was registered with older random keys. To continue, migrate to a new deterministic identity.
+              </Text>
+            </Column>
+          </Card>
+        )}
 
         {/* Recovery Method Selection */}
         <Card>
@@ -171,6 +231,42 @@ const RecoverIdentityScreen = (_props: RecoverIdentityScreenProps) => {
               <Text style={{ fontSize: typography.size.xs, color: colors.text_secondary }}>
                 {t.auth.recoverIdentity.seed.hint}
               </Text>
+
+              <Card
+                style={{
+                  marginTop: spacing.sm,
+                  backgroundColor: colors.bg_dark,
+                  borderColor: colors.border,
+                  borderWidth: 1,
+                }}
+              >
+                <Pressable
+                  disabled={isLoading}
+                  onPress={() => setPersistSeed((prev) => !prev)}
+                  style={{ padding: spacing.md }}
+                >
+                  <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}>
+                    <View style={{ flex: 1 }}>
+                      <Text
+                        variant="body"
+                        weight="semibold"
+                        color={colors.text_primary}
+                        style={{ marginBottom: spacing.xs }}
+                      >
+                        Save seed on this device
+                      </Text>
+                      <Text variant="caption" color={colors.text_secondary}>
+                        Store in device Keychain/Keystore after successful recovery.
+                      </Text>
+                    </View>
+                    <Switch
+                      value={persistSeed}
+                      onValueChange={setPersistSeed}
+                      disabled={isLoading}
+                    />
+                  </View>
+                </Pressable>
+              </Card>
               <View
                 style={{
                   flexDirection: 'row',
@@ -291,6 +387,20 @@ const RecoverIdentityScreen = (_props: RecoverIdentityScreenProps) => {
               disabled: isLoading,
               loading: isLoading,
             },
+            ...(showMigration ? [
+              {
+                label: 'Migration Seed',
+                onPress: () => {
+                  const normalized = seedWords.map(word => word.trim().toLowerCase()).filter(Boolean);
+                  if (normalized.length !== 24) {
+                    setLocalError('Recovery phrase must be 24 words.');
+                    return;
+                  }
+                  _props.navigation.navigate('MigrationSeed', { seedWords: normalized });
+                },
+                variant: 'secondary',
+              } as const,
+            ] : []),
           ]}
         />
       </Column>

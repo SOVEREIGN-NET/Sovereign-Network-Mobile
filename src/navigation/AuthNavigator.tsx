@@ -19,6 +19,7 @@ import SignInScreen from '../screens/SignInScreen';
 import CreateIdentityScreen from '../screens/CreateIdentityScreen';
 import RecoverIdentityScreen from '../screens/RecoverIdentityScreen';
 import SeedPhraseScreen from '../screens/SeedPhraseScreen';
+import MigrationSeedScreen from '../screens/MigrationSeedScreen';
 
 const Stack = createNativeStackNavigator();
 
@@ -26,6 +27,9 @@ export type AuthStackParamList = {
   SignIn: undefined;
   CreateIdentity: undefined;
   RecoverIdentity: undefined;
+  MigrationSeed: {
+    seedWords: string[];
+  };
   SeedPhrase: {
     seedPhrases: string[];
     identity?: Identity;
@@ -35,7 +39,7 @@ export type AuthStackParamList = {
 /**
  * AuthNavigatorContent component that uses translations
  */
-const AuthNavigatorContent: React.FC = () => {
+const AuthNavigatorContent: React.FC<{ initialRouteName?: keyof AuthStackParamList }> = ({ initialRouteName }) => {
   const { t } = useTranslation();
 
   return (
@@ -51,7 +55,7 @@ const AuthNavigatorContent: React.FC = () => {
           color: colors.text_primary,
         },
       } as any}
-      initialRouteName="SignIn"
+      initialRouteName={initialRouteName || 'SignIn'}
     >
       <Stack.Screen
         name="SignIn"
@@ -69,6 +73,11 @@ const AuthNavigatorContent: React.FC = () => {
         options={{ title: t.auth.recoverIdentity.title }}
       />
       <Stack.Screen
+        name="MigrationSeed"
+        component={MigrationSeedScreen as any}
+        options={{ title: 'Migration Seed' }}
+      />
+      <Stack.Screen
         name="SeedPhrase"
         component={SeedPhraseScreen as any}
         options={{ title: t.auth.seedPhrase.screenTitle }}
@@ -77,13 +86,13 @@ const AuthNavigatorContent: React.FC = () => {
   );
 };
 
-const AuthNavigator: React.FC = () => {
+const AuthNavigator: React.FC<{ initialRouteName?: keyof AuthStackParamList }> = ({ initialRouteName }) => {
   const colorScheme = useColorScheme();
   const theme = colorScheme === 'dark' ? DarkTheme : DefaultTheme;
 
   return (
     <NavigationContainer theme={theme}>
-      <AuthNavigatorContent />
+      <AuthNavigatorContent initialRouteName={initialRouteName} />
     </NavigationContainer>
   );
 };

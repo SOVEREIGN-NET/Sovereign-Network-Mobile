@@ -129,11 +129,14 @@ android {
     }
 }
 
-play {
-    serviceAccountCredentials.set(
-        file(System.getenv("GOOGLE_PLAY_SERVICE_ACCOUNT_JSON") ?: "")
-    )
-    track.set(project.findProperty("playTrack")?.toString() ?: "internal")
+def playServiceAccountPath = System.getenv("GOOGLE_PLAY_SERVICE_ACCOUNT_JSON")
+if (playServiceAccountPath != null && !playServiceAccountPath.trim().isEmpty()) {
+    play {
+        serviceAccountCredentials.set(file(playServiceAccountPath))
+        track.set(project.findProperty("playTrack")?.toString() ?: "internal")
+    }
+} else {
+    logger.lifecycle("GOOGLE_PLAY_SERVICE_ACCOUNT_JSON not set; skipping Play Publisher configuration.")
 }
 
 def quicJniScript = file("src/main/rust/quic-jni/build-android.sh")

@@ -164,15 +164,39 @@ class NativeIdentityProvisioning(reactContext: ReactApplicationContext) :
     fun restoreIdentityToHandleStore(identityId: String, promise: Promise) {
         executor.execute {
             try {
-                val exists = IdentityStore.hasIdentity(reactApplicationContext, identityId)
+                val materials = IdentityStore.loadIdentity(reactApplicationContext, identityId)
                 val response = WritableNativeMap().apply {
-                    if (exists) {
+                    if (materials != null) {
+                        val validation = nativeValidateIdentityJson(materials.identityJson) as? Map<*, *>
+                        val ok = validation?.get("ok") as? Boolean ?: false
+                        if (!ok) {
+                            putString("status", "skipped")
+                            putString("identity_id", identityId)
+                            putString("reason", "invalid_identity_json")
+                            putString("error", validation?.get("error")?.toString() ?: "Invalid identity JSON")
+                            return@apply
+                        }
+
+                        val cached = CachedIdentity(
+                            did = materials.did,
+                            deviceId = materials.deviceId,
+                            publicKey = ByteArray(0),
+                            kyberPublicKey = ByteArray(0),
+                            nodeId = ByteArray(0),
+                            createdAt = 0L,
+                            identityJson = materials.identityJson,
+                            handshakeJson = materials.handshakeJson,
+                            dilithiumSk = materials.dilithiumSk,
+                            kyberSk = materials.kyberSk,
+                            masterSeed = materials.masterSeed
+                        )
+                        cachedIdentities[materials.did] = cached
                         putString("status", "restored")
                         putString("identity_id", identityId)
                     } else {
                         putString("status", "skipped")
                         putString("identity_id", identityId)
-                        putString("reason", "serialized_identity_not_found")
+                        putString("reason", "identity_materials_not_found")
                     }
                 }
                 promise.resolve(response)
@@ -181,10 +205,65 @@ class NativeIdentityProvisioning(reactContext: ReactApplicationContext) :
                 val response = WritableNativeMap().apply {
                     putString("status", "skipped")
                     putString("identity_id", identityId)
-                    putString("reason", "deserialization_failed")
+                    putString("reason", "restore_failed")
                     putString("error", e.message ?: "unknown")
                 }
                 promise.resolve(response)
+            }
+        }
+    }
+
+    @ReactMethod
+    fun getLocalIdentity(identityIdOrDid: String, promise: Promise) {
+        executor.execute {
+            try {
+                val normalized = normalizeIdentityId(identityIdOrDid)
+                if (normalized.isEmpty()) {
+                    promise.resolve(WritableNativeMap().apply {
+                        putString("status", "missing")
+                        putString("reason", "empty_identity_id")
+                    })
+                    return@execute
+                }
+
+                val materials = IdentityStore.loadIdentity(reactApplicationContext, normalized)
+                if (materials == null) {
+                    promise.resolve(WritableNativeMap().apply {
+                        putString("status", "missing")
+                        putString("reason", "identity_materials_not_found")
+                    })
+                    return@execute
+                }
+
+                var createdAt = 0.0
+                var identityType: String? = null
+                try {
+                    val json = org.json.JSONObject(materials.identityJson)
+                    if (json.has("created_at")) {
+                        createdAt = json.optDouble("created_at", 0.0)
+                    }
+                    if (json.has("identity_type")) {
+                        identityType = json.optString("identity_type", null)
+                    }
+                } catch (_: Exception) {
+                }
+
+                val response = WritableNativeMap().apply {
+                    putString("status", "found")
+                    putString("identity_id", normalized)
+                    putString("did", materials.did)
+                    putString("device_id", materials.deviceId)
+                    if (createdAt > 0) putDouble("created_at", createdAt)
+                    if (!identityType.isNullOrBlank()) putString("identity_type", identityType)
+                }
+                promise.resolve(response)
+            } catch (e: Exception) {
+                Log.e(TAG, "Failed to get local identity", e)
+                promise.resolve(WritableNativeMap().apply {
+                    putString("status", "missing")
+                    putString("reason", "exception")
+                    putString("error", e.message ?: "unknown")
+                })
             }
         }
     }
@@ -208,6 +287,41 @@ class NativeIdentityProvisioning(reactContext: ReactApplicationContext) :
                 promise.resolve(phrase)
             } catch (e: Exception) {
                 Log.e(TAG, "Failed to get seed phrase", e)
+                promise.reject("IDENTITY_ERROR", "Failed to get seed phrase: ${e.message}", e)
+            }
+        }
+    }
+
+    @ReactMethod
+    fun getSeedPhraseFromStoredIdentity(identityIdOrDid: String, promise: Promise) {
+        executor.execute {
+            try {
+                val normalized = normalizeIdentityId(identityIdOrDid)
+                val materials = IdentityStore.loadIdentity(reactApplicationContext, normalized)
+                if (materials == null) {
+                    promise.reject("IDENTITY_ERROR", "Identity not found in local store")
+                    return@execute
+                }
+
+                val validation = nativeValidateIdentityJson(materials.identityJson) as? Map<*, *>
+                val ok = validation?.get("ok") as? Boolean ?: false
+                if (!ok) {
+                    promise.reject(
+                        "IDENTITY_ERROR",
+                        validation?.get("error")?.toString() ?: "Invalid identity JSON"
+                    )
+                    return@execute
+                }
+
+                val phrase = nativeGetSeedPhrase(materials.identityJson)
+                if (phrase.isNullOrBlank()) {
+                    promise.reject("IDENTITY_ERROR", "Failed to get seed phrase")
+                    return@execute
+                }
+
+                promise.resolve(phrase)
+            } catch (e: Exception) {
+                Log.e(TAG, "Failed to get seed phrase from stored identity", e)
                 promise.reject("IDENTITY_ERROR", "Failed to get seed phrase: ${e.message}", e)
             }
         }
@@ -255,6 +369,8 @@ class NativeIdentityProvisioning(reactContext: ReactApplicationContext) :
                     putString("status", "restored")
                     putString("did", did)
                     putString("deviceId", deviceId)
+                    putString("publicDilithium", b64(publicKey))
+                    putString("publicKyber", b64(kyberPublicKey))
                     putDouble("createdAt", createdAt.toDouble())
                     putString("identityType", "human")
                 }
@@ -299,6 +415,15 @@ class NativeIdentityProvisioning(reactContext: ReactApplicationContext) :
             Settings.Secure.ANDROID_ID
         )
         return if (!androidId.isNullOrBlank()) androidId else UUID.randomUUID().toString()
+    }
+
+    private fun normalizeIdentityId(identityId: String): String {
+        val trimmed = identityId.trim()
+        return if (trimmed.startsWith("did:zhtp:")) {
+            trimmed.removePrefix("did:zhtp:")
+        } else {
+            trimmed
+        }
     }
 
     @ReactMethod
@@ -501,6 +626,7 @@ class NativeIdentityProvisioning(reactContext: ReactApplicationContext) :
     private external fun nativeSignMessage(identityJson: String, messageData: ByteArray): Any?
     private external fun nativeGetSeedPhrase(identityJson: String): String?
     private external fun nativeRestoreIdentityFromPhrase(phrase: String, deviceId: String): Any?
+    private external fun nativeValidateIdentityJson(identityJson: String): Any?
 
     // Token transaction building (returns hex-encoded signed transaction)
     private external fun nativeBuildTokenCreate(
@@ -627,6 +753,74 @@ class NativeIdentityProvisioning(reactContext: ReactApplicationContext) :
             } catch (e: Exception) {
                 Log.e(TAG, "Message signing failed", e)
                 promise.reject("SIGNING_ERROR", "Failed to sign message: ${e.message}", e)
+            }
+        }
+    }
+
+    @ReactMethod
+    fun signMessageForDid(did: String, message: String, promise: Promise) {
+        executor.execute {
+            try {
+                val identity = cachedIdentities[did]
+                if (identity == null) {
+                    promise.reject("NO_IDENTITY", "Cached identity not found for DID")
+                    return@execute
+                }
+
+                val result = nativeSignMessage(identity.identityJson, message.toByteArray(Charsets.UTF_8)) as? Map<*, *>
+                if (result == null || result["ok"] != true) {
+                    val error = result?.get("error")?.toString() ?: "Message signing failed"
+                    promise.reject("SIGNING_ERROR", error)
+                    return@execute
+                }
+
+                val signature = result["signature"] as? ByteArray ?: ByteArray(0)
+                val hex = signature.joinToString("") { "%02x".format(it) }
+                val response = WritableNativeMap().apply {
+                    putString("signature", hex)
+                }
+                promise.resolve(response)
+            } catch (e: Exception) {
+                Log.e(TAG, "Message signing failed for DID", e)
+                promise.reject("SIGNING_ERROR", "Failed to sign message for DID: ${e.message}", e)
+            }
+        }
+    }
+
+    @ReactMethod
+    fun signMessageFromSeed(phrase: String, message: String, promise: Promise) {
+        executor.execute {
+            try {
+                val deviceId = getDeviceId()
+                val result = nativeRestoreIdentityFromPhrase(phrase, deviceId) as? Map<*, *>
+                if (result == null || result["ok"] != true) {
+                    val error = result?.get("error")?.toString() ?: "Identity restore failed"
+                    promise.reject("IDENTITY_ERROR", error)
+                    return@execute
+                }
+
+                val identityJson = result["identityJson"] as? String ?: ""
+                if (identityJson.isEmpty()) {
+                    promise.reject("IDENTITY_ERROR", "Missing identity JSON for signing")
+                    return@execute
+                }
+
+                val signResult = nativeSignMessage(identityJson, message.toByteArray(Charsets.UTF_8)) as? Map<*, *>
+                if (signResult == null || signResult["ok"] != true) {
+                    val error = signResult?.get("error")?.toString() ?: "Message signing failed"
+                    promise.reject("SIGNING_ERROR", error)
+                    return@execute
+                }
+
+                val signature = signResult["signature"] as? ByteArray ?: ByteArray(0)
+                val hex = signature.joinToString("") { "%02x".format(it) }
+                val response = WritableNativeMap().apply {
+                    putString("signature", hex)
+                }
+                promise.resolve(response)
+            } catch (e: Exception) {
+                Log.e(TAG, "Message signing failed from seed", e)
+                promise.reject("SIGNING_ERROR", "Failed to sign message from seed: ${e.message}", e)
             }
         }
     }

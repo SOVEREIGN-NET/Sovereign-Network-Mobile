@@ -13,6 +13,9 @@ import { rateLimiter } from '../services/RateLimiter';
 import MockAuthService, { Identity } from '../services/MockAuthService';
 import type { CreateIdentityData } from '../services/RealAuthService';
 import { walletKeychainService } from '../services/WalletKeychainService';
+import { nativeIdentityProvisioning } from '../services/NativeIdentityProvisioning';
+import IdentityCleanup from '../services/IdentityCleanup';
+import { maskIdentifier } from '../utils/maskIdentifier';
 
 // Always import RealAuthService, use it when node is available
 import RealAuthServiceModule from '../services/RealAuthService';
@@ -22,6 +25,8 @@ const RealAuthService = RealAuthServiceModule;
 
 // Use native storage on Android, AsyncStorage on iOS
 const storage = Platform.OS === 'android' ? NativeStorage : AsyncStorage;
+const MIGRATION_REQUIRED_KEY = 'sovnet_migration_required';
+const MIGRATION_REQUIRED_REASON_KEY = 'sovnet_migration_required_reason';
 
 // Create context for feature flag management
 type UseMockServiceListener = (useMock: boolean) => void;
@@ -105,13 +110,18 @@ export interface AuthContextType {
   isAuthenticated: boolean;
   isLoading: boolean;
   isBootstrapping: boolean;
+  migrationRequired: boolean;
   error: string | null;
+  restoreWarning: string | null;
   signIn: (identity_id: string, password: string) => Promise<Identity>;
   createIdentity: (data: CreateIdentityData) => Promise<Identity>;
   checkUsernameAvailability: (username: string) => Promise<boolean>;
   recoverIdentity: (method: string, data: string) => Promise<Identity>;
+  migrateIdentityFromSeed: (displayName: string, seedPhrase: string) => Promise<{ identity: Identity; newSeedPhrase: string[] }>;
+  forceCleanupAndSignOut: (reason?: string) => Promise<void>;
   signOut: () => Promise<void>;
   clearError: () => void;
+  clearRestoreWarning: () => void;
   updateProfile: (displayName: string, avatar?: string) => Promise<void>;
   updatePassphrase: (newPassphrase: string) => Promise<void>;
   updateBiometric: (enabled: boolean) => Promise<void>;
@@ -140,6 +150,22 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
   const [isLoading, setIsLoading] = useState(false);
   const [isBootstrapping, setIsBootstrapping] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [restoreWarning, setRestoreWarning] = useState<string | null>(null);
+  const [migrationRequired, setMigrationRequired] = useState(false);
+
+  const setMigrationRequiredFlag = useCallback(async (reason?: string) => {
+    setMigrationRequired(true);
+    await AsyncStorage.setItem(MIGRATION_REQUIRED_KEY, '1');
+    if (reason) {
+      await AsyncStorage.setItem(MIGRATION_REQUIRED_REASON_KEY, reason);
+    }
+  }, []);
+
+  const clearMigrationRequiredFlag = useCallback(async () => {
+    setMigrationRequired(false);
+    await AsyncStorage.removeItem(MIGRATION_REQUIRED_KEY);
+    await AsyncStorage.removeItem(MIGRATION_REQUIRED_REASON_KEY);
+  }, []);
 
   /**
    * Restore identity from secure storage on app load
@@ -151,6 +177,14 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
   useEffect(() => {
     const restoreIdentity = async () => {
       try {
+        const migrationFlag = await AsyncStorage.getItem(MIGRATION_REQUIRED_KEY);
+        if (migrationFlag) {
+          setMigrationRequired(true);
+          await IdentityCleanup.cleanAllIdentities();
+          setCurrentIdentity(null);
+          return;
+        }
+
         // Try to restore cached identity without biometric prompt on startup
         // This keeps user logged in between app sessions
         const identity = await SecureIdentityStorage.getIdentityIfAvailable(true);
@@ -160,26 +194,6 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
             console.log('✅ Restored identity from secure storage:', identity.displayName);
           }
           setCurrentIdentity(identity);
-
-          // SECURITY: Restore lib-client Identity to handle store for UHP signing
-          if (identity.identityId && NativeModules.NativeIdentityProvisioning) {
-            try {
-              const result = await NativeModules.NativeIdentityProvisioning.restoreIdentityToHandleStore(
-                identity.identityId
-              );
-              if (result?.status === 'restored') {
-                console.log('[AuthContext] ✅ Identity restored to handle store during bootstrap');
-              } else if (result?.status === 'skipped') {
-                console.log('[AuthContext] ℹ️ Identity restoration skipped (reason:', result.reason + ')');
-                console.log('[AuthContext] 💡 UhpHandshake will use Keychain fallback');
-              } else {
-                console.log('[AuthContext] ℹ️ Handle store restoration result:', result);
-              }
-            } catch (err) {
-              console.error('[AuthContext] ⚠️ Failed to restore Identity to handle store:', err);
-              // Non-fatal - continue anyway
-            }
-          }
         }
       } catch (err) {
         console.error('Failed to restore cached identity:', err);
@@ -232,9 +246,21 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
           const result = await NativeModules.NativeIdentityProvisioning.restoreIdentityToHandleStore(
             identity.identityId
           );
-          console.log('[AuthContext.signIn] ✅ Identity restored to handle store:', result);
+          if (result?.status === 'restored') {
+            setRestoreWarning(null);
+            console.log('[AuthContext.signIn] ✅ Identity restored to handle store:', result);
+          } else if (result?.status === 'skipped') {
+            const message = `Handle store restore skipped: ${result.reason}${
+              result.error ? ` (${result.error})` : ''
+            }`;
+            setRestoreWarning(message);
+            console.warn('[AuthContext.signIn] ⚠️ Handle store restore skipped:', result);
+          } else {
+            console.log('[AuthContext.signIn] ℹ️ Handle store restoration result:', result);
+          }
         } catch (err) {
           console.error('[AuthContext.signIn] ⚠️ Failed to restore Identity to handle store:', err);
+          setRestoreWarning('Handle store restore failed');
           // Non-fatal - continue anyway
         }
       }
@@ -336,6 +362,12 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
         throw new Error('Unknown recovery method');
       }
 
+      if (method === 'seed' && RealAuthService.getLastSeedRecoveryNotFound()) {
+        await setMigrationRequiredFlag('seed_recovery_not_found');
+        setCurrentIdentity(null);
+        throw new Error('MIGRATION_REQUIRED');
+      }
+
       // Save to secure storage (Keychain) instead of plaintext AsyncStorage
       await SecureIdentityStorage.setIdentity(identity, { requireBiometric: false });
 
@@ -347,9 +379,21 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
           const result = await NativeModules.NativeIdentityProvisioning.restoreIdentityToHandleStore(
             identity.identityId
           );
-          console.log('[AuthContext.recoverIdentity] ✅ Identity restored to handle store:', result);
+          if (result?.status === 'restored') {
+            setRestoreWarning(null);
+            console.log('[AuthContext.recoverIdentity] ✅ Identity restored to handle store:', result);
+          } else if (result?.status === 'skipped') {
+            const message = `Handle store restore skipped: ${result.reason}${
+              result.error ? ` (${result.error})` : ''
+            }`;
+            setRestoreWarning(message);
+            console.warn('[AuthContext.recoverIdentity] ⚠️ Handle store restore skipped:', result);
+          } else {
+            console.log('[AuthContext.recoverIdentity] ℹ️ Handle store restoration result:', result);
+          }
         } catch (err) {
           console.error('[AuthContext.recoverIdentity] ⚠️ Failed to restore Identity to handle store:', err);
+          setRestoreWarning('Handle store restore failed');
           // Non-fatal - continue anyway
         }
       }
@@ -357,6 +401,34 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
       return identity;
     } catch (err: any) {
       const message = err.message || 'Identity recovery failed';
+      if (message.includes('MIGRATION_REQUIRED')) {
+        await setMigrationRequiredFlag('seed_recovery_not_found');
+        setCurrentIdentity(null);
+        setError(null);
+        throw err;
+      }
+      setError(message);
+      throw err;
+    } finally {
+      setIsLoading(false);
+    }
+  }, []);
+
+  const migrateIdentityFromSeed = useCallback(async (
+    displayName: string,
+    seedPhrase: string
+  ): Promise<{ identity: Identity; newSeedPhrase: string[] }> => {
+    setError(null);
+    setIsLoading(true);
+    try {
+      const result = await RealAuthService.migrateIdentityFromSeed(displayName, seedPhrase);
+      // Immediately switch to the new identity after successful migration
+      // This ensures old keys are no longer used.
+      await setIdentity(result.identity);
+      await clearMigrationRequiredFlag();
+      return result;
+    } catch (err: any) {
+      const message = err.message || 'Migration failed';
       setError(message);
       throw err;
     } finally {
@@ -468,6 +540,7 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
    */
   const signOut = useCallback(async () => {
     setError(null);
+    setRestoreWarning(null);
     setIsLoading(true);
 
     try {
@@ -483,11 +556,32 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
     }
   }, []);
 
+  const forceCleanupAndSignOut = useCallback(async (reason?: string) => {
+    setError(null);
+    setRestoreWarning(null);
+    setIsLoading(true);
+    try {
+      await setMigrationRequiredFlag(reason);
+      await IdentityCleanup.cleanAllIdentities();
+      setCurrentIdentity(null);
+    } catch (err: any) {
+      const message = err.message || 'Cleanup failed';
+      setError(message);
+      throw err;
+    } finally {
+      setIsLoading(false);
+    }
+  }, [setMigrationRequiredFlag]);
+
   /**
    * Clear error message
    */
   const clearError = useCallback(() => {
     setError(null);
+  }, []);
+
+  const clearRestoreWarning = useCallback(() => {
+    setRestoreWarning(null);
   }, []);
 
   /**
@@ -499,24 +593,36 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
   const setIdentity = useCallback(async (identity: Identity) => {
     try {
       if (__DEV__) {
-        console.log('🔐 AuthContext.setIdentity: Saving identity:', identity.did);
+        console.log('🔐 AuthContext.setIdentity: Saving identity:', maskIdentifier(identity.did));
       }
       // Save to secure storage (Keychain) instead of plaintext AsyncStorage
       await SecureIdentityStorage.setIdentity(identity, { requireBiometric: false });
       setCurrentIdentity(identity);
 
       // SECURITY: Restore lib-client Identity to handle store for UHP signing
-      if (identity.identityId && NativeModules.NativeIdentityProvisioning) {
-        try {
-          const result = await NativeModules.NativeIdentityProvisioning.restoreIdentityToHandleStore(
-            identity.identityId
-          );
-          console.log('[AuthContext.setIdentity] ✅ Identity restored to handle store:', result);
-        } catch (err) {
-          console.error('[AuthContext.setIdentity] ⚠️ Failed to restore Identity to handle store:', err);
-          // Non-fatal - continue anyway
+        if (identity.identityId && NativeModules.NativeIdentityProvisioning) {
+          try {
+            const result = await NativeModules.NativeIdentityProvisioning.restoreIdentityToHandleStore(
+              identity.identityId
+            );
+            if (result?.status === 'restored') {
+              setRestoreWarning(null);
+              console.log('[AuthContext.setIdentity] ✅ Identity restored to handle store:', result);
+            } else if (result?.status === 'skipped') {
+              const message = `Handle store restore skipped: ${result.reason}${
+                result.error ? ` (${result.error})` : ''
+              }`;
+              setRestoreWarning(message);
+              console.warn('[AuthContext.setIdentity] ⚠️ Handle store restore skipped:', result);
+            } else {
+              console.log('[AuthContext.setIdentity] ℹ️ Handle store restoration result:', result);
+            }
+          } catch (err) {
+            console.error('[AuthContext.setIdentity] ⚠️ Failed to restore Identity to handle store:', err);
+            setRestoreWarning('Handle store restore failed');
+            // Non-fatal - continue anyway
+          }
         }
-      }
     } catch (err: any) {
       const message = err.message || 'Failed to set identity';
       setError(message);
@@ -586,10 +692,28 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
         }
       }
       const vault = await SeedVaultService.getSeedPhraseWithBiometric();
-      return vault ? vault.join(' ') : null;
+      if (vault) {
+        return vault.join(' ');
+      }
+
+      // Android fallback: derive from locally stored identity materials if available
+      if (currentIdentity?.identityId && Platform.OS === 'android') {
+        try {
+          const phrase = await nativeIdentityProvisioning.getSeedPhraseFromStoredIdentity(
+            currentIdentity.identityId
+          );
+          if (phrase) {
+            return phrase;
+          }
+        } catch (fallbackError) {
+          console.warn('[AuthContext] Seed vault fallback failed:', fallbackError);
+        }
+      }
+
+      return null;
     } catch (error: any) {
       console.error('[AuthContext] Failed to retrieve master seed phrase:', error);
-      return null;
+      throw error;
     }
   }, [currentIdentity?.identityId]);
 
@@ -598,13 +722,18 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
     isAuthenticated: currentIdentity !== null,
     isLoading,
     isBootstrapping,
+    migrationRequired,
     error,
+    restoreWarning,
     signIn,
     createIdentity,
     checkUsernameAvailability,
     recoverIdentity,
+    migrateIdentityFromSeed,
+    forceCleanupAndSignOut,
     signOut,
     clearError,
+    clearRestoreWarning,
     updateProfile,
     updatePassphrase,
     updateBiometric,
@@ -613,7 +742,31 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
     isBiometricAvailable,
     getBiometryType,
     getMasterSeedPhrase,
-  }), [currentIdentity, isLoading, isBootstrapping, error, signIn, createIdentity, checkUsernameAvailability, recoverIdentity, signOut, clearError, updateProfile, updatePassphrase, updateBiometric, setIdentity, loadIdentityOnDemand, isBiometricAvailable, getBiometryType, getMasterSeedPhrase]);
+  }), [
+    currentIdentity,
+    isLoading,
+    isBootstrapping,
+    migrationRequired,
+    error,
+    restoreWarning,
+    signIn,
+    createIdentity,
+    checkUsernameAvailability,
+    recoverIdentity,
+    migrateIdentityFromSeed,
+    forceCleanupAndSignOut,
+    signOut,
+    clearError,
+    clearRestoreWarning,
+    updateProfile,
+    updatePassphrase,
+    updateBiometric,
+    setIdentity,
+    loadIdentityOnDemand,
+    isBiometricAvailable,
+    getBiometryType,
+    getMasterSeedPhrase,
+  ]);
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
 };

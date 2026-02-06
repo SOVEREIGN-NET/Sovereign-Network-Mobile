@@ -54,6 +54,10 @@ private func cIdentityGetSeedPhrase(_ handle: UnsafeMutableRawPointer) -> Unsafe
 @_silgen_name("zhtp_client_sign_registration_proof")
 private func cSignRegistrationProof(_ handle: UnsafeMutableRawPointer, _ timestamp: UInt64) -> ByteBuffer
 
+// Sign arbitrary message bytes (keeps private keys in Rust)
+@_silgen_name("zhtp_client_sign_message")
+private func cSignMessage(_ handle: UnsafeMutableRawPointer, _ message: UnsafeRawPointer, _ messageLen: Int) -> ByteBuffer
+
 // Sign UHP challenge (keeps private keys in Rust)
 @_silgen_name("zhtp_client_sign_uhp_challenge")
 private func cSignUhpChallenge(_ handle: UnsafeMutableRawPointer, _ challenge: UnsafeRawPointer, _ challengeLen: Int) -> ByteBuffer
@@ -389,9 +393,15 @@ public class ZhtpClient {
     /// - Returns: Dilithium signature bytes
     /// - Throws: ClientError if signing fails
     public static func signData(_ data: Data, using identity: Identity) throws -> [UInt8] {
+        NSLog("[ZhtpClient] signData: calling zhtp_client_sign_message (len=%d)", data.count)
         let buf = data.withUnsafeBytes { dataPtr in
-            cSignUhpChallenge(identity.getHandle(), dataPtr.baseAddress ?? UnsafeRawPointer(bitPattern: 0)!, data.count)
+            cSignMessage(identity.getHandle(), dataPtr.baseAddress ?? UnsafeRawPointer(bitPattern: 0)!, data.count)
         }
+        NSLog(
+            "[ZhtpClient] signData: zhtp_client_sign_message returned (buf.len=%d buf.data=%@)",
+            buf.len,
+            buf.data == nil ? "nil" : "non-nil"
+        )
         defer { cFreeBytes(buf) }
 
         guard let sigData = buf.data, buf.len > 0 else {

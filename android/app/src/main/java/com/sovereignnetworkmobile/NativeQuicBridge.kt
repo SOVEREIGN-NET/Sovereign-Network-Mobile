@@ -9,13 +9,16 @@ import android.util.Log
 object NativeQuicBridge {
     private const val TAG = "[🌐 Web4]"
     private var isInitialized = false
+    private var isLibraryLoaded = false
 
     init {
         try {
             System.loadLibrary("quic_jni")
+            isLibraryLoaded = true
             Log.d(TAG, "Native QUIC library loaded")
-        } catch (e: UnsatisfiedLinkError) {
-            Log.e(TAG, "Failed to load native QUIC library", e)
+        } catch (t: Throwable) {
+            isLibraryLoaded = false
+            Log.e(TAG, "Failed to load native QUIC library", t)
         }
     }
 
@@ -28,12 +31,16 @@ object NativeQuicBridge {
         if (isInitialized) {
             return true
         }
+        if (!isLibraryLoaded) {
+            Log.e(TAG, "Native QUIC library not loaded")
+            return false
+        }
         return try {
             isInitialized = nativeInit()
             Log.d(TAG, "Native QUIC initialized: $isInitialized")
             isInitialized
-        } catch (e: Exception) {
-            Log.e(TAG, "Failed to initialize native QUIC", e)
+        } catch (t: Throwable) {
+            Log.e(TAG, "Failed to initialize native QUIC", t)
             false
         }
     }
@@ -42,10 +49,14 @@ object NativeQuicBridge {
      * Check if QUIC is supported on this device
      */
     fun isSupported(): Boolean {
+        if (!isLibraryLoaded) {
+            Log.e(TAG, "Native QUIC library not loaded")
+            return false
+        }
         return try {
             nativeIsSupported()
-        } catch (e: Exception) {
-            Log.e(TAG, "Failed to check QUIC support", e)
+        } catch (t: Throwable) {
+            Log.e(TAG, "Failed to check QUIC support", t)
             false
         }
     }
@@ -55,13 +66,15 @@ object NativeQuicBridge {
      * Returns a map with: reachable (Boolean), latencyMs (Double), error (String?)
      */
     fun checkReachability(host: String, port: Int): Map<String, Any?>? {
-        ensureInitialized()
+        if (!ensureInitialized()) {
+            return mapOf("reachable" to false, "error" to "Native QUIC library not loaded")
+        }
         return try {
             @Suppress("UNCHECKED_CAST")
             nativeCheckReachability(host, port) as? Map<String, Any?>
-        } catch (e: Exception) {
-            Log.e(TAG, "Reachability check failed", e)
-            mapOf("reachable" to false, "error" to e.message)
+        } catch (t: Throwable) {
+            Log.e(TAG, "Reachability check failed", t)
+            mapOf("reachable" to false, "error" to t.message)
         }
     }
 
@@ -70,13 +83,15 @@ object NativeQuicBridge {
      * Returns a map with: success (Boolean), latencyMs (Double), protocol (String), error (String?)
      */
     fun testConnection(host: String, port: Int): Map<String, Any?>? {
-        ensureInitialized()
+        if (!ensureInitialized()) {
+            return mapOf("success" to false, "error" to "Native QUIC library not loaded")
+        }
         return try {
             @Suppress("UNCHECKED_CAST")
             nativeTestConnection(host, port) as? Map<String, Any?>
-        } catch (e: Exception) {
-            Log.e(TAG, "Connection test failed", e)
-            mapOf("success" to false, "error" to e.message)
+        } catch (t: Throwable) {
+            Log.e(TAG, "Connection test failed", t)
+            mapOf("success" to false, "error" to t.message)
         }
     }
 
@@ -100,13 +115,15 @@ object NativeQuicBridge {
         insecure: Boolean = true,
         alpn: String = "authenticated"
     ): Map<String, Any?>? {
-        ensureInitialized()
+        if (!ensureInitialized()) {
+            return mapOf("ok" to false, "status" to 0, "error" to "Native QUIC library not loaded")
+        }
         return try {
             @Suppress("UNCHECKED_CAST")
             nativeRequest(url, method, headersJson, body, timeoutSecs, insecure, alpn) as? Map<String, Any?>
-        } catch (e: Exception) {
-            Log.e(TAG, "Request failed", e)
-            mapOf("ok" to false, "status" to 0, "error" to e.message)
+        } catch (t: Throwable) {
+            Log.e(TAG, "Request failed", t)
+            mapOf("ok" to false, "status" to 0, "error" to t.message)
         }
     }
 
@@ -123,13 +140,15 @@ object NativeQuicBridge {
         insecure: Boolean = true,
         alpn: String = "authenticated"
     ): Map<String, Any?>? {
-        ensureInitialized()
+        if (!ensureInitialized()) {
+            return mapOf("ok" to false, "status" to 0, "error" to "Native QUIC library not loaded")
+        }
         return try {
             @Suppress("UNCHECKED_CAST")
             nativeRequestBytes(url, method, headersJson, body, timeoutSecs, insecure, alpn) as? Map<String, Any?>
-        } catch (e: Exception) {
-            Log.e(TAG, "Request (bytes) failed", e)
-            mapOf("ok" to false, "status" to 0, "error" to e.message)
+        } catch (t: Throwable) {
+            Log.e(TAG, "Request (bytes) failed", t)
+            mapOf("ok" to false, "status" to 0, "error" to t.message)
         }
     }
 
@@ -139,8 +158,8 @@ object NativeQuicBridge {
     fun cancelAll(): Boolean {
         return try {
             nativeCancelAll()
-        } catch (e: Exception) {
-            Log.e(TAG, "Cancel all failed", e)
+        } catch (t: Throwable) {
+            Log.e(TAG, "Cancel all failed", t)
             false
         }
     }
@@ -152,8 +171,8 @@ object NativeQuicBridge {
         try {
             nativeShutdown()
             isInitialized = false
-        } catch (e: Exception) {
-            Log.e(TAG, "Shutdown failed", e)
+        } catch (t: Throwable) {
+            Log.e(TAG, "Shutdown failed", t)
         }
     }
 
@@ -161,10 +180,14 @@ object NativeQuicBridge {
      * Initialize the Quinn UHP layer (installs crypto provider)
      */
     fun initUhpQuinn(): Boolean {
+        if (!isLibraryLoaded) {
+            Log.e(TAG, "Native QUIC library not loaded")
+            return false
+        }
         return try {
             nativeUhpQuinnInit()
-        } catch (e: Exception) {
-            Log.e(TAG, "Failed to initialize UHP Quinn", e)
+        } catch (t: Throwable) {
+            Log.e(TAG, "Failed to initialize UHP Quinn", t)
             false
         }
     }
@@ -183,7 +206,9 @@ object NativeQuicBridge {
         masterSeed: ByteArray,
         chainId: Int
     ): Map<String, Any?>? {
-        ensureInitialized()
+        if (!ensureInitialized()) {
+            return mapOf("ok" to false, "error" to "Native QUIC library not loaded")
+        }
         return try {
             @Suppress("UNCHECKED_CAST")
             nativeUhpQuicConnectAndHandshake(
@@ -197,9 +222,9 @@ object NativeQuicBridge {
                 masterSeed,
                 chainId
             ) as? Map<String, Any?>
-        } catch (e: Exception) {
-            Log.e(TAG, "UHP handshake failed", e)
-            mapOf("ok" to false, "error" to e.message)
+        } catch (t: Throwable) {
+            Log.e(TAG, "UHP handshake failed", t)
+            mapOf("ok" to false, "error" to t.message)
         }
     }
 
@@ -207,13 +232,15 @@ object NativeQuicBridge {
      * Send framed ZHTP request on an existing handle
      */
     fun uhpQuicRequest(handle: Long, requestBytes: ByteArray): Map<String, Any?>? {
-        ensureInitialized()
+        if (!ensureInitialized()) {
+            return mapOf("ok" to false, "error" to "Native QUIC library not loaded")
+        }
         return try {
             @Suppress("UNCHECKED_CAST")
             nativeUhpQuicRequest(handle, requestBytes) as? Map<String, Any?>
-        } catch (e: Exception) {
-            Log.e(TAG, "UHP request failed", e)
-            mapOf("ok" to false, "error" to e.message)
+        } catch (t: Throwable) {
+            Log.e(TAG, "UHP request failed", t)
+            mapOf("ok" to false, "error" to t.message)
         }
     }
 
@@ -227,13 +254,15 @@ object NativeQuicBridge {
         headersJson: String,
         body: ByteArray?
     ): Map<String, Any?>? {
-        ensureInitialized()
+        if (!ensureInitialized()) {
+            return mapOf("ok" to false, "error" to "Native QUIC library not loaded")
+        }
         return try {
             @Suppress("UNCHECKED_CAST")
             nativeUhpQuicAuthenticatedRequest(handle, method, path, headersJson, body) as? Map<String, Any?>
-        } catch (e: Exception) {
-            Log.e(TAG, "UHP authenticated request failed", e)
-            mapOf("ok" to false, "error" to e.message)
+        } catch (t: Throwable) {
+            Log.e(TAG, "UHP authenticated request failed", t)
+            mapOf("ok" to false, "error" to t.message)
         }
     }
 
@@ -247,13 +276,15 @@ object NativeQuicBridge {
         headersJson: String,
         body: ByteArray?
     ): Map<String, Any?>? {
-        ensureInitialized()
+        if (!ensureInitialized()) {
+            return mapOf("ok" to false, "error" to "Native QUIC library not loaded")
+        }
         return try {
             @Suppress("UNCHECKED_CAST")
             nativeUhpQuicAuthenticatedRequestBytes(handle, method, path, headersJson, body) as? Map<String, Any?>
-        } catch (e: Exception) {
-            Log.e(TAG, "UHP authenticated request (bytes) failed", e)
-            mapOf("ok" to false, "error" to e.message)
+        } catch (t: Throwable) {
+            Log.e(TAG, "UHP authenticated request (bytes) failed", t)
+            mapOf("ok" to false, "error" to t.message)
         }
     }
 
@@ -263,15 +294,20 @@ object NativeQuicBridge {
     fun uhpQuicClose(handle: Long) {
         try {
             nativeUhpQuicClose(handle)
-        } catch (e: Exception) {
-            Log.e(TAG, "UHP close failed", e)
+        } catch (t: Throwable) {
+            Log.e(TAG, "UHP close failed", t)
         }
     }
 
-    private fun ensureInitialized() {
-        if (!isInitialized) {
-            init()
+    private fun ensureInitialized(): Boolean {
+        if (!isLibraryLoaded) {
+            Log.e(TAG, "Native QUIC library not loaded")
+            return false
         }
+        if (!isInitialized) {
+            return init()
+        }
+        return true
     }
 
     // Native methods - implemented in Rust

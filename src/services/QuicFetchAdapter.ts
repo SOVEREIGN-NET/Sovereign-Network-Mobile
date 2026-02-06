@@ -171,6 +171,8 @@ const PUBLIC_ENDPOINTS: PublicEndpointRule[] = [
   { method: 'GET', path: '/api/v1/web4/domains/status/:domain' },
   { method: 'GET', path: '/api/v1/identity/username/available/:username' },
   { method: 'POST', path: '/api/v1/identity/recover' },
+  { method: 'POST', path: '/api/v1/identity/migrate' },
+  { method: 'POST', path: '/api/v1/identity/register' },
 ];
 
 /**

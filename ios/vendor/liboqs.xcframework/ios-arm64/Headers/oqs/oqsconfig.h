@@ -16,7 +16,7 @@
  */
 /* #undef OQS_VERSION_PRE_RELEASE */
 
-#define OQS_COMPILE_BUILD_TARGET "aarch64-Darwin-25.1.0"
+#define OQS_COMPILE_BUILD_TARGET "aarch64-Darwin-25.2.0"
 #define OQS_DIST_BUILD 1
 /* #undef OQS_DIST_X86_64_BUILD */
 /* #undef OQS_DIST_X86_BUILD */

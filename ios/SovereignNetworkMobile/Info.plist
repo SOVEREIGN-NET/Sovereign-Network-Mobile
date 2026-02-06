@@ -28,8 +28,6 @@
 	<true/>
 	<key>NSAppTransportSecurity</key>
 	<dict>
-		<!-- Allow cleartext (HTTP) for any domain to support QUIC connections -->
-		<!-- Node IP is configured via .env - no hardcoding here -->
 		<key>NSAllowsArbitraryLoads</key>
 		<true/>
 		<key>NSAllowsLocalNetworking</key>
@@ -41,16 +39,6 @@
 	<string>We use location to provide the user better alternatives to configure the app</string>
 	<key>RCTNewArchEnabled</key>
 	<true/>
-	<key>UITextView</key>
-	<dict>
-		<key>UITextContentType</key>
-		<string>none</string>
-	</dict>
-	<key>UITextInput</key>
-	<dict>
-		<key>UITextContentType</key>
-		<string>none</string>
-	</dict>
 	<key>UILaunchStoryboardName</key>
 	<string>LaunchScreen</string>
 	<key>UIRequiredDeviceCapabilities</key>
@@ -67,6 +55,16 @@
 		<string>UIInterfaceOrientationLandscapeRight</string>
 		<string>UIInterfaceOrientationPortrait</string>
 	</array>
+	<key>UITextInput</key>
+	<dict>
+		<key>UITextContentType</key>
+		<string>none</string>
+	</dict>
+	<key>UITextView</key>
+	<dict>
+		<key>UITextContentType</key>
+		<string>none</string>
+	</dict>
 	<key>UIViewControllerBasedStatusBarAppearance</key>
 	<false/>
 </dict>

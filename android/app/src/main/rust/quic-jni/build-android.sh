@@ -10,7 +10,24 @@ cd "$SCRIPT_DIR"
 
 # Android NDK path
 NDK_HOME="${ANDROID_NDK_HOME:-$HOME/Library/Android/sdk/ndk/27.1.12297006}"
-TOOLCHAIN="$NDK_HOME/toolchains/llvm/prebuilt/darwin-x86_64"
+HOST_TAG="${ANDROID_NDK_HOST_TAG:-}"
+if [ -z "$HOST_TAG" ]; then
+    ARCH="$(uname -m)"
+    if [ "$ARCH" = "arm64" ]; then
+        HOST_TAG="darwin-arm64"
+    else
+        HOST_TAG="darwin-x86_64"
+    fi
+fi
+TOOLCHAIN="$NDK_HOME/toolchains/llvm/prebuilt/$HOST_TAG"
+if [ ! -d "$TOOLCHAIN" ]; then
+    if [ -d "$NDK_HOME/toolchains/llvm/prebuilt/darwin-x86_64" ]; then
+        HOST_TAG="darwin-x86_64"
+    elif [ -d "$NDK_HOME/toolchains/llvm/prebuilt/darwin-arm64" ]; then
+        HOST_TAG="darwin-arm64"
+    fi
+    TOOLCHAIN="$NDK_HOME/toolchains/llvm/prebuilt/$HOST_TAG"
+fi
 
 if [ ! -d "$TOOLCHAIN" ]; then
     echo "Error: NDK toolchain not found at $TOOLCHAIN"

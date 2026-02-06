@@ -6,6 +6,7 @@
 import { quicRequest, toQuicUrl } from './QuicClient';
 import { DEFAULT_SOV_NODE_URL } from '../config';
 import SecureIdentityStorage from './SecureIdentityStorage';
+import { maskIdentifier } from '../utils/maskIdentifier';
 
 export interface WalletListResponse {
   identity_id: string;
@@ -111,7 +112,10 @@ class AppService {
       }
 
       const data = JSON.parse(response.body);
-      console.log('[AppService] ✅ getIdentity:', { identityId, did: data.did });
+      console.log('[AppService] ✅ getIdentity:', {
+        identityId: maskIdentifier(identityId),
+        did: maskIdentifier(data.did),
+      });
       return data;
     } catch (error: any) {
       console.error('[AppService] ❌ getIdentity failed:', error.message);

@@ -18,7 +18,7 @@ if linkage != nil
 end
 
 target 'SovereignNetworkMobile' do
-  config = use_native_modules!
+  rn_config = use_native_modules!
 
   # Firebase Swift pods need modular headers on their C deps when linked statically with RN
   pod 'FirebaseCore', :modular_headers => true
@@ -44,7 +44,7 @@ target 'SovereignNetworkMobile' do
   pod 'lib_client', :path => './lib-client'
 
   use_react_native!(
-    :path => config[:reactNativePath],
+    :path => rn_config[:reactNativePath],
     # An absolute path to your application root.
     :app_path => "#{Pod::Config.instance.installation_root}/.."
   )
@@ -52,15 +52,19 @@ target 'SovereignNetworkMobile' do
   post_install do |installer|
     react_native_post_install(
       installer,
-      config[:reactNativePath],
+      rn_config[:reactNativePath],
       :mac_catalyst_enabled => false,
       # :ccache_enabled => true
     )
 
     # Firebase build settings
+    react_native_abs_path = File.expand_path(rn_config[:reactNativePath], Pod::Config.instance.installation_root)
+
     installer.pods_project.targets.each do |target|
-      target.build_configurations.each do |config|
-        config.build_settings['GCC_PREPROCESSOR_DEFINITIONS'] ||= [
+      target.build_configurations.each do |build_config|
+        # Ensure REACT_NATIVE_PATH is available to Xcode script phases (Hermes, etc.)
+        build_config.build_settings['REACT_NATIVE_PATH'] = react_native_abs_path
+        build_config.build_settings['GCC_PREPROCESSOR_DEFINITIONS'] ||= [
           '$(inherited)',
           'FIREBASE_ANALYTICS_COLLECTION_ENABLED=1',
         ]
@@ -69,7 +73,7 @@ target 'SovereignNetworkMobile' do
 
     # Patch React Native TextInput to disable Safari password autofill
     # Prevents crash in _SFPasswordViewController when password fields are present
-    react_native_path = File.join(Pod::Config.instance.installation_root, config[:reactNativePath])
+    react_native_path = react_native_abs_path
     rct_text_input_path = File.join(react_native_path, 'React/Views/RCTTextInputView.m')
 
     if File.exist?(rct_text_input_path)

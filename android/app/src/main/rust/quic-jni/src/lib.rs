@@ -543,6 +543,23 @@ pub extern "system" fn Java_com_sovereignnetworkmobile_NativeIdentityProvisionin
 }
 
 #[no_mangle]
+pub extern "system" fn Java_com_sovereignnetworkmobile_NativeIdentityProvisioning_nativeValidateIdentityJson<'local>(
+    mut env: JNIEnv<'local>,
+    _class: JClass<'local>,
+    identity_json: JString<'local>,
+) -> jobject {
+    let identity_json_str: String = match env.get_string(&identity_json) {
+        Ok(s) => s.into(),
+        Err(e) => {
+            return create_ok_map(&mut env, Err(anyhow::anyhow!("Failed to get identity json: {}", e)));
+        }
+    };
+
+    let result = identity_bridge::validate_identity_json(&identity_json_str);
+    create_ok_map(&mut env, result)
+}
+
+#[no_mangle]
 pub extern "system" fn Java_com_sovereignnetworkmobile_NativeIdentityProvisioning_nativeGetSeedPhrase<'local>(
     mut env: JNIEnv<'local>,
     _class: JClass<'local>,
@@ -1203,6 +1220,33 @@ fn create_identity_bundle_map<'local>(
         Err(err) => {
             put_boolean(env, &map, "ok", false);
             put_string(env, &map, "error", &err.to_string());
+        }
+    }
+
+    map.into_raw()
+}
+
+fn create_ok_map<'local>(
+    env: &mut JNIEnv<'local>,
+    result: Result<(), anyhow::Error>,
+) -> jobject {
+    let hash_map_class = match env.find_class("java/util/HashMap") {
+        Ok(c) => c,
+        Err(_) => return std::ptr::null_mut(),
+    };
+
+    let map = match env.new_object(&hash_map_class, "()V", &[]) {
+        Ok(m) => m,
+        Err(_) => return std::ptr::null_mut(),
+    };
+
+    match result {
+        Ok(()) => {
+            put_boolean(env, &map, "ok", true);
+        }
+        Err(e) => {
+            put_boolean(env, &map, "ok", false);
+            put_string(env, &map, "error", &e.to_string());
         }
     }
 

@@ -3,7 +3,7 @@
  * Screen for backing up identity (seed phrase + encrypted backup file)
  */
 
-import React, { useState, useCallback, useEffect } from 'react';
+import React, { useState, useCallback } from 'react';
 import { View, Pressable, Share, Alert } from 'react-native';
 import { NativeStackScreenProps } from '@react-navigation/native-stack';
 import {
@@ -23,6 +23,7 @@ import { useAuth } from '../hooks';
 import { useTranslation } from '../i18n';
 import { colors, spacing, borderRadius, typography } from '../theme';
 import type { IdentityStackParamList } from '../types/navigation';
+import { maskIdentifier } from '../utils/maskIdentifier';
 
 type BackupIdentityScreenProps = NativeStackScreenProps<
   IdentityStackParamList,
@@ -47,19 +48,17 @@ const BackupIdentityScreen = ({ navigation }: BackupIdentityScreenProps) => {
 
   const [seedPhrase, setSeedPhrase] = useState<string>('');
 
-  useEffect(() => {
-    const loadSeedPhrase = async () => {
-      if (currentIdentity?.masterSeedPhrase) {
-        setSeedPhrase(currentIdentity.masterSeedPhrase);
-        return;
-      }
-      const stored = await getMasterSeedPhrase();
-      if (stored) {
-        setSeedPhrase(stored);
-      }
-    };
-    loadSeedPhrase().catch(() => {});
-  }, [currentIdentity?.masterSeedPhrase, getMasterSeedPhrase]);
+  const loadSeedPhraseOnDemand = useCallback(async () => {
+    if (seedPhrase) return;
+    if (currentIdentity?.masterSeedPhrase) {
+      setSeedPhrase(currentIdentity.masterSeedPhrase);
+      return;
+    }
+    const stored = await getMasterSeedPhrase();
+    if (stored) {
+      setSeedPhrase(stored);
+    }
+  }, [currentIdentity?.masterSeedPhrase, getMasterSeedPhrase, seedPhrase]);
 
   const handleCopySeed = useCallback(async () => {
     try {
@@ -103,7 +102,7 @@ const BackupIdentityScreen = ({ navigation }: BackupIdentityScreenProps) => {
       // In production, this would call RealAuthService.exportBackup()
       // For now, we simulate it since exportBackup is an async operation
       // that would be called via the auth service
-      console.log('✅ Backup file created for identity:', currentIdentity.did);
+      console.log('✅ Backup file created for identity:', maskIdentifier(currentIdentity.did));
 
       // Simulate backup creation
       await new Promise((resolve) => setTimeout(resolve, 1000));
@@ -235,7 +234,10 @@ const BackupIdentityScreen = ({ navigation }: BackupIdentityScreenProps) => {
                   </>
                 ) : (
                   <Pressable
-                    onPress={() => setShowSeed(true)}
+                    onPress={() => {
+                      setShowSeed(true);
+                      loadSeedPhraseOnDemand().catch(() => {});
+                    }}
                     style={{
                       backgroundColor: colors.bg_dark,
                       padding: spacing.lg,

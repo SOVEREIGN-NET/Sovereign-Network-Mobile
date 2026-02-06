@@ -65,7 +65,7 @@ const toWalletDisplay = (wallet: any): WalletDisplay => ({
 });
 
 export const useWalletList = () => {
-  const { currentIdentity } = useAuth();
+  const { currentIdentity, forceCleanupAndSignOut } = useAuth();
   const identityId = normalizeIdentityId(currentIdentity?.did);
   const useMock = getUseMockService();
 
@@ -97,12 +97,16 @@ export const useWalletList = () => {
           firstWallet: response?.wallets?.[0],
         });
         return response;
-      } catch (err) {
+      } catch (err: any) {
+        const msg = String(err?.message || err || '').toLowerCase();
+        if (msg.includes('invalid dilithium secret key size')) {
+          await forceCleanupAndSignOut('invalid_dilithium_key_size');
+        }
         console.error('[useWalletList] ❌ Failed to fetch wallet list:', err);
         throw err;
       }
     },
-    [identityId, useMock, currentIdentity?.wallets],
+    [identityId, useMock, currentIdentity?.wallets, forceCleanupAndSignOut],
     null,
   );
 

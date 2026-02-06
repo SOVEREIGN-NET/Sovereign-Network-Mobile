@@ -310,8 +310,9 @@ export const SecureIdentityStorage = {
   async getIdentityIfAvailable(suppressBiometric?: boolean): Promise<Identity | null> {
     try {
       if (suppressBiometric) {
-        // Just check if it exists in cache without prompting
-        return await this.getCachedDidOnly() ? await this.getIdentity().catch(() => null) : null;
+        // Do not trigger biometric prompt on background/startup paths.
+        // Use AsyncStorage backup only.
+        return await this.restoreFromBackup();
       }
       return await this.getIdentity();
     } catch (error) {
