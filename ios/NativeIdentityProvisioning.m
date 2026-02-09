@@ -69,4 +69,7 @@ RCT_EXTERN_METHOD(signMessageFromSeed:(NSString *)phrase
                   resolve:(RCTPromiseResolveBlock)resolve
                   reject:(RCTPromiseRejectBlock)reject)
 
+RCT_EXTERN_METHOD(getCurrentIdentityDid:(RCTPromiseResolveBlock)resolve
+                  reject:(RCTPromiseRejectBlock)reject)
+
 @end

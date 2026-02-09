@@ -286,9 +286,9 @@ const CreateIdentityScreen = ({ navigation }: CreateIdentityScreenProps) => {
             error={fieldErrors.password}
             editable={!isCreateDisabled}
             containerStyle={{ marginBottom: spacing.xs }}
-            textContentType="none"
-            autoComplete="off"
-            importantForAutofill="no"
+            textContentType="newPassword"
+            autoComplete="password-new"
+            importantForAutofill="yes"
             autoCapitalize="none"
             autoCorrect={false}
             spellCheck={false}

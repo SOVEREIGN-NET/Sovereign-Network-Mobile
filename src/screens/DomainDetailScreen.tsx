@@ -109,12 +109,13 @@ const DomainDetailScreen = ({ route, navigation }: any) => {
     try {
       console.log('[DomainDetailScreen] Updating domain content:', {
         domain: domainName,
-        contentCid,
+        newManifestCid: contentCid,
       });
 
       await domainService.updateDomain({
         domain: domainName,
-        content_cid: contentCid,
+        new_manifest_cid: contentCid,
+        expected_previous_manifest_cid: '',
       });
 
       setUpdateStatus({

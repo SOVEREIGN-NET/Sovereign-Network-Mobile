@@ -3,7 +3,8 @@
  * Provides test data for UI development without API connectivity
  */
 
-import type { Identity, Wallet, Transaction, Proposal, DAOStats, NetworkStatus } from '../types/models';
+import type { Identity } from '../types/identity';
+import type { Wallet, Transaction, Proposal, DAOStats, NetworkStatus } from '../types/models';
 
 class MockDataService {
   /**

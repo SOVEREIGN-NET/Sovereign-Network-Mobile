@@ -3,7 +3,7 @@
  * Screen for signing in with existing ZK-DID identity
  */
 
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { View, Pressable, Text as RNText, Alert, NativeModules } from 'react-native';
 import LinearGradient from 'react-native-linear-gradient';
 import MaskedView from '@react-native-masked-view/masked-view';
@@ -22,9 +22,15 @@ import {
 import { useAuth, useNodeConnection } from '../hooks';
 import { useTranslation } from '../i18n';
 import { colors, spacing, typography } from '../theme';
+import SecureIdentityStorage from '../services/SecureIdentityStorage';
 import { AuthStackParamList } from '../navigation/AuthNavigator';
 
 type SignInScreenProps = NativeStackScreenProps<AuthStackParamList, 'SignIn'>;
+
+/** Validate DID format: "did:zhtp:" followed by exactly 64 lowercase hex chars. */
+function isValidDid(did: string): boolean {
+  return /^did:zhtp:[0-9a-f]{64}$/.test(did);
+}
 
 const SignInScreen = ({ navigation }: SignInScreenProps) => {
   const { t } = useTranslation();
@@ -36,12 +42,47 @@ const SignInScreen = ({ navigation }: SignInScreenProps) => {
   const [showPassword, setShowPassword] = useState(false);
   const [localError, setLocalError] = useState<string | null>(null);
 
+  // Pre-fill DID from native identity store (EncryptedSharedPreferences → Rust serde
+  // roundtrip — immune to react-native-keychain AES-CBC silent corruption).
+  useEffect(() => {
+    const prefillDid = async () => {
+      try {
+        // 1. Direct native path: IdentityStore.getCurrentIdentityId → loadIdentity → Rust deser → DID
+        if (NativeModules.NativeIdentityProvisioning) {
+          const nativeDid: string | null = await NativeModules.NativeIdentityProvisioning.getCurrentIdentityDid();
+          if (nativeDid && isValidDid(nativeDid)) {
+            if (__DEV__) console.log('[SignIn] Pre-fill DID from native store');
+            setDid(nativeDid);
+            return;
+          }
+        }
+        // 2. Fallback: react-native-keychain (may be corrupted by AES-CBC)
+        const creds = await SecureIdentityStorage.getLoginCredentials();
+        if (creds?.did && isValidDid(creds.did)) {
+          if (__DEV__) console.log('[SignIn] Pre-fill DID from keychain');
+          setDid(creds.did);
+        } else if (creds?.did) {
+          console.warn('[SignIn] Keychain DID failed validation — not pre-filling');
+        }
+      } catch {
+        // Pre-fill is best-effort
+      }
+    };
+    prefillDid();
+  }, []);
+
   const handleSignIn = async () => {
     setLocalError(null);
 
     // Validation
     if (!did.trim()) {
       setLocalError(t.auth.signIn.validation.didRequired);
+      return;
+    }
+
+    // Validate DID format — catches AES-CBC silent corruption from react-native-keychain
+    if (did.trim().startsWith('did:zhtp:') && !isValidDid(did.trim())) {
+      setLocalError('DID appears corrupted (non-hex characters detected). Please recover your identity.');
       return;
     }
 
@@ -181,6 +222,9 @@ const SignInScreen = ({ navigation }: SignInScreenProps) => {
               onChangeText={setDid}
               editable={!isLoading}
               helperText="Your DID (did:zhtp:...) or hex Identity ID from creation"
+              textContentType="username"
+              autoComplete="username"
+              importantForAutofill="yes"
             />
 
             {/* Passphrase Input */}
@@ -221,6 +265,9 @@ const SignInScreen = ({ navigation }: SignInScreenProps) => {
                 editable={!isLoading}
                 helperText="The password you set when creating your identity"
                 containerStyle={{ marginBottom: 0 }}
+                textContentType="password"
+                autoComplete="password"
+                importantForAutofill="yes"
               />
             </View>
           </Column>

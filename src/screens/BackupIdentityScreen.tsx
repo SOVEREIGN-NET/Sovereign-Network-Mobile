@@ -54,9 +54,18 @@ const BackupIdentityScreen = ({ navigation }: BackupIdentityScreenProps) => {
       setSeedPhrase(currentIdentity.masterSeedPhrase);
       return;
     }
-    const stored = await getMasterSeedPhrase();
-    if (stored) {
-      setSeedPhrase(stored);
+    try {
+      const stored = await getMasterSeedPhrase();
+      if (stored) {
+        setSeedPhrase(stored);
+      } else {
+        Alert.alert(
+          'Seed Phrase Unavailable',
+          'No seed phrase was found on this device. If you have not backed it up yet, recover using your original 24 words.'
+        );
+      }
+    } catch (err: any) {
+      Alert.alert('Seed Vault Error', err?.message || 'Failed to load seed phrase from secure storage.');
     }
   }, [currentIdentity?.masterSeedPhrase, getMasterSeedPhrase, seedPhrase]);
 

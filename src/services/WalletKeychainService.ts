@@ -1,23 +1,35 @@
 /**
  * Wallet Keychain Service
- * Securely stores the master seed phrase in iOS Keychain
- * Uses native WalletKeychain module for secure Keychain storage
+ * Securely stores the master seed phrase.
+ *
+ * - iOS: prefers the native WalletKeychain module when available
+ * - Android (and iOS fallback): uses react-native-keychain
  */
 
 import { NativeModules, Platform } from 'react-native';
+import * as Keychain from 'react-native-keychain';
 
 class WalletKeychainService {
   private nativeModule: any;
 
   constructor() {
+    this.nativeModule = NativeModules.WalletKeychain;
     if (Platform.OS === 'ios') {
-      this.nativeModule = NativeModules.WalletKeychain;
       if (!this.nativeModule) {
-        console.warn('[WalletKeychainService] ⚠️ WalletKeychain native module not found');
+        console.warn('[WalletKeychainService] ⚠️ WalletKeychain native module not found; using Keychain fallback');
       } else {
         console.log('[WalletKeychainService] ✅ WalletKeychain native module initialized');
       }
     }
+  }
+
+  private keychainOptionsFor(key: string): Keychain.Options {
+    // Use per-key service names so multiple identities can coexist.
+    return {
+      service: `WalletKeychain:${key}`,
+      accessible: Keychain.ACCESSIBLE.WHEN_UNLOCKED_THIS_DEVICE_ONLY,
+      securityLevel: Keychain.SECURITY_LEVEL.SECURE_HARDWARE,
+    };
   }
 
   /**
@@ -27,16 +39,19 @@ class WalletKeychainService {
     seedPhrase: string,
     identityId: string
   ): Promise<boolean> {
-    if (!this.nativeModule) {
-      console.warn('[WalletKeychainService] Cannot store master seed - native module unavailable');
-      return false;
-    }
-
     const key = `master_seed_${identityId}`;
     try {
-      const result = await this.nativeModule.storeSecureString(key, seedPhrase);
-      console.log(`[WalletKeychainService] ✅ Stored master seed in Keychain`);
-      return result === true;
+      if (this.nativeModule?.storeSecureString) {
+        const result = await this.nativeModule.storeSecureString(key, seedPhrase);
+        console.log('[WalletKeychainService] ✅ Stored master seed via native module');
+        return result === true;
+      }
+
+      // Cross-platform fallback.
+      const opts = this.keychainOptionsFor(key);
+      await Keychain.setGenericPassword('seed', seedPhrase, opts);
+      console.log('[WalletKeychainService] ✅ Stored master seed via react-native-keychain');
+      return true;
     } catch (error: any) {
       console.error('[WalletKeychainService] ❌ Failed to store master seed:', error.message);
       return false;
@@ -47,19 +62,24 @@ class WalletKeychainService {
    * Retrieve master seed phrase from native iOS Keychain
    */
   async retrieveMasterSeedPhrase(identityId: string): Promise<string | null> {
-    if (!this.nativeModule) {
-      console.warn('[WalletKeychainService] Cannot retrieve master seed - native module unavailable');
-      return null;
-    }
-
     const key = `master_seed_${identityId}`;
     try {
-      const seedPhrase = await this.nativeModule.getSecureString(key);
-      if (seedPhrase) {
-        console.log('[WalletKeychainService] ✅ Retrieved master seed from Keychain');
-        return seedPhrase;
+      if (this.nativeModule?.getSecureString) {
+        const seedPhrase = await this.nativeModule.getSecureString(key);
+        if (seedPhrase) {
+          console.log('[WalletKeychainService] ✅ Retrieved master seed via native module');
+          return seedPhrase;
+        }
+        return null;
       }
-      return null;
+
+      const opts = this.keychainOptionsFor(key);
+      const credentials = await Keychain.getGenericPassword(opts);
+      if (!credentials) {
+        return null;
+      }
+      console.log('[WalletKeychainService] ✅ Retrieved master seed via react-native-keychain');
+      return credentials.password || null;
     } catch (error: any) {
       console.error('[WalletKeychainService] ❌ Failed to retrieve master seed:', error.message);
       return null;
@@ -70,16 +90,18 @@ class WalletKeychainService {
    * Delete master seed phrase for an identity (for logout/uninstall)
    */
   async deleteMasterSeedPhrase(identityId: string): Promise<boolean> {
-    if (!this.nativeModule) {
-      console.warn('[WalletKeychainService] Cannot delete master seed - native module unavailable');
-      return false;
-    }
-
+    const key = `master_seed_${identityId}`;
     try {
-      const key = `master_seed_${identityId}`;
-      const result = await this.nativeModule.deleteSecureString(key);
-      console.log(`[WalletKeychainService] ✅ Deleted master seed for identity ${identityId}`);
-      return result === true;
+      if (this.nativeModule?.deleteSecureString) {
+        const result = await this.nativeModule.deleteSecureString(key);
+        console.log(`[WalletKeychainService] ✅ Deleted master seed via native module for identity ${identityId}`);
+        return result === true;
+      }
+
+      const opts = this.keychainOptionsFor(key);
+      await Keychain.resetGenericPassword(opts);
+      console.log(`[WalletKeychainService] ✅ Deleted master seed via react-native-keychain for identity ${identityId}`);
+      return true;
     } catch (error: any) {
       console.error('[WalletKeychainService] ❌ Failed to delete master seed:', error.message);
       return false;

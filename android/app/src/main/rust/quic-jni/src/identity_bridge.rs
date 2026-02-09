@@ -37,7 +37,7 @@ pub fn generate_identity_bundle(device_id: &str) -> Result<GeneratedIdentity> {
         handshake_json,
         dilithium_sk: identity.private_key,
         kyber_sk: identity.kyber_secret_key,
-        master_seed: identity.master_seed,
+        master_seed: identity.recovery_entropy,
     })
 }
 
@@ -78,11 +78,11 @@ pub fn restore_identity_bundle_from_phrase(phrase: &str, device_id: &str) -> Res
         handshake_json,
         dilithium_sk: identity.private_key,
         kyber_sk: identity.kyber_secret_key,
-        master_seed: identity.master_seed,
+        master_seed: identity.recovery_entropy,
     })
 }
 
-fn identity_to_handshake_json(identity: &Identity) -> Result<String> {
+pub fn identity_to_handshake_json(identity: &Identity) -> Result<String> {
     let key_id = zhtp_client::crypto::Blake3::hash(&identity.public_key);
     let id_hex = identity.did.strip_prefix("did:zhtp:").unwrap_or(&identity.did);
     let id_bytes: Vec<u8> = hex::decode(id_hex).unwrap_or_else(|_| key_id.to_vec());

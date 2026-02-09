@@ -3,14 +3,15 @@
  * Manages global auth state for the app
  */
 
-import React, { createContext, useState, useCallback, useEffect, useMemo } from 'react';
+import React, { createContext, useState, useCallback, useEffect, useMemo, useRef } from 'react';
 import { Platform, NativeModules } from 'react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { NativeStorage } from '../services/NativeStorage';
 import SecureIdentityStorage from '../services/SecureIdentityStorage';
 import SeedVaultService from '../services/SeedVaultService';
 import { rateLimiter } from '../services/RateLimiter';
-import MockAuthService, { Identity } from '../services/MockAuthService';
+import MockAuthService from '../services/MockAuthService';
+import type { Identity } from '../types/identity';
 import type { CreateIdentityData } from '../services/RealAuthService';
 import { walletKeychainService } from '../services/WalletKeychainService';
 import { nativeIdentityProvisioning } from '../services/NativeIdentityProvisioning';
@@ -27,6 +28,23 @@ const RealAuthService = RealAuthServiceModule;
 const storage = Platform.OS === 'android' ? NativeStorage : AsyncStorage;
 const MIGRATION_REQUIRED_KEY = 'sovnet_migration_required';
 const MIGRATION_REQUIRED_REASON_KEY = 'sovnet_migration_required_reason';
+
+function isSecureStorageUnavailableError(error: unknown): boolean {
+  const message = String((error as any)?.message || error || '').toLowerCase();
+
+  // Heuristic match for common secure storage failures (device not secured, keystore reset, etc).
+  return (
+    message.includes('cryptofailedexception') ||
+    message.includes('keystore') ||
+    message.includes('strongbox') ||
+    message.includes('secure hardware') ||
+    message.includes('authentication tag verification failed') ||
+    message.includes('user not authenticated') ||
+    message.includes('biometry') ||
+    message.includes('biometric') ||
+    (message.includes('keychain') && message.includes('unavailable'))
+  );
+}
 
 // Create context for feature flag management
 type UseMockServiceListener = (useMock: boolean) => void;
@@ -153,6 +171,10 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
   const [restoreWarning, setRestoreWarning] = useState<string | null>(null);
   const [migrationRequired, setMigrationRequired] = useState(false);
 
+  // Carries password from createIdentity() across the async seed phrase confirmation
+  // to setIdentity() where login credentials are persisted for local sign-in + OS autofill.
+  const pendingPasswordRef = useRef<string | null>(null);
+
   const setMigrationRequiredFlag = useCallback(async (reason?: string) => {
     setMigrationRequired(true);
     await AsyncStorage.setItem(MIGRATION_REQUIRED_KEY, '1');
@@ -194,6 +216,20 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
             console.log('✅ Restored identity from secure storage:', identity.displayName);
           }
           setCurrentIdentity(identity);
+
+          // Restore lib-client Identity handle for signing (tokens, domains, UHP)
+          if (identity.identityId && NativeModules.NativeIdentityProvisioning) {
+            try {
+              const result = await NativeModules.NativeIdentityProvisioning.restoreIdentityToHandleStore(
+                identity.identityId
+              );
+              if (__DEV__) {
+                console.log('[AuthContext.bootstrap] Handle store restore:', result?.status);
+              }
+            } catch (err) {
+              console.warn('[AuthContext.bootstrap] Handle store restore failed:', err);
+            }
+          }
         }
       } catch (err) {
         console.error('Failed to restore cached identity:', err);
@@ -302,6 +338,10 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
       } else {
         identity = await RealAuthService!.createIdentity(data);
       }
+
+      // Stash password for later storage when setIdentity() is called
+      // after the user confirms their seed phrase
+      pendingPasswordRef.current = data.password;
 
       // Don't save to storage or set as currentIdentity yet
       // The CreateIdentityScreen will show the master seed phrase first
@@ -412,6 +452,61 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
     } finally {
       setIsLoading(false);
     }
+  }, [setMigrationRequiredFlag]);
+
+  /**
+   * Manually set the current identity
+   * Used after saving identity to storage (e.g., after seed phrase confirmation)
+   * SECURITY: Uses SecureIdentityStorage instead of plaintext AsyncStorage
+   * Also ensures lib-client Identity is available in handle store for signing
+   */
+  const setIdentity = useCallback(async (identity: Identity) => {
+    try {
+      if (__DEV__) {
+        console.log('🔐 AuthContext.setIdentity: Saving identity:', maskIdentifier(identity.did));
+      }
+      // Save to secure storage (Keychain) instead of plaintext AsyncStorage
+      await SecureIdentityStorage.setIdentity(identity, { requireBiometric: false });
+
+      // Save login credentials for local sign-in + OS autofill
+      // Validate DID format first — react-native-keychain AES-CBC can silently corrupt on retrieval
+      if (pendingPasswordRef.current && identity.did &&
+          /^did:zhtp:[0-9a-f]{64}$/.test(identity.did)) {
+        await SecureIdentityStorage.saveLoginCredentials(identity.did, pendingPasswordRef.current);
+        pendingPasswordRef.current = null;
+      }
+
+      setCurrentIdentity(identity);
+
+      // SECURITY: Restore lib-client Identity to handle store for UHP signing
+        if (identity.identityId && NativeModules.NativeIdentityProvisioning) {
+          try {
+            const result = await NativeModules.NativeIdentityProvisioning.restoreIdentityToHandleStore(
+              identity.identityId
+            );
+            if (result?.status === 'restored') {
+              setRestoreWarning(null);
+              console.log('[AuthContext.setIdentity] ✅ Identity restored to handle store:', result);
+            } else if (result?.status === 'skipped') {
+              const message = `Handle store restore skipped: ${result.reason}${
+                result.error ? ` (${result.error})` : ''
+              }`;
+              setRestoreWarning(message);
+              console.warn('[AuthContext.setIdentity] ⚠️ Handle store restore skipped:', result);
+            } else {
+              console.log('[AuthContext.setIdentity] ℹ️ Handle store restoration result:', result);
+            }
+          } catch (err) {
+            console.error('[AuthContext.setIdentity] ⚠️ Failed to restore Identity to handle store:', err);
+            setRestoreWarning('Handle store restore failed');
+            // Non-fatal - continue anyway
+          }
+        }
+    } catch (err: any) {
+      const message = err.message || 'Failed to set identity';
+      setError(message);
+      throw err;
+    }
   }, []);
 
   const migrateIdentityFromSeed = useCallback(async (
@@ -422,9 +517,11 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
     setIsLoading(true);
     try {
       const result = await RealAuthService.migrateIdentityFromSeed(displayName, seedPhrase);
-      // Immediately switch to the new identity after successful migration
-      // This ensures old keys are no longer used.
-      await setIdentity(result.identity);
+      // Persist identity to secure storage but DON'T set currentIdentity yet.
+      // MigrationSeedScreen navigates to SeedPhraseScreen which calls setCurrentIdentity
+      // after the user confirms their seed phrase. Setting it here would trigger
+      // navigation away from AuthNavigator before the user sees the seed.
+      await SecureIdentityStorage.setIdentity(result.identity, { requireBiometric: false });
       await clearMigrationRequiredFlag();
       return result;
     } catch (err: any) {
@@ -434,7 +531,7 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
     } finally {
       setIsLoading(false);
     }
-  }, []);
+  }, [clearMigrationRequiredFlag]);
 
   /**
    * Update user profile (display name, avatar)
@@ -585,52 +682,6 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
   }, []);
 
   /**
-   * Manually set the current identity
-   * Used after saving identity to storage (e.g., after seed phrase confirmation)
-   * SECURITY: Uses SecureIdentityStorage instead of plaintext AsyncStorage
-   * Also ensures lib-client Identity is available in handle store for signing
-   */
-  const setIdentity = useCallback(async (identity: Identity) => {
-    try {
-      if (__DEV__) {
-        console.log('🔐 AuthContext.setIdentity: Saving identity:', maskIdentifier(identity.did));
-      }
-      // Save to secure storage (Keychain) instead of plaintext AsyncStorage
-      await SecureIdentityStorage.setIdentity(identity, { requireBiometric: false });
-      setCurrentIdentity(identity);
-
-      // SECURITY: Restore lib-client Identity to handle store for UHP signing
-        if (identity.identityId && NativeModules.NativeIdentityProvisioning) {
-          try {
-            const result = await NativeModules.NativeIdentityProvisioning.restoreIdentityToHandleStore(
-              identity.identityId
-            );
-            if (result?.status === 'restored') {
-              setRestoreWarning(null);
-              console.log('[AuthContext.setIdentity] ✅ Identity restored to handle store:', result);
-            } else if (result?.status === 'skipped') {
-              const message = `Handle store restore skipped: ${result.reason}${
-                result.error ? ` (${result.error})` : ''
-              }`;
-              setRestoreWarning(message);
-              console.warn('[AuthContext.setIdentity] ⚠️ Handle store restore skipped:', result);
-            } else {
-              console.log('[AuthContext.setIdentity] ℹ️ Handle store restoration result:', result);
-            }
-          } catch (err) {
-            console.error('[AuthContext.setIdentity] ⚠️ Failed to restore Identity to handle store:', err);
-            setRestoreWarning('Handle store restore failed');
-            // Non-fatal - continue anyway
-          }
-        }
-    } catch (err: any) {
-      const message = err.message || 'Failed to set identity';
-      setError(message);
-      throw err;
-    }
-  }, []);
-
-  /**
    * Load identity on-demand when user needs to access protected features
    * This shows biometric prompt at the time of access, not on app startup
    * If user denies biometric or Keychain access, returns null (user can retry)
@@ -685,35 +736,86 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
 
   const getMasterSeedPhrase = useCallback(async (): Promise<string | null> => {
     try {
+      let secureStorageUnavailable = false;
+
+      // 1. Wallet keychain (identity-specific seed storage)
       if (currentIdentity?.identityId) {
-        const stored = await walletKeychainService.retrieveMasterSeedPhrase(currentIdentity.identityId);
-        if (stored) {
-          return stored;
+        try {
+          const stored = await walletKeychainService.retrieveMasterSeedPhrase(currentIdentity.identityId);
+          if (stored) {
+            return stored;
+          }
+        } catch (err) {
+          secureStorageUnavailable = secureStorageUnavailable || isSecureStorageUnavailableError(err);
         }
       }
-      const vault = await SeedVaultService.getSeedPhraseWithBiometric();
-      if (vault) {
-        return vault.join(' ');
+
+      // 2. SeedVaultService (biometric-protected vault in react-native-keychain)
+      try {
+        const vault = await SeedVaultService.getSeedPhraseWithBiometric();
+        if (vault) {
+          return vault.join(' ');
+        }
+      } catch (err) {
+        secureStorageUnavailable = secureStorageUnavailable || isSecureStorageUnavailableError(err);
+        if (!isSecureStorageUnavailableError(err)) {
+          // Non-storage error (user cancelled biometric prompt, etc.) — re-throw
+          throw err;
+        }
+        // Vault invalidated (keystore reset, biometrics changed) — fall through to native fallback
+        console.warn('[AuthContext] Seed vault invalidated, trying native identity store fallback');
       }
 
-      // Android fallback: derive from locally stored identity materials if available
-      if (currentIdentity?.identityId && Platform.OS === 'android') {
+      // 3. Native fallback: derive seed from identity stored in native secure storage
+      //    Android: EncryptedSharedPreferences (AES-256-GCM via MasterKey — NOT affected by
+      //             biometric vault invalidation, unlike react-native-keychain's AES-CBC vault)
+      //    iOS: IdentityHandleStore / cached identities
+      //
+      //    This resolves the chicken-and-egg problem where the vault is invalidated
+      //    but the user needs the seed to recover their identity.
+      const identityIdOrDid = currentIdentity?.identityId
+        || currentIdentity?.did
+        || (NativeModules.NativeIdentityProvisioning
+          ? await NativeModules.NativeIdentityProvisioning.getCurrentIdentityDid().catch(() => null)
+          : null);
+
+      if (identityIdOrDid) {
+        // Android primary: getSeedPhraseFromStoredIdentity reads from EncryptedSharedPreferences
+        if (Platform.OS === 'android') {
+          try {
+            const phrase = await nativeIdentityProvisioning.getSeedPhraseFromStoredIdentity(identityIdOrDid);
+            if (phrase) {
+              return phrase;
+            }
+          } catch (fallbackError) {
+            console.warn('[AuthContext] getSeedPhraseFromStoredIdentity failed:', fallbackError);
+            secureStorageUnavailable = secureStorageUnavailable || isSecureStorageUnavailableError(fallbackError);
+          }
+        }
+
+        // Cross-platform: getSeedPhraseForBackup from handle store / cached identities
         try {
-          const phrase = await nativeIdentityProvisioning.getSeedPhraseFromStoredIdentity(
-            currentIdentity.identityId
-          );
+          const phrase = await nativeIdentityProvisioning.getSeedPhraseForBackup(identityIdOrDid);
           if (phrase) {
             return phrase;
           }
         } catch (fallbackError) {
-          console.warn('[AuthContext] Seed vault fallback failed:', fallbackError);
+          console.warn('[AuthContext] getSeedPhraseForBackup failed:', fallbackError);
+          secureStorageUnavailable = secureStorageUnavailable || isSecureStorageUnavailableError(fallbackError);
         }
       }
 
+      if (secureStorageUnavailable) {
+        throw new Error(
+          'Could not retrieve seed phrase from this device. '
+          + 'If you have your 24-word seed phrase written down, enter it manually to recover.'
+        );
+      }
+
       return null;
-    } catch (error: any) {
-      console.error('[AuthContext] Failed to retrieve master seed phrase:', error);
-      throw error;
+    } catch (err: any) {
+      console.error('[AuthContext] Failed to retrieve master seed phrase:', err);
+      throw err;
     }
   }, [currentIdentity?.identityId]);
 

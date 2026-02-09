@@ -130,36 +130,8 @@ class NativeIdentityProvisioning: NSObject {
                 }
             }
 
-            // SECURITY: Do NOT store private keys even temporarily
-            // Private keys stay in Rust lib-client Identity objects
-            // Temp metadata only (public data) is stored for reference
-            do {
-                let tempKeyJson: [String: Any] = [
-                    "did": identity.did,
-                    "device_id": identity.deviceId,
-                    "node_id": Data(identity.nodeId).base64EncodedString(),
-                    "public_key": Data(identity.publicKey).base64EncodedString(),
-                    "kyber_public_key": Data(identity.kyberPublicKey).base64EncodedString(),
-                    "timestamp": identity.createdAt,
-                    "identity_type": "human"
-                    // Note: NO dilithium_sk, kyber_sk - these stay in Rust
-                ]
-                let tempData = try JSONSerialization.data(withJSONObject: tempKeyJson)
-                let tempQuery: [String: Any] = [
-                    kSecClass as String: kSecClassGenericPassword,
-                    kSecAttrService as String: "com.sovereign.zhtp",
-                    kSecAttrAccount as String: "temp_identity_\(identity.did)",
-                    kSecValueData as String: tempData,
-                    kSecAttrAccessible as String: kSecAttrAccessibleWhenUnlockedThisDeviceOnly
-                ]
-                SecItemDelete(tempQuery as CFDictionary)
-                SecItemAdd(tempQuery as CFDictionary, nil)
-                print("[NativeIdentityProvisioning]    ✅ Identity metadata stored (private keys stay in Rust)")
-            } catch {
-                print("[NativeIdentityProvisioning]    ⚠️ Failed to backup identity metadata: \(error)")
-            }
-
             // Return generated identity - TypeScript will handle server registration via QUIC
+            // Private keys stay in Rust lib-client; persistent storage happens in storeProvisionedIdentity()
             resolve([
                 "status": "generated",
                 "did": identity.did,
@@ -280,105 +252,33 @@ class NativeIdentityProvisioning: NSObject {
                     throw NSError(domain: "IdentityProvisioning", code: -3, userInfo: [NSLocalizedDescriptionKey: "Cached identity not found"])
                 }
 
-                // Step 1: Write identity materials to Documents keystore for UhpHandshake
-                print("[NativeIdentityProvisioning]    Step 1: Writing identity to Documents...")
-                let documentsDir = FileManager.default.urls(for: .documentDirectory, in: .userDomainMask)[0]
-                print("[NativeIdentityProvisioning]    Documents directory: \(documentsDir.path)")
-
-                let keystoreDir = documentsDir.appendingPathComponent("keystore").appendingPathComponent(identityId)
-                print("[NativeIdentityProvisioning]    Target keystore dir: \(keystoreDir.path)")
-
-                // Create keystore directory
-                try FileManager.default.createDirectory(at: keystoreDir, withIntermediateDirectories: true, attributes: nil)
-                print("[NativeIdentityProvisioning]    ✅ Keystore directory created")
-
-                // Prepare identity JSON for UhpHandshake
-                let identityJson: [String: Any] = [
-                    "did": identity.did,
-                    "identity_id": identityId,
-                    "device_id": identity.deviceId,
-                    "node_id": Data(identity.nodeId).base64EncodedString(),
-                    "public_key": Data(identity.publicKey).base64EncodedString(),
-                    "kyber_public_key": Data(identity.kyberPublicKey).base64EncodedString(),
-                    "timestamp": identity.createdAt,
-                    "identity_type": "human"
-                ]
-
-                let jsonData = try JSONSerialization.data(withJSONObject: identityJson, options: .prettyPrinted)
-                let identityFile = keystoreDir.appendingPathComponent("user_identity.json")
-                print("[NativeIdentityProvisioning]    Writing identity JSON to: \(identityFile.path)")
-                try jsonData.write(to: identityFile, options: .atomic)
-
-                // Verify file was written
-                if FileManager.default.fileExists(atPath: identityFile.path) {
-                    print("[NativeIdentityProvisioning]    ✅ Identity file verified to exist at: \(identityFile.path)")
-                } else {
-                    print("[NativeIdentityProvisioning]    ⚠️ VERIFICATION FAILED: Identity file not found after write!")
+                // Store lib-client Identity in handle store (in-memory, for signing)
+                // and serialize to Keychain (persistent, for restore on app launch)
+                // Private keys stay in Rust — this matches Android's EncryptedSharedPreferences model
+                guard let libIdentity = identity.libClientIdentity else {
+                    throw NSError(domain: "IdentityProvisioning", code: -4, userInfo: [NSLocalizedDescriptionKey: "lib-client Identity not available"])
                 }
 
-                print("[NativeIdentityProvisioning]    ✅ Identity materials written to: \(keystoreDir.path)")
+                try IdentityHandleStore.shared.store(identity: libIdentity, identityId: identityId)
+                print("[NativeIdentityProvisioning]    ✅ Identity stored in handle store")
 
-                // SECURITY: Do NOT store private keys in Keychain
-                // Private keys stay in Rust lib-client Identity objects via IdentityHandleStore
-                // This maintains the "keys never leave the crypto boundary" architecture
+                let serializedJson = try ZhtpClient.serializeIdentity(libIdentity as! Identity)
+                let serializedData = serializedJson.data(using: .utf8) ?? Data()
 
-                // Store lib-client Identity in handle store for UhpHandshake to use
-                // Store with both DID and identity_id for dual lookup capability
-                if let libIdentity = identity.libClientIdentity {
-                    do {
-                        try IdentityHandleStore.shared.store(identity: libIdentity, identityId: identityId)
-                        print("[NativeIdentityProvisioning]    ✅ Identity stored in handle store for handshake")
-                        print("[NativeIdentityProvisioning]       - Keys: DID + identity_id hash")
-
-                        // Also serialize and store the Identity JSON for restoration on app launch
-                        let identityJson = try ZhtpClient.serializeIdentity(libIdentity as! Identity)
-                        let serializedData = identityJson.data(using: .utf8) ?? Data()
-
-                        let serializedKeychainQuery: [String: Any] = [
-                            kSecClass as String: kSecClassGenericPassword,
-                            kSecAttrService as String: "com.sovereign.zhtp",
-                            kSecAttrAccount as String: "identity_serialized_\(identityId)",
-                            kSecValueData as String: serializedData,
-                            kSecAttrAccessible as String: kSecAttrAccessibleWhenUnlockedThisDeviceOnly
-                        ]
-
-                        SecItemDelete(serializedKeychainQuery as CFDictionary)
-                        let status = SecItemAdd(serializedKeychainQuery as CFDictionary, nil)
-                        if status == errSecSuccess {
-                            print("[NativeIdentityProvisioning]    ✅ Serialized Identity stored in Keychain")
-                        } else {
-                            print("[NativeIdentityProvisioning]    ⚠️ Failed to store serialized Identity: \(status)")
-                        }
-                    } catch {
-                        print("[NativeIdentityProvisioning]    ⚠️ Warning: Failed to store identity: \(error)")
-                    }
-                }
-
-                // Step 2 (formerly Step 3): Store the identity metadata in Keychain for quick lookup
-                let publicData: [String: String] = [
-                    "did": identity.did,
-                    "identityId": identityId,
-                    "timestamp": String(Date().timeIntervalSince1970)
-                ]
-
-                let publicDataJson = try JSONSerialization.data(withJSONObject: publicData)
-
-                let publicKeychainQuery: [String: Any] = [
+                let serializedKeychainQuery: [String: Any] = [
                     kSecClass as String: kSecClassGenericPassword,
                     kSecAttrService as String: "com.sovereign.zhtp",
-                    kSecAttrAccount as String: "zhtp_identity_provisioned_\(identityId)",
-                    kSecValueData as String: publicDataJson,
-                    kSecAttrAccessible as String: kSecAttrAccessibleWhenUnlocked
+                    kSecAttrAccount as String: "identity_serialized_\(identityId)",
+                    kSecValueData as String: serializedData,
+                    kSecAttrAccessible as String: kSecAttrAccessibleWhenUnlockedThisDeviceOnly
                 ]
 
-                // Delete if exists
-                SecItemDelete(publicKeychainQuery as CFDictionary)
-
-                // Add new
-                let status = SecItemAdd(publicKeychainQuery as CFDictionary, nil)
+                SecItemDelete(serializedKeychainQuery as CFDictionary)
+                let status = SecItemAdd(serializedKeychainQuery as CFDictionary, nil)
                 guard status == errSecSuccess else {
                     throw NSError(domain: "IdentityProvisioning", code: -5, userInfo: [NSLocalizedDescriptionKey: "Keychain storage failed: \(status)"])
                 }
+                print("[NativeIdentityProvisioning]    ✅ Serialized Identity stored in Keychain")
 
                 print("[NativeIdentityProvisioning] ✅ Identity provisioned and stored!")
                 resolve([
@@ -491,33 +391,18 @@ class NativeIdentityProvisioning: NSObject {
 
     // MARK: - Cleanup Functions
 
-    /// Clean all identity data (Documents keystore + Keychain + cached identities)
+    /// Clean all identity data (Keychain + handle store + cached identities)
     /// JavaScript API: NativeIdentityProvisioning.cleanKeystoreDirectory()
     @objc
     func cleanKeystoreDirectory() {
         queue.async {
-            do {
-                // Step 1: Clean Documents keystore directory
-                guard let documentsDir = FileManager.default.urls(for: .documentDirectory, in: .userDomainMask).first else {
-                    print("[NativeIdentityProvisioning] ❌ Failed to get Documents directory")
-                    return
-                }
+            // Clean all Keychain entries (identity_serialized_*, private_key_*, temp_identity_*, etc.)
+            _ = UhpKeystore.deleteAllPrivateKeys()
 
-                let keystoreDir = documentsDir.appendingPathComponent("keystore")
-                if FileManager.default.fileExists(atPath: keystoreDir.path) {
-                    try FileManager.default.removeItem(at: keystoreDir)
-                    print("[NativeIdentityProvisioning] ✅ Cleaned Documents/keystore directory")
-                }
-
-                // Step 2: Clean all Keychain entries
-                _ = UhpKeystore.deleteAllPrivateKeys()
-
-                // Step 3: Clear cached identities
-                self.cachedIdentities.removeAll()
-                print("[NativeIdentityProvisioning] ✅ All identity data cleaned")
-            } catch {
-                print("[NativeIdentityProvisioning] ❌ Cleanup failed: \(error)")
-            }
+            // Clear in-memory caches
+            IdentityHandleStore.shared.clear()
+            self.cachedIdentities.removeAll()
+            print("[NativeIdentityProvisioning] ✅ All identity data cleaned")
         }
     }
 
@@ -912,96 +797,111 @@ class NativeIdentityProvisioning: NSObject {
         }
     }
 
-    // MARK: - Unified Domain Transaction Signing
+    // MARK: - Unified Domain Request Building
 
-    /// UNIFIED: Sign domain transactions with Dilithium keypair
+    /// UNIFIED: Build domain requests with Dilithium-signed payloads
     /// Private key remains in Keychain - never reaches JavaScript
-    /// Routes to appropriate lib-client FFI based on domain transaction type
+    /// Routes to appropriate lib-client FFI based on domain request type
     @objc
-    func signDomainTransaction(
-        _ txType: String,
+    func signDomainRequest(
+        _ requestType: String,
         params: NSDictionary,
         resolve: @escaping RCTPromiseResolveBlock,
         reject: @escaping RCTPromiseRejectBlock
     ) {
         queue.async { [weak self] in
             do {
-                print("[NativeIdentityProvisioning] Signing domain transaction of type: \(txType)")
+                print("[NativeIdentityProvisioning] Building domain request of type: \(requestType)")
 
-                // Get the current identity from handle store once
                 guard let identityAny = IdentityHandleStore.shared.getLatestIdentity(),
                       let identity = identityAny as? Identity else {
                     reject("NO_IDENTITY", "No active identity for signing", nil)
                     return
                 }
 
-                // Route to appropriate lib-client FFI based on domain transaction type
-                let hexSignedTx: String
+                let requestJson: String
 
-                switch txType {
+                switch requestType {
                 case "domain_register":
                     guard let domain = params["domain"] as? String else {
                         reject("INVALID_PARAMS", "Missing domain parameter", nil)
                         return
                     }
-                    let contentCid = params["contentCid"] as? String
-                    hexSignedTx = try ZhtpClient.buildDomainRegister(
+                    requestJson = try ZhtpClient.buildDomainRegisterRequest(
                         domain: domain,
-                        contentCid: contentCid,
-                        using: identity,
-                        chainId: 0x02
+                        using: identity
                     )
 
                 case "domain_update":
                     guard let domain = params["domain"] as? String,
-                          let contentCid = params["contentCid"] as? String else {
+                          let newManifestCid = params["newManifestCid"] as? String else {
                         reject("INVALID_PARAMS", "Missing domain update parameters", nil)
                         return
                     }
-                    hexSignedTx = try ZhtpClient.buildDomainUpdate(
+                    requestJson = try ZhtpClient.buildDomainUpdateRequest(
                         domain: domain,
-                        contentCid: contentCid,
-                        using: identity,
-                        chainId: 0x02
+                        newManifestCid: newManifestCid,
+                        using: identity
+                    )
+
+                case "domain_transfer":
+                    guard let domain = params["domain"] as? String,
+                          let toOwnerDid = params["toOwnerDid"] as? String else {
+                        reject("INVALID_PARAMS", "Missing domain transfer parameters", nil)
+                        return
+                    }
+                    requestJson = try ZhtpClient.buildDomainTransferRequest(
+                        domain: domain,
+                        toOwnerDid: toOwnerDid,
+                        using: identity
                     )
 
                 default:
-                    reject("INVALID_TX_TYPE", "Unknown domain transaction type: \(txType)", nil)
+                    reject("INVALID_REQUEST_TYPE", "Unknown domain request type: \(requestType)", nil)
                     return
                 }
 
-                print("[NativeIdentityProvisioning] ✓ \(txType) signed successfully")
-                print("[NativeIdentityProvisioning] Hex tx length: \(hexSignedTx.count)")
+                print("[NativeIdentityProvisioning] ✓ \(requestType) built successfully")
 
-                resolve(["signed_tx": hexSignedTx])
+                resolve(["request_json": requestJson])
 
             } catch {
-                print("[NativeIdentityProvisioning] ❌ Domain transaction signing failed: \(error)")
-                reject("SIGNING_ERROR", "Failed to sign \(txType) transaction: \(error)", nil)
+                print("[NativeIdentityProvisioning] ❌ Domain request failed: \(error)")
+                reject("SIGNING_ERROR", "Failed to build \(requestType) request: \(error)", nil)
             }
         }
     }
 
-    // MARK: - Domain Signing (RN-friendly wrappers)
+    // MARK: - Domain Requests (RN-friendly wrappers)
 
-    /// Sign domain register transaction (RN)
+    /// Build domain register request (RN)
     @objc
-    func signDomainRegisterTransaction(
+    func signDomainRegisterRequest(
         _ params: NSDictionary,
         resolve: @escaping RCTPromiseResolveBlock,
         reject: @escaping RCTPromiseRejectBlock
     ) {
-        self.signDomainTransaction("domain_register", params: params, resolve: resolve, reject: reject)
+        self.signDomainRequest("domain_register", params: params, resolve: resolve, reject: reject)
     }
 
-    /// Sign domain update transaction (RN)
+    /// Build domain update request (RN)
     @objc
-    func signDomainUpdateTransaction(
+    func signDomainUpdateRequest(
         _ params: NSDictionary,
         resolve: @escaping RCTPromiseResolveBlock,
         reject: @escaping RCTPromiseRejectBlock
     ) {
-        self.signDomainTransaction("domain_update", params: params, resolve: resolve, reject: reject)
+        self.signDomainRequest("domain_update", params: params, resolve: resolve, reject: reject)
+    }
+
+    /// Build domain transfer request (RN)
+    @objc
+    func signDomainTransferRequest(
+        _ params: NSDictionary,
+        resolve: @escaping RCTPromiseResolveBlock,
+        reject: @escaping RCTPromiseRejectBlock
+    ) {
+        self.signDomainRequest("domain_transfer", params: params, resolve: resolve, reject: reject)
     }
 
     // MARK: - Generic Message Signing (Dilithium)
@@ -1093,6 +993,22 @@ class NativeIdentityProvisioning: NSObject {
                 resolve(["signature": hex])
             } catch {
                 reject("SIGNING_ERROR", "Failed to sign message from seed: \(error)", nil)
+            }
+        }
+    }
+
+    // MARK: - Current Identity DID
+
+    @objc
+    func getCurrentIdentityDid(
+        _ resolve: @escaping RCTPromiseResolveBlock,
+        reject: @escaping RCTPromiseRejectBlock
+    ) {
+        queue.async {
+            if let identity = IdentityHandleStore.shared.getLatestIdentity() as? Identity {
+                resolve(identity.did)
+            } else {
+                resolve(NSNull())
             }
         }
     }

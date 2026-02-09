@@ -167,7 +167,7 @@ async function getSeedPhraseWithBiometric(): Promise<string[] | null> {
       // Vault entry likely invalidated (biometrics changed / keystore reset)
       await clearSeedPhrase();
       throw new Error(
-        'Seed vault was invalidated on this device. Sign in locally and re-save your seed phrase.'
+        'Seed vault was invalidated (biometrics or screen lock changed). Trying native fallback.'
       );
     }
     return null;
@@ -206,7 +206,7 @@ async function getSeedPhraseWithPasscode(): Promise<string[] | null> {
     if (message.includes('Authentication tag verification failed') || message.includes('CryptoFailedException')) {
       await clearSeedPhrase();
       throw new Error(
-        'Seed vault was invalidated on this device. Sign in locally and re-save your seed phrase.'
+        'Seed vault was invalidated (biometrics or screen lock changed). Trying native fallback.'
       );
     }
     return null;

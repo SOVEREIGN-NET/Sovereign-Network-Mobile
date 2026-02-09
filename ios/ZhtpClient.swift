@@ -1,10 +1,10 @@
 // ZhtpClient.swift
 // Swift wrapper around lib-client Rust library C FFI
-// This provides the Swift API for identity generation and signing
+// This provides the Swift API for identity generation, signing, and UHP handshake
 
 import Foundation
 
-// MARK: - C FFI Declarations
+// MARK: - C FFI Declarations: Identity
 
 // Generate identity
 @_silgen_name("zhtp_client_generate_identity")
@@ -34,21 +34,25 @@ private func cIdentityGetNodeId(_ handle: UnsafeMutableRawPointer) -> ByteBuffer
 @_silgen_name("zhtp_client_identity_get_created_at")
 private func cIdentityGetCreatedAt(_ handle: UnsafeMutableRawPointer) -> UInt64
 
-// Get Dilithium secret key from identity handle
-@_silgen_name("zhtp_client_identity_get_dilithium_secret_key")
-private func cIdentityGetDilithiumSecretKey(_ handle: UnsafeMutableRawPointer) -> ByteBuffer
-
-// Get Kyber secret key from identity handle
-@_silgen_name("zhtp_client_identity_get_kyber_secret_key")
-private func cIdentityGetKyberSecretKey(_ handle: UnsafeMutableRawPointer) -> ByteBuffer
-
-// Get master seed from identity handle
-@_silgen_name("zhtp_client_identity_get_master_seed")
-private func cIdentityGetMasterSeed(_ handle: UnsafeMutableRawPointer) -> ByteBuffer
-
 // Get master seed phrase (BIP39) from identity handle
 @_silgen_name("zhtp_client_identity_get_seed_phrase")
 private func cIdentityGetSeedPhrase(_ handle: UnsafeMutableRawPointer) -> UnsafeMutablePointer<CChar>?
+
+// MARK: - C FFI Declarations: Deprecated secret key getters (will be removed after migration)
+
+// Deprecated: Use HandshakeState instead — keys no longer need to cross FFI
+@_silgen_name("zhtp_client_identity_get_dilithium_secret_key")
+private func cIdentityGetDilithiumSecretKey(_ handle: UnsafeMutableRawPointer) -> ByteBuffer
+
+// Deprecated: Use HandshakeState instead — keys no longer need to cross FFI
+@_silgen_name("zhtp_client_identity_get_kyber_secret_key")
+private func cIdentityGetKyberSecretKey(_ handle: UnsafeMutableRawPointer) -> ByteBuffer
+
+// Deprecated: Use HandshakeState instead — keys no longer need to cross FFI
+@_silgen_name("zhtp_client_identity_get_master_seed")
+private func cIdentityGetMasterSeed(_ handle: UnsafeMutableRawPointer) -> ByteBuffer
+
+// MARK: - C FFI Declarations: Signing
 
 // Sign registration proof
 @_silgen_name("zhtp_client_sign_registration_proof")
@@ -62,6 +66,8 @@ private func cSignMessage(_ handle: UnsafeMutableRawPointer, _ message: UnsafeRa
 @_silgen_name("zhtp_client_sign_uhp_challenge")
 private func cSignUhpChallenge(_ handle: UnsafeMutableRawPointer, _ challenge: UnsafeRawPointer, _ challengeLen: Int) -> ByteBuffer
 
+// MARK: - C FFI Declarations: Serialization
+
 // Serialize identity to JSON (legacy lib-client format)
 @_silgen_name("zhtp_client_identity_serialize")
 private func cSerializeIdentity(_ handle: UnsafeMutableRawPointer) -> UnsafeMutablePointer<CChar>?
@@ -69,6 +75,10 @@ private func cSerializeIdentity(_ handle: UnsafeMutableRawPointer) -> UnsafeMuta
 // Serialize identity to JSON in lib-network handshake format (includes all ZhtpIdentity fields)
 @_silgen_name("zhtp_client_identity_to_handshake_json")
 private func cSerializeIdentityToHandshakeJson(_ handle: UnsafeMutableRawPointer) -> UnsafeMutablePointer<CChar>?
+
+// Export identity keystore as base64 string
+@_silgen_name("zhtp_client_export_keystore_base64")
+private func cExportKeystoreBase64(_ handle: UnsafeMutableRawPointer) -> UnsafeMutablePointer<CChar>?
 
 // Deserialize identity from JSON
 @_silgen_name("zhtp_client_identity_deserialize")
@@ -82,20 +92,22 @@ private func cRestoreIdentityFromPhrase(_ phrase: UnsafePointer<CChar>, _ device
 @_silgen_name("zhtp_client_identity_free")
 private func cIdentityFree(_ handle: UnsafeMutableRawPointer)
 
-// Free string
-@_silgen_name("zhtp_client_free_string")
-private func cFreeString(_ ptr: UnsafeMutablePointer<CChar>)
+// MARK: - C FFI Declarations: Memory management
 
-// Free buffer
-@_silgen_name("zhtp_client_free_bytes")
-private func cFreeBytes(_ buf: ByteBuffer)
+// Free string allocated by Rust
+@_silgen_name("zhtp_client_string_free")
+private func cStringFree(_ ptr: UnsafeMutablePointer<CChar>)
 
-// Token transaction building functions (return hex-encoded signed transaction)
+// Free buffer allocated by Rust
+@_silgen_name("zhtp_client_buffer_free")
+private func cBufferFree(_ buf: ByteBuffer)
+
+// MARK: - C FFI Declarations: Token transactions (handle is opaque IdentityHandle*)
 
 /// Build signed token transfer transaction
 @_silgen_name("zhtp_client_build_token_transfer")
 private func cBuildTokenTransfer(
-    _ handle: UnsafePointer<UInt8>?,
+    _ handle: UnsafeMutableRawPointer,
     _ tokenId: UnsafePointer<UInt8>?,
     _ toPubkey: UnsafePointer<UInt8>?,
     _ toPubkeyLen: Int,
@@ -106,7 +118,7 @@ private func cBuildTokenTransfer(
 /// Build signed token mint transaction
 @_silgen_name("zhtp_client_build_token_mint")
 private func cBuildTokenMint(
-    _ handle: UnsafePointer<UInt8>?,
+    _ handle: UnsafeMutableRawPointer,
     _ tokenId: UnsafePointer<UInt8>?,
     _ toPubkey: UnsafePointer<UInt8>?,
     _ toPubkeyLen: Int,
@@ -117,7 +129,7 @@ private func cBuildTokenMint(
 /// Build signed token create transaction
 @_silgen_name("zhtp_client_build_token_create")
 private func cBuildTokenCreate(
-    _ handle: UnsafePointer<UInt8>?,
+    _ handle: UnsafeMutableRawPointer,
     _ name: UnsafePointer<CChar>?,
     _ symbol: UnsafePointer<CChar>?,
     _ initialSupply: UInt64,
@@ -128,18 +140,18 @@ private func cBuildTokenCreate(
 /// Build signed token burn transaction
 @_silgen_name("zhtp_client_build_token_burn")
 private func cBuildTokenBurn(
-    _ handle: UnsafePointer<UInt8>?,
+    _ handle: UnsafeMutableRawPointer,
     _ tokenId: UnsafePointer<UInt8>?,
     _ amount: UInt64,
     _ chainId: UInt8
 ) -> UnsafeMutablePointer<CChar>?
 
-// Domain transaction building functions (return hex-encoded signed transaction)
+// MARK: - C FFI Declarations: Domain transactions (handle is opaque IdentityHandle*)
 
 /// Build signed domain registration transaction
 @_silgen_name("zhtp_client_build_domain_register")
 private func cBuildDomainRegister(
-    _ handle: UnsafePointer<UInt8>?,
+    _ handle: UnsafeMutableRawPointer,
     _ domain: UnsafePointer<CChar>?,
     _ contentCid: UnsafePointer<CChar>?,
     _ chainId: UInt8
@@ -148,7 +160,7 @@ private func cBuildDomainRegister(
 /// Build signed domain update transaction
 @_silgen_name("zhtp_client_build_domain_update")
 private func cBuildDomainUpdate(
-    _ handle: UnsafePointer<UInt8>?,
+    _ handle: UnsafeMutableRawPointer,
     _ domain: UnsafePointer<CChar>?,
     _ contentCid: UnsafePointer<CChar>?,
     _ chainId: UInt8
@@ -157,11 +169,61 @@ private func cBuildDomainUpdate(
 /// Build signed domain transfer transaction
 @_silgen_name("zhtp_client_build_domain_transfer")
 private func cBuildDomainTransfer(
-    _ handle: UnsafePointer<UInt8>?,
+    _ handle: UnsafeMutableRawPointer,
     _ domain: UnsafePointer<CChar>?,
     _ toPubkey: UnsafePointer<UInt8>?,
     _ chainId: UInt8
 ) -> UnsafeMutablePointer<CChar>?
+
+// MARK: - C FFI Declarations: HandshakeState (3-leg UHP, keys stay in Rust)
+
+/// Create handshake state — keys never leave Rust
+@_silgen_name("zhtp_client_handshake_new")
+private func cHandshakeNew(
+    _ identity: UnsafeMutableRawPointer,
+    _ channelBinding: UnsafePointer<UInt8>,
+    _ channelBindingLen: Int
+) -> UnsafeMutableRawPointer?
+
+/// Produce ClientHello bytes to send to server
+@_silgen_name("zhtp_client_handshake_create_client_hello")
+private func cHandshakeCreateClientHello(_ hs: UnsafeMutableRawPointer) -> ByteBuffer
+
+/// Feed ServerHello bytes, get ClientFinish bytes back
+@_silgen_name("zhtp_client_handshake_process_server_hello")
+private func cHandshakeProcessServerHello(
+    _ hs: UnsafeMutableRawPointer,
+    _ serverHello: UnsafePointer<UInt8>,
+    _ serverHelloLen: Int
+) -> ByteBuffer
+
+/// Derive session from completed handshake
+@_silgen_name("zhtp_client_handshake_finalize")
+private func cHandshakeFinalize(_ hs: UnsafeMutableRawPointer) -> UnsafeMutableRawPointer?
+
+/// Get session key (32 bytes) from handshake result
+@_silgen_name("zhtp_client_handshake_result_get_session_key")
+private func cHandshakeResultGetSessionKey(_ result: UnsafeMutableRawPointer) -> ByteBuffer
+
+/// Get session ID (32 bytes) from handshake result
+@_silgen_name("zhtp_client_handshake_result_get_session_id")
+private func cHandshakeResultGetSessionId(_ result: UnsafeMutableRawPointer) -> ByteBuffer
+
+/// Get peer DID (null-terminated string) from handshake result
+@_silgen_name("zhtp_client_handshake_result_get_peer_did")
+private func cHandshakeResultGetPeerDid(_ result: UnsafeMutableRawPointer) -> UnsafeMutablePointer<CChar>?
+
+/// Get peer public key from handshake result
+@_silgen_name("zhtp_client_handshake_result_get_peer_public_key")
+private func cHandshakeResultGetPeerPublicKey(_ result: UnsafeMutableRawPointer) -> ByteBuffer
+
+/// Free handshake state
+@_silgen_name("zhtp_client_handshake_free")
+private func cHandshakeFree(_ hs: UnsafeMutableRawPointer)
+
+/// Free handshake result
+@_silgen_name("zhtp_client_handshake_result_free")
+private func cHandshakeResultFree(_ result: UnsafeMutableRawPointer)
 
 // MARK: - C Types
 
@@ -203,7 +265,7 @@ public class Identity {
         let buf = challenge.withUnsafeBytes { challengePtr in
             cSignUhpChallenge(handle, challengePtr.baseAddress ?? UnsafeRawPointer(bitPattern: 0)!, challenge.count)
         }
-        defer { cFreeBytes(buf) }
+        defer { cBufferFree(buf) }
 
         guard let data = buf.data, buf.len > 0 else {
             throw ClientError.signingError("Failed to sign UHP challenge")
@@ -221,6 +283,132 @@ public enum ClientError: Error {
     case cryptoError(String)
     case identityError(String)
     case signingError(String)
+    case handshakeError(String)
+}
+
+// MARK: - HandshakeState (3-leg UHP, keys stay in Rust)
+
+/// Manages a UHP v2 handshake. Secret keys never leave Rust.
+///
+/// Usage:
+///   let hs = try HandshakeState(identity: identity, channelBinding: binding)
+///   let clientHello = try hs.createClientHello()   // send to server
+///   let clientFinish = try hs.processServerHello(serverHelloBytes)  // send to server
+///   let result = try hs.finalize()
+///   // result.sessionKey, result.sessionId, result.peerDid
+public class HandshakeState {
+    private var handle: UnsafeMutableRawPointer?
+
+    /// Create a new handshake state. Channel binding is Blake3(sorted(local_addr || peer_addr)), 32 bytes.
+    public init(identity: Identity, channelBinding: Data) throws {
+        let hs = channelBinding.withUnsafeBytes { cbPtr -> UnsafeMutableRawPointer? in
+            guard let cbBase = cbPtr.baseAddress?.assumingMemoryBound(to: UInt8.self) else { return nil }
+            return cHandshakeNew(identity.getHandle(), cbBase, channelBinding.count)
+        }
+        guard let hs else {
+            throw ClientError.handshakeError("Failed to create handshake state")
+        }
+        self.handle = hs
+    }
+
+    /// Produce ClientHello bytes. Send these to the server.
+    /// Wire format: [4-byte BE length][serialized HandshakeMessage]
+    public func createClientHello() throws -> Data {
+        guard let hs = handle else {
+            throw ClientError.handshakeError("HandshakeState already consumed")
+        }
+        let buf = cHandshakeCreateClientHello(hs)
+        defer { cBufferFree(buf) }
+
+        guard let data = buf.data, buf.len > 0 else {
+            throw ClientError.handshakeError("Failed to create ClientHello")
+        }
+        return Data(bytes: data, count: buf.len)
+    }
+
+    /// Feed raw ServerHello bytes from the server, get ClientFinish bytes back.
+    /// Send the returned bytes to the server.
+    public func processServerHello(_ serverHello: Data) throws -> Data {
+        guard let hs = handle else {
+            throw ClientError.handshakeError("HandshakeState already consumed")
+        }
+        let buf = serverHello.withUnsafeBytes { shPtr -> ByteBuffer in
+            guard let shBase = shPtr.baseAddress?.assumingMemoryBound(to: UInt8.self) else {
+                return ByteBuffer(data: nil, len: 0)
+            }
+            return cHandshakeProcessServerHello(hs, shBase, serverHello.count)
+        }
+        defer { cBufferFree(buf) }
+
+        guard let data = buf.data, buf.len > 0 else {
+            throw ClientError.handshakeError("Failed to process ServerHello")
+        }
+        return Data(bytes: data, count: buf.len)
+    }
+
+    /// Derive session from completed handshake. Consumes the handshake state.
+    public func finalize() throws -> HandshakeResult {
+        guard let hs = handle else {
+            throw ClientError.handshakeError("HandshakeState already consumed")
+        }
+        guard let resultHandle = cHandshakeFinalize(hs) else {
+            throw ClientError.handshakeError("Failed to finalize handshake")
+        }
+        // State is consumed after finalize — don't free it again in deinit
+        handle = nil
+
+        return HandshakeResult(handle: resultHandle)
+    }
+
+    deinit {
+        if let hs = handle {
+            cHandshakeFree(hs)
+        }
+    }
+}
+
+/// Session data extracted from a completed UHP handshake
+public class HandshakeResult {
+    private let handle: UnsafeMutableRawPointer
+
+    fileprivate init(handle: UnsafeMutableRawPointer) {
+        self.handle = handle
+    }
+
+    /// 32-byte session key for MAC derivation
+    public var sessionKey: Data {
+        let buf = cHandshakeResultGetSessionKey(handle)
+        defer { cBufferFree(buf) }
+        guard let data = buf.data, buf.len > 0 else { return Data() }
+        return Data(bytes: data, count: buf.len)
+    }
+
+    /// 32-byte session ID
+    public var sessionId: Data {
+        let buf = cHandshakeResultGetSessionId(handle)
+        defer { cBufferFree(buf) }
+        guard let data = buf.data, buf.len > 0 else { return Data() }
+        return Data(bytes: data, count: buf.len)
+    }
+
+    /// Server's DID
+    public var peerDid: String {
+        guard let ptr = cHandshakeResultGetPeerDid(handle) else { return "" }
+        defer { cStringFree(ptr) }
+        return String(cString: ptr)
+    }
+
+    /// Server's public key
+    public var peerPublicKey: Data {
+        let buf = cHandshakeResultGetPeerPublicKey(handle)
+        defer { cBufferFree(buf) }
+        guard let data = buf.data, buf.len > 0 else { return Data() }
+        return Data(bytes: data, count: buf.len)
+    }
+
+    deinit {
+        cHandshakeResultFree(handle)
+    }
 }
 
 // MARK: - Public API
@@ -255,7 +443,7 @@ public class ZhtpClient {
 
     public static func signRegistrationProof(identity: Identity, timestamp: UInt64) throws -> [UInt8] {
         let buf = cSignRegistrationProof(identity.getHandle(), timestamp)
-        defer { cFreeBytes(buf) }
+        defer { cBufferFree(buf) }
 
         guard let data = buf.data, buf.len > 0 else {
             throw ClientError.signingError("Failed to sign registration proof")
@@ -269,7 +457,7 @@ public class ZhtpClient {
         guard let jsonPtr = cSerializeIdentity(identity.getHandle()) else {
             throw ClientError.identityError("Failed to serialize identity")
         }
-        defer { cFreeString(jsonPtr) }
+        defer { cStringFree(jsonPtr) }
         return String(cString: jsonPtr)
     }
 
@@ -280,15 +468,26 @@ public class ZhtpClient {
         guard let jsonPtr = cSerializeIdentityToHandshakeJson(identity.getHandle()) else {
             throw ClientError.identityError("Failed to serialize identity to handshake JSON")
         }
-        defer { cFreeString(jsonPtr) }
+        defer { cStringFree(jsonPtr) }
         return String(cString: jsonPtr)
     }
 
-    /// Get Dilithium secret key for UHP handshake
-    /// Keys stay on-device - only passed in memory to uhp-ffi
+    /// Export identity keystore as base64 string
+    public static func exportKeystoreBase64(_ identity: Identity) throws -> String {
+        guard let ptr = cExportKeystoreBase64(identity.getHandle()) else {
+            throw ClientError.identityError("Failed to export keystore as base64")
+        }
+        defer { cStringFree(ptr) }
+        return String(cString: ptr)
+    }
+
+    // MARK: Deprecated secret key getters — use HandshakeState instead
+
+    /// Deprecated: Use HandshakeState instead. Keys no longer need to cross FFI.
+    @available(*, deprecated, message: "Use HandshakeState for UHP handshake — keys stay in Rust")
     public static func getDilithiumSecretKey(_ identity: Identity) throws -> [UInt8] {
         let buf = cIdentityGetDilithiumSecretKey(identity.getHandle())
-        defer { cFreeBytes(buf) }
+        defer { cBufferFree(buf) }
         if buf.data == nil || buf.len == 0 {
             throw ClientError.identityError("Failed to get Dilithium secret key")
         }
@@ -296,11 +495,11 @@ public class ZhtpClient {
         return Array(UnsafeBufferPointer(start: ptr, count: buf.len))
     }
 
-    /// Get Kyber secret key for UHP handshake
-    /// Keys stay on-device - only passed in memory to uhp-ffi
+    /// Deprecated: Use HandshakeState instead. Keys no longer need to cross FFI.
+    @available(*, deprecated, message: "Use HandshakeState for UHP handshake — keys stay in Rust")
     public static func getKyberSecretKey(_ identity: Identity) throws -> [UInt8] {
         let buf = cIdentityGetKyberSecretKey(identity.getHandle())
-        defer { cFreeBytes(buf) }
+        defer { cBufferFree(buf) }
         if buf.data == nil || buf.len == 0 {
             throw ClientError.identityError("Failed to get Kyber secret key")
         }
@@ -308,11 +507,11 @@ public class ZhtpClient {
         return Array(UnsafeBufferPointer(start: ptr, count: buf.len))
     }
 
-    /// Get master seed for UHP handshake
-    /// Keys stay on-device - only passed in memory to uhp-ffi
+    /// Deprecated: Use HandshakeState instead. Keys no longer need to cross FFI.
+    @available(*, deprecated, message: "Use HandshakeState for UHP handshake — keys stay in Rust")
     public static func getMasterSeed(_ identity: Identity) throws -> [UInt8] {
         let buf = cIdentityGetMasterSeed(identity.getHandle())
-        defer { cFreeBytes(buf) }
+        defer { cBufferFree(buf) }
         if buf.data == nil || buf.len == 0 {
             throw ClientError.identityError("Failed to get master seed")
         }
@@ -325,7 +524,7 @@ public class ZhtpClient {
         guard let phrasePtr = cIdentityGetSeedPhrase(identity.getHandle()) else {
             throw ClientError.identityError("Failed to get seed phrase")
         }
-        defer { cFreeString(phrasePtr) }
+        defer { cStringFree(phrasePtr) }
         return String(cString: phrasePtr)
     }
 
@@ -387,11 +586,6 @@ public class ZhtpClient {
     }
 
     /// Sign arbitrary data (transaction, message, etc.) with identity's Dilithium keypair
-    /// - Parameters:
-    ///   - data: Data to sign
-    ///   - identity: Identity with Dilithium secret key
-    /// - Returns: Dilithium signature bytes
-    /// - Throws: ClientError if signing fails
     public static func signData(_ data: Data, using identity: Identity) throws -> [UInt8] {
         NSLog("[ZhtpClient] signData: calling zhtp_client_sign_message (len=%d)", data.count)
         let buf = data.withUnsafeBytes { dataPtr in
@@ -402,7 +596,7 @@ public class ZhtpClient {
             buf.len,
             buf.data == nil ? "nil" : "non-nil"
         )
-        defer { cFreeBytes(buf) }
+        defer { cBufferFree(buf) }
 
         guard let sigData = buf.data, buf.len > 0 else {
             throw ClientError.signingError("Failed to sign data")
@@ -410,6 +604,8 @@ public class ZhtpClient {
 
         return Array(UnsafeBufferPointer(start: sigData.assumingMemoryBound(to: UInt8.self), count: buf.len))
     }
+
+    // MARK: Token transactions — handle is opaque IdentityHandle*
 
     /// Build signed token transfer transaction (returns hex-encoded string ready for API)
     public static func buildTokenTransfer(
@@ -422,7 +618,7 @@ public class ZhtpClient {
         guard let hexPtr = tokenId.withUnsafeBytes({ tokenIdPtr in
             toPublicKey.withUnsafeBytes { toPubkeyPtr in
                 cBuildTokenTransfer(
-                    identity.getHandle().assumingMemoryBound(to: UInt8.self),
+                    identity.getHandle(),
                     tokenIdPtr.baseAddress?.assumingMemoryBound(to: UInt8.self),
                     toPubkeyPtr.baseAddress?.assumingMemoryBound(to: UInt8.self),
                     toPublicKey.count,
@@ -433,7 +629,7 @@ public class ZhtpClient {
         }) else {
             throw ClientError.signingError("Failed to build token transfer transaction")
         }
-        defer { cFreeString(hexPtr) }
+        defer { cStringFree(hexPtr) }
         return String(cString: hexPtr)
     }
 
@@ -448,7 +644,7 @@ public class ZhtpClient {
         guard let hexPtr = tokenId.withUnsafeBytes({ tokenIdPtr in
             toPublicKey.withUnsafeBytes { toPubkeyPtr in
                 cBuildTokenMint(
-                    identity.getHandle().assumingMemoryBound(to: UInt8.self),
+                    identity.getHandle(),
                     tokenIdPtr.baseAddress?.assumingMemoryBound(to: UInt8.self),
                     toPubkeyPtr.baseAddress?.assumingMemoryBound(to: UInt8.self),
                     toPublicKey.count,
@@ -459,7 +655,7 @@ public class ZhtpClient {
         }) else {
             throw ClientError.signingError("Failed to build token mint transaction")
         }
-        defer { cFreeString(hexPtr) }
+        defer { cStringFree(hexPtr) }
         return String(cString: hexPtr)
     }
 
@@ -475,7 +671,7 @@ public class ZhtpClient {
         guard let hexPtr = name.withCString({ namePtr in
             symbol.withCString { symbolPtr in
                 cBuildTokenCreate(
-                    identity.getHandle().assumingMemoryBound(to: UInt8.self),
+                    identity.getHandle(),
                     namePtr,
                     symbolPtr,
                     initialSupply,
@@ -486,7 +682,7 @@ public class ZhtpClient {
         }) else {
             throw ClientError.signingError("Failed to build token create transaction")
         }
-        defer { cFreeString(hexPtr) }
+        defer { cStringFree(hexPtr) }
         return String(cString: hexPtr)
     }
 
@@ -499,7 +695,7 @@ public class ZhtpClient {
     ) throws -> String {
         guard let hexPtr = tokenId.withUnsafeBytes({ tokenIdPtr in
             cBuildTokenBurn(
-                identity.getHandle().assumingMemoryBound(to: UInt8.self),
+                identity.getHandle(),
                 tokenIdPtr.baseAddress?.assumingMemoryBound(to: UInt8.self),
                 amount,
                 chainId
@@ -507,90 +703,91 @@ public class ZhtpClient {
         }) else {
             throw ClientError.signingError("Failed to build token burn transaction")
         }
-        defer { cFreeString(hexPtr) }
+        defer { cStringFree(hexPtr) }
         return String(cString: hexPtr)
     }
 
-    /// Build signed domain registration transaction (returns hex-encoded string ready for API)
-    public static func buildDomainRegister(
+    // MARK: Domain requests — handle is opaque IdentityHandle*
+    // Note: C FFI still uses old function names but internally delegates to _request functions
+    // which return JSON. New parameters (content_mappings, expected_previous_manifest_cid)
+    // require new C FFI exports from lib-client.
+
+    /// Build domain registration request (returns JSON for REST API)
+    public static func buildDomainRegisterRequest(
         domain: String,
-        contentCid: String? = nil,
-        using identity: Identity,
-        chainId: UInt8 = 0x02  // testnet
+        using identity: Identity
     ) throws -> String {
-        let hexPtr: UnsafeMutablePointer<CChar>?
-
-        if let cid = contentCid {
-            hexPtr = domain.withCString { domainPtr in
-                cid.withCString { cidPtr in
-                    cBuildDomainRegister(
-                        identity.getHandle().assumingMemoryBound(to: UInt8.self),
-                        domainPtr,
-                        cidPtr,
-                        chainId
-                    )
-                }
-            }
-        } else {
-            hexPtr = domain.withCString { domainPtr in
-                cBuildDomainRegister(
-                    identity.getHandle().assumingMemoryBound(to: UInt8.self),
-                    domainPtr,
-                    nil,
-                    chainId
-                )
-            }
+        let resultPtr = domain.withCString { domainPtr in
+            cBuildDomainRegister(
+                identity.getHandle(),
+                domainPtr,
+                nil,
+                0x02
+            )
         }
 
-        guard let ptr = hexPtr else {
-            throw ClientError.signingError("Failed to build domain register transaction")
+        guard let ptr = resultPtr else {
+            throw ClientError.signingError("Failed to build domain register request")
         }
-        defer { cFreeString(ptr) }
+        defer { cStringFree(ptr) }
         return String(cString: ptr)
     }
 
-    /// Build signed domain update transaction (returns hex-encoded string ready for API)
-    public static func buildDomainUpdate(
+    /// Build domain update request (returns JSON for REST API)
+    /// Note: expected_previous_manifest_cid not supported via C FFI yet — uses "" as placeholder
+    public static func buildDomainUpdateRequest(
         domain: String,
-        contentCid: String,
-        using identity: Identity,
-        chainId: UInt8 = 0x02  // testnet
+        newManifestCid: String,
+        using identity: Identity
     ) throws -> String {
-        guard let hexPtr = domain.withCString({ domainPtr in
-            contentCid.withCString { cidPtr in
+        guard let resultPtr = domain.withCString({ domainPtr in
+            newManifestCid.withCString { cidPtr in
                 cBuildDomainUpdate(
-                    identity.getHandle().assumingMemoryBound(to: UInt8.self),
+                    identity.getHandle(),
                     domainPtr,
                     cidPtr,
-                    chainId
+                    0x02
                 )
             }
         }) else {
-            throw ClientError.signingError("Failed to build domain update transaction")
+            throw ClientError.signingError("Failed to build domain update request")
         }
-        defer { cFreeString(hexPtr) }
-        return String(cString: hexPtr)
+        defer { cStringFree(resultPtr) }
+        return String(cString: resultPtr)
     }
 
-    /// Build signed domain transfer transaction (returns hex-encoded string ready for API)
-    public static func buildDomainTransfer(
+    /// Build domain transfer request (returns JSON for REST API)
+    /// Note: C FFI takes pubkey bytes; DID-based transfer requires new C FFI export from lib-client
+    public static func buildDomainTransferRequest(
         domain: String,
-        toPubkey: [UInt8],
-        using identity: Identity,
-        chainId: UInt8 = 0x02  // testnet
+        toOwnerDid: String,
+        using identity: Identity
     ) throws -> String {
-        guard let hexPtr = domain.withCString({ domainPtr in
+        // Convert DID to pubkey bytes for the old C FFI
+        // Strip "did:zhtp:" prefix and decode hex to bytes
+        let hexPart = toOwnerDid.hasPrefix("did:zhtp:")
+            ? String(toOwnerDid.dropFirst("did:zhtp:".count))
+            : toOwnerDid
+        var pubkeyBytes = [UInt8]()
+        var chars = hexPart.makeIterator()
+        while let c1 = chars.next(), let c2 = chars.next() {
+            if let byte = UInt8(String([c1, c2]), radix: 16) {
+                pubkeyBytes.append(byte)
+            }
+        }
+
+        guard let resultPtr = domain.withCString({ domainPtr in
             cBuildDomainTransfer(
-                identity.getHandle().assumingMemoryBound(to: UInt8.self),
+                identity.getHandle(),
                 domainPtr,
-                toPubkey,
-                chainId
+                pubkeyBytes,
+                0x02
             )
         }) else {
-            throw ClientError.signingError("Failed to build domain transfer transaction")
+            throw ClientError.signingError("Failed to build domain transfer request")
         }
-        defer { cFreeString(hexPtr) }
-        return String(cString: hexPtr)
+        defer { cStringFree(resultPtr) }
+        return String(cString: resultPtr)
     }
 }
 
@@ -598,12 +795,12 @@ public class ZhtpClient {
 
 private func extractString(_ ptr: UnsafeMutablePointer<CChar>?) -> String {
     guard let p = ptr else { return "" }
-    defer { cFreeString(p) }
+    defer { cStringFree(p) }
     return String(cString: p)
 }
 
 private func extractBuffer(_ buf: ByteBuffer) -> [UInt8] {
     guard let data = buf.data, buf.len > 0 else { return [] }
-    defer { cFreeBytes(buf) }
+    defer { cBufferFree(buf) }
     return Array(UnsafeBufferPointer(start: data.assumingMemoryBound(to: UInt8.self), count: buf.len))
 }

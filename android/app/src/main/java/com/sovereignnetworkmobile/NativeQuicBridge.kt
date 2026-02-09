@@ -299,6 +299,209 @@ object NativeQuicBridge {
         }
     }
 
+    // ── lib-client HandshakeState API (3-leg UHP, keys stay in Rust) ──
+
+    /**
+     * Feature flag for new lib-client handshake path.
+     * Set to true once quinn-ffi exposes ALPN-aware connect.
+     */
+    var useLibClientHandshake: Boolean = false
+
+    /**
+     * Create a HandshakeState. Returns opaque handle (Long), or 0 on error.
+     * Takes an opaque Identity handle (from Identity.getHandle()).
+     * Channel binding: Blake3(sorted(local_addr || peer_addr)), 32 bytes.
+     */
+    fun handshakeNew(identityHandle: Long, channelBinding: ByteArray): Long {
+        if (!ensureInitialized()) return 0L
+        return try {
+            nativeHandshakeNew(identityHandle, channelBinding)
+        } catch (t: Throwable) {
+            Log.e(TAG, "HandshakeState creation failed", t)
+            0L
+        }
+    }
+
+    /**
+     * Produce ClientHello bytes from a HandshakeState handle.
+     */
+    fun handshakeCreateClientHello(hsHandle: Long): ByteArray? {
+        return try {
+            nativeHandshakeCreateClientHello(hsHandle)
+        } catch (t: Throwable) {
+            Log.e(TAG, "HandshakeState createClientHello failed", t)
+            null
+        }
+    }
+
+    /**
+     * Feed ServerHello bytes, get ClientFinish bytes back.
+     */
+    fun handshakeProcessServerHello(hsHandle: Long, serverHello: ByteArray): ByteArray? {
+        return try {
+            nativeHandshakeProcessServerHello(hsHandle, serverHello)
+        } catch (t: Throwable) {
+            Log.e(TAG, "HandshakeState processServerHello failed", t)
+            null
+        }
+    }
+
+    /**
+     * Finalize handshake → extract session data.
+     * Returns map: { ok: Boolean, session_key: ByteArray, session_id: ByteArray,
+     *                peer_did: String, peer_public_key: ByteArray }
+     * Consumes the HandshakeState (do not call handshakeFree after this).
+     */
+    fun handshakeFinalize(hsHandle: Long): Map<String, Any?>? {
+        return try {
+            @Suppress("UNCHECKED_CAST")
+            nativeHandshakeFinalize(hsHandle) as? Map<String, Any?>
+        } catch (t: Throwable) {
+            Log.e(TAG, "HandshakeState finalize failed", t)
+            mapOf("ok" to false, "error" to t.message)
+        }
+    }
+
+    /**
+     * Free a HandshakeState that was NOT finalized (e.g. on error path).
+     */
+    fun handshakeFree(hsHandle: Long) {
+        try {
+            nativeHandshakeFree(hsHandle)
+        } catch (t: Throwable) {
+            Log.e(TAG, "HandshakeState free failed", t)
+        }
+    }
+
+    /**
+     * Perform full 3-leg UHP handshake via lib-client HandshakeState.
+     * Secret keys never leave Rust.
+     *
+     * @return Map with ok, handle (QUIC connection), session_key, session_id, peer_did
+     *
+     * NOTE: Currently blocked on quinn-ffi needing ALPN-aware connect (zhtp-uhp/2).
+     * uhp_quic_connect_public uses zhtp-public/1 ALPN which is wrong for UHP.
+     */
+    fun handshakeViaLibClient(
+        host: String,
+        port: Int,
+        serverName: String,
+        spkiPinHex: String,
+        identityHandle: Long
+    ): Map<String, Any?> {
+        if (!ensureInitialized()) {
+            return mapOf("ok" to false, "error" to "Native QUIC library not loaded")
+        }
+
+        // Step 1: Open QUIC connection (public ALPN)
+        // TODO: Needs ALPN-aware connect for zhtp-uhp/2.
+        //       Currently uses uhp_quic_connect_public which negotiates zhtp-public/1.
+        val connectResult = try {
+            @Suppress("UNCHECKED_CAST")
+            nativeUhpQuicConnectPublic(host, port, serverName, spkiPinHex) as? Map<String, Any?>
+        } catch (t: Throwable) {
+            return mapOf("ok" to false, "error" to "QUIC connect failed: ${t.message}")
+        }
+
+        val quicOk = connectResult?.get("ok") as? Boolean ?: false
+        if (!quicOk) {
+            val err = connectResult?.get("error") as? String ?: "QUIC connect failed"
+            return mapOf("ok" to false, "error" to err)
+        }
+        val quicHandle = (connectResult?.get("handle") as? Number)?.toLong() ?: 0L
+
+        // Step 2: Compute channel binding — Blake3(sorted(local_addr || peer_addr))
+        // For now, use a placeholder. Real implementation needs local/peer socket addresses.
+        val channelBinding = computeChannelBinding(host, port)
+
+        // Step 3: Create HandshakeState (identity handle — keys stay in Rust)
+        val hsHandle = handshakeNew(identityHandle, channelBinding)
+        if (hsHandle == 0L) {
+            uhpQuicClose(quicHandle)
+            return mapOf("ok" to false, "error" to "Failed to create HandshakeState")
+        }
+
+        try {
+            // Step 4: Leg 1 — ClientHello
+            val clientHello = handshakeCreateClientHello(hsHandle)
+                ?: run {
+                    handshakeFree(hsHandle)
+                    uhpQuicClose(quicHandle)
+                    return mapOf("ok" to false, "error" to "Failed to create ClientHello")
+                }
+
+            // Send ClientHello via QUIC, receive ServerHello
+            val leg1Result = uhpQuicRequest(quicHandle, clientHello)
+            val leg1Ok = leg1Result?.get("ok") as? Boolean ?: false
+            if (!leg1Ok) {
+                handshakeFree(hsHandle)
+                uhpQuicClose(quicHandle)
+                return mapOf("ok" to false, "error" to "Leg 1 send/receive failed: ${leg1Result?.get("error")}")
+            }
+            val serverHello = leg1Result?.get("response") as? ByteArray
+                ?: run {
+                    handshakeFree(hsHandle)
+                    uhpQuicClose(quicHandle)
+                    return mapOf("ok" to false, "error" to "No ServerHello received")
+                }
+
+            // Step 5: Leg 2 — process ServerHello → ClientFinish
+            val clientFinish = handshakeProcessServerHello(hsHandle, serverHello)
+                ?: run {
+                    handshakeFree(hsHandle)
+                    uhpQuicClose(quicHandle)
+                    return mapOf("ok" to false, "error" to "Failed to process ServerHello")
+                }
+
+            // Send ClientFinish
+            val leg2Result = uhpQuicRequest(quicHandle, clientFinish)
+            val leg2Ok = leg2Result?.get("ok") as? Boolean ?: false
+            if (!leg2Ok) {
+                handshakeFree(hsHandle)
+                uhpQuicClose(quicHandle)
+                return mapOf("ok" to false, "error" to "Leg 2 send failed: ${leg2Result?.get("error")}")
+            }
+
+            // Step 6: Finalize — derive session (consumes hsHandle)
+            val sessionResult = handshakeFinalize(hsHandle)
+            val sessionOk = sessionResult?.get("ok") as? Boolean ?: false
+            if (!sessionOk) {
+                uhpQuicClose(quicHandle)
+                return mapOf("ok" to false, "error" to "Handshake finalization failed: ${sessionResult?.get("error")}")
+            }
+
+            return mapOf(
+                "ok" to true,
+                "handle" to quicHandle,
+                "session_key" to sessionResult?.get("session_key"),
+                "session_id" to sessionResult?.get("session_id"),
+                "peer_did" to sessionResult?.get("peer_did"),
+                "peer_public_key" to sessionResult?.get("peer_public_key")
+            )
+        } catch (t: Throwable) {
+            Log.e(TAG, "lib-client handshake failed", t)
+            uhpQuicClose(quicHandle)
+            return mapOf("ok" to false, "error" to "Handshake error: ${t.message}")
+        }
+    }
+
+    /**
+     * Compute channel binding for UHP: Blake3(sorted(local_addr || peer_addr)).
+     * Simplified: uses "0.0.0.0:0" as local (real impl needs actual socket addresses).
+     */
+    private fun computeChannelBinding(host: String, port: Int): ByteArray {
+        val local = "0.0.0.0:0"
+        val peer = "$host:$port"
+        val sorted = if (local <= peer) "$local$peer" else "$peer$local"
+        // Blake3 hash — delegate to JNI
+        return try {
+            nativeBlake3(sorted.toByteArray(Charsets.UTF_8)) ?: ByteArray(32)
+        } catch (t: Throwable) {
+            Log.e(TAG, "Blake3 computation failed", t)
+            ByteArray(32)
+        }
+    }
+
     private fun ensureInitialized(): Boolean {
         if (!isLibraryLoaded) {
             Log.e(TAG, "Native QUIC library not loaded")
@@ -347,6 +550,12 @@ object NativeQuicBridge {
         masterSeed: ByteArray,
         chainId: Int
     ): Any?
+    private external fun nativeUhpQuicConnectPublic(
+        host: String,
+        port: Int,
+        serverName: String,
+        spkiPinHex: String
+    ): Any?
     private external fun nativeUhpQuicRequest(handle: Long, requestBytes: ByteArray): Any?
     private external fun nativeUhpQuicAuthenticatedRequest(
         handle: Long,
@@ -363,4 +572,14 @@ object NativeQuicBridge {
         body: ByteArray?
     ): Any?
     private external fun nativeUhpQuicClose(handle: Long)
+
+    // HandshakeState JNI — 3-leg UHP, keys stay in Rust
+    private external fun nativeHandshakeNew(identityHandle: Long, channelBinding: ByteArray): Long
+    private external fun nativeHandshakeCreateClientHello(hsHandle: Long): ByteArray?
+    private external fun nativeHandshakeProcessServerHello(hsHandle: Long, serverHello: ByteArray): ByteArray?
+    private external fun nativeHandshakeFinalize(hsHandle: Long): Any?
+    private external fun nativeHandshakeFree(hsHandle: Long)
+
+    // Utility
+    private external fun nativeBlake3(data: ByteArray): ByteArray?
 }

@@ -4,7 +4,7 @@
  */
 
 import { useState, useEffect, useCallback } from 'react';
-import { isQuicSupported, testQuicConnection } from '../services/QuicClient';
+import { isQuicSupported, testQuicConnection } from '../services/quic';
 import { DEFAULT_NODE_HOST, DEFAULT_NODE_PORT } from '../config';
 
 export interface UseNodeConnectionStatusReturn {

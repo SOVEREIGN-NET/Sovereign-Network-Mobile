@@ -9,10 +9,11 @@
 
 import * as Keychain from 'react-native-keychain';
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import { Identity } from './MockAuthService';
+import type { Identity } from '../types/identity';
 
 const IDENTITY_KEYCHAIN_SERVICE = 'sovnet_identity_secure';
 const SESSION_TOKEN_KEYCHAIN_SERVICE = 'sovnet_session_token';
+const LOGIN_CREDENTIAL_SERVER = 'sovnet.auth'; // Internet Credentials server key for OS autofill
 const IDENTITY_ID_ASYNC_STORAGE = 'sovnet_identity_id'; // Non-sensitive, used for UI state only
 const IDENTITY_BACKUP_STORAGE = 'sovnet_identity_backup'; // Unencrypted fallback backup (survives Keystore resets)
 
@@ -237,6 +238,10 @@ export const SecureIdentityStorage = {
       // Remove DID from AsyncStorage
       await AsyncStorage.removeItem(IDENTITY_ID_ASYNC_STORAGE);
 
+      // NOTE: Login credentials are intentionally preserved here so that
+      // sign-out → sign-in can use OS autofill. Call clearLoginCredentials()
+      // separately for a full identity wipe.
+
       if (__DEV__) {
         console.log('✅ Identity cleared from secure storage (Keychain + AsyncStorage backup)');
       }
@@ -320,6 +325,63 @@ export const SecureIdentityStorage = {
         console.log('[SecureIdentityStorage] Identity not available (may require authentication):', error);
       }
       return null;
+    }
+  },
+
+  // --- Login Credentials (local password for sign-in + OS autofill) ---
+
+  /**
+   * Save login credentials for local sign-in and OS autofill.
+   * Uses Internet Credentials API so iOS/Android offer to save and autofill.
+   */
+  async saveLoginCredentials(did: string, password: string): Promise<void> {
+    try {
+      await Keychain.setInternetCredentials(
+        LOGIN_CREDENTIAL_SERVER,
+        did,
+        password,
+        {
+          accessible: Keychain.ACCESSIBLE.WHEN_UNLOCKED_THIS_DEVICE_ONLY,
+          securityLevel: Keychain.SECURITY_LEVEL.SECURE_HARDWARE,
+        }
+      );
+      if (__DEV__) {
+        console.log('[SecureIdentityStorage] ✅ Login credentials saved for autofill');
+      }
+    } catch (error) {
+      console.error('[SecureIdentityStorage] ❌ Failed to save login credentials:', error);
+      throw new Error('Failed to save login credentials');
+    }
+  },
+
+  /**
+   * Retrieve stored login credentials for local password validation.
+   * @returns { did, password } or null if not stored
+   */
+  async getLoginCredentials(): Promise<{ did: string; password: string } | null> {
+    try {
+      const credentials = await Keychain.getInternetCredentials(LOGIN_CREDENTIAL_SERVER);
+      if (!credentials) {
+        return null;
+      }
+      return { did: credentials.username, password: credentials.password };
+    } catch (error) {
+      console.error('[SecureIdentityStorage] ❌ Failed to get login credentials:', error);
+      return null;
+    }
+  },
+
+  /**
+   * Clear stored login credentials (used during full identity wipe).
+   */
+  async clearLoginCredentials(): Promise<void> {
+    try {
+      await Keychain.resetInternetCredentials({ server: LOGIN_CREDENTIAL_SERVER });
+      if (__DEV__) {
+        console.log('[SecureIdentityStorage] ✅ Login credentials cleared');
+      }
+    } catch (error) {
+      console.warn('[SecureIdentityStorage] Failed to clear login credentials:', error);
     }
   },
 

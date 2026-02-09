@@ -4,38 +4,8 @@
  * TODO: Replace with real SOV API calls when backend is ready
  */
 
-export interface WalletInfo {
-  id: string;
-  wallet_type: string;
-  name: string;
-  balance: number;
-  staked_balance: number;
-  pending_rewards: number;
-}
-
-export interface Identity {
-  did: string;
-  displayName: string;
-  username?: string;
-  identityType: 'citizen' | 'organization' | 'developer' | 'validator';
-  avatar?: string;
-  createdAt: string;
-  citizenship?: boolean;
-  publicKey?: string;
-  biometricHash?: string;
-  wallets?: {
-    primary: WalletInfo;
-    ubi: WalletInfo;
-    savings: WalletInfo;
-  };
-  daoMembership?: {
-    votingPower: number;
-    soulboundNftIssued: boolean;
-  };
-  masterSeedPhrase?: string;
-  votingPower?: number;
-  ubiEarned?: number;
-}
+import type { Identity, WalletInfo } from '../types/identity';
+export type { Identity, WalletInfo } from '../types/identity';
 
 // Keep old Wallet interface for backwards compatibility
 export interface Wallet {

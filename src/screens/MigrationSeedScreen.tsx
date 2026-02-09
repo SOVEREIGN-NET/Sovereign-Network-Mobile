@@ -15,11 +15,13 @@ import {
   ScreenLayout,
   ErrorAlert,
   ActionFooter,
+  PasswordField,
 } from '../components';
 import { useAuth } from '../hooks';
 import { colors, spacing, typography, borderRadius } from '../theme';
 import { AuthStackParamList } from '../navigation/AuthNavigator';
 import SeedVaultService from '../services/SeedVaultService';
+import SecureIdentityStorage from '../services/SecureIdentityStorage';
 
 type MigrationSeedScreenProps = NativeStackScreenProps<AuthStackParamList, 'MigrationSeed'>;
 
@@ -35,6 +37,8 @@ const MigrationSeedScreen = ({ navigation, route }: MigrationSeedScreenProps) =>
   const [displayName, setDisplayName] = useState<string>('');
   const [localError, setLocalError] = useState<string | null>(null);
   const [step, setStep] = useState<number>(1);
+  const [newPassword, setNewPassword] = useState('');
+  const [confirmNewPassword, setConfirmNewPassword] = useState('');
 
   const handleMigrate = async () => {
     setLocalError(null);
@@ -52,6 +56,12 @@ const MigrationSeedScreen = ({ navigation, route }: MigrationSeedScreenProps) =>
       console.log('[MigrationSeed] ▶️ Starting migration request');
       console.log('[MigrationSeed] Display name:', displayName.trim());
       const result = await migrateIdentityFromSeed(displayName.trim(), normalized.join(' '));
+
+      // Save login credentials for local sign-in + OS autofill
+      if (result.identity?.did) {
+        await SecureIdentityStorage.saveLoginCredentials(result.identity.did, newPassword);
+      }
+
       try {
         await SeedVaultService.saveSeedPhrase(result.newSeedPhrase);
       } catch (saveError: any) {
@@ -91,7 +101,17 @@ const MigrationSeedScreen = ({ navigation, route }: MigrationSeedScreenProps) =>
         return;
       }
     }
-    setStep((prev) => Math.min(prev + 1, 4));
+    if (step === 4) {
+      if (newPassword.length < 8) {
+        setLocalError('Password must be at least 8 characters.');
+        return;
+      }
+      if (newPassword !== confirmNewPassword) {
+        setLocalError('Passwords do not match.');
+        return;
+      }
+    }
+    setStep((prev) => Math.min(prev + 1, 5));
   };
 
   const goBack = () => {
@@ -113,7 +133,7 @@ const MigrationSeedScreen = ({ navigation, route }: MigrationSeedScreenProps) =>
         >
           <Column gap="xs">
             <Text style={{ fontSize: typography.size.sm, fontWeight: typography.weight.semibold, color: colors.text_primary }}>
-              Migration Step {step} of 4
+              Migration Step {step} of 5
             </Text>
             <Text style={{ fontSize: typography.size.xs, color: colors.text_secondary }}>
               We will guide you through migration. A new identity and new seed will be created only after migration succeeds.
@@ -280,6 +300,45 @@ const MigrationSeedScreen = ({ navigation, route }: MigrationSeedScreenProps) =>
           <Card>
             <Column gap="sm">
               <Text style={{ fontSize: typography.size.sm, fontWeight: typography.weight.semibold, color: colors.text_primary }}>
+                Set Local Password
+              </Text>
+              <Text style={{ fontSize: typography.size.xs, color: colors.text_secondary }}>
+                This password is stored locally on your device for sign-in. It is never sent to any server.
+              </Text>
+              <PasswordField
+                label="Password"
+                placeholder="At least 8 characters"
+                value={newPassword}
+                onChangeText={setNewPassword}
+                editable={!isLoading}
+                textContentType="newPassword"
+                autoComplete="password-new"
+                importantForAutofill="yes"
+                autoCapitalize="none"
+                autoCorrect={false}
+                spellCheck={false}
+              />
+              <PasswordField
+                label="Confirm Password"
+                placeholder="Re-enter your password"
+                value={confirmNewPassword}
+                onChangeText={setConfirmNewPassword}
+                editable={!isLoading}
+                textContentType="newPassword"
+                autoComplete="password-new"
+                importantForAutofill="no"
+                autoCapitalize="none"
+                autoCorrect={false}
+                spellCheck={false}
+              />
+            </Column>
+          </Card>
+        )}
+
+        {step === 5 && (
+          <Card>
+            <Column gap="sm">
+              <Text style={{ fontSize: typography.size.sm, fontWeight: typography.weight.semibold, color: colors.text_primary }}>
                 Ready to migrate
               </Text>
               <Text style={{ fontSize: typography.size.xs, color: colors.text_secondary }}>
@@ -302,7 +361,7 @@ const MigrationSeedScreen = ({ navigation, route }: MigrationSeedScreenProps) =>
                 disabled: isLoading,
               }]
               : []),
-            ...(step < 4
+            ...(step < 5
               ? [{
                 label: 'Next',
                 onPress: () => { goNext(); },

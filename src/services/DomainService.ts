@@ -1,20 +1,16 @@
 /**
  * Domain Service
  * Direct QUIC-based domain operations (register, check availability, manage, etc.)
- * Uses native QUIC transport via QuicFetchAdapter - no HTTP fallback
- * Follows TokenService pattern exactly
  */
 
-import { createQuicFetchAdapterSync, FetchAdapter } from './QuicFetchAdapter';
-import { QUIC_CONFIG } from '../config';
+import { quicRequest, quicRequestRaw } from './quic';
 import { nativeIdentityProvisioning } from './NativeIdentityProvisioning';
 import { maskIdentifier } from '../utils/maskIdentifier';
-import {
+import type {
   DomainRegisterRequest,
   DomainRegisterResponse,
   DomainAvailabilityResult,
   DomainListResponse,
-  DomainInfo,
   DomainStatusResponse,
   DomainHistoryResponse,
   DomainUpdateRequest,
@@ -23,279 +19,132 @@ import {
   DomainRollbackResponse,
 } from '../types/domain';
 
-/**
- * Domain Service - All methods use QUIC authenticated endpoints
- */
 class DomainService {
-  private readonly quicFetch: FetchAdapter;
-  private readonly nodeUrl: string;
-
-  constructor(nodeUrl: string) {
-    this.nodeUrl = nodeUrl;
-
-    // Create QUIC-based fetch adapter for native transport
-    this.quicFetch = createQuicFetchAdapterSync({
-      insecure: QUIC_CONFIG.insecure,
-      timeout: QUIC_CONFIG.defaultTimeout,
-    });
-
-    console.log('[DomainService] QUIC adapter configured for domain operations');
-  }
-
   /**
    * GET /api/v1/web4/domains/status/{domain}
-   * Check domain availability and get its current status
-   * Response: { found: boolean, domain, owner_did, ... }
-   * - found: false → Domain is AVAILABLE
-   * - found: true → Domain is TAKEN
+   * Check domain availability.
+   * found: false → available, found: true → taken
    */
   async checkAvailability(domain: string): Promise<DomainAvailabilityResult> {
-    try {
-      console.log('[DomainService] Checking availability for domain:', domain);
+    console.log('[DomainService] Checking availability for domain:', domain);
+    const data = await quicRequest<{
+      found: boolean;
+      classification?: string;
+      owner_did?: string;
+      registrar_fee?: number;
+    }>(`/api/v1/web4/domains/status/${domain}`);
 
-      const response = await this.quicFetch(
-        `${this.nodeUrl}/api/v1/web4/domains/status/${domain}`,
-        {
-          method: 'GET',
-          headers: { 'Content-Type': 'application/json' },
-        }
-      );
+    console.log('[DomainService] Domain status response:', {
+      domain,
+      found: data.found,
+      owner_did: maskIdentifier(data.owner_did),
+    });
 
-      if (!response.ok) {
-        throw new Error(`HTTP ${response.status}: Failed to check domain availability`);
-      }
-
-      const data = await response.json();
-      console.log('[DomainService] Domain status response:', {
-        domain,
-        found: data.found,
-        owner_did: maskIdentifier(data.owner_did),
-      });
-
-      return {
-        available: !data.found, // found: false means available, found: true means taken
-        classification: data.classification,
-        reason: data.found ? `Domain is already registered by ${data.owner_did}` : undefined,
-        registrar_fee: data.registrar_fee,
-      };
-    } catch (error: any) {
-      console.error('[DomainService] Availability check failed:', error.message);
-      throw new Error(error.message || 'Failed to check domain availability');
-    }
+    return {
+      available: !data.found,
+      classification: data.classification,
+      reason: data.found ? `Domain is already registered by ${data.owner_did}` : undefined,
+      registrar_fee: data.registrar_fee,
+    };
   }
 
   /**
-   * POST /api/v1/web4/domains/register
-   * Register a new domain with Dilithium-signed transaction
+   * POST /api/v1/web4/domains/register — Dilithium-signed
+   * lib-client builds the complete signed request body (domain, owner, content_mappings, signature, timestamp, fee)
    */
   async registerDomain(request: DomainRegisterRequest): Promise<DomainRegisterResponse> {
-    try {
-      console.log('[DomainService] Registering domain:', request.domain);
-      console.log('[DomainService] Signing domain registration message');
+    console.log('[DomainService] Registering domain:', request.domain);
+    const contentMappingsJson = request.content_mappings
+      ? JSON.stringify(request.content_mappings)
+      : null;
+    const signingResult = await nativeIdentityProvisioning.signDomainRegisterRequest({
+      domain: request.domain,
+      contentMappingsJson,
+    });
+    console.log('[DomainService] Register request built, json length:', signingResult.request_json.length);
 
-      const timestamp = Math.floor(Date.now() / 1000);
-      const fee = request.fee;
-      const message = `${request.domain}|${timestamp}|${fee}`;
-      const signature = await nativeIdentityProvisioning.signMessage(message);
-      console.log('[DomainService] Signature length (hex):', signature.length);
-
-      // Send domain registration payload
-      const response = await this.quicFetch(
-        `${this.nodeUrl}/api/v1/web4/domains/register`,
-        {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            domain: request.domain,
-            owner: request.owner,
-            content_mappings: request.content_mappings,
-            metadata: request.metadata,
-            signature,
-            timestamp,
-            fee,
-          }),
-        }
-      );
-
-      if (!response.ok) {
-        throw new Error(`HTTP ${response.status}: Failed to register domain`);
-      }
-
-      const data = await response.json();
-      console.log('[DomainService] Domain registered:', data.domain);
-      return data;
-    } catch (error: any) {
-      console.error('[DomainService] Domain registration failed:', error.message);
-      throw new Error(error.message || 'Failed to register domain');
-    }
+    const data = await quicRequest<DomainRegisterResponse>(
+      '/api/v1/web4/domains/register',
+      { method: 'POST', body: signingResult.request_json },
+    );
+    console.log('[DomainService] Domain registered:', data.domain);
+    return data;
   }
 
   /**
    * GET /api/v1/web4/domains?owner={did}
-   * Get all domains owned by a user
    */
   async getUserDomains(ownerDid: string): Promise<DomainListResponse> {
-    try {
-      console.log('[DomainService] Fetching domains for owner:', ownerDid);
-
-      const response = await this.quicFetch(
-        `${this.nodeUrl}/api/v1/web4/domains?owner=${encodeURIComponent(ownerDid)}`,
-        {
-          method: 'GET',
-          headers: { 'Content-Type': 'application/json' },
-        }
-      );
-
-      if (!response.ok) {
-        throw new Error(`HTTP ${response.status}: Failed to fetch user domains`);
-      }
-
-      const data = await response.json();
-      console.log('[DomainService] Found', data.count, 'domains for owner');
-      return data;
-    } catch (error: any) {
-      console.error('[DomainService] Failed to fetch user domains:', error.message);
-      throw new Error(error.message || 'Failed to fetch domains');
-    }
+    console.log('[DomainService] Fetching domains for owner:', ownerDid);
+    const data = await quicRequest<DomainListResponse>(
+      `/api/v1/web4/domains?owner=${encodeURIComponent(ownerDid)}`,
+    );
+    console.log('[DomainService] Found', data.count, 'domains for owner');
+    return data;
   }
 
   /**
    * GET /api/v1/web4/domains/status/{domain}
-   * Get detailed status of a specific domain
    */
   async getDomainStatus(domain: string): Promise<DomainStatusResponse> {
+    console.log('[DomainService] Fetching status for domain:', domain);
     try {
-      console.log('[DomainService] Fetching status for domain:', domain);
-
-      const response = await this.quicFetch(
-        `${this.nodeUrl}/api/v1/web4/domains/status/${domain}`,
-        {
-          method: 'GET',
-          headers: { 'Content-Type': 'application/json' },
-        }
+      return await quicRequest<DomainStatusResponse>(
+        `/api/v1/web4/domains/status/${domain}`,
       );
-
-      if (!response.ok) {
-        if (response.status === 404) {
-          // Domain doesn't exist, but we can still return status
-          return {
-            domain,
-            available: true,
-            classification: 'commercial',
-          };
-        }
-        throw new Error(`HTTP ${response.status}: Failed to fetch domain status`);
+    } catch (error: unknown) {
+      // 404 means domain doesn't exist — return "available" status
+      if (error instanceof Error && 'status' in error && (error as any).status === 404) {
+        return { domain, available: true, classification: 'commercial' };
       }
-
-      const data = await response.json();
-      return data;
-    } catch (error: any) {
-      console.error('[DomainService] Failed to fetch domain status:', error.message);
-      throw new Error(error.message || 'Failed to fetch domain status');
+      throw error;
     }
   }
 
   /**
    * GET /api/v1/web4/domains/{domain}/history
-   * Get the history of changes for a domain
    */
   async getDomainHistory(domain: string): Promise<DomainHistoryResponse> {
-    try {
-      console.log('[DomainService] Fetching history for domain:', domain);
-
-      const response = await this.quicFetch(
-        `${this.nodeUrl}/api/v1/web4/domains/${domain}/history`,
-        {
-          method: 'GET',
-          headers: { 'Content-Type': 'application/json' },
-        }
-      );
-
-      if (!response.ok) {
-        throw new Error(`HTTP ${response.status}: Failed to fetch domain history`);
-      }
-
-      const data = await response.json();
-      return data;
-    } catch (error: any) {
-      console.error('[DomainService] Failed to fetch domain history:', error.message);
-      throw new Error(error.message || 'Failed to fetch domain history');
-    }
+    console.log('[DomainService] Fetching history for domain:', domain);
+    return await quicRequest<DomainHistoryResponse>(
+      `/api/v1/web4/domains/${domain}/history`,
+    );
   }
 
   /**
-   * POST /api/v1/web4/domains/update
-   * Update domain content (e.g., point to new CID)
+   * POST /api/v1/web4/domains/update — Dilithium-signed
+   * lib-client builds the complete signed request body (domain, new_manifest_cid, expected_previous_manifest_cid, signature, timestamp)
    */
   async updateDomain(request: DomainUpdateRequest): Promise<DomainUpdateResponse> {
-    try {
-      console.log('[DomainService] Updating domain:', request.domain);
-      console.log('[DomainService] Signing domain update transaction with Dilithium keypair');
+    console.log('[DomainService] Updating domain:', request.domain);
+    const signingResult = await nativeIdentityProvisioning.signDomainUpdateRequest({
+      domain: request.domain,
+      newManifestCid: request.new_manifest_cid,
+      expectedPreviousManifestCid: request.expected_previous_manifest_cid,
+    });
+    console.log('[DomainService] Update request built, json length:', signingResult.request_json.length);
 
-      const signingResult = await nativeIdentityProvisioning.signDomainUpdateTransaction({
-        domain: request.domain,
-        contentCid: request.content_cid,
-      });
-
-      const signedTx = signingResult.signed_tx;
-      console.log('[DomainService] Update transaction signed, hex length:', signedTx.length);
-
-      // Send signed transaction to API
-      const response = await this.quicFetch(
-        `${this.nodeUrl}/api/v1/web4/domains/update`,
-        {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ signed_tx: signedTx }),
-        }
-      );
-
-      if (!response.ok) {
-        throw new Error(`HTTP ${response.status}: Failed to update domain`);
-      }
-
-      const data = await response.json();
-      console.log('[DomainService] Domain updated:', data.domain);
-      return data;
-    } catch (error: any) {
-      console.error('[DomainService] Domain update failed:', error.message);
-      throw new Error(error.message || 'Failed to update domain');
-    }
+    const data = await quicRequest<DomainUpdateResponse>(
+      '/api/v1/web4/domains/update',
+      { method: 'POST', body: signingResult.request_json },
+    );
+    console.log('[DomainService] Domain updated:', data.domain);
+    return data;
   }
 
   /**
    * POST /api/v1/web4/domains/{domain}/rollback
-   * Rollback domain to a previous version
    */
   async rollbackDomain(request: DomainRollbackRequest): Promise<DomainRollbackResponse> {
-    try {
-      console.log('[DomainService] Rolling back domain:', request.domain);
-
-      const response = await this.quicFetch(
-        `${this.nodeUrl}/api/v1/web4/domains/${request.domain}/rollback`,
-        {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ version: request.version }),
-        }
-      );
-
-      if (!response.ok) {
-        throw new Error(`HTTP ${response.status}: Failed to rollback domain`);
-      }
-
-      const data = await response.json();
-      console.log('[DomainService] Domain rolled back:', data.domain);
-      return data;
-    } catch (error: any) {
-      console.error('[DomainService] Domain rollback failed:', error.message);
-      throw new Error(error.message || 'Failed to rollback domain');
-    }
+    console.log('[DomainService] Rolling back domain:', request.domain);
+    const data = await quicRequest<DomainRollbackResponse>(
+      `/api/v1/web4/domains/${request.domain}/rollback`,
+      { method: 'POST', body: JSON.stringify({ version: request.version }) },
+    );
+    console.log('[DomainService] Domain rolled back:', data.domain);
+    return data;
   }
 }
 
-// Export singleton instance using the default node URL from config
-import { DEFAULT_SOV_NODE_URL } from '../config';
-
-const domainService = new DomainService(DEFAULT_SOV_NODE_URL);
+const domainService = new DomainService();
 export default domainService;

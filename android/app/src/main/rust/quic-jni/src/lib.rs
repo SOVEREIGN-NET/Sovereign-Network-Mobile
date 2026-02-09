@@ -25,6 +25,7 @@ mod zhtp_auth;
 mod zhtp_auth_request;
 use zhtp_request::send_zhtp_request;
 mod identity_bridge;
+mod identity_jni;
 mod uhp_quinn;
 
 // Global state for the QUIC client

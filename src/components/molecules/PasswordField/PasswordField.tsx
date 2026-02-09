@@ -49,7 +49,14 @@ export const PasswordField = React.forwardRef<any, PasswordFieldProps>(
           rightIcon={
             <Pressable
               onPress={() => setIsVisible(!isVisible)}
-              style={{ opacity: isVisible ? 1 : 0.5 }}
+              hitSlop={{ top: 16, bottom: 16, left: 16, right: 16 }}
+              style={{
+                opacity: isVisible ? 1 : 0.5,
+                minWidth: 44,
+                minHeight: 44,
+                alignItems: 'center',
+                justifyContent: 'center',
+              }}
             >
               <Text style={{ fontSize: typography.size.lg }}>👁️</Text>
             </Pressable>

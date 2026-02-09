@@ -53,6 +53,11 @@ class NativeQuic: NSObject {
     let session: QuinnHandshakeSession
   }
 
+  // When true, use new lib-client HandshakeState (3-leg, keys stay in Rust).
+  // Requires quinn-ffi to expose ALPN-aware connect (uhp_quic_connect_for_handshake).
+  // Set to true once quinn-ffi is updated.
+  private let useLibClientHandshake = false
+
   // Default configuration
   // These values are loaded from GeneratedConfig.swift which is generated from .env file
   // GeneratedConfig.swift is the single source of truth - updated at build time
@@ -290,14 +295,26 @@ class NativeQuic: NSObject {
     guard shouldStart else { return }
 
     DispatchQueue.global(qos: .userInitiated).async {
-      let handshakeResult = self.performQuinnHandshakeWithHandle(
-        host: self.quinnControlPlaneHost,
-        port: Int(self.quinnControlPlanePort),
-        serverName: self.quinnControlPlaneServerName,
-        spkiPin: spkiPin,
-        identityId: identityId,
-        chainId: 0
-      )
+      let handshakeResult: Result<QuinnHandshakeResult, Error>
+
+      if self.useLibClientHandshake {
+        handshakeResult = self.performHandshakeViaLibClient(
+          host: self.quinnControlPlaneHost,
+          port: Int(self.quinnControlPlanePort),
+          serverName: self.quinnControlPlaneServerName,
+          spkiPin: spkiPin,
+          identityId: identityId
+        )
+      } else {
+        handshakeResult = self.performLegacyHandshake(
+          host: self.quinnControlPlaneHost,
+          port: Int(self.quinnControlPlanePort),
+          serverName: self.quinnControlPlaneServerName,
+          spkiPin: spkiPin,
+          identityId: identityId,
+          chainId: 0
+        )
+      }
 
       switch handshakeResult {
       case .failure(let error):
@@ -413,7 +430,148 @@ class NativeQuic: NSObject {
     return buffer.isEmpty ? data : nil
   }
 
-  private func performQuinnHandshakeWithHandle(
+  // MARK: - New lib-client HandshakeState (3-leg UHP, keys stay in Rust)
+
+  /// Perform UHP handshake using lib-client HandshakeState.
+  /// Secret keys never leave Rust. Requires quinn-ffi ALPN-aware connect.
+  ///
+  /// Flow:
+  ///   1. Resolve Identity handle from IdentityHandleStore
+  ///   2. Open QUIC connection to control plane (needs zhtp-uhp/2 ALPN)
+  ///   3. Create HandshakeState → ClientHello → send over QUIC
+  ///   4. Receive ServerHello → process → ClientFinish → send over QUIC
+  ///   5. Finalize → extract session (sessionKey, sessionId, peerDid)
+  ///
+  /// TODO: Blocked on quinn-ffi exposing uhp_quic_connect_for_handshake()
+  ///       that connects with zhtp-uhp/2 ALPN without running the old handshake.
+  ///       Until then, uhp_quic_connect_public uses zhtp-public/1 ALPN which
+  ///       the server will reject for handshake messages.
+  private func performHandshakeViaLibClient(
+    host: String,
+    port: Int,
+    serverName: String,
+    spkiPin: Data,
+    identityId: String
+  ) -> Result<QuinnHandshakeResult, Error> {
+    guard spkiPin.count == 32 else {
+      return .failure(NSError(domain: "NativeQuic", code: -1, userInfo: [NSLocalizedDescriptionKey: "Invalid SPKI pin length"]))
+    }
+
+    // 1. Resolve Identity handle
+    let didCandidates = identityId.hasPrefix("did:zhtp:")
+      ? [identityId]
+      : [identityId, "did:zhtp:\(identityId)"]
+    var identityHandle: Identity? = nil
+    for candidate in didCandidates {
+      if let found = IdentityHandleStore.shared.retrieve(by: candidate) as? Identity {
+        identityHandle = found
+        break
+      }
+    }
+    guard let identityHandle else {
+      return .failure(NSError(domain: "NativeQuic", code: -1, userInfo: [NSLocalizedDescriptionKey: "Identity not found in handle store for handshake"]))
+    }
+
+    // 2. Open QUIC connection to control plane
+    // TODO: Replace uhp_quic_connect_public with uhp_quic_connect_for_handshake
+    //       once quinn-ffi exposes ALPN-aware connect (zhtp-uhp/2)
+    var quinnHandle: UInt64 = 0
+    let connectRc = host.withCString { hostPtr in
+      serverName.withCString { serverNamePtr in
+        spkiPin.withUnsafeBytes { spkiBuf -> Int32 in
+          guard let spkiPtr = spkiBuf.baseAddress?.assumingMemoryBound(to: UInt8.self) else {
+            return -1
+          }
+          return uhp_quic_connect_public(hostPtr, UInt16(port), serverNamePtr, spkiPtr, &quinnHandle)
+        }
+      }
+    }
+    if connectRc != 0 {
+      let message = uhp_quinn_last_error_message().flatMap { String(cString: $0) } ?? "unknown error"
+      return .failure(NSError(domain: "NativeQuic", code: -1, userInfo: [NSLocalizedDescriptionKey: "QUIC connect failed: \(message)"]))
+    }
+
+    do {
+      // 3. Compute channel binding: Blake3(sorted(local_addr || peer_addr))
+      let peerAddr = "\(host):\(port)"
+      let localAddr = "0.0.0.0:0"  // Local address unknown at this point
+      let sorted = [localAddr, peerAddr].sorted()
+      let bindingInput = (sorted[0] + sorted[1]).data(using: .utf8)!
+      let channelBinding = try computeBlake3(bindingInput)
+
+      // 4. Create HandshakeState (keys stay in Rust)
+      let handshake = try HandshakeState(identity: identityHandle, channelBinding: channelBinding)
+
+      // 5. Leg 1: ClientHello → send to server, receive ServerHello
+      let clientHello = try handshake.createClientHello()
+      let serverHello = try quinnRequest(handle: quinnHandle, requestData: clientHello)
+
+      // 6. Leg 2: Process ServerHello → get ClientFinish → send to server
+      let clientFinish = try handshake.processServerHello(serverHello)
+      _ = try quinnRequest(handle: quinnHandle, requestData: clientFinish)
+
+      // 7. Finalize → derive session
+      let result = try handshake.finalize()
+
+      let sessionKey = result.sessionKey
+      let sessionId = result.sessionId
+      let peerDid = result.peerDid
+
+      guard sessionKey.count == 32 else {
+        uhp_quic_close(quinnHandle)
+        return .failure(NSError(domain: "NativeQuic", code: -1, userInfo: [NSLocalizedDescriptionKey: "Invalid session key length from lib-client handshake"]))
+      }
+      guard sessionId.count == 32 else {
+        uhp_quic_close(quinnHandle)
+        return .failure(NSError(domain: "NativeQuic", code: -1, userInfo: [NSLocalizedDescriptionKey: "Invalid session ID length from lib-client handshake"]))
+      }
+
+      // handshakeHash: use Blake3 of (sessionKey || sessionId) as substitute
+      // The new HandshakeResult doesn't expose handshakeHash directly;
+      // MAC key derivation uses HKDF(sessionKey, salt=handshakeHash).
+      // TODO: Either add handshake_hash getter to lib-client, or change
+      //       deriveMacKey to use sessionId as salt for new handshakes.
+      let handshakeHash = try computeBlake3(sessionKey + sessionId)
+
+      let sessionInfo = QuinnHandshakeSession(
+        sessionKey: sessionKey,
+        sessionId: sessionId,
+        handshakeHash: handshakeHash,
+        peerDid: peerDid,
+        clientDid: identityHandle.did
+      )
+
+      return .success(QuinnHandshakeResult(handle: quinnHandle, session: sessionInfo))
+    } catch {
+      uhp_quic_close(quinnHandle)
+      return .failure(error)
+    }
+  }
+
+  /// Compute Blake3 hash (32 bytes) using uhp-ffi
+  private func computeBlake3(_ input: Data) throws -> Data {
+    var output = Data(count: 32)
+    let rc = input.withUnsafeBytes { inBuf -> Int32 in
+      output.withUnsafeMutableBytes { outBuf -> Int32 in
+        guard let inPtr = inBuf.baseAddress?.assumingMemoryBound(to: UInt8.self),
+              let outPtr = outBuf.baseAddress?.assumingMemoryBound(to: UInt8.self) else {
+          return -1
+        }
+        return uhp_blake3(inPtr, input.count, outPtr, 32)
+      }
+    }
+    guard rc == 0 else {
+      throw NSError(domain: "NativeQuic", code: -1, userInfo: [NSLocalizedDescriptionKey: "Blake3 hash computation failed"])
+    }
+    return output
+  }
+
+  // MARK: - Legacy handshake (deprecated — uses raw secret key extraction)
+
+  /// Legacy UHP handshake that extracts raw secret keys across FFI.
+  /// Deprecated: Migrate to performHandshakeViaLibClient once quinn-ffi
+  /// exposes ALPN-aware QUIC connect.
+  private func performLegacyHandshake(
     host: String,
     port: Int,
     serverName: String,

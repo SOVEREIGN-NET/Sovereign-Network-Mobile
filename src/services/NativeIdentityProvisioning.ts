@@ -239,41 +239,61 @@ class NativeIdentityProvisioningBridge {
   }
 
   /**
-   * Sign a domain registration transaction with Dilithium keypair
-   * Routes through unified domain transaction signing
+   * Build a signed domain registration request (JSON for REST API)
+   * lib-client builds the complete request body with signature + timestamp
    */
-  async signDomainRegisterTransaction(params: {
+  async signDomainRegisterRequest(params: {
     domain: string;
-    contentCid?: string | null;
-  }): Promise<{ signed_tx: string }> {
+    contentMappingsJson?: string | null;
+  }): Promise<{ request_json: string }> {
     if (!this.nativeModule) {
       throw new Error('NativeIdentityProvisioning not available on this platform');
     }
 
-    if (!this.nativeModule.signDomainRegisterTransaction) {
-      throw new Error('NativeIdentityProvisioning.signDomainRegisterTransaction not available');
+    if (!this.nativeModule.signDomainRegisterRequest) {
+      throw new Error('NativeIdentityProvisioning.signDomainRegisterRequest not available');
     }
 
-    return await this.nativeModule.signDomainRegisterTransaction(params);
+    return await this.nativeModule.signDomainRegisterRequest(params);
   }
 
   /**
-   * Sign a domain update transaction with Dilithium keypair
-   * Routes through unified domain transaction signing
+   * Build a signed domain update request (JSON for REST API)
+   * Uses manifest CID versioning with compare-and-swap
    */
-  async signDomainUpdateTransaction(params: {
+  async signDomainUpdateRequest(params: {
     domain: string;
-    contentCid: string;
-  }): Promise<{ signed_tx: string }> {
+    newManifestCid: string;
+    expectedPreviousManifestCid: string;
+  }): Promise<{ request_json: string }> {
     if (!this.nativeModule) {
       throw new Error('NativeIdentityProvisioning not available on this platform');
     }
 
-    if (!this.nativeModule.signDomainUpdateTransaction) {
-      throw new Error('NativeIdentityProvisioning.signDomainUpdateTransaction not available');
+    if (!this.nativeModule.signDomainUpdateRequest) {
+      throw new Error('NativeIdentityProvisioning.signDomainUpdateRequest not available');
     }
 
-    return await this.nativeModule.signDomainUpdateTransaction(params);
+    return await this.nativeModule.signDomainUpdateRequest(params);
+  }
+
+  /**
+   * Build a signed domain transfer request (JSON for REST API)
+   * Transfers domain ownership to another DID
+   */
+  async signDomainTransferRequest(params: {
+    domain: string;
+    toOwnerDid: string;
+  }): Promise<{ request_json: string }> {
+    if (!this.nativeModule) {
+      throw new Error('NativeIdentityProvisioning not available on this platform');
+    }
+
+    if (!this.nativeModule.signDomainTransferRequest) {
+      throw new Error('NativeIdentityProvisioning.signDomainTransferRequest not available');
+    }
+
+    return await this.nativeModule.signDomainTransferRequest(params);
   }
 
   /**

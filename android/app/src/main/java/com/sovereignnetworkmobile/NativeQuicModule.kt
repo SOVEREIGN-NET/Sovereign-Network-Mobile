@@ -269,25 +269,50 @@ class NativeQuicModule(reactContext: ReactApplicationContext) :
         }
 
         executor.execute {
-            val materials = IdentityStore.loadIdentity(reactApplicationContext, identityId)
-            if (materials == null) {
-                failQuinnQueue(identityId, "Identity materials not found for $identityId")
+            val identity = IdentityStore.loadIdentity(reactApplicationContext, identityId)
+            if (identity == null) {
+                failQuinnQueue(identityId, "Identity not found for $identityId")
                 return@execute
             }
 
             NativeQuicBridge.initUhpQuinn()
-            val spkiPin = reactApplicationContext.getString(R.string.zhtp_spki_pin_hex)
-            val handshake = NativeQuicBridge.uhpQuicConnectAndHandshake(
-                host = QUINN_CONTROL_PLANE_HOST,
-                port = QUINN_CONTROL_PLANE_PORT,
-                serverName = QUINN_CONTROL_PLANE_SERVER_NAME,
-                spkiPinHex = spkiPin,
-                identityJson = materials.handshakeJson,
-                dilithiumSk = materials.dilithiumSk,
-                kyberSk = materials.kyberSk,
-                masterSeed = materials.masterSeed,
-                chainId = 0
-            )
+            val spkiPin = com.sovereignnetworkmobile.config.GeneratedConfig.QUINN_SPKI_PIN_HEX
+
+            val handshake: Map<String, Any?>? = if (NativeQuicBridge.useLibClientHandshake) {
+                // New path: 3-leg UHP via lib-client HandshakeState (keys stay in Rust)
+                // NOTE: Blocked on quinn-ffi ALPN-aware connect (zhtp-uhp/2)
+                NativeQuicBridge.handshakeViaLibClient(
+                    host = QUINN_CONTROL_PLANE_HOST,
+                    port = QUINN_CONTROL_PLANE_PORT,
+                    serverName = QUINN_CONTROL_PLANE_SERVER_NAME,
+                    spkiPinHex = spkiPin,
+                    identityHandle = identity.getHandle()
+                )
+            } else {
+                // Legacy path: extract keys via deprecated getters (briefly in JVM memory)
+                val handshakeJson = identity.toHandshakeJson() ?: ""
+                @Suppress("DEPRECATION")
+                val dilithiumSk = identity.getDilithiumSecretKey() ?: ByteArray(0)
+                @Suppress("DEPRECATION")
+                val kyberSk = identity.getKyberSecretKey() ?: ByteArray(0)
+                @Suppress("DEPRECATION")
+                val masterSeed = identity.getMasterSeed() ?: ByteArray(0)
+
+                NativeQuicBridge.uhpQuicConnectAndHandshake(
+                    host = QUINN_CONTROL_PLANE_HOST,
+                    port = QUINN_CONTROL_PLANE_PORT,
+                    serverName = QUINN_CONTROL_PLANE_SERVER_NAME,
+                    spkiPinHex = spkiPin,
+                    identityJson = handshakeJson,
+                    dilithiumSk = dilithiumSk,
+                    kyberSk = kyberSk,
+                    masterSeed = masterSeed,
+                    chainId = 0
+                )
+            }
+
+            // Identity handle no longer needed after handshake setup
+            identity.close()
 
             val ok = handshake?.get("ok") as? Boolean ?: false
             if (!ok) {

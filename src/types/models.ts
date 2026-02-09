@@ -1,17 +1,9 @@
 /**
  * Domain Models
  * Core data structures for the SOV Web4 Mobile application
+ *
+ * NOTE: Identity is defined in types/identity.ts (canonical source)
  */
-
-// Identity
-export interface Identity {
-  did: string;
-  displayName: string;
-  identityType: 'human' | 'organization' | 'developer';
-  createdAt: string;
-  citizenship: boolean;
-  avatar?: string;
-}
 
 // Wallet
 export interface Wallet {

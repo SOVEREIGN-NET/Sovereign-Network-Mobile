@@ -1,14 +1,11 @@
 /**
  * Token Service
  * Direct QUIC-based token operations (create, mint, transfer, etc.)
- * Uses native QUIC transport via QuicFetchAdapter - no HTTP fallback
  */
 
-import { createQuicFetchAdapterSync, FetchAdapter } from './QuicFetchAdapter';
-import { QUIC_CONFIG } from '../config';
-import SecureIdentityStorage from './SecureIdentityStorage';
+import { quicRequest } from './quic';
 import { nativeIdentityProvisioning } from './NativeIdentityProvisioning';
-import {
+import type {
   TokenCreateRequest,
   TokenCreateResponse,
   TokenMintRequest,
@@ -20,9 +17,6 @@ import {
   TokenListResponse,
 } from '../types/token';
 
-/**
- * Normalize a DID to just the hex address (strip did:zhtp: prefix)
- */
 const normalizeDIDToAddress = (did: string): string => {
   if (did.startsWith('did:zhtp:')) {
     return did.substring('did:zhtp:'.length);
@@ -30,314 +24,111 @@ const normalizeDIDToAddress = (did: string): string => {
   return did;
 };
 
-/**
- * Token Service - All methods use QUIC authenticated endpoints
- */
 class TokenService {
-  private readonly quicFetch: FetchAdapter;
-  private readonly nodeUrl: string;
-
-  constructor(nodeUrl: string) {
-    this.nodeUrl = nodeUrl;
-
-    // Create QUIC-based fetch adapter for native transport
-    this.quicFetch = createQuicFetchAdapterSync({
-      insecure: QUIC_CONFIG.insecure,
-      timeout: QUIC_CONFIG.defaultTimeout,
-    });
-
-    console.log('[TokenService] QUIC adapter configured for token operations');
-  }
-
-  /**
-   * POST /api/v1/token/create
-   * Create a new token with Dilithium-signed transaction
-   */
+  /** POST /api/v1/token/create — Dilithium-signed */
   async createToken(request: TokenCreateRequest): Promise<TokenCreateResponse> {
-    try {
-      console.log('[TokenService] Creating token:', request.name);
-      console.log('[TokenService] Signing token create transaction with Dilithium keypair');
-      const signingResult = await nativeIdentityProvisioning.signTokenCreateTransaction({
-        name: request.name,
-        symbol: request.symbol,
-        initialSupply: request.initial_supply,
-        decimals: request.decimals,
-        maxSupply: request.max_supply,
-      });
+    console.log('[TokenService] Creating token:', request.name);
+    const signingResult = await nativeIdentityProvisioning.signTokenCreateTransaction({
+      name: request.name,
+      symbol: request.symbol,
+      initialSupply: Number(request.initial_supply),
+      decimals: request.decimals,
+      maxSupply: request.max_supply != null ? Number(request.max_supply) : null,
+    });
+    console.log('[TokenService] Transaction signed, hex length:', signingResult.signed_tx.length);
 
-      const signedTx = signingResult.signed_tx;
-      console.log('[TokenService] Transaction signed, hex length:', signedTx.length);
-
-      // Send signed transaction to API
-      const response = await this.quicFetch(
-        `${this.nodeUrl}/api/v1/token/create`,
-        {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ signed_tx: signedTx }),
-        }
-      );
-
-      if (!response.ok) {
-        throw new Error(`HTTP ${response.status}: Failed to create token`);
-      }
-
-      const data = await response.json();
-      console.log('[TokenService] Token created:', data.token_id);
-      return data;
-    } catch (error: any) {
-      console.error('[TokenService] Token creation failed:', error.message);
-      throw new Error(error.message || 'Failed to create token');
-    }
+    const data = await quicRequest<TokenCreateResponse>(
+      '/api/v1/token/create',
+      { method: 'POST', body: JSON.stringify({ signed_tx: signingResult.signed_tx }) },
+    );
+    console.log('[TokenService] Token created:', data.token_id);
+    return data;
   }
 
-  /**
-   * POST /api/v1/token/mint
-   * Mint additional tokens (creator only) with signed transaction
-   */
+  /** POST /api/v1/token/mint — creator only, Dilithium-signed */
   async mintToken(request: TokenMintRequest): Promise<TokenMintResponse> {
-    try {
-      console.log('[TokenService] Minting tokens for:', request.token_id);
-      console.log('[TokenService] Signing token mint transaction with Dilithium keypair');
-      const amountStr = typeof request.amount === 'string' ? request.amount : String(request.amount);
-      const signingResult = await nativeIdentityProvisioning.signTokenMintTransaction({
-        tokenId: request.token_id,
-        amount: amountStr,
-        recipientDid: normalizeDIDToAddress(request.to),
-      });
+    console.log('[TokenService] Minting tokens for:', request.token_id);
+    const signingResult = await nativeIdentityProvisioning.signTokenMintTransaction({
+      tokenId: request.token_id,
+      amount: Number(request.amount),
+      recipientDid: normalizeDIDToAddress(request.to),
+    });
+    console.log('[TokenService] Mint transaction signed, hex length:', signingResult.signed_tx.length);
 
-      const signedTx = signingResult.signed_tx;
-      console.log('[TokenService] Mint transaction signed, hex length:', signedTx.length);
-
-      const response = await this.quicFetch(
-        `${this.nodeUrl}/api/v1/token/mint`,
-        {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ signed_tx: signedTx }),
-        }
-      );
-
-      const data = await response.json();
-      console.log('[TokenService] Tokens minted:', data.amount_minted);
-      return data;
-    } catch (error: any) {
-      console.error('[TokenService] Token mint failed:', error.message);
-      throw new Error(error.message || 'Failed to mint tokens');
-    }
+    const data = await quicRequest<TokenMintResponse>(
+      '/api/v1/token/mint',
+      { method: 'POST', body: JSON.stringify({ signed_tx: signingResult.signed_tx }) },
+    );
+    console.log('[TokenService] Tokens minted:', data.amount_minted);
+    return data;
   }
 
-  /**
-   * POST /api/v1/token/transfer
-   * Transfer tokens between addresses with signed transaction
-   */
+  /** POST /api/v1/token/transfer — Dilithium-signed */
   async transferToken(request: TokenTransferRequest): Promise<TokenTransferResponse> {
-    try {
-      console.log('[TokenService] Transferring tokens to:', request.to);
-      console.log('[TokenService] Signing token transfer transaction with Dilithium keypair');
-      const amountStr = typeof request.amount === 'string' ? request.amount : String(request.amount);
-      const signingResult = await nativeIdentityProvisioning.signTokenTransferTransaction({
-        tokenId: request.token_id,
-        toAddress: normalizeDIDToAddress(request.to),
-        amount: amountStr,
-      });
+    console.log('[TokenService] Transferring tokens to:', request.to);
+    const signingResult = await nativeIdentityProvisioning.signTokenTransferTransaction({
+      tokenId: request.token_id,
+      toAddress: normalizeDIDToAddress(request.to),
+      amount: Number(request.amount),
+    });
+    console.log('[TokenService] Transfer transaction signed, hex length:', signingResult.signed_tx.length);
 
-      const signedTx = signingResult.signed_tx;
-      console.log('[TokenService] Transfer transaction signed, hex length:', signedTx.length);
-
-      const response = await this.quicFetch(
-        `${this.nodeUrl}/api/v1/token/transfer`,
-        {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ signed_tx: signedTx }),
-        }
-      );
-
-      const data = await response.json();
-      console.log('[TokenService] Transfer successful');
-      return data;
-    } catch (error: any) {
-      console.error('[TokenService] Token transfer failed:', error.message);
-      throw new Error(error.message || 'Failed to transfer tokens');
-    }
+    const data = await quicRequest<TokenTransferResponse>(
+      '/api/v1/token/transfer',
+      { method: 'POST', body: JSON.stringify({ signed_tx: signingResult.signed_tx }) },
+    );
+    console.log('[TokenService] Transfer successful');
+    return data;
   }
 
-  /**
-   * GET /api/v1/token/{token_id}
-   * Get token information by ID
-   */
+  /** GET /api/v1/token/{token_id} */
   async getTokenInfo(tokenId: string): Promise<TokenInfoResponse> {
-    try {
-      console.log('[TokenService] Fetching token info:', tokenId);
-
-      const response = await this.quicFetch(
-        `${this.nodeUrl}/api/v1/token/${tokenId}`,
-        {
-          method: 'GET',
-          headers: { 'Content-Type': 'application/json' },
-        }
-      );
-
-      if (!response.ok) {
-        throw new Error(`HTTP ${response.status}: Token not found`);
-      }
-
-      const data = await response.json();
-      console.log('[TokenService] Token info retrieved:', data.name);
-      return data;
-    } catch (error: any) {
-      console.error('[TokenService] Token info fetch failed:', error.message);
-      throw new Error(error.message || 'Failed to fetch token info');
-    }
+    console.log('[TokenService] Fetching token info:', tokenId);
+    const data = await quicRequest<TokenInfoResponse>(`/api/v1/token/${tokenId}`);
+    console.log('[TokenService] Token info retrieved:', data.name);
+    return data;
   }
 
-  /**
-   * GET /api/v1/token/{token_id}/balance/{address}
-   * Get token balance for an address
-   */
+  /** GET /api/v1/token/{token_id}/balance/{address} */
   async getTokenBalance(tokenId: string, address: string): Promise<TokenBalanceResponse> {
-    try {
-      console.log('[TokenService] Fetching balance for:', address);
-
-      const response = await this.quicFetch(
-        `${this.nodeUrl}/api/v1/token/${tokenId}/balance/${address}`,
-        {
-          method: 'GET',
-          headers: { 'Content-Type': 'application/json' },
-        }
-      );
-
-      const data = await response.json();
-      console.log('[TokenService] Balance retrieved:', data.balance);
-      return data;
-    } catch (error: any) {
-      console.error('[TokenService] Balance fetch failed:', error.message);
-      throw new Error(error.message || 'Failed to fetch token balance');
-    }
+    console.log('[TokenService] Fetching balance for:', address);
+    const data = await quicRequest<TokenBalanceResponse>(
+      `/api/v1/token/${tokenId}/balance/${address}`,
+    );
+    console.log('[TokenService] Balance retrieved:', data.balance);
+    return data;
   }
 
-  /**
-   * GET /api/v1/token/list
-   * Get list of all tokens on the network
-   */
+  /** GET /api/v1/token/list */
   async listTokens(): Promise<TokenListResponse> {
-    try {
-      console.log('[TokenService] Fetching token list');
-
-      const response = await this.quicFetch(
-        `${this.nodeUrl}/api/v1/token/list`,
-        {
-          method: 'GET',
-          headers: { 'Content-Type': 'application/json' },
-        }
-      );
-
-      const data = await response.json();
-      console.log('[TokenService] Token list retrieved:', data.count, 'tokens');
-      return data;
-    } catch (error: any) {
-      console.error('[TokenService] Token list fetch failed:', error.message);
-      throw new Error(error.message || 'Failed to fetch token list');
-    }
+    console.log('[TokenService] Fetching token list');
+    const data = await quicRequest<TokenListResponse>('/api/v1/token/list');
+    console.log('[TokenService] Token list retrieved:', data.count, 'tokens');
+    return data;
   }
 
-  /**
-   * GET /api/v1/token/balances/{address}
-   * Get all token balances for an address
-   */
+  /** GET /api/v1/token/balances/{address} */
   async getUserTokenBalances(address: string): Promise<TokenBalanceResponse[]> {
-    try {
-      console.log('[TokenService] Fetching user token balances:', address);
-
-      const response = await this.quicFetch(
-        `${this.nodeUrl}/api/v1/token/balances/${address}`,
-        {
-          method: 'GET',
-          headers: { 'Content-Type': 'application/json' },
-        }
-      );
-
-      // Handle response - add extra debugging for Android JSON parse issues
-      let data: any;
-
-      if (!response.ok) {
-        console.error('[TokenService] Non-OK response status:', response.status);
-        const text = await response.text();
-        throw new Error(`HTTP ${response.status}: ${text}`);
-      }
-
-      try {
-        // Try JSON parsing with better error handling
-        data = await response.json();
-      } catch (jsonError: any) {
-        console.error('[TokenService] JSON parse error:', jsonError.message);
-
-        // Fallback: try to read as text and parse manually
-        try {
-          const bodyText = await response.text();
-          console.error('[TokenService] Raw response body (first 200 chars):', bodyText.substring(0, 200));
-          console.error('[TokenService] Body type:', typeof bodyText);
-          console.error('[TokenService] Body length:', bodyText?.length);
-
-          // Try parsing again with better error info
-          data = JSON.parse(bodyText);
-        } catch (fallbackError) {
-          console.error('[TokenService] Fallback parse also failed:', fallbackError);
-          throw new Error(`Failed to parse token balances response: ${jsonError.message}`);
-        }
-      }
-
-      // API returns { address, balances: [...] } - extract the balances array
-      const balances = data.balances || [];
-      console.log('[TokenService] User token balances retrieved:', balances.length, 'tokens');
-      return balances;
-    } catch (error: any) {
-      console.error('[TokenService] User token balances fetch failed:', error.message);
-      throw new Error(error.message || 'Failed to fetch user token balances');
-    }
+    console.log('[TokenService] Fetching user token balances:', address);
+    const data = await quicRequest<{ address: string; balances: TokenBalanceResponse[] }>(
+      `/api/v1/token/balances/${address}`,
+    );
+    const balances = data.balances || [];
+    console.log('[TokenService] User token balances retrieved:', balances.length, 'tokens');
+    return balances;
   }
 
-  /**
-   * POST /api/v1/token/burn
-   * Burn tokens with signed transaction
-   */
+  /** POST /api/v1/token/burn — Dilithium-signed */
+  // TODO: Blocked — signTokenBurnTransaction not yet exposed on NativeIdentityProvisioning bridge
+  // (both platforms). The low-level FFI/JNI exists (zhtp_client_build_token_burn / nativeBuildTokenBurn)
+  // but needs a @ReactMethod/@objc wrapper in NativeIdentityProvisioning on iOS and Android.
   async burnToken(request: { token_id: string; amount: number }): Promise<{ success: boolean; amount_burned: number }> {
-    try {
-      console.log('[TokenService] Burning tokens for:', request.token_id);
-      console.log('[TokenService] Signing token burn transaction with Dilithium keypair');
-      const signingResult = await nativeIdentityProvisioning.signTokenBurnTransaction({
-        tokenId: request.token_id,
-        amount: request.amount,
-      });
-
-      const signedTx = signingResult.signed_tx;
-      console.log('[TokenService] Burn transaction signed, hex length:', signedTx.length);
-
-      const response = await this.quicFetch(
-        `${this.nodeUrl}/api/v1/token/burn`,
-        {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ signed_tx: signedTx }),
-        }
-      );
-
-      const data = await response.json();
-      console.log('[TokenService] Tokens burned:', data.amount_burned);
-      return data;
-    } catch (error: any) {
-      console.error('[TokenService] Token burn failed:', error.message);
-      throw new Error(error.message || 'Failed to burn tokens');
-    }
+    throw new Error(
+      'burnToken not yet available — signTokenBurnTransaction bridge method not implemented on either platform',
+    );
   }
 }
 
-import { DEFAULT_SOV_NODE_URL } from '../config';
-
-// Export singleton instance
-const tokenServiceInstance = new TokenService(DEFAULT_SOV_NODE_URL);
+const tokenServiceInstance = new TokenService();
 export default tokenServiceInstance;
-
-// Also export the class for creating custom instances
 export { TokenService };

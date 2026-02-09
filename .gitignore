@@ -136,3 +136,14 @@ android/app/src/main/jniLibs/arm64-v8a/
 android/app/src/main/jniLibs/armeabi-v7a/
 android/app/src/main/jniLibs/x86/
 android/app/src/main/jniLibs/x86_64/
+
+# UhpFFI xcframework (built from source via build-xcframework.sh)
+ios/uhp-ffi/UhpFFI.xcframework/
+
+# Symlink artifacts
+ios/liboqs.xcframework
+ios/vendor/liboqs.xcframework/liboqs.xcframework
+
+# Sensitive files
+wallet.txt
+android/vault/

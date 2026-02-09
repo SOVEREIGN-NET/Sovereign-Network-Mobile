@@ -85,7 +85,8 @@ export interface DomainHistoryResponse {
 
 export interface DomainUpdateRequest {
   domain: string;
-  content_cid: string;
+  new_manifest_cid: string;
+  expected_previous_manifest_cid: string;
 }
 
 export interface DomainUpdateResponse {

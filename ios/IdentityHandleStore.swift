@@ -10,6 +10,9 @@ import Foundation
 /// Identity objects. This store ensures those objects remain in memory for
 /// the lifetime of their usage, preventing premature deallocation.
 ///
+/// Self-healing: if the in-memory cache is empty (e.g. after process restart),
+/// `getLatestIdentity()` auto-restores from Keychain using the persisted identity ID.
+///
 /// Uses Any to avoid circular dependencies with ZhtpClient.swift
 ///
 /// Usage:
@@ -27,6 +30,8 @@ public class IdentityHandleStore {
     private var identities: [String: Any] = [:]
     private var latestIdentity: Any? = nil
     private let queue = DispatchQueue(label: "com.sovereign.identity-handle-store", attributes: .concurrent)
+
+    private static let currentIdentityIdKey = "com.sovereign.zhtp.current_identity_id"
 
     private init() {}
 
@@ -57,6 +62,8 @@ public class IdentityHandleStore {
             // Also store by identity_id hash if provided (for handshake lookup)
             if let idHash = identityId {
                 identities[idHash] = identity
+                // Persist current identity ID for auto-restore on cache miss
+                UserDefaults.standard.set(idHash, forKey: IdentityHandleStore.currentIdentityIdKey)
             }
         }
     }
@@ -100,10 +107,45 @@ public class IdentityHandleStore {
         }
     }
 
-    /// Get the most recently stored identity (for token signing operations)
+    /// Single point of access for the current signing identity.
+    /// Self-heals: if the in-memory cache is empty (e.g. after process restart),
+    /// auto-restores from Keychain via the persisted identity ID.
     public func getLatestIdentity() -> Any? {
-        return queue.sync {
-            latestIdentity
+        // Fast path: return cached identity
+        let cached: Any? = queue.sync { latestIdentity }
+        if cached != nil { return cached }
+
+        // Cache miss — auto-restore from Keychain
+        guard let identityId = UserDefaults.standard.string(forKey: IdentityHandleStore.currentIdentityIdKey) else {
+            return nil
+        }
+
+        // Load serialized Identity JSON from Keychain
+        let keychainQuery: [String: Any] = [
+            kSecClass as String: kSecClassGenericPassword,
+            kSecAttrService as String: "com.sovereign.zhtp",
+            kSecAttrAccount as String: "identity_serialized_\(identityId)",
+            kSecReturnData as String: true
+        ]
+
+        var result: CFTypeRef?
+        let status = SecItemCopyMatching(keychainQuery as CFDictionary, &result)
+
+        guard status == errSecSuccess,
+              let data = result as? Data,
+              let jsonString = String(data: data, encoding: .utf8) else {
+            print("[IdentityHandleStore] Auto-restore: Keychain lookup failed for \(identityId)")
+            return nil
+        }
+
+        do {
+            let identity = try ZhtpClient.deserializeIdentity(jsonString)
+            print("[IdentityHandleStore] Auto-restored identity from Keychain: \(identity.did)")
+            try store(identity: identity, identityId: identityId)
+            return identity
+        } catch {
+            print("[IdentityHandleStore] Auto-restore: deserialization failed: \(error)")
+            return nil
         }
     }
 
@@ -113,5 +155,6 @@ public class IdentityHandleStore {
             identities.removeAll()
             latestIdentity = nil
         }
+        UserDefaults.standard.removeObject(forKey: IdentityHandleStore.currentIdentityIdKey)
     }
 }

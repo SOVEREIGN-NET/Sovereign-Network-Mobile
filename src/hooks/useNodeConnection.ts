@@ -5,7 +5,7 @@
 
 import { useState, useCallback, useEffect } from 'react';
 import RealAuthService from '../services/RealAuthService';
-import { isQuicSupported, testQuicConnection } from '../services/QuicClient';
+import { isQuicSupported, testQuicConnection } from '../services/quic';
 import { DEFAULT_NODE_HOST, DEFAULT_NODE_PORT } from '../config';
 import { useTranslation } from '../i18n';
 

@@ -1,86 +1,30 @@
 /**
  * App Service - Generic API calls for wallet and identity data
- * Replaces api-client dependency for non-auth endpoints
  */
 
-import { quicRequest, toQuicUrl } from './QuicClient';
-import { DEFAULT_SOV_NODE_URL } from '../config';
-import SecureIdentityStorage from './SecureIdentityStorage';
+import { quicRequest } from './quic';
 import { maskIdentifier } from '../utils/maskIdentifier';
+import type { WalletListResponse } from '../types/wallet';
+import type { NodeIdentityResponse } from '../types/identity';
 
-export interface WalletListResponse {
-  identity_id: string;
-  total_balance: number;
-  wallets: Array<{
-    wallet_id?: string;
-    id?: string;
-    summary?: {
-      id?: string[];
-    };
-    name?: string;
-    wallet_type: string;
-    available_balance: number;
-    staked_balance: number;
-    pending_rewards: number;
-    total_balance?: number;
-    balance?: number;
-    permissions?: any;
-    created_at?: number;
-    description?: string;
-  }>;
-}
-
-export interface IdentityResponse {
-  identity_id: string;
-  did: string;
-  display_name: string;
-  identity_type: string;
-  device_id?: string;
-  created_at?: number;
-  wallet_seed_phrases?: {
-    master_seed_phrase?: string;
-  };
-  [key: string]: any;
-}
+// Re-export for consumers that imported from here
+export type { WalletListResponse } from '../types/wallet';
+export type { NodeIdentityResponse as IdentityResponse } from '../types/identity';
 
 class AppService {
-  private baseUrl: string;
-
-  constructor(baseUrl: string = DEFAULT_SOV_NODE_URL) {
-    this.baseUrl = baseUrl;
-  }
-
   /**
    * Get wallet list for an identity
    */
   async getWalletList(identityId: string): Promise<WalletListResponse> {
-    const url = toQuicUrl(`${this.baseUrl}/api/v1/wallet/list/${identityId}`);
-
     try {
-      const headerIdentityId = await SecureIdentityStorage.getIdentityId();
-      if (!headerIdentityId) {
-        throw new Error('Missing identity for authenticated request');
-      }
-
-      const response = await quicRequest(url, {
-        method: 'GET',
-        headers: {
-          'content-type': 'application/json',
-          'X-Zhtp-Identity': headerIdentityId,
-        },
-        alpn: 'authenticated',
-        timeout: 10,
-      });
-
-      if (!response.ok) {
-        throw new Error(`Failed to fetch wallet list: HTTP ${response.status}`);
-      }
-
-      const data = JSON.parse(response.body);
-      console.log('[AppService] ✅ getWalletList:', { identityId, walletCount: data.wallets?.length || 0 });
+      const data = await quicRequest<WalletListResponse>(
+        `/api/v1/wallet/list/${identityId}`,
+        { timeout: 10 },
+      );
+      console.log('[AppService] getWalletList:', { identityId, walletCount: data.wallets?.length || 0 });
       return data;
-    } catch (error: any) {
-      console.error('[AppService] ❌ getWalletList failed:', error.message);
+    } catch (error: unknown) {
+      console.error('[AppService] getWalletList failed:', error instanceof Error ? error.message : error);
       throw error;
     }
   }
@@ -88,42 +32,23 @@ class AppService {
   /**
    * Get identity information
    */
-  async getIdentity(identityId: string): Promise<IdentityResponse> {
-    const url = toQuicUrl(`${this.baseUrl}/api/v1/identities/${identityId}`);
-
+  async getIdentity(identityId: string): Promise<NodeIdentityResponse> {
     try {
-      const headerIdentityId = await SecureIdentityStorage.getIdentityId();
-      if (!headerIdentityId) {
-        throw new Error('Missing identity for authenticated request');
-      }
-
-      const response = await quicRequest(url, {
-        method: 'GET',
-        headers: {
-          'content-type': 'application/json',
-          'X-Zhtp-Identity': headerIdentityId,
-        },
-        alpn: 'authenticated',
-        timeout: 10,
-      });
-
-      if (!response.ok) {
-        throw new Error(`Failed to fetch identity: HTTP ${response.status}`);
-      }
-
-      const data = JSON.parse(response.body);
-      console.log('[AppService] ✅ getIdentity:', {
+      const data = await quicRequest<NodeIdentityResponse>(
+        `/api/v1/identities/${identityId}`,
+        { timeout: 10 },
+      );
+      console.log('[AppService] getIdentity:', {
         identityId: maskIdentifier(identityId),
         did: maskIdentifier(data.did),
       });
       return data;
-    } catch (error: any) {
-      console.error('[AppService] ❌ getIdentity failed:', error.message);
+    } catch (error: unknown) {
+      console.error('[AppService] getIdentity failed:', error instanceof Error ? error.message : error);
       throw error;
     }
   }
 }
 
-// Export singleton instance
-const appService = new AppService(DEFAULT_SOV_NODE_URL);
+const appService = new AppService();
 export default appService;

@@ -14,7 +14,7 @@ import { createNativeStackNavigator } from '@react-navigation/native-stack';
 import { useColorScheme } from 'react-native';
 import { colors } from '../theme/tokens';
 import { useTranslation } from '../i18n';
-import type { Identity } from '../services/MockAuthService';
+import type { Identity } from '../types/identity';
 import SignInScreen from '../screens/SignInScreen';
 import CreateIdentityScreen from '../screens/CreateIdentityScreen';
 import RecoverIdentityScreen from '../screens/RecoverIdentityScreen';

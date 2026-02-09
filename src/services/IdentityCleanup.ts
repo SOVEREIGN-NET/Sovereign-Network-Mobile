@@ -33,6 +33,11 @@ export const IdentityCleanup = {
         // May not be set, that's fine
       });
 
+      // Clear login credentials (full wipe — sign-out preserves them for autofill)
+      await SecureIdentityStorage.clearLoginCredentials().catch(() => {
+        // May not be set, that's fine
+      });
+
       console.log('[IdentityCleanup] ✅ All identity data cleaned successfully');
     } catch (error) {
       console.error('[IdentityCleanup] ❌ Cleanup failed:', error);

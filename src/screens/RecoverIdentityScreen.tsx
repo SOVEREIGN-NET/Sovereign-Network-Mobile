@@ -17,6 +17,7 @@ import {
   SelectableOptionCard,
   ActionFooter,
   Switch,
+  PasswordField,
 } from '../components';
 import { useAuth } from '../hooks';
 import { useTranslation } from '../i18n';
@@ -24,6 +25,7 @@ import { colors, spacing, typography, borderRadius } from '../theme';
 import { AuthStackParamList } from '../navigation/AuthNavigator';
 import SeedVaultService from '../services/SeedVaultService';
 import RealAuthService from '../services/RealAuthService';
+import SecureIdentityStorage from '../services/SecureIdentityStorage';
 
 type RecoverIdentityScreenProps = NativeStackScreenProps<AuthStackParamList, 'RecoverIdentity'>;
 
@@ -41,6 +43,12 @@ const RecoverIdentityScreen = (_props: RecoverIdentityScreenProps) => {
   const [persistSeed, setPersistSeed] = useState(true);
   const [showMigration, setShowMigration] = useState(false);
   const [showMigrationBanner, setShowMigrationBanner] = useState(false);
+
+  // Password step: shown after seed is validated, before calling recoverIdentity
+  const [recoveryPhase, setRecoveryPhase] = useState<'seed' | 'password'>('seed');
+  const [validatedSeedData, setValidatedSeedData] = useState<string | null>(null);
+  const [newPassword, setNewPassword] = useState('');
+  const [confirmNewPassword, setConfirmNewPassword] = useState('');
 
   useEffect(() => {
     if (migrationRequired) {
@@ -72,14 +80,12 @@ const RecoverIdentityScreen = (_props: RecoverIdentityScreenProps) => {
     }
   };
 
-  const handleRecover = async () => {
+  // Phase 1: Validate seed and move to password step
+  const handleValidateSeed = () => {
     setLocalError(null);
 
-    let data: string;
-    let method: RecoveryMethod;
-
     switch (recoveryMethod) {
-      case 'seed':
+      case 'seed': {
         const normalized = seedWords.map(word => word.trim().toLowerCase()).filter(Boolean);
         if (normalized.length === 0) {
           setLocalError(t.auth.recoverIdentity.validation.seedRequired);
@@ -89,27 +95,51 @@ const RecoverIdentityScreen = (_props: RecoverIdentityScreenProps) => {
           setLocalError(t.auth.recoverIdentity.validation.seedInvalid);
           return;
         }
-        data = normalized.join(' ');
-        method = 'seed';
+        setValidatedSeedData(normalized.join(' '));
+        setRecoveryPhase('password');
         break;
-
+      }
       default:
         setLocalError(t.auth.recoverIdentity.validation.invalidMethod);
-        return;
+    }
+  };
+
+  // Phase 2: Set password and finalize recovery
+  const handleRecover = async () => {
+    setLocalError(null);
+
+    if (!validatedSeedData) {
+      setLocalError('Seed phrase not validated');
+      return;
+    }
+
+    // Validate password
+    if (newPassword.length < 8) {
+      setLocalError('Password must be at least 8 characters');
+      return;
+    }
+    if (newPassword !== confirmNewPassword) {
+      setLocalError('Passwords do not match');
+      return;
     }
 
     try {
-      await recoverIdentity(method, data);
+      const identity = await recoverIdentity(recoveryMethod, validatedSeedData);
 
-      if (method === 'seed' && RealAuthService.getLastSeedRecoveryNotFound()) {
+      if (recoveryMethod === 'seed' && RealAuthService.getLastSeedRecoveryNotFound()) {
         setShowMigrationBanner(true);
         setShowMigration(true);
         return;
       }
 
-      if (method === 'seed' && persistSeed) {
+      // Save login credentials for local sign-in + OS autofill
+      if (identity?.did) {
+        await SecureIdentityStorage.saveLoginCredentials(identity.did, newPassword);
+      }
+
+      if (recoveryMethod === 'seed' && persistSeed) {
         try {
-          await SeedVaultService.saveSeedPhrase(data.split(/\s+/));
+          await SeedVaultService.saveSeedPhrase(validatedSeedData.split(/\s+/));
         } catch (saveError: any) {
           console.warn('[RecoverIdentity] Failed to persist seed phrase:', saveError);
           setLocalError(saveError?.message || 'Recovered, but failed to persist seed phrase.');
@@ -118,6 +148,10 @@ const RecoverIdentityScreen = (_props: RecoverIdentityScreenProps) => {
 
       // Reset form
       setSeedWords(Array(24).fill(''));
+      setNewPassword('');
+      setConfirmNewPassword('');
+      setRecoveryPhase('seed');
+      setValidatedSeedData(null);
       setShowMigration(false);
       setShowMigrationBanner(false);
 
@@ -378,15 +412,75 @@ const RecoverIdentityScreen = (_props: RecoverIdentityScreenProps) => {
         )}
 
 
+        {/* Set Local Password (shown after seed validation) */}
+        {recoveryPhase === 'password' && (
+          <Card>
+            <Column gap="sm">
+              <Text
+                style={{
+                  fontSize: typography.size.sm,
+                  fontWeight: typography.weight.semibold,
+                  color: colors.text_primary,
+                }}
+              >
+                Set Local Password
+              </Text>
+              <Text style={{ fontSize: typography.size.xs, color: colors.text_secondary }}>
+                This password is stored locally on your device for sign-in. It is never sent to any server.
+              </Text>
+              <PasswordField
+                label="Password"
+                placeholder="At least 8 characters"
+                value={newPassword}
+                onChangeText={setNewPassword}
+                editable={!isLoading}
+                textContentType="newPassword"
+                autoComplete="password-new"
+                importantForAutofill="yes"
+                autoCapitalize="none"
+                autoCorrect={false}
+                spellCheck={false}
+              />
+              <PasswordField
+                label="Confirm Password"
+                placeholder="Re-enter your password"
+                value={confirmNewPassword}
+                onChangeText={setConfirmNewPassword}
+                editable={!isLoading}
+                textContentType="newPassword"
+                autoComplete="password-new"
+                importantForAutofill="no"
+                autoCapitalize="none"
+                autoCorrect={false}
+                spellCheck={false}
+              />
+            </Column>
+          </Card>
+        )}
+
         {/* Action Buttons */}
         <ActionFooter
           actions={[
-            {
-              label: isLoading ? t.auth.recoverIdentity.buttonLoading : t.auth.recoverIdentity.button,
-              onPress: () => { handleRecover().catch(() => {}); },
-              disabled: isLoading,
-              loading: isLoading,
-            },
+            ...(recoveryPhase === 'seed' ? [
+              {
+                label: isLoading ? t.auth.recoverIdentity.buttonLoading : 'Next: Set Password',
+                onPress: handleValidateSeed,
+                disabled: isLoading,
+                loading: isLoading,
+              },
+            ] : [
+              {
+                label: isLoading ? t.auth.recoverIdentity.buttonLoading : t.auth.recoverIdentity.button,
+                onPress: () => { handleRecover().catch(() => {}); },
+                disabled: isLoading,
+                loading: isLoading,
+              },
+              {
+                label: 'Back',
+                onPress: () => { setRecoveryPhase('seed'); setLocalError(null); },
+                variant: 'secondary' as const,
+              },
+            ]),
             ...(showMigration ? [
               {
                 label: 'Migration Seed',
@@ -398,8 +492,8 @@ const RecoverIdentityScreen = (_props: RecoverIdentityScreenProps) => {
                   }
                   _props.navigation.navigate('MigrationSeed', { seedWords: normalized });
                 },
-                variant: 'secondary',
-              } as const,
+                variant: 'secondary' as const,
+              },
             ] : []),
           ]}
         />

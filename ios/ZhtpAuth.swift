@@ -421,68 +421,8 @@ enum UhpKeystore {
             }
         }
 
-        print("[UhpKeystore] ⚠️ Serialized Identity not in Keychain (or user denied), trying Documents keystore fallback...")
-
-        // Fallback: Load identity JSON from Documents keystore (partial metadata only)
-        guard let identityJson = loadIdentityJson(identityId: trimmedId) else {
-            print("[UhpKeystore] ❌ Failed to load identity JSON from Documents/keystore for ID: \(trimmedId)")
-            return nil
-        }
-        print("[UhpKeystore] ✅ Loaded identity JSON from Documents (\(identityJson.count) bytes)")
-
-        guard let identityDid = parseIdentityDid(identityJson) else {
-            print("[UhpKeystore] ❌ Failed to parse DID from identity JSON")
-            return nil
-        }
-        print("[UhpKeystore] ✅ Parsed identity DID: \(identityDid)")
-
-        // Private keys stay in Rust, use empty byte arrays
-        let privateKey = UhpPrivateKeyBytesData(dilithiumSk: Data(), kyberSk: Data(), masterSeed: Data())
-
-        return UhpIdentityMaterials(identityJson: identityJson, identityDid: identityDid, privateKey: privateKey)
-    }
-
-    private static func loadIdentityJson(identityId: String) -> Data? {
-        guard let documentsDir = FileManager.default.urls(for: .documentDirectory, in: .userDomainMask).first else {
-            print("[UhpKeystore] Failed to get Documents directory")
-            return nil
-        }
-
-        let keystoreDir = documentsDir.appendingPathComponent("keystore")
-        let identityDir = keystoreDir.appendingPathComponent(identityId)
-        let identityPath = identityDir.appendingPathComponent("user_identity.json")
-
-        do {
-            let data = try Data(contentsOf: identityPath)
-            print("[UhpKeystore] ✓ Successfully loaded identity from: \(identityPath)")
-            return data
-        } catch {
-            print("[UhpKeystore] ⚠️ Identity file missing at: \(identityPath)")
-            print("[UhpKeystore] Requested identity ID: \(identityId)")
-
-            // List all available identities in keystore directory
-            do {
-                let keystoreContents = try FileManager.default.contentsOfDirectory(at: keystoreDir, includingPropertiesForKeys: nil)
-                let identityFolders = keystoreContents.filter { $0.hasDirectoryPath }.map { $0.lastPathComponent }
-                print("[UhpKeystore] Available identities in keystore: \(identityFolders.isEmpty ? "NONE" : identityFolders.joined(separator: ", "))")
-            } catch {
-                print("[UhpKeystore] Could not list keystore directory: \(error)")
-            }
-
-            print("[UhpKeystore] This identity needs to be provisioned:")
-            print("[UhpKeystore] Expected identity materials:")
-            print("[UhpKeystore]   - Dilithium5 signing keypair (for UHP v2 ClientHello signature)")
-            print("[UhpKeystore]   - Kyber1024 KEM keypair (for post-quantum key exchange)")
-            print("[UhpKeystore]   - Identity DID, public keys, node ID, device ID, timestamp")
-            print("[UhpKeystore]")
-            print("[UhpKeystore] Identity provisioning flow:")
-            print("[UhpKeystore]   1. Call NativeIdentityProvisioning.provisionIdentity(displayName, serverUrl)")
-            print("[UhpKeystore]   2. This generates keys locally and registers with server")
-            print("[UhpKeystore]   3. Server returns identity_id which is used for authenticated requests")
-            print("[UhpKeystore]   4. Identity stored at: \(identityPath)")
-            print("[UhpKeystore]   5. Private keys stored in Keychain: private_key_\(identityId)")
-            return nil
-        }
+        print("[UhpKeystore] ❌ Serialized Identity not found in Keychain for ID: \(trimmedId)")
+        return nil
     }
 
     static func storePrivateKeyJson(identityId: String, data: Data, requireUserPresence: Bool) -> Bool {

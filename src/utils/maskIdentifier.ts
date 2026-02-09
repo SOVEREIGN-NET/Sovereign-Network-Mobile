@@ -3,5 +3,5 @@ export function maskIdentifier(value?: string | null): string {
   if (!trimmed) return '<empty>';
   const core = trimmed.replace(/^did:[^:]*:/, '');
   if (core.length <= 8) return core;
-  return `${core.slice(0, 4)}…${core.slice(-4)}`;
+  return `${core.slice(0, 4)}..${core.slice(-4)}`;
 }
