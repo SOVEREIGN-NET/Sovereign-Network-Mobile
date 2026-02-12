@@ -197,7 +197,8 @@ const DAOScreen = ({ navigation }: any) => {
               </Text>
               <Button
                 variant="primary"
-                onPress={() => navigation?.navigate('ProposalDetail')}
+                onPress={() => {}}
+                disabled
               >
                 {t.dao.governance.viewProposals}
               </Button>
@@ -249,7 +250,8 @@ const DAOScreen = ({ navigation }: any) => {
                 </Text>
                 <Button
                   variant="secondary"
-                  onPress={() => navigation.navigate('Browser', { url: `zhtp://${dao.url}` })}
+                  onPress={() => {}}
+                  disabled
                 >
                   Launch {dao.name}
                 </Button>

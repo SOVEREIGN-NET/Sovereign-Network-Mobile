@@ -542,6 +542,108 @@ class NativeIdentityProvisioning: NSObject {
         }
     }
 
+    // MARK: - Local Identity Lookup
+
+    /// Check if an identity exists locally (handle store or Keychain)
+    /// JavaScript API: await NativeIdentityProvisioning.getLocalIdentity(identityIdOrDid)
+    @objc
+    func getLocalIdentity(
+        _ identityIdOrDid: String,
+        resolve: @escaping RCTPromiseResolveBlock,
+        reject: @escaping RCTPromiseRejectBlock
+    ) {
+        queue.async {
+            let trimmed = identityIdOrDid.trimmingCharacters(in: .whitespacesAndNewlines)
+            if trimmed.isEmpty {
+                resolve([
+                    "status": "missing",
+                    "reason": "empty_identity_id"
+                ])
+                return
+            }
+
+            // Normalize: strip did:zhtp: prefix to get raw identity ID
+            let identityId = trimmed.hasPrefix("did:zhtp:") ? String(trimmed.dropFirst(9)) : trimmed
+
+            // 1. Handle store lookup (by full DID, then by raw identity ID)
+            if let identity = IdentityHandleStore.shared.retrieve(by: trimmed) as? Identity {
+                resolve([
+                    "status": "found",
+                    "identity_id": identityId,
+                    "did": identity.did,
+                    "device_id": identity.deviceId,
+                    "created_at": NSNumber(value: identity.createdAt)
+                ])
+                return
+            }
+
+            if trimmed != identityId,
+               let identity = IdentityHandleStore.shared.retrieve(by: identityId) as? Identity {
+                resolve([
+                    "status": "found",
+                    "identity_id": identityId,
+                    "did": identity.did,
+                    "device_id": identity.deviceId,
+                    "created_at": NSNumber(value: identity.createdAt)
+                ])
+                return
+            }
+
+            // 2. Auto-restore (getLatestIdentity reads from Keychain on cache miss)
+            if let identity = IdentityHandleStore.shared.getLatestIdentity() as? Identity {
+                let matchesDid = identity.did == trimmed
+                let matchesId = identity.did.hasSuffix(identityId)
+                if matchesDid || matchesId {
+                    resolve([
+                        "status": "found",
+                        "identity_id": identityId,
+                        "did": identity.did,
+                        "device_id": identity.deviceId,
+                        "created_at": NSNumber(value: identity.createdAt)
+                    ])
+                    return
+                }
+            }
+
+            // 3. Direct Keychain lookup by identity ID
+            let keychainQuery: [String: Any] = [
+                kSecClass as String: kSecClassGenericPassword,
+                kSecAttrService as String: "com.sovereign.zhtp",
+                kSecAttrAccount as String: "identity_serialized_\(identityId)",
+                kSecReturnData as String: true
+            ]
+
+            var result: CFTypeRef?
+            let status = SecItemCopyMatching(keychainQuery as CFDictionary, &result)
+
+            if status == errSecSuccess,
+               let data = result as? Data,
+               let jsonString = String(data: data, encoding: .utf8) {
+                do {
+                    let identity = try ZhtpClient.deserializeIdentity(jsonString)
+                    // Cache in handle store for future lookups
+                    try? IdentityHandleStore.shared.store(identity: identity, identityId: identityId)
+
+                    resolve([
+                        "status": "found",
+                        "identity_id": identityId,
+                        "did": identity.did,
+                        "device_id": identity.deviceId,
+                        "created_at": NSNumber(value: identity.createdAt)
+                    ])
+                    return
+                } catch {
+                    print("[NativeIdentityProvisioning] getLocalIdentity deserialization failed: \(error)")
+                }
+            }
+
+            resolve([
+                "status": "missing",
+                "reason": "identity_materials_not_found"
+            ])
+        }
+    }
+
     // MARK: - Token Transaction Signing
 
     /// Sign a token creation transaction with Dilithium keypair
@@ -794,6 +896,114 @@ class NativeIdentityProvisioning: NSObject {
                 print("[NativeIdentityProvisioning] ❌ Transfer signing failed: \(error)")
                 reject("SIGNING_ERROR", "Failed to sign transfer transaction: \(error)", nil)
             }
+        }
+    }
+
+    /// Sign a SOV wallet-to-wallet transfer transaction with Dilithium keypair
+    /// Uses wallet IDs (32 bytes each) instead of token_id + pubkey
+    @objc
+    func signSovWalletTransferTransaction(
+        _ params: NSDictionary,
+        resolve: @escaping RCTPromiseResolveBlock,
+        reject: @escaping RCTPromiseRejectBlock
+    ) {
+        queue.async { [weak self] in
+            do {
+                guard let fromWalletIdHex = params["fromWalletId"] as? String,
+                      let toWalletIdHex = params["toWalletId"] as? String else {
+                    reject("INVALID_PARAMS", "Missing required SOV transfer parameters (fromWalletId, toWalletId)", nil)
+                    return
+                }
+
+                // Parse amount - accept both String and Number
+                var amountValue: UInt64 = 0
+                if let amountStr = params["amount"] as? String {
+                    guard let parsed = UInt64(amountStr) else {
+                        reject("INVALID_PARAMS", "amount must be a valid integer string", nil)
+                        return
+                    }
+                    amountValue = parsed
+                } else if let amountNum = params["amount"] as? NSNumber {
+                    amountValue = amountNum.uint64Value
+                } else {
+                    reject("INVALID_PARAMS", "amount must be a string or number", nil)
+                    return
+                }
+
+                // Validate and decode wallet IDs (must be 64 hex chars = 32 bytes each)
+                guard let fromWalletId = Data(fromHexString: fromWalletIdHex), fromWalletId.count == 32 else {
+                    reject("INVALID_PARAMS", "fromWalletId must be 64 hex characters (32 bytes)", nil)
+                    return
+                }
+                guard let toWalletId = Data(fromHexString: toWalletIdHex), toWalletId.count == 32 else {
+                    reject("INVALID_PARAMS", "toWalletId must be 64 hex characters (32 bytes)", nil)
+                    return
+                }
+
+                print("[NativeIdentityProvisioning] Building signed SOV wallet transfer transaction")
+                print("[NativeIdentityProvisioning]   From: \(fromWalletIdHex)")
+                print("[NativeIdentityProvisioning]   To: \(toWalletIdHex)")
+                print("[NativeIdentityProvisioning]   Amount: \(amountValue)")
+
+                guard let identityAny = IdentityHandleStore.shared.getLatestIdentity(),
+                      let identity = identityAny as? Identity else {
+                    reject("NO_IDENTITY", "No active identity for signing", nil)
+                    return
+                }
+
+                let hexSignedTx = try ZhtpClient.buildSovWalletTransfer(
+                    fromWalletId: fromWalletId,
+                    toWalletId: toWalletId,
+                    amount: amountValue,
+                    using: identity,
+                    chainId: 0x02  // testnet
+                )
+
+                print("[NativeIdentityProvisioning] SOV wallet transfer transaction built and signed")
+                print("[NativeIdentityProvisioning] Hex tx length: \(hexSignedTx.count)")
+
+                resolve(["signed_tx": hexSignedTx])
+
+            } catch {
+                print("[NativeIdentityProvisioning] ❌ SOV wallet transfer signing failed: \(error)")
+                reject("SIGNING_ERROR", "Failed to sign SOV wallet transfer transaction: \(error)", nil)
+            }
+        }
+    }
+
+    // MARK: - Fee Config
+
+    @objc
+    func setFeeConfig(
+        _ configJson: String,
+        resolve: @escaping RCTPromiseResolveBlock,
+        reject: @escaping RCTPromiseRejectBlock
+    ) {
+        queue.async {
+            do {
+                let (updatedAt, chainHeight) = try ZhtpClient.setFeeConfig(json: configJson)
+                print("[NativeIdentityProvisioning] Fee config set: updatedAt=\(updatedAt) chainHeight=\(chainHeight)")
+                resolve([
+                    "ok": true,
+                    "updatedAt": NSNumber(value: updatedAt),
+                    "chainHeight": NSNumber(value: chainHeight),
+                ])
+            } catch {
+                print("[NativeIdentityProvisioning] ❌ Fee config failed: \(error)")
+                reject("FEE_CONFIG_ERROR", "Failed to set fee config: \(error)", error)
+            }
+        }
+    }
+
+    @objc
+    func quoteFeeForTxHex(
+        _ txHex: String,
+        resolve: @escaping RCTPromiseResolveBlock,
+        reject: @escaping RCTPromiseRejectBlock
+    ) {
+        queue.async {
+            let fee = ZhtpClient.quoteFeeForTx(txHex: txHex)
+            resolve(NSNumber(value: fee))
         }
     }
 

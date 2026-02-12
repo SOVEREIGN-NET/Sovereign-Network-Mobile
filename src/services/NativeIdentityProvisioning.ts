@@ -239,6 +239,49 @@ class NativeIdentityProvisioningBridge {
   }
 
   /**
+   * Sign a SOV wallet-to-wallet transfer transaction with Dilithium keypair
+   * Uses wallet IDs (32 bytes each) instead of token_id + pubkey
+   * Returns hex-encoded signed transaction ready for API
+   */
+  async signSovWalletTransferTransaction(params: {
+    fromWalletId: string;
+    toWalletId: string;
+    amount: number;
+  }): Promise<{ signed_tx: string }> {
+    if (!this.nativeModule) {
+      throw new Error('NativeIdentityProvisioning not available on this platform');
+    }
+
+    return await this.nativeModule.signSovWalletTransferTransaction(params);
+  }
+
+  /**
+   * Pass fee config JSON (from server) to Rust for cached fee computation.
+   * Returns updatedAt height and current chain height.
+   */
+  async setFeeConfig(configJson: string): Promise<{
+    ok: boolean;
+    updatedAt: number;
+    chainHeight: number;
+  }> {
+    if (!this.nativeModule) {
+      throw new Error('NativeIdentityProvisioning not available on this platform');
+    }
+    return await this.nativeModule.setFeeConfig(configJson);
+  }
+
+  /**
+   * Quote exact fee for a hex-encoded transaction.
+   * Returns fee in atomic units.
+   */
+  async quoteFeeForTxHex(txHex: string): Promise<number> {
+    if (!this.nativeModule) {
+      throw new Error('NativeIdentityProvisioning not available on this platform');
+    }
+    return await this.nativeModule.quoteFeeForTxHex(txHex);
+  }
+
+  /**
    * Build a signed domain registration request (JSON for REST API)
    * lib-client builds the complete request body with signature + timestamp
    */

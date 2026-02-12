@@ -67,6 +67,8 @@ const envConfig = parseEnv(envPath);
 const nodeUrl = envConfig.ZHTP_NODE_URL || 'http://77.42.37.161:9334';
 const { host: nodeHost, port: nodePort } = parseNodeUrl(nodeUrl);
 const certificatePin = envConfig.CERTIFICATE_PIN || 'd21aa1f13cea799f96588a274c210c6de46786f098dc321477d8e04b7d87e058'; // Default testnet pin
+const sovTokenId = envConfig.SOV_TOKEN_ID || null;
+const chainId = envConfig.CHAIN_ID || '2';
 
 // 1. Generate JSON config for React Native
 const generatedConfig = {
@@ -74,6 +76,8 @@ const generatedConfig = {
   ZHTP_NODE_HOST: nodeHost,
   ZHTP_NODE_PORT: nodePort,
   CERTIFICATE_PIN: certificatePin,
+  SOV_TOKEN_ID: sovTokenId,
+  CHAIN_ID: chainId,
 };
 
 fs.writeFileSync(
@@ -87,6 +91,8 @@ console.log(`  ZHTP_NODE_URL: ${generatedConfig.ZHTP_NODE_URL}`);
 console.log(`  ZHTP_NODE_HOST: ${generatedConfig.ZHTP_NODE_HOST}`);
 console.log(`  ZHTP_NODE_PORT: ${generatedConfig.ZHTP_NODE_PORT}`);
 console.log(`  CERTIFICATE_PIN: ${certificatePin}`);
+console.log(`  SOV_TOKEN_ID: ${sovTokenId || '(not set)'}`);
+console.log(`  CHAIN_ID: ${chainId}`);
 
 // 2. Generate iOS Swift config
 const iosConfig = `import Foundation

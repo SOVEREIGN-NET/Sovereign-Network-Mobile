@@ -3,6 +3,7 @@ import { useAuth } from './useAuth';
 import { useAsyncData } from './useAsyncData';
 import tokenService from '../services/TokenService';
 import { TokenBalanceResponse } from '../types/token';
+import { atomicToHuman } from '../utils/tokenUnits';
 
 export interface TokenDisplay {
   token_id: string;
@@ -32,7 +33,9 @@ const normalizeIdentityId = (identityId?: string | null): string | null => {
 const toTokenDisplay = (balance: TokenBalanceResponse): TokenDisplay => ({
   token_id: balance.token_id,
   symbol: balance.symbol,
-  balance: balance.balance,
+  balance: atomicToHuman(balance.balance, balance.decimals),
+  name: balance.name,
+  decimals: balance.decimals,
 });
 
 export const useUserTokenBalances = () => {

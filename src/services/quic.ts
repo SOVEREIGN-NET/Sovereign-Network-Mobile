@@ -44,6 +44,7 @@ const PUBLIC_ENDPOINTS: EndpointRule[] = [
   { method: 'POST', path: '/api/v1/identity/recover' },
   { method: 'POST', path: '/api/v1/identity/migrate' },
   { method: 'POST', path: '/api/v1/identity/register' },
+  { method: 'GET', path: '/api/v1/blockchain/fee-config' },
 ];
 
 /**

@@ -109,6 +109,8 @@ class NativeQuic: NSObject {
 
     let startTime = Date()
 
+    uhp_quinn_init()
+
     guard let spkiPin = dataFromHex(quinnSpkiPinHex), spkiPin.count == 32 else {
       reject("QUIC_ERROR", "Invalid SPKI pin configuration", nil)
       return
@@ -342,59 +344,60 @@ class NativeQuic: NSObject {
   }
 
   private func drainQuinnQueue(identityId: String, quinnHandle: UInt64, sessionBox: AuthSessionBox) {
-    let nextRequest: QuinnQueuedRequest? = {
-      connectionLock.lock()
-      defer { connectionLock.unlock() }
-      guard var queue = quinnRequestQueue[identityId], !queue.isEmpty else {
-        quinnRequestQueue.removeValue(forKey: identityId)
-        quinnHandshakeInProgress.remove(identityId)
-        return nil
+    while true {
+      let nextRequest: QuinnQueuedRequest? = {
+        connectionLock.lock()
+        defer { connectionLock.unlock() }
+        guard var queue = quinnRequestQueue[identityId], !queue.isEmpty else {
+          quinnRequestQueue.removeValue(forKey: identityId)
+          quinnHandshakeInProgress.remove(identityId)
+          return nil
+        }
+        let request = queue.removeFirst()
+        if queue.isEmpty {
+          quinnRequestQueue.removeValue(forKey: identityId)
+        } else {
+          quinnRequestQueue[identityId] = queue
+        }
+        return request
+      }()
+
+      guard let request = nextRequest else {
+        uhp_quic_close(quinnHandle)
+        return
       }
-      let request = queue.removeFirst()
-      if queue.isEmpty {
-        quinnRequestQueue.removeValue(forKey: identityId)
-      } else {
-        quinnRequestQueue[identityId] = queue
+
+      let requestBody = request.body?.data(using: .utf8) ?? Data()
+      let zhtpMethod = httpMethodToZhtpMethod(request.method)
+      var currentSession = sessionBox.session
+
+      let requestResult = sendAuthenticatedZhtpRequestViaQuinn(
+        quinnHandle: quinnHandle,
+        session: &currentSession,
+        method: zhtpMethod,
+        path: request.parsedUrl.path,
+        headers: request.headers,
+        body: requestBody,
+        requester: currentSession.clientDid
+      )
+
+      switch requestResult {
+      case .success(let (status, responseBody)):
+        let bodyString = String(data: responseBody, encoding: .utf8) ?? ""
+        let response: [String: Any] = [
+          "status": Int(status),
+          "statusText": status >= 200 && status < 300 ? "OK" : "Error",
+          "headers": [:],
+          "body": bodyString,
+          "ok": status >= 200 && status < 300
+        ]
+        request.resolve(response)
+      case .failure(let error):
+        request.reject("QUIC_ERROR", error.localizedDescription, error)
       }
-      return request
-    }()
 
-    guard let request = nextRequest else {
-      uhp_quic_close(quinnHandle)
-      return
+      sessionBox.session = currentSession
     }
-
-    let requestBody = request.body?.data(using: .utf8) ?? Data()
-    let zhtpMethod = httpMethodToZhtpMethod(request.method)
-    var currentSession = sessionBox.session
-
-    let requestResult = sendAuthenticatedZhtpRequestViaQuinn(
-      quinnHandle: quinnHandle,
-      session: &currentSession,
-      method: zhtpMethod,
-      path: request.parsedUrl.path,
-      headers: request.headers,
-      body: requestBody,
-      requester: currentSession.clientDid
-    )
-
-    switch requestResult {
-    case .success(let (status, responseBody)):
-      let bodyString = String(data: responseBody, encoding: .utf8) ?? ""
-      let response: [String: Any] = [
-        "status": Int(status),
-        "statusText": status >= 200 && status < 300 ? "OK" : "Error",
-        "headers": [:],
-        "body": bodyString,
-        "ok": status >= 200 && status < 300
-      ]
-      request.resolve(response)
-    case .failure(let error):
-      request.reject("QUIC_ERROR", error.localizedDescription, error)
-    }
-
-    sessionBox.session = currentSession
-    self.drainQuinnQueue(identityId: identityId, quinnHandle: quinnHandle, sessionBox: sessionBox)
   }
 
   private func failQuinnQueue(identityId: String, error: Error) {

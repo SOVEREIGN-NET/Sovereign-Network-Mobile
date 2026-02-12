@@ -436,6 +436,93 @@ class NativeIdentityProvisioning(reactContext: ReactApplicationContext) :
         }
     }
 
+    @ReactMethod
+    fun signSovWalletTransferTransaction(params: ReadableMap, promise: Promise) {
+        executor.execute {
+            try {
+                val fromWalletIdHex = params.getString("fromWalletId") ?: ""
+                val toWalletIdHex = params.getString("toWalletId") ?: ""
+                val amount = parseAmount(params, "amount")
+                    ?: run {
+                        promise.reject("INVALID_PARAMS", "amount must be a valid integer string or number")
+                        return@execute
+                    }
+
+                // Validate wallet IDs are 64 hex chars (32 bytes each)
+                if (fromWalletIdHex.length != 64 || !fromWalletIdHex.matches(Regex("[0-9a-fA-F]+"))) {
+                    promise.reject("INVALID_PARAMS", "fromWalletId must be 64 hex characters (32 bytes)")
+                    return@execute
+                }
+                if (toWalletIdHex.length != 64 || !toWalletIdHex.matches(Regex("[0-9a-fA-F]+"))) {
+                    promise.reject("INVALID_PARAMS", "toWalletId must be 64 hex characters (32 bytes)")
+                    return@execute
+                }
+
+                val identity = getLatestIdentity()
+                if (identity == null) {
+                    promise.reject("IDENTITY_ERROR", "No identity available for signing")
+                    return@execute
+                }
+
+                val fromWalletId = hexToBytes(fromWalletIdHex)
+                val toWalletId = hexToBytes(toWalletIdHex)
+
+                Log.d(TAG, "Building SOV wallet transfer: $fromWalletIdHex -> $toWalletIdHex")
+
+                val hexSignedTx = identity.buildSovWalletTransfer(fromWalletId, toWalletId, amount)
+                if (hexSignedTx == null) {
+                    promise.reject("SIGNING_ERROR", "Failed to build SOV wallet transfer transaction")
+                    return@execute
+                }
+
+                promise.resolve(WritableNativeMap().apply {
+                    putString("signed_tx", hexSignedTx)
+                })
+            } catch (e: Exception) {
+                Log.e(TAG, "SOV wallet transfer signing failed", e)
+                promise.reject("IDENTITY_ERROR", "Failed to sign SOV wallet transfer: ${e.message}", e)
+            }
+        }
+    }
+
+    // ─── Fee config ───
+
+    @ReactMethod
+    fun setFeeConfig(configJson: String, promise: Promise) {
+        executor.execute {
+            try {
+                val result = Identity.setFeeConfig(configJson)
+                if (result != null) {
+                    Log.d(TAG, "Fee config set: updatedAt=${result.first} chainHeight=${result.second}")
+                    val map = WritableNativeMap().apply {
+                        putBoolean("ok", true)
+                        putDouble("updatedAt", result.first.toDouble())
+                        putDouble("chainHeight", result.second.toDouble())
+                    }
+                    promise.resolve(map)
+                } else {
+                    promise.reject("FEE_CONFIG_ERROR", "Rust returned error for fee config")
+                }
+            } catch (e: Exception) {
+                Log.e(TAG, "Failed to set fee config", e)
+                promise.reject("FEE_CONFIG_ERROR", "Failed to set fee config: ${e.message}", e)
+            }
+        }
+    }
+
+    @ReactMethod
+    fun quoteFeeForTxHex(txHex: String, promise: Promise) {
+        executor.execute {
+            try {
+                val fee = Identity.quoteFeeForTxHex(txHex)
+                promise.resolve(fee.toDouble())
+            } catch (e: Exception) {
+                Log.e(TAG, "Failed to quote fee", e)
+                promise.reject("FEE_QUOTE_ERROR", "Failed to quote fee: ${e.message}", e)
+            }
+        }
+    }
+
     // ─── Domain transaction signing ───
 
     @ReactMethod
@@ -731,7 +818,7 @@ class NativeIdentityProvisioning(reactContext: ReactApplicationContext) :
     }
 
     private fun hexToBytes(hex: String): ByteArray {
-        return hex.chunked(2).mapNotNull { it.toByteOrNull(16) }.toByteArray()
+        return hex.chunked(2).map { it.toInt(16).toByte() }.toByteArray()
     }
 
     /** Parse an amount from ReadableMap — accepts both String and Number. */

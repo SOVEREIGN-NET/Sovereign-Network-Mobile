@@ -12,6 +12,8 @@ import type {
   TokenMintResponse,
   TokenTransferRequest,
   TokenTransferResponse,
+  SovTransferRequest,
+  SovTransferResponse,
   TokenInfoResponse,
   TokenBalanceResponse,
   TokenListResponse,
@@ -78,6 +80,24 @@ class TokenService {
       { method: 'POST', body: JSON.stringify({ signed_tx: signingResult.signed_tx }) },
     );
     console.log('[TokenService] Transfer successful');
+    return data;
+  }
+
+  /** POST /api/v1/token/transfer — SOV wallet-to-wallet, Dilithium-signed */
+  async transferSov(request: SovTransferRequest): Promise<SovTransferResponse> {
+    console.log('[TokenService] Transferring SOV:', request.from_wallet_id, '->', request.to_wallet_id);
+    const signingResult = await nativeIdentityProvisioning.signSovWalletTransferTransaction({
+      fromWalletId: request.from_wallet_id,
+      toWalletId: request.to_wallet_id,
+      amount: Number(request.amount),
+    });
+    console.log('[TokenService] SOV transfer transaction signed, hex length:', signingResult.signed_tx.length);
+
+    const data = await quicRequest<SovTransferResponse>(
+      '/api/v1/token/transfer',
+      { method: 'POST', body: JSON.stringify({ signed_tx: signingResult.signed_tx }) },
+    );
+    console.log('[TokenService] SOV transfer successful');
     return data;
   }
 

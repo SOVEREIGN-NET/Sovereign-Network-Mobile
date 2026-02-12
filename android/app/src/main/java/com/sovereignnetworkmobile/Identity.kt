@@ -125,6 +125,11 @@ class Identity private constructor(
             handle: Long, tokenId: ByteArray, amount: Long, chainId: Int
         ): String?
 
+        @JvmStatic private external fun nativeBuildSovWalletTransfer(
+            handle: Long, fromWalletId: ByteArray, toWalletId: ByteArray,
+            amount: Long, chainId: Int
+        ): String?
+
         // ─── JNI: Domain requests (returns JSON for REST API) ───
         @JvmStatic private external fun nativeBuildDomainRegisterRequest(
             handle: Long, domain: String, contentMappingsJson: String?
@@ -137,6 +142,22 @@ class Identity private constructor(
         @JvmStatic private external fun nativeBuildDomainTransferRequest(
             handle: Long, domain: String, toOwnerDid: String
         ): String?
+
+        // ─── JNI: Fee config (global, no handle) ───
+        @JvmStatic private external fun nativeSetFeeConfigJsonEx(
+            json: String, heights: LongArray
+        ): Int
+
+        @JvmStatic private external fun nativeQuoteFeeForTxHex(txHex: String): Long
+
+        /** Pass fee config JSON to Rust. Returns (updatedAt, chainHeight) or null on error. */
+        fun setFeeConfig(json: String): Pair<Long, Long>? {
+            val heights = LongArray(2)
+            val ok = nativeSetFeeConfigJsonEx(json, heights)
+            return if (ok == 0) Pair(heights[0], heights[1]) else null
+        }
+
+        fun quoteFeeForTxHex(txHex: String): Long = nativeQuoteFeeForTxHex(txHex)
 
         // ─── JNI: Deprecated secret key getters (legacy handshake path only) ───
         @JvmStatic private external fun nativeIdentityGetDilithiumSk(handle: Long): ByteArray?
@@ -182,6 +203,10 @@ class Identity private constructor(
 
     fun buildTokenBurn(tokenId: ByteArray, amount: Long, chainId: Int = 0x02): String? =
         nativeBuildTokenBurn(handle, tokenId, amount, chainId)
+
+    /** Build signed SOV wallet-to-wallet transfer. fromWalletId and toWalletId must each be 32 bytes. */
+    fun buildSovWalletTransfer(fromWalletId: ByteArray, toWalletId: ByteArray, amount: Long, chainId: Int = 0x02): String? =
+        nativeBuildSovWalletTransfer(handle, fromWalletId, toWalletId, amount, chainId)
 
     // ─── Domain requests (returns JSON for REST API) ───
 

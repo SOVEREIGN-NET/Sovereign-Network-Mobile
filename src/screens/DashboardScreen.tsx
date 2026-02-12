@@ -91,7 +91,7 @@ const DashboardScreen: React.FC<any> = ({ navigation }) => {
     navigation.navigate('Browser', { url: targetUrl });
   };
 
-  const { trendingDapps, trendingTokens, bounties } = t.dashboard;
+  const { trendingDapps, trendingTokens } = t.dashboard;
 
   return (
     <>
@@ -316,37 +316,6 @@ const DashboardScreen: React.FC<any> = ({ navigation }) => {
           </Column>
         </Card>
 
-        <Card>
-          <Row justify="space-between" align="center" style={{ marginBottom: spacing.sm }}>
-            <Text variant="h3">{bounties.title}</Text>
-            <Badge label="Coming soon" size="sm" />
-          </Row>
-          <Column gap="md">
-            {bounties.items.map((item: any) => (
-              <Row
-                key={item.title}
-                justify="space-between"
-                align="center"
-                style={{
-                  paddingVertical: spacing.sm,
-                  paddingHorizontal: spacing.md,
-                  borderRadius: borderRadius.lg,
-                  backgroundColor: colors.bg_darker,
-                }}
-              >
-                <Column gap="xs" style={{ flex: 1 }}>
-                  <Text variant="body" style={{ fontWeight: '600' }}>
-                    {item.title}
-                  </Text>
-                  <Text variant="caption" style={{ color: colors.text_secondary }}>
-                    {item.reward} • {item.daysLeft}d left
-                  </Text>
-                </Column>
-                <Badge label={`${item.contributors} builders`} variant="default" size="sm" />
-              </Row>
-            ))}
-          </Column>
-        </Card>
 
       </ScreenLayout>
     </>

@@ -1857,6 +1857,7 @@ dependencies = [
  "getrandom 0.2.17",
  "hex",
  "hkdf",
+ "jni 0.21.1",
  "lib-blockchain",
  "lib-crypto",
  "lib-identity-core",

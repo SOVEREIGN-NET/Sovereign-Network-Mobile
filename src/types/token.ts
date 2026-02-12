@@ -59,6 +59,23 @@ export interface TokenTransferResponse {
   to_balance: number;
 }
 
+// ============ SOV WALLET TRANSFER ============
+
+export interface SovTransferRequest {
+  from_wallet_id: string; // 64 hex chars (32 bytes)
+  to_wallet_id: string;   // 64 hex chars (32 bytes)
+  amount: string | number; // Atomic units string
+}
+
+export interface SovTransferResponse {
+  success: boolean;
+  amount: number;
+  from_wallet_id: string;
+  to_wallet_id: string;
+  from_balance: number;
+  to_balance: number;
+}
+
 // ============ GET TOKEN INFO ============
 
 export interface TokenInfoResponse {
@@ -117,6 +134,7 @@ export type TokenResponse =
   | TokenCreateResponse
   | TokenMintResponse
   | TokenTransferResponse
+  | SovTransferResponse
   | TokenBurnResponse
   | TokenInfoResponse
   | TokenBalanceResponse

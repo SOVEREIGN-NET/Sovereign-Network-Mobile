@@ -1,11 +1,19 @@
 /**
  * useNodeConnectionStatus Hook
  * Manages node connection status and reachability checking
+ *
+ * Checks on mount, on foreground resume, and every 120s as a fallback.
+ * Each check does a full QUIC+TLS connect/close via quinn-ffi, so
+ * keeping the interval high avoids resource accumulation in the Rust runtime.
  */
 
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
+import { AppState, AppStateStatus } from 'react-native';
 import { isQuicSupported, testQuicConnection } from '../services/quic';
 import { DEFAULT_NODE_HOST, DEFAULT_NODE_PORT } from '../config';
+import { refreshFeeConfig } from '../services/FeeConfigService';
+
+const POLL_INTERVAL_MS = 120_000; // 120 seconds
 
 export interface UseNodeConnectionStatusReturn {
   connectionStatus: 'idle' | 'checking' | 'connected' | 'disconnected';
@@ -14,13 +22,6 @@ export interface UseNodeConnectionStatusReturn {
   isConnected: boolean;
 }
 
-/**
- * Hook to monitor node connection status
- * Periodically checks QUIC node reachability and latency
- *
- * @param autoCheck - Whether to automatically check connection on mount and periodically
- * @returns Connection status, latency, check function, and boolean flag
- */
 export function useNodeConnectionStatus(
   autoCheck: boolean = true
 ): UseNodeConnectionStatusReturn {
@@ -28,56 +29,67 @@ export function useNodeConnectionStatus(
     () => (autoCheck ? 'checking' : 'idle')
   );
   const [latencyMs, setLatencyMs] = useState<number | null>(null);
+  const checkInFlightRef = useRef(false);
 
-  // Check QUIC node reachability (UDP-based, doesn't require full PQC handshake)
   const checkNodeConnection = useCallback(async () => {
+    // Prevent overlapping checks — if one is already running, skip
+    if (checkInFlightRef.current) {
+      return;
+    }
+    checkInFlightRef.current = true;
+
     try {
-      console.log('[🔗 HeaderBar:useNodeConnectionStatus] Starting node reachability check');
-      console.log(`[🔗 HeaderBar:useNodeConnectionStatus] Target: ${DEFAULT_NODE_HOST}:${DEFAULT_NODE_PORT}`);
-
-      // First check if QUIC is supported
       const supported = await isQuicSupported();
-      console.log(`[🔗 HeaderBar:useNodeConnectionStatus] QUIC supported: ${supported}`);
-
       if (!supported) {
-        console.warn('QUIC not supported on this device');
         setConnectionStatus('disconnected');
         return;
       }
 
-      // Use QUIC connection test (full PQC handshake works)
-      console.log('[🔗 HeaderBar:useNodeConnectionStatus] Calling testQuicConnection (full QUIC+PQC handshake)');
       setConnectionStatus('checking');
       const result = await testQuicConnection(DEFAULT_NODE_HOST, DEFAULT_NODE_PORT);
-      console.log('[🔗 HeaderBar:useNodeConnectionStatus] testQuicConnection result:', result);
 
       if (result.success) {
-        console.log(`[✅ HeaderBar:useNodeConnectionStatus] Connected! Latency: ${result.latencyMs}ms`);
         setConnectionStatus('connected');
         setLatencyMs(result.latencyMs ? Math.round(result.latencyMs) : null);
+        // Refresh fee config whenever node is reachable
+        refreshFeeConfig().catch(err =>
+          console.warn('[FeeConfig] Refresh failed:', err)
+        );
       } else {
-        console.log('[❌ HeaderBar:useNodeConnectionStatus] Connection failed');
         setConnectionStatus('disconnected');
         setLatencyMs(null);
       }
-    } catch (error) {
-      console.error('[❌ HeaderBar:useNodeConnectionStatus] Node reachability check failed:', error);
+    } catch {
       setConnectionStatus('disconnected');
       setLatencyMs(null);
+    } finally {
+      checkInFlightRef.current = false;
     }
   }, []);
 
-  // Check connection on mount and periodically
   useEffect(() => {
     if (!autoCheck) {
       return;
     }
 
+    // Check once on mount
     checkNodeConnection();
 
-    // Re-check every 30 seconds
-    const interval = setInterval(checkNodeConnection, 30000);
-    return () => clearInterval(interval);
+    // Re-check every 120 seconds (was 30s — too aggressive for a full QUIC+TLS round-trip)
+    const interval = setInterval(checkNodeConnection, POLL_INTERVAL_MS);
+
+    // Re-check when app returns to foreground
+    const handleAppState = (nextState: AppStateStatus) => {
+      if (nextState === 'active') {
+        checkNodeConnection();
+      }
+    };
+    const sub = AppState.addEventListener('change', handleAppState);
+
+    return () => {
+      clearInterval(interval);
+      sub.remove();
+    };
   }, [checkNodeConnection, autoCheck]);
 
   return {

@@ -146,6 +146,16 @@ private func cBuildTokenBurn(
     _ chainId: UInt8
 ) -> UnsafeMutablePointer<CChar>?
 
+/// Build signed SOV wallet-to-wallet transfer transaction
+@_silgen_name("zhtp_client_build_sov_wallet_transfer")
+private func cBuildSovWalletTransfer(
+    _ handle: UnsafeMutableRawPointer,
+    _ fromWalletId: UnsafePointer<UInt8>?,  // 32 bytes
+    _ toWalletId: UnsafePointer<UInt8>?,    // 32 bytes
+    _ amount: UInt64,
+    _ chainId: UInt8
+) -> UnsafeMutablePointer<CChar>?
+
 // MARK: - C FFI Declarations: Domain transactions (handle is opaque IdentityHandle*)
 
 /// Build signed domain registration transaction
@@ -174,6 +184,20 @@ private func cBuildDomainTransfer(
     _ toPubkey: UnsafePointer<UInt8>?,
     _ chainId: UInt8
 ) -> UnsafeMutablePointer<CChar>?
+
+// MARK: - C FFI Declarations: Fee Config (global, no handle)
+
+/// Set fee config from server JSON. Returns 0 on success, writes updated_at and chain_height.
+@_silgen_name("zhtp_client_set_fee_config_json_ex")
+private func cSetFeeConfigJsonEx(
+    _ json: UnsafePointer<CChar>,
+    _ updatedAt: UnsafeMutablePointer<UInt64>,
+    _ chainHeight: UnsafeMutablePointer<UInt64>
+) -> Int32
+
+/// Quote exact fee for a hex-encoded transaction.
+@_silgen_name("zhtp_client_quote_fee_for_tx_hex")
+private func cQuoteFeeForTxHex(_ txHex: UnsafePointer<CChar>) -> UInt64
 
 // MARK: - C FFI Declarations: HandshakeState (3-leg UHP, keys stay in Rust)
 
@@ -707,6 +731,39 @@ public class ZhtpClient {
         return String(cString: hexPtr)
     }
 
+    /// Build signed SOV wallet-to-wallet transfer transaction (returns hex-encoded string ready for API)
+    /// fromWalletId and toWalletId must each be exactly 32 bytes
+    public static func buildSovWalletTransfer(
+        fromWalletId: Data,
+        toWalletId: Data,
+        amount: UInt64,
+        using identity: Identity,
+        chainId: UInt8 = 0x02  // testnet
+    ) throws -> String {
+        guard fromWalletId.count == 32 else {
+            throw ClientError.signingError("fromWalletId must be exactly 32 bytes, got \(fromWalletId.count)")
+        }
+        guard toWalletId.count == 32 else {
+            throw ClientError.signingError("toWalletId must be exactly 32 bytes, got \(toWalletId.count)")
+        }
+
+        guard let hexPtr = fromWalletId.withUnsafeBytes({ fromPtr in
+            toWalletId.withUnsafeBytes { toPtr in
+                cBuildSovWalletTransfer(
+                    identity.getHandle(),
+                    fromPtr.baseAddress?.assumingMemoryBound(to: UInt8.self),
+                    toPtr.baseAddress?.assumingMemoryBound(to: UInt8.self),
+                    amount,
+                    chainId
+                )
+            }
+        }) else {
+            throw ClientError.signingError("Failed to build SOV wallet transfer transaction")
+        }
+        defer { cStringFree(hexPtr) }
+        return String(cString: hexPtr)
+    }
+
     // MARK: Domain requests — handle is opaque IdentityHandle*
     // Note: C FFI still uses old function names but internally delegates to _request functions
     // which return JSON. New parameters (content_mappings, expected_previous_manifest_cid)
@@ -788,6 +845,26 @@ public class ZhtpClient {
         }
         defer { cStringFree(resultPtr) }
         return String(cString: resultPtr)
+    }
+
+    // MARK: - Fee Config
+
+    /// Pass fee config JSON to Rust. Returns (updatedAt, chainHeight) on success.
+    public static func setFeeConfig(json: String) throws -> (updatedAt: UInt64, chainHeight: UInt64) {
+        var updatedAt: UInt64 = 0
+        var chainHeight: UInt64 = 0
+        let ok = json.withCString { cStr in
+            cSetFeeConfigJsonEx(cStr, &updatedAt, &chainHeight)
+        }
+        guard ok == 0 else {
+            throw ClientError.cryptoError("Failed to set fee config (code: \(ok))")
+        }
+        return (updatedAt, chainHeight)
+    }
+
+    /// Quote exact fee for a hex-encoded transaction.
+    public static func quoteFeeForTx(txHex: String) -> UInt64 {
+        return txHex.withCString { cStr in cQuoteFeeForTxHex(cStr) }
     }
 }
 

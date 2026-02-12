@@ -3,6 +3,7 @@ import { useAuth } from './useAuth';
 import { useAsyncData } from './useAsyncData';
 import { getUseMockService } from '../context/AuthContext';
 import appService from '../services/AppService';
+import { atomicToHuman } from '../utils/tokenUnits';
 
 export interface WalletPermissions {
   can_transfer_external: boolean;
@@ -55,10 +56,10 @@ const toWalletDisplay = (wallet: any): WalletDisplay => ({
   id: resolveWalletId(wallet),
   name: wallet.name ?? `${wallet.wallet_type} Wallet`,
   wallet_type: wallet.wallet_type ?? 'Unknown',
-  available_balance: wallet.available_balance ?? 0,
-  staked_balance: wallet.staked_balance ?? 0,
-  pending_rewards: wallet.pending_rewards ?? 0,
-  total_balance: wallet.total_balance ?? wallet.balance ?? 0,
+  available_balance: atomicToHuman(wallet.available_balance ?? 0),
+  staked_balance: atomicToHuman(wallet.staked_balance ?? 0),
+  pending_rewards: atomicToHuman(wallet.pending_rewards ?? 0),
+  total_balance: atomicToHuman(wallet.total_balance ?? wallet.balance ?? 0),
   permissions: wallet.permissions,
   created_at: wallet.created_at,
   description: wallet.description,
@@ -119,7 +120,7 @@ export const useWalletList = () => {
     const totalFromWallets = wallets.reduce((sum, wallet) => sum + (wallet.total_balance ?? 0), 0);
     const totalBalance =
       data?.total_balance && data.total_balance > 0
-        ? data.total_balance
+        ? atomicToHuman(data.total_balance)
         : totalFromWallets;
 
     return {
