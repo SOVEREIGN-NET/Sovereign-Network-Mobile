@@ -6,14 +6,24 @@ final class Web4SchemeHandler: NSObject, WKURLSchemeHandler {
   private let runtime: Web4Runtime?
   private let domain: String
   private let embeddedApp: String?
+  private let proxyBaseUrl: String?
+  private let proxyHostHeader: String?
   private let chunkSize = 64 * 1024 // 64KB chunks for streaming
   private var activeTasks = Set<Int>()
   private let lock = NSLock()
 
-  init(runtime: Web4Runtime?, domain: String, embeddedApp: String? = nil) {
+  init(
+    runtime: Web4Runtime?,
+    domain: String,
+    embeddedApp: String? = nil,
+    proxyBaseUrl: String? = nil,
+    proxyHostHeader: String? = nil
+  ) {
     self.runtime = runtime
     self.domain = domain.lowercased()
     self.embeddedApp = embeddedApp?.lowercased()
+    self.proxyBaseUrl = proxyBaseUrl
+    self.proxyHostHeader = proxyHostHeader?.lowercased()
   }
 
   private func embeddedMime(forPath path: String) -> String {
@@ -42,6 +52,12 @@ final class Web4SchemeHandler: NSObject, WKURLSchemeHandler {
 
     guard FileManager.default.fileExists(atPath: fileUrl.path) else { return nil }
     return (fileUrl, embeddedMime(forPath: trimmed))
+  }
+
+  private func shouldProxyToNode(path: String) -> Bool {
+    // Explorer (WASM) is expected to call into node APIs via same-origin /api/...
+    // Keep this narrow to avoid turning the WebView into a generic proxy.
+    return path == "/api" || path.hasPrefix("/api/")
   }
 
   private func errorPage(code: Int, title: String, message: String, url: String) -> Data {
@@ -162,6 +178,52 @@ final class Web4SchemeHandler: NSObject, WKURLSchemeHandler {
           if isTaskActive(taskId) {
             urlSchemeTask.didFinish()
           }
+
+          lock.lock()
+          activeTasks.remove(taskId)
+          lock.unlock()
+          return
+        }
+
+        // If not an embedded asset, optionally proxy node API calls over QUIC.
+        if let base = proxyBaseUrl, shouldProxyToNode(path: path) {
+          let method = (urlSchemeTask.request.httpMethod ?? "GET").uppercased()
+          let body = urlSchemeTask.request.httpBody
+          let query = url.query.map { "?\($0)" } ?? ""
+          let fullUrl = base.trimmingCharacters(in: CharacterSet(charactersIn: "/")) + (url.path.isEmpty ? "/" : url.path) + query
+
+          let contentType = urlSchemeTask.request.value(forHTTPHeaderField: "content-type")
+            ?? urlSchemeTask.request.value(forHTTPHeaderField: "Content-Type")
+            ?? "application/json"
+
+          let response = try await NativeQuic().requestBytes(
+            url: fullUrl,
+            method: method,
+            headers: [
+              "content-type": contentType,
+              // Important: use the Web4 domain as SNI/Host to match the node certificate.
+              "Host": proxyHostHeader ?? domain
+            ],
+            body: body,
+            timeout: 30,
+            insecure: true,
+            alpn: NativeQuic.QuicAlpnProfile.publicContent
+          )
+
+          guard isTaskActive(taskId) else { return }
+
+          let mime = response.headers["content-type"] ?? "application/json"
+          let bodyBytes = response.body
+
+          let urlResponse = URLResponse(
+            url: url,
+            mimeType: mime,
+            expectedContentLength: bodyBytes.count,
+            textEncodingName: mime.contains("text") || mime.contains("json") ? "utf-8" : nil
+          )
+          urlSchemeTask.didReceive(urlResponse)
+          urlSchemeTask.didReceive(bodyBytes)
+          urlSchemeTask.didFinish()
 
           lock.lock()
           activeTasks.remove(taskId)

@@ -20,7 +20,7 @@ import {
 } from '../components';
 import { useTranslation } from '../i18n';
 import { borderRadius, colors, spacing, typography } from '../theme';
-import { FEATURE_FLAGS } from '../config';
+import { DEFAULT_NODE_HOST, DEFAULT_NODE_PORT, FEATURE_FLAGS } from '../config';
 import SShieldLogo from '../components/atoms/Logo';
 
 const getTrendColor = (trend: TokenData['trend']) => {
@@ -135,8 +135,11 @@ const DashboardScreen: React.FC<any> = ({ navigation }) => {
               <View style={{ flex: 1, backgroundColor: colors.bg_darkest }}>
                 <Web4View
                   style={{ flex: 1, backgroundColor: colors.bg_darkest }}
-                  domain="explorer.embedded"
+                  domain="explorer.local"
                   embeddedApp="explorer"
+                  hostHeader="explorer.sov"
+                  nodeHost={DEFAULT_NODE_HOST}
+                  nodePort={DEFAULT_NODE_PORT}
                   cacheLimitMb={150}
                   allowHttpsExternal={false}
                   onLoadStart={() => setExplorerWebLoading(true)}

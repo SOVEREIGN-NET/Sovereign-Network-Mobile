@@ -13,14 +13,17 @@ import android.webkit.WebViewClient
 import com.facebook.react.bridge.Arguments
 import com.facebook.react.bridge.ReactContext
 import com.facebook.react.uimanager.events.RCTEventEmitter
+import com.sovereignnetworkmobile.NativeQuicBridge
 import java.io.FileInputStream
 import java.io.InputStream
+import java.io.ByteArrayInputStream
 import java.util.concurrent.Executors
 
 @SuppressLint("SetJavaScriptEnabled")
 class Web4ReactWebView(context: Context) : WebView(context) {
     private var domain: String? = null
     private var embeddedApp: String? = null
+    private var hostHeader: String? = null
     private var allowHttpsExternal: Boolean = false
     private var nodeHost: String? = null
     private var nodePort: Int = 0
@@ -31,6 +34,7 @@ class Web4ReactWebView(context: Context) : WebView(context) {
     private var lastConfiguredHost: String? = null
     private var lastConfiguredPort: Int? = null
     private var lastConfiguredEmbeddedApp: String? = null
+    private var lastConfiguredHostHeader: String? = null
     private val fetchExecutor = Executors.newCachedThreadPool()
 
     init {
@@ -286,6 +290,11 @@ class Web4ReactWebView(context: Context) : WebView(context) {
         applyConfigIfReady()
     }
 
+    fun setHostHeader(value: String?) {
+        this.hostHeader = value?.lowercase()
+        applyConfigIfReady()
+    }
+
     fun setNodeHost(value: String?) {
         this.nodeHost = value
         applyConfigIfReady()
@@ -310,9 +319,15 @@ class Web4ReactWebView(context: Context) : WebView(context) {
 
         val embedded = this.embeddedApp
         if (embedded != null && embedded.isNotEmpty()) {
+            val host = this.nodeHost ?: return
+            if (nodePort == 0) return
+
             val isSameConfig = (configured &&
                 lastConfiguredDomain == domain &&
-                lastConfiguredEmbeddedApp == embedded)
+                lastConfiguredEmbeddedApp == embedded &&
+                lastConfiguredHost == host &&
+                lastConfiguredPort == nodePort &&
+                lastConfiguredHostHeader == hostHeader)
             if (isSameConfig) return
 
             if (configured && !isSameConfig) {
@@ -323,9 +338,10 @@ class Web4ReactWebView(context: Context) : WebView(context) {
             runtime = null
             loadUrl("zhtp://${domain}/")
             lastConfiguredDomain = domain
-            lastConfiguredHost = null
-            lastConfiguredPort = null
+            lastConfiguredHost = host
+            lastConfiguredPort = nodePort
             lastConfiguredEmbeddedApp = embedded
+            lastConfiguredHostHeader = hostHeader
             return
         }
 
@@ -335,7 +351,8 @@ class Web4ReactWebView(context: Context) : WebView(context) {
             lastConfiguredDomain == domain &&
             lastConfiguredHost == host &&
             lastConfiguredPort == nodePort &&
-            lastConfiguredEmbeddedApp == null)
+            lastConfiguredEmbeddedApp == null &&
+            lastConfiguredHostHeader == hostHeader)
         if (isSameConfig) return
 
         if (configured && !isSameConfig) {
@@ -351,6 +368,7 @@ class Web4ReactWebView(context: Context) : WebView(context) {
         lastConfiguredHost = host
         lastConfiguredPort = nodePort
         lastConfiguredEmbeddedApp = null
+        lastConfiguredHostHeader = hostHeader
     }
 
     private data class EmbeddedResolved(val mime: String, val stream: InputStream) {
@@ -393,19 +411,60 @@ class Web4ReactWebView(context: Context) : WebView(context) {
 
         val embedded = this.embeddedApp
         if (embedded != null && embedded.isNotEmpty()) {
-            val resolved = resolveEmbeddedAsset(embedded, path) ?: return errorResponse("Not Found", 404)
-            val (mime, encoding) = parseMime(resolved.mime)
-            val contentTypeHeader = if (encoding != null) "$mime; charset=$encoding" else mime
-            return WebResourceResponse(mime, encoding, resolved.stream).apply {
-                setStatusCodeAndReasonPhrase(200, "OK")
-                responseHeaders = mapOf(
-                    "Content-Type" to contentTypeHeader,
-                    "Access-Control-Allow-Origin" to "*",
-                    "Access-Control-Allow-Methods" to "GET, POST, OPTIONS",
-                    "Access-Control-Allow-Headers" to "*",
-                    "Cache-Control" to "public, max-age=31536000"
-                )
+            // Serve embedded assets first.
+            val resolved = resolveEmbeddedAsset(embedded, path)
+            if (resolved != null) {
+                val (mime, encoding) = parseMime(resolved.mime)
+                val contentTypeHeader = if (encoding != null) "$mime; charset=$encoding" else mime
+                return WebResourceResponse(mime, encoding, resolved.stream).apply {
+                    setStatusCodeAndReasonPhrase(200, "OK")
+                    responseHeaders = mapOf(
+                        "Content-Type" to contentTypeHeader,
+                        "Access-Control-Allow-Origin" to "*",
+                        "Access-Control-Allow-Methods" to "GET, POST, OPTIONS",
+                        "Access-Control-Allow-Headers" to "*",
+                        "Cache-Control" to "public, max-age=31536000"
+                    )
+                }
             }
+
+            // Proxy node API calls (Explorer expects /api/...).
+            if (path == "/api" || path.startsWith("/api/")) {
+                val host = this.nodeHost ?: return errorResponse("Not Found", 404)
+                if (nodePort == 0) return errorResponse("Not Found", 404)
+
+                val base = "quic://${host}:${nodePort}"
+                val hh = (this.hostHeader ?: domain).lowercase()
+                return try {
+                    val response = NativeQuicBridge.requestBytes(
+                        url = base + path,
+                        method = "GET",
+                        headersJson = """{"content-type":"application/json","Host":"$hh"}""",
+                        body = null,
+                        timeoutSecs = 30,
+                        insecure = true,
+                        alpn = "public"
+                    ) ?: return errorResponse("Error", 500)
+
+                    val status = (response["status"] as? Number)?.toInt() ?: 0
+                    val bodyBytes = response["body"] as? ByteArray ?: ByteArray(0)
+                    val mime = "application/json"
+                    val stream = ByteArrayInputStream(bodyBytes)
+                    WebResourceResponse(mime, "utf-8", stream).apply {
+                        setStatusCodeAndReasonPhrase(if (status == 0) 500 else status, "OK")
+                        responseHeaders = mapOf(
+                            "Content-Type" to mime,
+                            "Access-Control-Allow-Origin" to "*",
+                            "Access-Control-Allow-Methods" to "GET, POST, OPTIONS",
+                            "Access-Control-Allow-Headers" to "*"
+                        )
+                    }
+                } catch (e: Exception) {
+                    errorResponse("Error: ${e.message}", 500)
+                }
+            }
+
+            return errorResponse("Not Found", 404)
         }
 
         val runtime = this.runtime ?: return null
@@ -554,6 +613,7 @@ class Web4ReactWebView(context: Context) : WebView(context) {
         lastConfiguredHost = null
         lastConfiguredPort = null
         lastConfiguredEmbeddedApp = null
+        lastConfiguredHostHeader = null
         stopLoading()
         loadUrl("about:blank")
     }

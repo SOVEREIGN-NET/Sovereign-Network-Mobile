@@ -7,12 +7,14 @@ final class Web4View: UIView {
   private var webView: WKWebView?
   private var domain: String?
   private var embeddedApp: String?
+  private var hostHeader: String?
   private var nodeHost: String?
   private var nodePort: Int?
   private var lastConfiguredDomain: String?
   private var lastConfiguredHost: String?
   private var lastConfiguredPort: Int?
   private var lastConfiguredEmbeddedApp: String?
+  private var lastConfiguredHostHeader: String?
   private var cacheLimitMb: Int = 150
   private var allowHttpsExternal: Bool = false
   private var runtime: Web4Runtime?
@@ -20,6 +22,11 @@ final class Web4View: UIView {
   @objc var onLoadEnd: RCTDirectEventBlock?
   @objc var onNavigation: RCTDirectEventBlock?
   @objc var onError: RCTDirectEventBlock?
+
+  @objc func setHostHeader(_ value: NSString?) {
+    hostHeader = value as String?
+    configureIfReady()
+  }
 
   @objc func setEmbeddedApp(_ value: NSString?) {
     embeddedApp = value as String?
@@ -54,10 +61,18 @@ final class Web4View: UIView {
 
     let domain = domainRaw.lowercased()
     let embedded = embeddedApp?.lowercased()
+    let hostHeader = self.hostHeader?.lowercased()
 
     if let embeddedApp = embedded, !embeddedApp.isEmpty {
+      guard let host = nodeHost,
+            let port = nodePort,
+            port > 0 else { return }
+
       let isSameConfig = (lastConfiguredDomain == domain &&
-                          lastConfiguredEmbeddedApp == embeddedApp)
+                          lastConfiguredEmbeddedApp == embeddedApp &&
+                          lastConfiguredHostHeader == hostHeader &&
+                          lastConfiguredHost == host &&
+                          lastConfiguredPort == port)
 
       if webView != nil && isSameConfig {
         return
@@ -69,12 +84,27 @@ final class Web4View: UIView {
 
       let config = WKWebViewConfiguration()
       self.runtime = nil
-      let handler = Web4SchemeHandler(runtime: nil, domain: domain, embeddedApp: embeddedApp)
+      let handler = Web4SchemeHandler(
+        runtime: nil,
+        domain: domain,
+        embeddedApp: embeddedApp,
+        proxyBaseUrl: "quic://\(host):\(port)",
+        proxyHostHeader: hostHeader
+      )
       config.setURLSchemeHandler(handler, forURLScheme: "zhtp")
 
       // Add message handler for fetch polyfill
       let contentController = config.userContentController
-      contentController.add(ZhtpFetchHandler(runtime: nil, domain: domain, embeddedApp: embeddedApp), name: "zhtpFetch")
+      contentController.add(
+        ZhtpFetchHandler(
+          runtime: nil,
+          domain: domain,
+          embeddedApp: embeddedApp,
+          proxyBaseUrl: "quic://\(host):\(port)",
+          proxyHostHeader: hostHeader
+        ),
+        name: "zhtpFetch"
+      )
 
       // Inject fetch polyfill script
       let fetchPolyfill = WKUserScript(source: Self.fetchPolyfillScript, injectionTime: .atDocumentStart, forMainFrameOnly: false)
@@ -90,9 +120,10 @@ final class Web4View: UIView {
       addSubview(wv)
       webView = wv
       lastConfiguredDomain = domain
-      lastConfiguredHost = nil
-      lastConfiguredPort = nil
+      lastConfiguredHost = host
+      lastConfiguredPort = port
       lastConfiguredEmbeddedApp = embeddedApp
+      lastConfiguredHostHeader = hostHeader
       return
     }
 
@@ -103,7 +134,8 @@ final class Web4View: UIView {
     let isSameConfig = (lastConfiguredDomain == domain &&
                         lastConfiguredHost == host &&
                         lastConfiguredPort == port &&
-                        lastConfiguredEmbeddedApp == nil)
+                        lastConfiguredEmbeddedApp == nil &&
+                        lastConfiguredHostHeader == hostHeader)
 
     if webView != nil && isSameConfig {
       return
@@ -118,7 +150,7 @@ final class Web4View: UIView {
     let rt = Web4Runtime(
       cacheDir: cacheDir.appendingPathComponent("web4_blobs"),
       cacheLimitBytes: Int64(cacheLimitMb) * 1024 * 1024,
-      client: Web4Client(baseUrl: "quic://\(host):\(port)", hostHeader: domain)
+      client: Web4Client(baseUrl: "quic://\(host):\(port)", hostHeader: hostHeader ?? domain)
     )
     self.runtime = rt
     let handler = Web4SchemeHandler(runtime: rt, domain: domain, embeddedApp: nil)
@@ -144,6 +176,7 @@ final class Web4View: UIView {
     lastConfiguredDomain = domain
     lastConfiguredHost = host
     lastConfiguredPort = port
+    lastConfiguredHostHeader = hostHeader
   }
 
   private func teardownWebView() {
@@ -160,6 +193,7 @@ final class Web4View: UIView {
     lastConfiguredHost = nil
     lastConfiguredPort = nil
     lastConfiguredEmbeddedApp = nil
+    lastConfiguredHostHeader = nil
   }
 
   deinit {
@@ -260,12 +294,16 @@ private class ZhtpFetchHandler: NSObject, WKScriptMessageHandler {
   private let runtime: Web4Runtime?
   private let domain: String
   private let embeddedApp: String?
+  private let proxyBaseUrl: String?
+  private let proxyHostHeader: String?
   private let maxFetchSize: Int64 = 1024 * 1024 // 1MB max for fetch polyfill
 
-  init(runtime: Web4Runtime?, domain: String, embeddedApp: String?) {
+  init(runtime: Web4Runtime?, domain: String, embeddedApp: String?, proxyBaseUrl: String?, proxyHostHeader: String?) {
     self.runtime = runtime
     self.domain = domain
     self.embeddedApp = embeddedApp?.lowercased()
+    self.proxyBaseUrl = proxyBaseUrl
+    self.proxyHostHeader = proxyHostHeader?.lowercased()
   }
 
   private func embeddedMime(forPath path: String) -> String {
@@ -296,6 +334,10 @@ private class ZhtpFetchHandler: NSObject, WKScriptMessageHandler {
     return (fileUrl, embeddedMime(forPath: trimmed))
   }
 
+  private func shouldProxyToNode(path: String) -> Bool {
+    return path == "/api" || path.hasPrefix("/api/")
+  }
+
   func userContentController(_ userContentController: WKUserContentController, didReceive message: WKScriptMessage) {
     guard let body = message.body as? [String: Any],
           let urlString = body["url"] as? String,
@@ -319,6 +361,32 @@ private class ZhtpFetchHandler: NSObject, WKScriptMessageHandler {
           let data = try Data(contentsOf: embedded.url)
           let base64 = data.base64EncodedString()
           let js = "window['\(callbackId)'](true, 200, '\(embedded.mime)', '\(base64)', null)"
+          await MainActor.run { webView?.evaluateJavaScript(js, completionHandler: nil) }
+          return
+        }
+
+        if let base = proxyBaseUrl, shouldProxyToNode(path: path) {
+          let method = "GET"
+          let requestBody: Data? = nil
+          let urlWithQuery = url.path + (url.query.map { "?\($0)" } ?? "")
+
+          let contentType = "application/json"
+          let response = try await NativeQuic().requestBytes(
+            url: base.trimmingCharacters(in: CharacterSet(charactersIn: "/")) + urlWithQuery,
+            method: method,
+            headers: [
+              "content-type": contentType,
+              "Host": proxyHostHeader ?? domain
+            ],
+            body: requestBody,
+            timeout: 30,
+            insecure: true,
+            alpn: NativeQuic.QuicAlpnProfile.publicContent
+          )
+
+          let respMime = response.headers["content-type"] ?? "application/json"
+          let base64 = response.body.base64EncodedString()
+          let js = "window['\(callbackId)'](true, \(response.status), '\(respMime)', '\(base64)', null)"
           await MainActor.run { webView?.evaluateJavaScript(js, completionHandler: nil) }
           return
         }

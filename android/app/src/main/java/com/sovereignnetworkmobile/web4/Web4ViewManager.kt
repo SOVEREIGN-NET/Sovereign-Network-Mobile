@@ -27,6 +27,9 @@ class Web4ViewManager : SimpleViewManager<Web4ReactWebView>() {
     @ReactProp(name = "embeddedApp")
     fun setEmbeddedApp(view: Web4ReactWebView, app: String?) = view.setEmbeddedApp(app)
 
+    @ReactProp(name = "hostHeader")
+    fun setHostHeader(view: Web4ReactWebView, header: String?) = view.setHostHeader(header)
+
     @ReactProp(name = "nodeHost")
     fun setNodeHost(view: Web4ReactWebView, host: String?) = view.setNodeHost(host)
 

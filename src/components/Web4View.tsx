@@ -16,6 +16,7 @@ type Web4ErrorEvent = NativeSyntheticEvent<{
 export interface Web4ViewProps extends ViewProps {
   domain: string;
   embeddedApp?: string;
+  hostHeader?: string;
   nodeHost?: string;
   nodePort?: number;
   cacheLimitMb?: number;
