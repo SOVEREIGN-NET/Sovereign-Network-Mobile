@@ -3,15 +3,45 @@ import WebKit
 
 @available(iOS 15.0, *)
 final class Web4SchemeHandler: NSObject, WKURLSchemeHandler {
-  private let runtime: Web4Runtime
+  private let runtime: Web4Runtime?
   private let domain: String
+  private let embeddedApp: String?
   private let chunkSize = 64 * 1024 // 64KB chunks for streaming
   private var activeTasks = Set<Int>()
   private let lock = NSLock()
 
-  init(runtime: Web4Runtime, domain: String) {
+  init(runtime: Web4Runtime?, domain: String, embeddedApp: String? = nil) {
     self.runtime = runtime
     self.domain = domain.lowercased()
+    self.embeddedApp = embeddedApp?.lowercased()
+  }
+
+  private func embeddedMime(forPath path: String) -> String {
+    let lower = path.lowercased()
+    if lower.hasSuffix(".html") { return "text/html" }
+    if lower.hasSuffix(".css") { return "text/css" }
+    if lower.hasSuffix(".js") { return "application/javascript" }
+    if lower.hasSuffix(".wasm") { return "application/wasm" }
+    return "application/octet-stream"
+  }
+
+  private func resolveEmbeddedUrl(path: String) -> (url: URL, mime: String)? {
+    guard let app = embeddedApp, !app.isEmpty else { return nil }
+
+    var rel = path
+    if rel.isEmpty || rel == "/" { rel = "/index.html" }
+    if rel.contains("..") { return nil }
+
+    let trimmed = rel.hasPrefix("/") ? String(rel.dropFirst()) : rel
+    guard let base = Bundle.main.resourceURL else { return nil }
+
+    let fileUrl = base
+      .appendingPathComponent("web4apps", isDirectory: true)
+      .appendingPathComponent(app, isDirectory: true)
+      .appendingPathComponent(trimmed, isDirectory: false)
+
+    guard FileManager.default.fileExists(atPath: fileUrl.path) else { return nil }
+    return (fileUrl, embeddedMime(forPath: trimmed))
   }
 
   private func errorPage(code: Int, title: String, message: String, url: String) -> Data {
@@ -105,6 +135,44 @@ final class Web4SchemeHandler: NSObject, WKURLSchemeHandler {
 
     Task {
       do {
+        // Prefer embedded assets when configured.
+        if let embedded = resolveEmbeddedUrl(path: path) {
+          let fileAttributes = try FileManager.default.attributesOfItem(atPath: embedded.url.path)
+          let fileSize = fileAttributes[.size] as? Int ?? -1
+
+          guard isTaskActive(taskId) else { return }
+
+          let response = URLResponse(
+            url: url,
+            mimeType: embedded.mime,
+            expectedContentLength: fileSize,
+            textEncodingName: embedded.mime.contains("text") ? "utf-8" : nil
+          )
+          urlSchemeTask.didReceive(response)
+
+          let fileHandle = try FileHandle(forReadingFrom: embedded.url)
+          defer { try? fileHandle.close() }
+
+          while isTaskActive(taskId) {
+            let chunk = fileHandle.readData(ofLength: chunkSize)
+            if chunk.isEmpty { break }
+            urlSchemeTask.didReceive(chunk)
+          }
+
+          if isTaskActive(taskId) {
+            urlSchemeTask.didFinish()
+          }
+
+          lock.lock()
+          activeTasks.remove(taskId)
+          lock.unlock()
+          return
+        }
+
+        guard let runtime = runtime else {
+          throw NSError(domain: "Web4", code: 404, userInfo: [NSLocalizedDescriptionKey: "Not found: \(path)"])
+        }
+
         let resolved = try await runtime.resolveFile(domain: domain, path: path)
 
         // Get file size for Content-Length header

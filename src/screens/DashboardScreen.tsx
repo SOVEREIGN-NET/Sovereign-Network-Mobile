@@ -1,5 +1,6 @@
 import React, { useMemo, useState } from 'react';
-import { View, TextInput, Animated } from 'react-native';
+import { View, TextInput, Animated, Modal, Pressable, ActivityIndicator } from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
 import { useTrendingTokens, formatTokenPrice, formatChange, TokenData } from '../hooks/useTrendingTokens';
 import { useTrendingDapps, formatUserCount, getActivityColor } from '../hooks/useTrendingDapps';
 import {
@@ -14,6 +15,8 @@ import {
   ScreenLayout,
   SideDrawer,
   Text,
+  Web4View,
+  isWeb4ViewAvailable,
 } from '../components';
 import { useTranslation } from '../i18n';
 import { borderRadius, colors, spacing, typography } from '../theme';
@@ -36,6 +39,8 @@ const DashboardScreen: React.FC<any> = ({ navigation }) => {
   const { t } = useTranslation();
   const [drawerVisible, setDrawerVisible] = useState(false);
   const [urlInput, setUrlInput] = useState('zhtp://central.sov');
+  const [explorerVisible, setExplorerVisible] = useState(false);
+  const [explorerWebLoading, setExplorerWebLoading] = useState(true);
   const trendingTokensData = useTrendingTokens();
   const trendingDappsData = useTrendingDapps();
 
@@ -96,6 +101,79 @@ const DashboardScreen: React.FC<any> = ({ navigation }) => {
   return (
     <>
       <HeaderBar onMenuPress={() => setDrawerVisible(true)} />
+      <Modal
+        visible={explorerVisible}
+        animationType="slide"
+        presentationStyle="fullScreen"
+        onRequestClose={() => setExplorerVisible(false)}
+      >
+        <SafeAreaView style={{ flex: 1, backgroundColor: colors.bg_darkest }}>
+          <View style={{ paddingHorizontal: spacing.sm, paddingTop: spacing.sm, paddingBottom: spacing.xs }}>
+            <Row gap="sm" align="center">
+              <Button
+                onPress={() => setExplorerVisible(false)}
+                size="sm"
+                variant="secondary"
+                style={{
+                  width: 36,
+                  height: 36,
+                  paddingHorizontal: 0,
+                  paddingVertical: 0,
+                  justifyContent: 'center',
+                  alignItems: 'center',
+                  borderRadius: 18,
+                }}
+              >
+                <Text style={{ fontSize: 18, color: colors.text_secondary }}>✕</Text>
+              </Button>
+              <Text variant="h3">Explorer</Text>
+            </Row>
+          </View>
+
+          <View style={{ flex: 1, backgroundColor: colors.bg_darkest }}>
+            {isWeb4ViewAvailable ? (
+              <View style={{ flex: 1, backgroundColor: colors.bg_darkest }}>
+                <Web4View
+                  style={{ flex: 1, backgroundColor: colors.bg_darkest }}
+                  domain="explorer.embedded"
+                  embeddedApp="explorer"
+                  cacheLimitMb={150}
+                  allowHttpsExternal={false}
+                  onLoadStart={() => setExplorerWebLoading(true)}
+                  onLoadEnd={() => setExplorerWebLoading(false)}
+                  onError={() => setExplorerWebLoading(false)}
+                />
+                {explorerWebLoading && (
+                  <View
+                    style={{
+                      position: 'absolute',
+                      top: 0,
+                      left: 0,
+                      right: 0,
+                      bottom: 0,
+                      backgroundColor: 'rgba(0,0,0,0.4)',
+                      justifyContent: 'center',
+                      alignItems: 'center',
+                    }}
+                    pointerEvents="none"
+                  >
+                    <SShieldLogo size={64} />
+                    <View style={{ marginTop: spacing.sm }}>
+                      <ActivityIndicator size="small" color={colors.text_secondary} />
+                    </View>
+                  </View>
+                )}
+              </View>
+            ) : (
+              <View style={{ flex: 1, padding: spacing.md, justifyContent: 'center' }}>
+                <Text variant="body" style={{ color: colors.text_secondary, textAlign: 'center' }}>
+                  Web runtime not available on this build. Please rebuild native binaries.
+                </Text>
+              </View>
+            )}
+          </View>
+        </SafeAreaView>
+      </Modal>
       <ScreenLayout paddingTop={spacing.lg} paddingBottom={spacing.xl} safeAreaEdges={['bottom']}>
         <SideDrawer visible={drawerVisible} onClose={() => setDrawerVisible(false)} items={drawerItems} title="Menu" />
 
@@ -234,6 +312,42 @@ const DashboardScreen: React.FC<any> = ({ navigation }) => {
               );
             })}
           </Column>
+        </Card>
+
+        <Card>
+          <Row justify="space-between" align="center" style={{ marginBottom: spacing.sm }}>
+            <Text variant="h3">Explorer</Text>
+            <Badge label="Featured" variant="info" size="sm" />
+          </Row>
+          <Pressable
+            onPress={() => {
+              setExplorerWebLoading(true);
+              setExplorerVisible(true);
+            }}
+            style={{
+              flexDirection: 'row',
+              alignItems: 'center',
+              justifyContent: 'space-between',
+              paddingVertical: spacing.sm,
+              paddingHorizontal: spacing.md,
+              borderRadius: borderRadius.lg,
+              backgroundColor: colors.bg_darker,
+              borderWidth: 1,
+              borderColor: colors.border,
+            }}
+          >
+            <Column gap="xs" style={{ flex: 1 }}>
+              <Text variant="body" style={{ fontWeight: '600' }}>
+                Open Sovereign Explorer
+              </Text>
+              <Text variant="caption" style={{ color: colors.text_secondary }}>
+                Browse accounts, transactions, validators, and network status
+              </Text>
+            </Column>
+            <Text variant="body" style={{ color: colors.text_secondary }}>
+              →
+            </Text>
+          </Pressable>
         </Card>
 
         <Card>

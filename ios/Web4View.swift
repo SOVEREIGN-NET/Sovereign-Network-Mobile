@@ -6,11 +6,13 @@ import React
 final class Web4View: UIView {
   private var webView: WKWebView?
   private var domain: String?
+  private var embeddedApp: String?
   private var nodeHost: String?
   private var nodePort: Int?
   private var lastConfiguredDomain: String?
   private var lastConfiguredHost: String?
   private var lastConfiguredPort: Int?
+  private var lastConfiguredEmbeddedApp: String?
   private var cacheLimitMb: Int = 150
   private var allowHttpsExternal: Bool = false
   private var runtime: Web4Runtime?
@@ -18,6 +20,11 @@ final class Web4View: UIView {
   @objc var onLoadEnd: RCTDirectEventBlock?
   @objc var onNavigation: RCTDirectEventBlock?
   @objc var onError: RCTDirectEventBlock?
+
+  @objc func setEmbeddedApp(_ value: NSString?) {
+    embeddedApp = value as String?
+    configureIfReady()
+  }
 
   @objc func setDomain(_ value: NSString?) {
     domain = value as String?
@@ -43,15 +50,60 @@ final class Web4View: UIView {
   }
 
   private func configureIfReady() {
-    guard let domainRaw = domain,
-          let host = nodeHost,
+    guard let domainRaw = domain else { return }
+
+    let domain = domainRaw.lowercased()
+    let embedded = embeddedApp?.lowercased()
+
+    if let embeddedApp = embedded, !embeddedApp.isEmpty {
+      let isSameConfig = (lastConfiguredDomain == domain &&
+                          lastConfiguredEmbeddedApp == embeddedApp)
+
+      if webView != nil && isSameConfig {
+        return
+      }
+
+      if webView != nil && !isSameConfig {
+        teardownWebView()
+      }
+
+      let config = WKWebViewConfiguration()
+      self.runtime = nil
+      let handler = Web4SchemeHandler(runtime: nil, domain: domain, embeddedApp: embeddedApp)
+      config.setURLSchemeHandler(handler, forURLScheme: "zhtp")
+
+      // Add message handler for fetch polyfill
+      let contentController = config.userContentController
+      contentController.add(ZhtpFetchHandler(runtime: nil, domain: domain, embeddedApp: embeddedApp), name: "zhtpFetch")
+
+      // Inject fetch polyfill script
+      let fetchPolyfill = WKUserScript(source: Self.fetchPolyfillScript, injectionTime: .atDocumentStart, forMainFrameOnly: false)
+      contentController.addUserScript(fetchPolyfill)
+
+      let wv = WKWebView(frame: bounds, configuration: config)
+      wv.autoresizingMask = [.flexibleWidth, .flexibleHeight]
+      wv.navigationDelegate = self
+      wv.uiDelegate = self
+      let request = URLRequest(url: URL(string: "zhtp://\(domain)/")!)
+      onLoadStart?(["url": request.url?.absoluteString ?? ""])
+      wv.load(request)
+      addSubview(wv)
+      webView = wv
+      lastConfiguredDomain = domain
+      lastConfiguredHost = nil
+      lastConfiguredPort = nil
+      lastConfiguredEmbeddedApp = embeddedApp
+      return
+    }
+
+    guard let host = nodeHost,
           let port = nodePort,
           port > 0 else { return }
 
-    let domain = domainRaw.lowercased()
     let isSameConfig = (lastConfiguredDomain == domain &&
                         lastConfiguredHost == host &&
-                        lastConfiguredPort == port)
+                        lastConfiguredPort == port &&
+                        lastConfiguredEmbeddedApp == nil)
 
     if webView != nil && isSameConfig {
       return
@@ -69,12 +121,12 @@ final class Web4View: UIView {
       client: Web4Client(baseUrl: "quic://\(host):\(port)", hostHeader: domain)
     )
     self.runtime = rt
-    let handler = Web4SchemeHandler(runtime: rt, domain: domain)
+    let handler = Web4SchemeHandler(runtime: rt, domain: domain, embeddedApp: nil)
     config.setURLSchemeHandler(handler, forURLScheme: "zhtp")
 
     // Add message handler for fetch polyfill
     let contentController = config.userContentController
-    contentController.add(ZhtpFetchHandler(runtime: rt, domain: domain), name: "zhtpFetch")
+    contentController.add(ZhtpFetchHandler(runtime: rt, domain: domain, embeddedApp: nil), name: "zhtpFetch")
 
     // Inject fetch polyfill script
     let fetchPolyfill = WKUserScript(source: Self.fetchPolyfillScript, injectionTime: .atDocumentStart, forMainFrameOnly: false)
@@ -107,6 +159,7 @@ final class Web4View: UIView {
     lastConfiguredDomain = nil
     lastConfiguredHost = nil
     lastConfiguredPort = nil
+    lastConfiguredEmbeddedApp = nil
   }
 
   deinit {
@@ -204,13 +257,43 @@ final class Web4View: UIView {
 
 @available(iOS 15.0, *)
 private class ZhtpFetchHandler: NSObject, WKScriptMessageHandler {
-  private let runtime: Web4Runtime
+  private let runtime: Web4Runtime?
   private let domain: String
+  private let embeddedApp: String?
   private let maxFetchSize: Int64 = 1024 * 1024 // 1MB max for fetch polyfill
 
-  init(runtime: Web4Runtime, domain: String) {
+  init(runtime: Web4Runtime?, domain: String, embeddedApp: String?) {
     self.runtime = runtime
     self.domain = domain
+    self.embeddedApp = embeddedApp?.lowercased()
+  }
+
+  private func embeddedMime(forPath path: String) -> String {
+    let lower = path.lowercased()
+    if lower.hasSuffix(".html") { return "text/html" }
+    if lower.hasSuffix(".css") { return "text/css" }
+    if lower.hasSuffix(".js") { return "application/javascript" }
+    if lower.hasSuffix(".wasm") { return "application/wasm" }
+    return "application/octet-stream"
+  }
+
+  private func resolveEmbeddedUrl(path: String) -> (url: URL, mime: String)? {
+    guard let app = embeddedApp, !app.isEmpty else { return nil }
+
+    var rel = path
+    if rel.isEmpty || rel == "/" { rel = "/index.html" }
+    if rel.contains("..") { return nil }
+
+    let trimmed = rel.hasPrefix("/") ? String(rel.dropFirst()) : rel
+    guard let base = Bundle.main.resourceURL else { return nil }
+
+    let fileUrl = base
+      .appendingPathComponent("web4apps", isDirectory: true)
+      .appendingPathComponent(app, isDirectory: true)
+      .appendingPathComponent(trimmed, isDirectory: false)
+
+    guard FileManager.default.fileExists(atPath: fileUrl.path) else { return nil }
+    return (fileUrl, embeddedMime(forPath: trimmed))
   }
 
   func userContentController(_ userContentController: WKUserContentController, didReceive message: WKScriptMessage) {
@@ -224,6 +307,26 @@ private class ZhtpFetchHandler: NSObject, WKScriptMessageHandler {
 
     Task {
       do {
+        if let embedded = resolveEmbeddedUrl(path: path) {
+          // Check file size before loading
+          let fileAttributes = try FileManager.default.attributesOfItem(atPath: embedded.url.path)
+          let fileSize = fileAttributes[.size] as? Int64 ?? 0
+
+          if fileSize > maxFetchSize {
+            throw NSError(domain: "ZhtpFetch", code: 413, userInfo: [NSLocalizedDescriptionKey: "File too large for fetch (\(fileSize) bytes). Max: \(maxFetchSize)"])
+          }
+
+          let data = try Data(contentsOf: embedded.url)
+          let base64 = data.base64EncodedString()
+          let js = "window['\(callbackId)'](true, 200, '\(embedded.mime)', '\(base64)', null)"
+          await MainActor.run { webView?.evaluateJavaScript(js, completionHandler: nil) }
+          return
+        }
+
+        guard let runtime = runtime else {
+          throw NSError(domain: "ZhtpFetch", code: 404, userInfo: [NSLocalizedDescriptionKey: "Not found: \(path)"])
+        }
+
         let resolved = try await runtime.resolveFile(domain: domain, path: path)
 
         // Check file size before loading
@@ -231,25 +334,11 @@ private class ZhtpFetchHandler: NSObject, WKScriptMessageHandler {
         let fileSize = fileAttributes[.size] as? Int64 ?? 0
 
         if fileSize > maxFetchSize {
-          throw NSError(
-            domain: "ZhtpFetch",
-            code: 413,
-            userInfo: [NSLocalizedDescriptionKey: "File too large for fetch (\(fileSize) bytes). Max: \(maxFetchSize)"]
-          )
+          throw NSError(domain: "ZhtpFetch", code: 413, userInfo: [NSLocalizedDescriptionKey: "File too large for fetch (\(fileSize) bytes). Max: \(maxFetchSize)"])
         }
 
-        // Stream read in chunks to avoid peak memory usage
-        let fileHandle = try FileHandle(forReadingFrom: resolved.url)
-        defer { try? fileHandle.close() }
-
-        var base64Parts: [String] = []
-        let chunkSize = 8192
-        while true {
-          let chunk = fileHandle.readData(ofLength: chunkSize)
-          if chunk.isEmpty { break }
-          base64Parts.append(chunk.base64EncodedString())
-        }
-        let base64 = base64Parts.joined()
+        let data = try Data(contentsOf: resolved.url)
+        let base64 = data.base64EncodedString()
 
         let js = "window['\(callbackId)'](true, 200, '\(resolved.mime)', '\(base64)', null)"
         await MainActor.run { webView?.evaluateJavaScript(js, completionHandler: nil) }

@@ -14,11 +14,13 @@ import com.facebook.react.bridge.Arguments
 import com.facebook.react.bridge.ReactContext
 import com.facebook.react.uimanager.events.RCTEventEmitter
 import java.io.FileInputStream
+import java.io.InputStream
 import java.util.concurrent.Executors
 
 @SuppressLint("SetJavaScriptEnabled")
 class Web4ReactWebView(context: Context) : WebView(context) {
     private var domain: String? = null
+    private var embeddedApp: String? = null
     private var allowHttpsExternal: Boolean = false
     private var nodeHost: String? = null
     private var nodePort: Int = 0
@@ -28,6 +30,7 @@ class Web4ReactWebView(context: Context) : WebView(context) {
     private var lastConfiguredDomain: String? = null
     private var lastConfiguredHost: String? = null
     private var lastConfiguredPort: Int? = null
+    private var lastConfiguredEmbeddedApp: String? = null
     private val fetchExecutor = Executors.newCachedThreadPool()
 
     init {
@@ -227,29 +230,31 @@ class Web4ReactWebView(context: Context) : WebView(context) {
                     val uri = Uri.parse(url)
                     val path = uri.path?.ifEmpty { "/" } ?: "/"
                     val currentDomain = domain ?: throw Exception("No domain configured")
-                    val currentRuntime = runtime ?: throw Exception("Runtime not ready")
+                    val embedded = embeddedApp
 
-                    val resolved = currentRuntime.resolveFile(currentDomain, path)
-                        ?: throw Exception("Not found: $path")
+                    val (mime, data) = if (embedded != null) {
+                        val res = resolveEmbeddedAsset(embedded, path) ?: throw Exception("Not found: $path")
+                        res.mime to res.readAllBytes(maxFetchSize)
+                    } else {
+                        val currentRuntime = runtime ?: throw Exception("Runtime not ready")
+                        val resolved = currentRuntime.resolveFile(currentDomain, path)
+                            ?: throw Exception("Not found: $path")
+                        val fileSize = resolved.file.length()
+                        if (fileSize > maxFetchSize) {
+                            throw Exception("File too large for fetch ($fileSize bytes). Max: $maxFetchSize")
+                        }
+                        resolved.mime to resolved.file.readBytes()
+                    }
 
-                    val fileSize = resolved.file.length()
+                    val fileSize = data.size.toLong()
                     if (fileSize > maxFetchSize) {
                         throw Exception("File too large for fetch ($fileSize bytes). Max: $maxFetchSize")
                     }
 
-                    // Stream file in chunks to avoid loading all into memory at once
-                    val base64 = FileInputStream(resolved.file).use { input ->
-                        val buffer = ByteArray(minOf(fileSize.toInt(), 8192))
-                        val output = StringBuilder()
-                        var bytesRead: Int
-                        while (input.read(buffer).also { bytesRead = it } != -1) {
-                            output.append(Base64.encodeToString(buffer, 0, bytesRead, Base64.NO_WRAP))
-                        }
-                        output.toString()
-                    }
+                    val base64 = Base64.encodeToString(data, Base64.NO_WRAP)
 
                     post {
-                        evaluateJavascript("window['$callbackId'](true, 200, '${resolved.mime}', '$base64', null)", null)
+                        evaluateJavascript("window['$callbackId'](true, 200, '$mime', '$base64', null)", null)
                     }
                 } catch (e: Exception) {
                     val errorMsg = e.message?.replace("'", "\\'") ?: "Unknown error"
@@ -276,6 +281,11 @@ class Web4ReactWebView(context: Context) : WebView(context) {
         applyConfigIfReady()
     }
 
+    fun setEmbeddedApp(value: String?) {
+        this.embeddedApp = value?.lowercase()
+        applyConfigIfReady()
+    }
+
     fun setNodeHost(value: String?) {
         this.nodeHost = value
         applyConfigIfReady()
@@ -297,12 +307,35 @@ class Web4ReactWebView(context: Context) : WebView(context) {
 
     private fun applyConfigIfReady() {
         val domain = this.domain ?: return
+
+        val embedded = this.embeddedApp
+        if (embedded != null && embedded.isNotEmpty()) {
+            val isSameConfig = (configured &&
+                lastConfiguredDomain == domain &&
+                lastConfiguredEmbeddedApp == embedded)
+            if (isSameConfig) return
+
+            if (configured && !isSameConfig) {
+                teardownRuntime()
+            }
+
+            configured = true
+            runtime = null
+            loadUrl("zhtp://${domain}/")
+            lastConfiguredDomain = domain
+            lastConfiguredHost = null
+            lastConfiguredPort = null
+            lastConfiguredEmbeddedApp = embedded
+            return
+        }
+
         val host = this.nodeHost ?: return
         if (nodePort == 0) return
         val isSameConfig = (configured &&
             lastConfiguredDomain == domain &&
             lastConfiguredHost == host &&
-            lastConfiguredPort == nodePort)
+            lastConfiguredPort == nodePort &&
+            lastConfiguredEmbeddedApp == null)
         if (isSameConfig) return
 
         if (configured && !isSameConfig) {
@@ -317,6 +350,36 @@ class Web4ReactWebView(context: Context) : WebView(context) {
         lastConfiguredDomain = domain
         lastConfiguredHost = host
         lastConfiguredPort = nodePort
+        lastConfiguredEmbeddedApp = null
+    }
+
+    private data class EmbeddedResolved(val mime: String, val stream: InputStream) {
+        fun readAllBytes(max: Long): ByteArray {
+            val bytes = stream.readBytes()
+            if (bytes.size.toLong() > max) throw Exception("File too large for fetch (${bytes.size} bytes). Max: $max")
+            return bytes
+        }
+    }
+
+    private fun resolveEmbeddedAsset(app: String, path: String): EmbeddedResolved? {
+        var rel = path
+        if (rel.isEmpty() || rel == "/") rel = "/index.html"
+        if (rel.contains("..")) return null
+        val trimmed = if (rel.startsWith("/")) rel.substring(1) else rel
+        val assetPath = "web4apps/$app/$trimmed"
+        return try {
+            val stream = context.assets.open(assetPath)
+            val mime = when {
+                trimmed.endsWith(".html", true) -> "text/html"
+                trimmed.endsWith(".css", true) -> "text/css"
+                trimmed.endsWith(".js", true) -> "application/javascript"
+                trimmed.endsWith(".wasm", true) -> "application/wasm"
+                else -> "application/octet-stream"
+            }
+            EmbeddedResolved(mime, stream)
+        } catch (_: Exception) {
+            null
+        }
     }
 
     private fun intercept(uri: Uri): WebResourceResponse? {
@@ -327,6 +390,23 @@ class Web4ReactWebView(context: Context) : WebView(context) {
 
         val domain = this.domain ?: return null
         val path = uri.path?.ifEmpty { "/" } ?: "/"
+
+        val embedded = this.embeddedApp
+        if (embedded != null && embedded.isNotEmpty()) {
+            val resolved = resolveEmbeddedAsset(embedded, path) ?: return errorResponse("Not Found", 404)
+            val (mime, encoding) = parseMime(resolved.mime)
+            val contentTypeHeader = if (encoding != null) "$mime; charset=$encoding" else mime
+            return WebResourceResponse(mime, encoding, resolved.stream).apply {
+                setStatusCodeAndReasonPhrase(200, "OK")
+                responseHeaders = mapOf(
+                    "Content-Type" to contentTypeHeader,
+                    "Access-Control-Allow-Origin" to "*",
+                    "Access-Control-Allow-Methods" to "GET, POST, OPTIONS",
+                    "Access-Control-Allow-Headers" to "*",
+                    "Cache-Control" to "public, max-age=31536000"
+                )
+            }
+        }
 
         val runtime = this.runtime ?: return null
 
@@ -473,6 +553,7 @@ class Web4ReactWebView(context: Context) : WebView(context) {
         lastConfiguredDomain = null
         lastConfiguredHost = null
         lastConfiguredPort = null
+        lastConfiguredEmbeddedApp = null
         stopLoading()
         loadUrl("about:blank")
     }
