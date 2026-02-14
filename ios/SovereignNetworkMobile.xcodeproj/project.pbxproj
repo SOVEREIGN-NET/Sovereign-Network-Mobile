@@ -32,10 +32,6 @@
 		30E39C482F07364A004BA6A5 /* LibOQSTypes.swift in Sources */ = {isa = PBXBuildFile; fileRef = 30E39C412F07364A004BA6A5 /* LibOQSTypes.swift */; };
 		30E39C4A2F073687004BA6A5 /* liboqs.xcframework in Frameworks */ = {isa = PBXBuildFile; fileRef = 30E39C492F073687004BA6A5 /* liboqs.xcframework */; };
 		30E39C5B2F073A1A004BA6A5 /* ZhtpCodec.swift in Sources */ = {isa = PBXBuildFile; fileRef = 30E39C572F073A1A004BA6A5 /* ZhtpCodec.swift */; };
-		E7A1B0B12F9A1B2C3D4E5F60 /* web4apps/explorer/index.html in Resources */ = {isa = PBXBuildFile; fileRef = E7A1B0A12F9A1B2C3D4E5F60 /* web4apps/explorer/index.html */; };
-		E7A1B0B22F9A1B2C3D4E5F60 /* web4apps/explorer/explorer-fc2bf72afe7588e8.js in Resources */ = {isa = PBXBuildFile; fileRef = E7A1B0A22F9A1B2C3D4E5F60 /* web4apps/explorer/explorer-fc2bf72afe7588e8.js */; };
-		E7A1B0B32F9A1B2C3D4E5F60 /* web4apps/explorer/explorer-fc2bf72afe7588e8_bg.wasm in Resources */ = {isa = PBXBuildFile; fileRef = E7A1B0A32F9A1B2C3D4E5F60 /* web4apps/explorer/explorer-fc2bf72afe7588e8_bg.wasm */; };
-		E7A1B0B42F9A1B2C3D4E5F60 /* web4apps/explorer/style-1c011d8f0c15ca86.css in Resources */ = {isa = PBXBuildFile; fileRef = E7A1B0A42F9A1B2C3D4E5F60 /* web4apps/explorer/style-1c011d8f0c15ca86.css */; };
 		30E39C5D2F073A1A004BA6A5 /* ZhtpTypes.swift in Sources */ = {isa = PBXBuildFile; fileRef = 30E39C592F073A1A004BA6A5 /* ZhtpTypes.swift */; };
 		30E39C5E2F073A1A004BA6A5 /* ZhtpWireFraming.swift in Sources */ = {isa = PBXBuildFile; fileRef = 30E39C5A2F073A1A004BA6A5 /* ZhtpWireFraming.swift */; };
 		30E671212F216BAA00115EAD /* QuinnFFI.xcframework in Frameworks */ = {isa = PBXBuildFile; fileRef = 30E671182F215FB900115EAD /* QuinnFFI.xcframework */; };
@@ -55,6 +51,10 @@
 		A1001F1712B4D5A500A1F001 /* Web4View.swift in Sources */ = {isa = PBXBuildFile; fileRef = A1001F0712B4D5A500A1F001 /* Web4View.swift */; };
 		A1001F1912B4D5A500A1F001 /* Web4ViewManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = A1001F0912B4D5A500A1F001 /* Web4ViewManager.swift */; };
 		A1001F1A12B4D5A500A1F001 /* Web4ViewManager.m in Sources */ = {isa = PBXBuildFile; fileRef = A1001F0A12B4D5A500A1F001 /* Web4ViewManager.m */; };
+		E7A1B0B12F9A1B2C3D4E5F60 /* index.html in Resources */ = {isa = PBXBuildFile; fileRef = E7A1B0A12F9A1B2C3D4E5F60 /* index.html */; };
+		E7A1B0B22F9A1B2C3D4E5F60 /* explorer-fc2bf72afe7588e8.js in Resources */ = {isa = PBXBuildFile; fileRef = E7A1B0A22F9A1B2C3D4E5F60 /* explorer-fc2bf72afe7588e8.js */; };
+		E7A1B0B32F9A1B2C3D4E5F60 /* explorer-fc2bf72afe7588e8_bg.wasm in Resources */ = {isa = PBXBuildFile; fileRef = E7A1B0A32F9A1B2C3D4E5F60 /* explorer-fc2bf72afe7588e8_bg.wasm */; };
+		E7A1B0B42F9A1B2C3D4E5F60 /* style-1c011d8f0c15ca86.css in Resources */ = {isa = PBXBuildFile; fileRef = E7A1B0A42F9A1B2C3D4E5F60 /* style-1c011d8f0c15ca86.css */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXCopyFilesBuildPhase section */
@@ -95,10 +95,6 @@
 		30CB59682EE88A1D00D6B4B7 /* NativeSettings.m */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.objc; path = NativeSettings.m; sourceTree = "<group>"; };
 		30CB59692EE88A1D00D6B4B7 /* NativeSettings.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = NativeSettings.swift; sourceTree = "<group>"; };
 		30CB596A2EE88A1D00D6B4B7 /* Settings.bundle */ = {isa = PBXFileReference; lastKnownFileType = "wrapper.plug-in"; path = Settings.bundle; sourceTree = "<group>"; };
-		E7A1B0A12F9A1B2C3D4E5F60 /* web4apps/explorer/index.html */ = {isa = PBXFileReference; lastKnownFileType = text.html; name = index.html; path = SovereignNetworkMobile/web4apps/explorer/index.html; sourceTree = "<group>"; };
-		E7A1B0A22F9A1B2C3D4E5F60 /* web4apps/explorer/explorer-fc2bf72afe7588e8.js */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.javascript; name = "explorer-fc2bf72afe7588e8.js"; path = "SovereignNetworkMobile/web4apps/explorer/explorer-fc2bf72afe7588e8.js"; sourceTree = "<group>"; };
-		E7A1B0A32F9A1B2C3D4E5F60 /* web4apps/explorer/explorer-fc2bf72afe7588e8_bg.wasm */ = {isa = PBXFileReference; lastKnownFileType = file; name = "explorer-fc2bf72afe7588e8_bg.wasm"; path = "SovereignNetworkMobile/web4apps/explorer/explorer-fc2bf72afe7588e8_bg.wasm"; sourceTree = "<group>"; };
-		E7A1B0A42F9A1B2C3D4E5F60 /* web4apps/explorer/style-1c011d8f0c15ca86.css */ = {isa = PBXFileReference; lastKnownFileType = text.css; name = "style-1c011d8f0c15ca86.css"; path = "SovereignNetworkMobile/web4apps/explorer/style-1c011d8f0c15ca86.css"; sourceTree = "<group>"; };
 		30CB59702EE88A1F00D6B4B7 /* SovereignNetworkMobile-Bridging-Header.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = "SovereignNetworkMobile-Bridging-Header.h"; sourceTree = "<group>"; };
 		30E39C3C2F07364A004BA6A5 /* LibOQS.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LibOQS.swift; sourceTree = "<group>"; };
 		30E39C3D2F07364A004BA6A5 /* LibOQSBridge.m */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.objc; path = LibOQSBridge.m; sourceTree = "<group>"; };
@@ -129,6 +125,10 @@
 		A1001F0712B4D5A500A1F001 /* Web4View.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Web4View.swift; sourceTree = "<group>"; };
 		A1001F0912B4D5A500A1F001 /* Web4ViewManager.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Web4ViewManager.swift; sourceTree = "<group>"; };
 		A1001F0A12B4D5A500A1F001 /* Web4ViewManager.m */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.objc; path = Web4ViewManager.m; sourceTree = "<group>"; };
+		E7A1B0A12F9A1B2C3D4E5F60 /* index.html */ = {isa = PBXFileReference; lastKnownFileType = text.html; name = index.html; path = SovereignNetworkMobile/web4apps/explorer/index.html; sourceTree = "<group>"; };
+		E7A1B0A22F9A1B2C3D4E5F60 /* explorer-fc2bf72afe7588e8.js */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.javascript; name = "explorer-fc2bf72afe7588e8.js"; path = "SovereignNetworkMobile/web4apps/explorer/explorer-fc2bf72afe7588e8.js"; sourceTree = "<group>"; };
+		E7A1B0A32F9A1B2C3D4E5F60 /* explorer-fc2bf72afe7588e8_bg.wasm */ = {isa = PBXFileReference; lastKnownFileType = file; name = "explorer-fc2bf72afe7588e8_bg.wasm"; path = "SovereignNetworkMobile/web4apps/explorer/explorer-fc2bf72afe7588e8_bg.wasm"; sourceTree = "<group>"; };
+		E7A1B0A42F9A1B2C3D4E5F60 /* style-1c011d8f0c15ca86.css */ = {isa = PBXFileReference; lastKnownFileType = text.css; name = "style-1c011d8f0c15ca86.css"; path = "SovereignNetworkMobile/web4apps/explorer/style-1c011d8f0c15ca86.css"; sourceTree = "<group>"; };
 		ED297162215061F000B7C4FE /* JavaScriptCore.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = JavaScriptCore.framework; path = System/Library/Frameworks/JavaScriptCore.framework; sourceTree = SDKROOT; };
 /* End PBXFileReference section */
 
@@ -168,10 +168,10 @@
 				303D4B5E2F31D5CF00647354 /* NativeZhtpApiModule.m */,
 				13B07FB81A68108700A75B9A /* PrivacyInfo.xcprivacy */,
 				30CB596A2EE88A1D00D6B4B7 /* Settings.bundle */,
-				E7A1B0A12F9A1B2C3D4E5F60 /* web4apps/explorer/index.html */,
-				E7A1B0A22F9A1B2C3D4E5F60 /* web4apps/explorer/explorer-fc2bf72afe7588e8.js */,
-				E7A1B0A32F9A1B2C3D4E5F60 /* web4apps/explorer/explorer-fc2bf72afe7588e8_bg.wasm */,
-				E7A1B0A42F9A1B2C3D4E5F60 /* web4apps/explorer/style-1c011d8f0c15ca86.css */,
+				E7A1B0A12F9A1B2C3D4E5F60 /* index.html */,
+				E7A1B0A22F9A1B2C3D4E5F60 /* explorer-fc2bf72afe7588e8.js */,
+				E7A1B0A32F9A1B2C3D4E5F60 /* explorer-fc2bf72afe7588e8_bg.wasm */,
+				E7A1B0A42F9A1B2C3D4E5F60 /* style-1c011d8f0c15ca86.css */,
 				30CB59702EE88A1F00D6B4B7 /* SovereignNetworkMobile-Bridging-Header.h */,
 				30F1A1A32F1A0001 /* UhpHandshake.swift */,
 				3049D7D12F1EFD6E002C2DE5 /* WalletKeychain.m */,
@@ -337,10 +337,10 @@
 				30CB596B2EE88A1D00D6B4B7 /* Settings.bundle in Resources */,
 				13B07FBF1A68108700A75B9A /* Images.xcassets in Resources */,
 				7B9CBBBC6C3C0DDFC7CD0808 /* PrivacyInfo.xcprivacy in Resources */,
-				E7A1B0B12F9A1B2C3D4E5F60 /* web4apps/explorer/index.html in Resources */,
-				E7A1B0B22F9A1B2C3D4E5F60 /* web4apps/explorer/explorer-fc2bf72afe7588e8.js in Resources */,
-				E7A1B0B32F9A1B2C3D4E5F60 /* web4apps/explorer/explorer-fc2bf72afe7588e8_bg.wasm in Resources */,
-				E7A1B0B42F9A1B2C3D4E5F60 /* web4apps/explorer/style-1c011d8f0c15ca86.css in Resources */,
+				E7A1B0B12F9A1B2C3D4E5F60 /* index.html in Resources */,
+				E7A1B0B22F9A1B2C3D4E5F60 /* explorer-fc2bf72afe7588e8.js in Resources */,
+				E7A1B0B32F9A1B2C3D4E5F60 /* explorer-fc2bf72afe7588e8_bg.wasm in Resources */,
+				E7A1B0B42F9A1B2C3D4E5F60 /* style-1c011d8f0c15ca86.css in Resources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
