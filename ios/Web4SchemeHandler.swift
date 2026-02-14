@@ -158,7 +158,19 @@ final class Web4SchemeHandler: NSObject, WKURLSchemeHandler {
 
           guard isTaskActive(taskId) else { return }
 
-          let response = URLResponse(
+          let headers = [
+            "Content-Type": embedded.mime,
+            "Access-Control-Allow-Origin": "*",
+            "Access-Control-Allow-Methods": "GET, POST, OPTIONS",
+            "Access-Control-Allow-Headers": "*",
+            "Cache-Control": "public, max-age=31536000",
+          ]
+          let response = HTTPURLResponse(
+            url: url,
+            statusCode: 200,
+            httpVersion: "HTTP/1.1",
+            headerFields: headers
+          ) ?? URLResponse(
             url: url,
             mimeType: embedded.mime,
             expectedContentLength: fileSize,
@@ -215,7 +227,19 @@ final class Web4SchemeHandler: NSObject, WKURLSchemeHandler {
           let mime = response.headers["content-type"] ?? "application/json"
           let bodyBytes = response.body
 
-          let urlResponse = URLResponse(
+          let headers = [
+            "Content-Type": mime,
+            "Access-Control-Allow-Origin": "*",
+            "Access-Control-Allow-Methods": "GET, POST, OPTIONS",
+            "Access-Control-Allow-Headers": "*",
+            "Cache-Control": "no-store",
+          ]
+          let urlResponse = HTTPURLResponse(
+            url: url,
+            statusCode: response.status,
+            httpVersion: "HTTP/1.1",
+            headerFields: headers
+          ) ?? URLResponse(
             url: url,
             mimeType: mime,
             expectedContentLength: bodyBytes.count,
@@ -244,7 +268,19 @@ final class Web4SchemeHandler: NSObject, WKURLSchemeHandler {
         // Check if task was cancelled
         guard isTaskActive(taskId) else { return }
 
-        let response = URLResponse(
+        let headers = [
+          "Content-Type": resolved.mime,
+          "Access-Control-Allow-Origin": "*",
+          "Access-Control-Allow-Methods": "GET, POST, OPTIONS",
+          "Access-Control-Allow-Headers": "*",
+          "Cache-Control": "public, max-age=31536000",
+        ]
+        let response = HTTPURLResponse(
+          url: url,
+          statusCode: 200,
+          httpVersion: "HTTP/1.1",
+          headerFields: headers
+        ) ?? URLResponse(
           url: url,
           mimeType: resolved.mime,
           expectedContentLength: fileSize,
