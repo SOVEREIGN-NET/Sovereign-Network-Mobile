@@ -45,13 +45,26 @@ final class Web4SchemeHandler: NSObject, WKURLSchemeHandler {
     let trimmed = rel.hasPrefix("/") ? String(rel.dropFirst()) : rel
     guard let base = Bundle.main.resourceURL else { return nil }
 
-    let fileUrl = base
+    let appDir = base
       .appendingPathComponent("web4apps", isDirectory: true)
       .appendingPathComponent(app, isDirectory: true)
-      .appendingPathComponent(trimmed, isDirectory: false)
 
-    guard FileManager.default.fileExists(atPath: fileUrl.path) else { return nil }
-    return (fileUrl, embeddedMime(forPath: trimmed))
+    let fileUrl = appDir.appendingPathComponent(trimmed, isDirectory: false)
+
+    if FileManager.default.fileExists(atPath: fileUrl.path) {
+      return (fileUrl, embeddedMime(forPath: trimmed))
+    }
+
+    // Don't SPA-fallback for API paths — let them fall through to the proxy handler
+    if rel.hasPrefix("/api/") || rel == "/api" { return nil }
+
+    // SPA fallback: serve index.html for routes that don't match a file
+    let indexUrl = appDir.appendingPathComponent("index.html", isDirectory: false)
+    if FileManager.default.fileExists(atPath: indexUrl.path) {
+      return (indexUrl, "text/html")
+    }
+
+    return nil
   }
 
   private func shouldProxyToNode(path: String) -> Bool {

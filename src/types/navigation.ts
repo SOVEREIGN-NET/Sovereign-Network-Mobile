@@ -17,6 +17,12 @@ export type TabParamList = {
 export type DashboardStackParamList = {
   DashboardMain: undefined;
   ClaimUBI: undefined;
+  ExplorerDashboard: undefined;
+  BlockDetail: { hashOrHeight: string };
+  TransactionDetail: { hash: string };
+  IdentityDetail: { did: string };
+  WalletDetail: { ownerId: string };
+  ExplorerSearch: { query?: string };
 };
 
 export type IdentityStackParamList = {

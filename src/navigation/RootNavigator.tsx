@@ -38,6 +38,12 @@ import MyTokensScreen from '../screens/MyTokensScreen';
 import TokenDetailScreen from '../screens/TokenDetailScreen';
 import MyDomainsScreen from '../screens/MyDomainsScreen';
 import DomainDetailScreen from '../screens/DomainDetailScreen';
+import ExplorerDashboardScreen from '../screens/explorer/ExplorerDashboardScreen';
+import BlockDetailScreen from '../screens/explorer/BlockDetailScreen';
+import TransactionDetailScreen from '../screens/explorer/TransactionDetailScreen';
+import IdentityDetailScreen from '../screens/explorer/IdentityDetailScreen';
+import WalletDetailScreen from '../screens/explorer/WalletDetailScreen';
+import SearchScreen from '../screens/explorer/SearchScreen';
 
 const Stack = createNativeStackNavigator();
 const Tab = createBottomTabNavigator();
@@ -72,6 +78,36 @@ const DashboardStack = () => {
           title: 'Claim UBI',
           headerBackTitle: 'Back',
         }}
+      />
+      <Stack.Screen
+        name="ExplorerDashboard"
+        component={ExplorerDashboardScreen}
+        options={{ headerShown: false }}
+      />
+      <Stack.Screen
+        name="BlockDetail"
+        component={BlockDetailScreen}
+        options={{ headerShown: false }}
+      />
+      <Stack.Screen
+        name="TransactionDetail"
+        component={TransactionDetailScreen}
+        options={{ headerShown: false }}
+      />
+      <Stack.Screen
+        name="IdentityDetail"
+        component={IdentityDetailScreen}
+        options={{ headerShown: false }}
+      />
+      <Stack.Screen
+        name="WalletDetail"
+        component={WalletDetailScreen}
+        options={{ headerShown: false }}
+      />
+      <Stack.Screen
+        name="ExplorerSearch"
+        component={SearchScreen}
+        options={{ headerShown: false }}
       />
     </Stack.Navigator>
   );

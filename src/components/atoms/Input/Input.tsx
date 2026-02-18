@@ -132,11 +132,7 @@ export const Input = React.forwardRef<TextInput | null, InputProps>(
             {rightIcon && typeof rightIcon === 'string' && (
               <Text style={[baseStyles.icon, baseStyles.rightIcon]}>{rightIcon}</Text>
             )}
-            {rightIcon && typeof rightIcon !== 'string' && (
-              <View style={[baseStyles.icon, baseStyles.rightIcon]}>
-                {rightIcon}
-              </View>
-            )}
+            {rightIcon && typeof rightIcon !== 'string' && rightIcon}
           </View>
 
           {error && (

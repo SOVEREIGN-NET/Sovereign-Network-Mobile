@@ -181,7 +181,7 @@ export const QUIC_CONFIG = {
  */
 export const APP_DEFAULTS = {
   /** Use mock data service in development */
-  useMockData: __DEV__,
+  useMockData: false,
 
   /** Enable biometric authentication if available */
   enableBiometrics: true,

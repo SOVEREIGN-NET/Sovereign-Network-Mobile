@@ -49,16 +49,18 @@ export const PasswordField = React.forwardRef<any, PasswordFieldProps>(
           rightIcon={
             <Pressable
               onPress={() => setIsVisible(!isVisible)}
-              hitSlop={{ top: 16, bottom: 16, left: 16, right: 16 }}
-              style={{
-                opacity: isVisible ? 1 : 0.5,
-                minWidth: 44,
-                minHeight: 44,
+              style={({ pressed }) => ({
+                opacity: pressed ? 0.7 : isVisible ? 1 : 0.5,
+                width: 52,
+                height: '100%',
+                minHeight: 52,
                 alignItems: 'center',
                 justifyContent: 'center',
-              }}
+                marginLeft: 0,
+                marginRight: -18,
+              })}
             >
-              <Text style={{ fontSize: typography.size.lg }}>👁️</Text>
+              <Text style={{ fontSize: 22 }}>{isVisible ? '👁️' : '👁️‍🗨️'}</Text>
             </Pressable>
           }
           {...inputProps}

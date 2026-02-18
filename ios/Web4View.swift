@@ -57,125 +57,78 @@ final class Web4View: UIView {
   }
 
   private func configureIfReady() {
-    guard let domainRaw = domain else { return }
+    guard let domainRaw = domain,
+          let host = nodeHost,
+          let port = nodePort,
+          port > 0 else { return }
 
     let domain = domainRaw.lowercased()
     let embedded = embeddedApp?.lowercased()
     let hostHeader = self.hostHeader?.lowercased()
 
-    if let embeddedApp = embedded, !embeddedApp.isEmpty {
-      guard let host = nodeHost,
-            let port = nodePort,
-            port > 0 else { return }
-
-      let isSameConfig = (lastConfiguredDomain == domain &&
-                          lastConfiguredEmbeddedApp == embeddedApp &&
-                          lastConfiguredHostHeader == hostHeader &&
-                          lastConfiguredHost == host &&
-                          lastConfiguredPort == port)
-
-      if webView != nil && isSameConfig {
-        return
-      }
-
-      if webView != nil && !isSameConfig {
-        teardownWebView()
-      }
-
-      let config = WKWebViewConfiguration()
-      self.runtime = nil
-      let handler = Web4SchemeHandler(
-        runtime: nil,
-        domain: domain,
-        embeddedApp: embeddedApp,
-        proxyBaseUrl: "quic://\(host):\(port)",
-        proxyHostHeader: hostHeader
-      )
-      config.setURLSchemeHandler(handler, forURLScheme: "zhtp")
-
-      // Add message handler for fetch polyfill
-      let contentController = config.userContentController
-      contentController.add(
-        ZhtpFetchHandler(
-          runtime: nil,
-          domain: domain,
-          embeddedApp: embeddedApp,
-          proxyBaseUrl: "quic://\(host):\(port)",
-          proxyHostHeader: hostHeader
-        ),
-        name: "zhtpFetch"
-      )
-
-      // Inject fetch polyfill script
-      let fetchPolyfill = WKUserScript(source: Self.fetchPolyfillScript, injectionTime: .atDocumentStart, forMainFrameOnly: false)
-      contentController.addUserScript(fetchPolyfill)
-
-      let wv = WKWebView(frame: bounds, configuration: config)
-      wv.autoresizingMask = [.flexibleWidth, .flexibleHeight]
-      wv.navigationDelegate = self
-      wv.uiDelegate = self
-      let request = URLRequest(url: URL(string: "zhtp://\(domain)/")!)
-      onLoadStart?(["url": request.url?.absoluteString ?? ""])
-      wv.load(request)
-      addSubview(wv)
-      webView = wv
-      lastConfiguredDomain = domain
-      lastConfiguredHost = host
-      lastConfiguredPort = port
-      lastConfiguredEmbeddedApp = embeddedApp
-      lastConfiguredHostHeader = hostHeader
-      return
-    }
-
-    guard let host = nodeHost,
-          let port = nodePort,
-          port > 0 else { return }
-
     let isSameConfig = (lastConfiguredDomain == domain &&
+                        lastConfiguredEmbeddedApp == embedded &&
+                        lastConfiguredHostHeader == hostHeader &&
                         lastConfiguredHost == host &&
-                        lastConfiguredPort == port &&
-                        lastConfiguredEmbeddedApp == nil &&
-                        lastConfiguredHostHeader == hostHeader)
+                        lastConfiguredPort == port)
 
-    if webView != nil && isSameConfig {
-      return
-    }
+    if webView != nil && isSameConfig { return }
+    if webView != nil { teardownWebView() }
 
-    if webView != nil && !isSameConfig {
-      teardownWebView()
+    // Resolve content source: embedded bundle or remote Web4 runtime
+    let rt: Web4Runtime?
+    let proxyBaseUrl: String?
+    let proxyHostHeader: String?
+
+    if let app = embedded, !app.isEmpty {
+      rt = nil
+      proxyBaseUrl = "quic://\(host):\(port)"
+      proxyHostHeader = hostHeader
+    } else {
+      let cacheDir = FileManager.default.urls(for: .cachesDirectory, in: .userDomainMask).first!
+      rt = Web4Runtime(
+        cacheDir: cacheDir.appendingPathComponent("web4_blobs"),
+        cacheLimitBytes: Int64(cacheLimitMb) * 1024 * 1024,
+        client: Web4Client(baseUrl: "quic://\(host):\(port)", hostHeader: hostHeader ?? domain)
+      )
+      proxyBaseUrl = nil
+      proxyHostHeader = nil
     }
+    self.runtime = rt
 
     let config = WKWebViewConfiguration()
-    let cacheDir = FileManager.default.urls(for: .cachesDirectory, in: .userDomainMask).first!
-    let rt = Web4Runtime(
-      cacheDir: cacheDir.appendingPathComponent("web4_blobs"),
-      cacheLimitBytes: Int64(cacheLimitMb) * 1024 * 1024,
-      client: Web4Client(baseUrl: "quic://\(host):\(port)", hostHeader: hostHeader ?? domain)
+    config.setURLSchemeHandler(
+      Web4SchemeHandler(runtime: rt, domain: domain, embeddedApp: embedded, proxyBaseUrl: proxyBaseUrl, proxyHostHeader: proxyHostHeader),
+      forURLScheme: "zhtp"
     )
-    self.runtime = rt
-    let handler = Web4SchemeHandler(runtime: rt, domain: domain, embeddedApp: nil)
-    config.setURLSchemeHandler(handler, forURLScheme: "zhtp")
 
-    // Add message handler for fetch polyfill
     let contentController = config.userContentController
-    contentController.add(ZhtpFetchHandler(runtime: rt, domain: domain, embeddedApp: nil), name: "zhtpFetch")
-
-    // Inject fetch polyfill script
-    let fetchPolyfill = WKUserScript(source: Self.fetchPolyfillScript, injectionTime: .atDocumentStart, forMainFrameOnly: false)
-    contentController.addUserScript(fetchPolyfill)
+    contentController.add(
+      ZhtpFetchHandler(runtime: rt, domain: domain, embeddedApp: embedded, proxyBaseUrl: proxyBaseUrl, proxyHostHeader: proxyHostHeader),
+      name: "zhtpFetch"
+    )
+    contentController.addUserScript(
+      WKUserScript(source: Self.fetchPolyfillScript, injectionTime: .atDocumentStart, forMainFrameOnly: false)
+    )
 
     let wv = WKWebView(frame: bounds, configuration: config)
     wv.autoresizingMask = [.flexibleWidth, .flexibleHeight]
+    wv.isOpaque = false
+    wv.backgroundColor = .clear
+    wv.scrollView.backgroundColor = .clear
     wv.navigationDelegate = self
     wv.uiDelegate = self
+
     let request = URLRequest(url: URL(string: "zhtp://\(domain)/")!)
     onLoadStart?(["url": request.url?.absoluteString ?? ""])
     wv.load(request)
     addSubview(wv)
     webView = wv
+
     lastConfiguredDomain = domain
     lastConfiguredHost = host
     lastConfiguredPort = port
+    lastConfiguredEmbeddedApp = embedded
     lastConfiguredHostHeader = hostHeader
   }
 
@@ -227,6 +180,12 @@ final class Web4View: UIView {
         return null;
       }
 
+      // Resolve any URL (relative or absolute) to a fully-qualified URL
+      function resolveUrl(url) {
+        if (typeof url !== 'string') return url;
+        try { return new URL(url, document.baseURI).href; } catch(e) { return url; }
+      }
+
       // Check if URL is a Web4 zhtp:// URL
       function isZhtpUrl(url) {
         return typeof url === 'string' && url.startsWith('zhtp://');
@@ -274,9 +233,10 @@ final class Web4View: UIView {
       // Expose explicit Web4 fetch API
       window.web4Fetch = web4FetchInternal;
 
-      // Minimal fetch override - only intercepts zhtp://, preserves all other behavior
+      // Minimal fetch override - resolves relative URLs and intercepts zhtp://
       window.fetch = function(input, init) {
-        const url = extractUrl(input);
+        const raw = extractUrl(input);
+        const url = resolveUrl(raw);
         if (isZhtpUrl(url)) {
           return web4FetchInternal(url);
         }
@@ -325,13 +285,26 @@ private class ZhtpFetchHandler: NSObject, WKScriptMessageHandler {
     let trimmed = rel.hasPrefix("/") ? String(rel.dropFirst()) : rel
     guard let base = Bundle.main.resourceURL else { return nil }
 
-    let fileUrl = base
+    let appDir = base
       .appendingPathComponent("web4apps", isDirectory: true)
       .appendingPathComponent(app, isDirectory: true)
-      .appendingPathComponent(trimmed, isDirectory: false)
 
-    guard FileManager.default.fileExists(atPath: fileUrl.path) else { return nil }
-    return (fileUrl, embeddedMime(forPath: trimmed))
+    let fileUrl = appDir.appendingPathComponent(trimmed, isDirectory: false)
+
+    if FileManager.default.fileExists(atPath: fileUrl.path) {
+      return (fileUrl, embeddedMime(forPath: trimmed))
+    }
+
+    // Don't SPA-fallback for API paths — let them fall through to the proxy handler
+    if rel.hasPrefix("/api/") || rel == "/api" { return nil }
+
+    // SPA fallback: serve index.html for routes that don't match a file
+    let indexUrl = appDir.appendingPathComponent("index.html", isDirectory: false)
+    if FileManager.default.fileExists(atPath: indexUrl.path) {
+      return (indexUrl, "text/html")
+    }
+
+    return nil
   }
 
   private func shouldProxyToNode(path: String) -> Bool {

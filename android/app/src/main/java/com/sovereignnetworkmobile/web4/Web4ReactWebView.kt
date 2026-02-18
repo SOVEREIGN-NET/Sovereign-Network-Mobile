@@ -44,6 +44,8 @@ class Web4ReactWebView(context: Context) : WebView(context) {
         settings.allowContentAccess = false
         settings.setSupportMultipleWindows(false)
         settings.javaScriptCanOpenWindowsAutomatically = false
+        // Match the app's dark theme — prevents white flash before content loads
+        setBackgroundColor(android.graphics.Color.parseColor("#0b1016"))
         addJavascriptInterface(ZhtpFetchBridge(), "ZhtpBridge")
         setWebViewClient(object : WebViewClient() {
             override fun onPageStarted(view: WebView?, url: String?, favicon: Bitmap?) {
@@ -93,6 +95,12 @@ class Web4ReactWebView(context: Context) : WebView(context) {
                     return null;
                 }
 
+                // Resolve any URL (relative or absolute) to a fully-qualified URL
+                function resolveUrl(url) {
+                    if (typeof url !== 'string') return url;
+                    try { return new URL(url, document.baseURI).href; } catch(e) { return url; }
+                }
+
                 // Check if URL is a Web4 zhtp:// URL
                 function isZhtpUrl(url) {
                     return typeof url === 'string' && url.startsWith('zhtp://');
@@ -140,9 +148,10 @@ class Web4ReactWebView(context: Context) : WebView(context) {
                 // Expose explicit Web4 fetch API
                 window.web4Fetch = web4FetchInternal;
 
-                // Minimal fetch override - only intercepts zhtp://, preserves all other behavior
+                // Minimal fetch override - resolves relative URLs and intercepts zhtp://
                 window.fetch = function(input, init) {
-                    const url = extractUrl(input);
+                    const raw = extractUrl(input);
+                    const url = resolveUrl(raw);
                     if (isZhtpUrl(url)) {
                         return web4FetchInternal(url);
                     }
@@ -237,8 +246,37 @@ class Web4ReactWebView(context: Context) : WebView(context) {
                     val embedded = embeddedApp
 
                     val (mime, data) = if (embedded != null) {
-                        val res = resolveEmbeddedAsset(embedded, path) ?: throw Exception("Not found: $path")
-                        res.mime to res.readAllBytes(maxFetchSize)
+                        // Try embedded asset first
+                        val res = resolveEmbeddedAsset(embedded, path)
+                        if (res != null) {
+                            res.mime to res.readAllBytes(maxFetchSize)
+                        } else if (path == "/api" || path.startsWith("/api/")) {
+                            // Proxy API calls to node
+                            val host = nodeHost ?: throw Exception("No node host configured")
+                            if (nodePort == 0) throw Exception("No node port configured")
+                            val base = "quic://${host}:${nodePort}"
+                            val hh = (hostHeader ?: currentDomain).lowercase()
+                            val query = uri.query?.let { "?$it" } ?: ""
+                            val response = NativeQuicBridge.requestBytes(
+                                url = base + path + query,
+                                method = "GET",
+                                headersJson = """{"content-type":"application/json","Host":"$hh"}""",
+                                body = null,
+                                timeoutSecs = 30,
+                                insecure = true,
+                                alpn = "public"
+                            ) ?: throw Exception("Node request failed")
+                            val status = (response["status"] as? Number)?.toInt() ?: 200
+                            val bodyBytes = response["body"] as? ByteArray ?: ByteArray(0)
+                            val respBase64 = Base64.encodeToString(bodyBytes, Base64.NO_WRAP)
+                            val respMime = "application/json"
+                            post {
+                                evaluateJavascript("window['$callbackId'](true, $status, '$respMime', '$respBase64', null)", null)
+                            }
+                            return@execute
+                        } else {
+                            throw Exception("Not found: $path")
+                        }
                     } else {
                         val currentRuntime = runtime ?: throw Exception("Runtime not ready")
                         val resolved = currentRuntime.resolveFile(currentDomain, path)
@@ -396,7 +434,16 @@ class Web4ReactWebView(context: Context) : WebView(context) {
             }
             EmbeddedResolved(mime, stream)
         } catch (_: Exception) {
-            null
+            // Don't SPA-fallback for API paths — let them fall through to the proxy handler
+            if (rel == "/api" || rel.startsWith("/api/")) return null
+
+            // SPA fallback: serve index.html for routes that don't match a file
+            try {
+                val stream = context.assets.open("web4apps/$app/index.html")
+                EmbeddedResolved("text/html", stream)
+            } catch (_: Exception) {
+                null
+            }
         }
     }
 
@@ -435,9 +482,10 @@ class Web4ReactWebView(context: Context) : WebView(context) {
 
                 val base = "quic://${host}:${nodePort}"
                 val hh = (this.hostHeader ?: domain).lowercase()
+                val query = uri.query?.let { "?$it" } ?: ""
                 return try {
                     val response = NativeQuicBridge.requestBytes(
-                        url = base + path,
+                        url = base + path + query,
                         method = "GET",
                         headersJson = """{"content-type":"application/json","Host":"$hh"}""",
                         body = null,

@@ -52,9 +52,11 @@ export function useNodeConnectionStatus(
         setConnectionStatus('connected');
         setLatencyMs(result.latencyMs ? Math.round(result.latencyMs) : null);
         // Refresh fee config whenever node is reachable
-        refreshFeeConfig().catch(err =>
-          console.warn('[FeeConfig] Refresh failed:', err)
-        );
+        refreshFeeConfig().catch(err => {
+          if (__DEV__) {
+            console.warn('[FeeConfig] Refresh failed:', err?.message || err);
+          }
+        });
       } else {
         setConnectionStatus('disconnected');
         setLatencyMs(null);

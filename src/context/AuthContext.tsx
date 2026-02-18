@@ -57,8 +57,7 @@ let cachedUseMockService: boolean | null = null;
  */
 export function getUseMockService(): boolean {
   if (cachedUseMockService === null) {
-    // Return default only if not yet loaded
-    return process.env.REACT_APP_USE_MOCK_AUTH === 'true' && __DEV__;
+    return false;
   }
   return cachedUseMockService;
 }
@@ -107,16 +106,12 @@ function notifyMockServiceListeners(value: boolean): void {
  */
 async function initializeMockServiceFlag(): Promise<void> {
   try {
-    const stored = await storage.getItem('zhtp_use_mock_service');
-    if (stored !== null) {
-      const value = JSON.parse(stored);
-      cachedUseMockService = value;
-    } else {
-      cachedUseMockService = process.env.REACT_APP_USE_MOCK_AUTH === 'true' && __DEV__;
-    }
+    // Clear stale mock flag — mock is now opt-in only via Settings
+    await storage.removeItem('zhtp_use_mock_service');
+    cachedUseMockService = false;
   } catch (err) {
-    console.warn('Failed to load mock service setting, using default:', err);
-    cachedUseMockService = process.env.REACT_APP_USE_MOCK_AUTH === 'true' && __DEV__;
+    console.warn('Failed to initialize mock service setting:', err);
+    cachedUseMockService = false;
   }
 }
 
@@ -261,8 +256,10 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
       }
 
       let identity: Identity;
+      const useMock = getUseMockService();
+      console.log(`[AuthContext.signIn] Using ${useMock ? 'MOCK' : 'REAL'} auth service`);
 
-      if (getUseMockService()) {
+      if (useMock) {
         identity = await MockAuthService.signIn({ did: normalizedIdentityId, passphrase: password });
       } else {
         identity = await RealAuthService!.signIn({ identity_id: normalizedIdentityId, password });
