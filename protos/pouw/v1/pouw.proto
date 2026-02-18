@@ -105,6 +105,12 @@ message Receipt {
   bytes receipt_nonce = 10;
   // Auxiliary data for Merkle proofs (optional)
   Aux aux = 11;
+  // Client node identifier (32 bytes)
+  bytes client_node_id = 12;
+  // Provider that served content (optional)
+  bytes provider_id = 13;
+  // Content identifier (CID)
+  bytes content_id = 14;
 }
 
 // SignedReceipt is a Receipt with a cryptographic signature
@@ -145,4 +151,10 @@ message SubmissionResponse {
   repeated Rejection rejected = 2;
   // Server timestamp (milliseconds)
   int64 server_time = 3;
+}
+
+// HealthResponse is returned by the node health check endpoint
+message HealthResponse {
+  // Status: "ok" or error message
+  string status = 1;
 }

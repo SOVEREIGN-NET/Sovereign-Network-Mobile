@@ -1,5 +1,6 @@
 package com.sovereignnetworkmobile.pouw
 
+import android.util.Base64
 import android.util.Log
 import com.sovereignnetworkmobile.NativeQuicBridge
 import com.sovereignnetworkmobile.pouw.model.PoUWError
@@ -7,6 +8,7 @@ import com.sovereignnetworkmobile.pouw.model.ReceiptEntity
 import kotlinx.coroutines.*
 import org.json.JSONArray
 import org.json.JSONObject
+import java.io.ByteArrayInputStream
 import java.util.concurrent.atomic.AtomicLong
 
 /**
@@ -29,9 +31,9 @@ class SubmissionClient(
         private const val RATE_LIMIT_WINDOW_MS = 60_000L
         private const val MAX_BATCH_SIZE = 100
         private const val DEFAULT_TIMEOUT_SECS = 30
-        private const val CHALLENGE_PATH = "/api/v1/pouw/challenge"
-        private const val SUBMIT_PATH = "/api/v1/pouw/submit"
-        private const val BATCH_SUBMIT_PATH = "/api/v1/pouw/batch"
+        private const val CHALLENGE_PATH = "/pouw/challenge"
+        private const val SUBMIT_PATH = "/pouw/submit"
+        private const val BATCH_SUBMIT_PATH = "/pouw/batch"
     }
     
     private val requestTimestamps = mutableListOf<Long>()
@@ -40,6 +42,8 @@ class SubmissionClient(
     // Track challenge expiration
     private var currentChallengeNonce: ByteArray? = null
     private var challengeExpirationTime: Long = 0
+    private var currentTaskId: ByteArray? = null
+    private var currentPolicy: ChallengePolicy? = null
     private val CHALLENGE_VALIDITY_MS = 5 * 60 * 1000 // 5 minutes
     
     /**
@@ -54,7 +58,8 @@ class SubmissionClient(
     suspend fun requestChallenge(): ChallengeResponse {
         checkRateLimit()
         
-        val url = buildQuicUrl(CHALLENGE_PATH)
+        // Add cap query parameter for challenge capabilities
+        val url = buildQuicUrl("$CHALLENGE_PATH?cap=hash,merkle,signature")
         
         return try {
             val result = withContext(Dispatchers.IO) {
@@ -182,11 +187,31 @@ class SubmissionClient(
     }
     
     /**
+     * Gets the current task ID if challenge is valid.
+     * 
+     * @return The task ID or null if expired/not available
+     */
+    fun getCurrentTaskId(): ByteArray? {
+        return if (isChallengeValid()) currentTaskId else null
+    }
+    
+    /**
+     * Gets the current challenge policy if valid.
+     * 
+     * @return The policy or null if expired/not available
+     */
+    fun getCurrentPolicy(): ChallengePolicy? {
+        return if (isChallengeValid()) currentPolicy else null
+    }
+    
+    /**
      * Clears the current challenge, forcing a new challenge request.
      */
     fun clearChallenge() {
         currentChallengeNonce = null
         challengeExpirationTime = 0
+        currentTaskId = null
+        currentPolicy = null
     }
     
     /**
@@ -198,50 +223,217 @@ class SubmissionClient(
     
     /**
      * Parses the challenge response from the network.
+     * The response contains a base64-encoded ChallengeToken protobuf.
+     * 
+     * Spec response format:
+     * {
+     *   "token": "base64-encoded-protobuf",
+     *   "expires_at": 1760000030
+     * }
      */
     private fun parseChallengeResponse(body: String): ChallengeResponse {
         return try {
             val json = JSONObject(body)
-            val nonce = json.getString("nonce").decodeHex()
-            val difficulty = json.getInt("difficulty")
-            val expiresAt = json.optLong("expires_at", System.currentTimeMillis() + CHALLENGE_VALIDITY_MS)
+            val tokenBase64 = json.getString("token")
+            val expiresAt = json.optLong("expires_at", System.currentTimeMillis() / 1000 + 300)
             
-            currentChallengeNonce = nonce
-            challengeExpirationTime = expiresAt
+            // Parse the base64-encoded ChallengeToken protobuf
+            val tokenBytes = Base64.decode(tokenBase64, Base64.DEFAULT)
+            val token = parseChallengeToken(tokenBytes)
+            
+            currentChallengeNonce = token.challengeNonce
+            challengeExpirationTime = expiresAt * 1000 // Convert seconds to milliseconds
+            currentTaskId = token.taskId
+            currentPolicy = token.policy
             
             ChallengeResponse(
-                nonce = nonce,
-                difficulty = difficulty,
-                expiresAt = expiresAt
+                nonce = token.challengeNonce,
+                difficulty = token.policy?.difficulty ?: 20,
+                expiresAt = expiresAt * 1000,
+                taskId = token.taskId,
+                policy = token.policy
             )
         } catch (e: Exception) {
-            Log.e(TAG, "Failed to parse challenge response: ${e.message}")
+            Log.e(TAG, "Failed to parse challenge response: ${e.message}", e)
             throw PoUWError.SerializationError()
         }
     }
     
     /**
+     * Parses a ChallengeToken protobuf from bytes.
+     * This is a simple protobuf parser for the ChallengeToken message.
+     * 
+     * ChallengeToken protobuf structure:
+     * - task_id: bytes (field 1)
+     * - challenge_nonce: bytes (field 2)
+     * - expires_at: uint64 (field 3)
+     * - policy: Policy message (field 4)
+     */
+    private fun parseChallengeToken(bytes: ByteArray): ChallengeToken {
+        val input = ByteArrayInputStream(bytes)
+        var taskId: ByteArray? = null
+        var challengeNonce: ByteArray? = null
+        var expiresAt: Long = 0
+        var policy: ChallengePolicy? = null
+        
+        while (input.available() > 0) {
+            val tag = input.read()
+            if (tag == -1) break
+            
+            val fieldNumber = (tag shr 3)
+            val wireType = tag and 0x07
+            
+            when (fieldNumber) {
+                1 -> { // task_id: bytes
+                    if (wireType == 2) {
+                        taskId = readLengthDelimited(input)
+                    }
+                }
+                2 -> { // challenge_nonce: bytes
+                    if (wireType == 2) {
+                        challengeNonce = readLengthDelimited(input)
+                    }
+                }
+                3 -> { // expires_at: varint
+                    if (wireType == 0) {
+                        expiresAt = readVarint(input)
+                    }
+                }
+                4 -> { // policy: embedded message
+                    if (wireType == 2) {
+                        val policyBytes = readLengthDelimited(input)
+                        policy = parsePolicy(policyBytes)
+                    }
+                }
+                else -> {
+                    // Skip unknown field
+                    skipField(input, wireType)
+                }
+            }
+        }
+        
+        return ChallengeToken(
+            taskId = taskId ?: ByteArray(0),
+            challengeNonce = challengeNonce ?: ByteArray(0),
+            expiresAt = expiresAt,
+            policy = policy
+        )
+    }
+    
+    /**
+     * Parses a Policy protobuf message.
+     */
+    private fun parsePolicy(bytes: ByteArray): ChallengePolicy {
+        val input = ByteArrayInputStream(bytes)
+        var maxReceipts: Int = 100
+        var difficulty: Int = 20
+        
+        while (input.available() > 0) {
+            val tag = input.read()
+            if (tag == -1) break
+            
+            val fieldNumber = (tag shr 3)
+            val wireType = tag and 0x07
+            
+            when (fieldNumber) {
+                1 -> { // max_receipts: varint
+                    if (wireType == 0) {
+                        maxReceipts = readVarint(input).toInt()
+                    }
+                }
+                2 -> { // difficulty: varint
+                    if (wireType == 0) {
+                        difficulty = readVarint(input).toInt()
+                    }
+                }
+                else -> {
+                    skipField(input, wireType)
+                }
+            }
+        }
+        
+        return ChallengePolicy(maxReceipts = maxReceipts, difficulty = difficulty)
+    }
+    
+    /**
+     * Reads a length-delimited field from the input stream.
+     */
+    private fun readLengthDelimited(input: ByteArrayInputStream): ByteArray {
+        val length = readVarint(input).toInt()
+        val bytes = ByteArray(length)
+        input.read(bytes)
+        return bytes
+    }
+    
+    /**
+     * Reads a varint from the input stream.
+     */
+    private fun readVarint(input: ByteArrayInputStream): Long {
+        var result: Long = 0
+        var shift = 0
+        while (true) {
+            val b = input.read()
+            if (b == -1) throw IllegalStateException("Unexpected end of stream")
+            result = result or ((b and 0x7F).toLong() shl shift)
+            if ((b and 0x80) == 0) break
+            shift += 7
+        }
+        return result
+    }
+    
+    /**
+     * Skips an unknown field based on its wire type.
+     */
+    private fun skipField(input: ByteArrayInputStream, wireType: Int) {
+        when (wireType) {
+            0 -> { // Varint
+                while (input.read() and 0x80 != 0) {}
+            }
+            2 -> { // Length-delimited
+                val length = readVarint(input).toInt()
+                input.skip(length.toLong())
+            }
+            5 -> { // Fixed32
+                input.skip(4)
+            }
+            1 -> { // Fixed64
+                input.skip(8)
+            }
+        }
+    }
+    
+    /**
      * Parses the submission response from the network.
+     * 
+     * Spec response format:
+     * {
+     *   "accepted": 1,
+     *   "rejected": 0
+     * }
      */
     private fun parseSubmitResponse(body: String, submittedReceipts: List<ReceiptEntity>): SubmitResponse {
         return try {
             val json = JSONObject(body)
-            val success = json.optBoolean("success", true)
-            val acceptedCount = json.optInt("accepted_count", submittedReceipts.size)
+            val accepted = json.optInt("accepted", submittedReceipts.size)
+            val rejected = json.optInt("rejected", 0)
             
-            val rejectedArray = json.optJSONArray("rejected")
-            val rejectedNonces = mutableListOf<ByteArray>()
-            if (rejectedArray != null) {
-                for (i in 0 until rejectedArray.length()) {
-                    rejectedNonces.add(rejectedArray.getString(i).decodeHex())
-                }
+            // Calculate accepted/rejected nonces
+            val acceptedNonces = if (accepted >= submittedReceipts.size) {
+                submittedReceipts.map { it.receiptNonce }
+            } else {
+                // If not all accepted, first 'accepted' count are accepted
+                submittedReceipts.take(accepted).map { it.receiptNonce }
             }
             
-            val acceptedNonces = submittedReceipts.map { it.receiptNonce } - rejectedNonces.toSet()
+            val rejectedNonces = if (rejected > 0) {
+                submittedReceipts.drop(accepted).map { it.receiptNonce }.take(rejected)
+            } else {
+                emptyList()
+            }
             
             SubmitResponse(
-                success = success,
-                acceptedCount = acceptedCount,
+                success = true,
+                acceptedCount = accepted,
                 acceptedNonces = acceptedNonces,
                 rejectedNonces = rejectedNonces
             )
@@ -258,22 +450,66 @@ class SubmissionClient(
     
     /**
      * Builds the JSON payload for batch submission.
+     * 
+     * Spec request format:
+     * {
+     *   "version": 1,
+     *   "client_did": "did:zhtp:alice",
+     *   "receipts": [
+     *     {
+     *       "receipt": {
+     *         "version": 1,
+     *         "task_id": "hex",
+     *         "client_did": "did:zhtp:alice",
+     *         "client_node_id": "hex-32-bytes",
+     *         "provider_id": "hex",
+     *         "content_id": "hex",
+     *         "proof_type": "hash",
+     *         "bytes_verified": 1024,
+     *         "result_ok": true,
+     *         "started_at": 1760000010,
+     *         "finished_at": 1760000020,
+     *         "receipt_nonce": "hex-16-bytes",
+     *         "challenge_nonce": "hex"
+     *       },
+     *       "sig_scheme": "ed25519",
+     *       "signature": "hex"
+     *     }
+     *   ]
+     * }
      */
     private fun buildBatchPayload(receipts: List<ReceiptEntity>): String {
         val receiptsArray = JSONArray()
         
         receipts.forEach { receipt ->
-            val receiptObj = JSONObject().apply {
+            val receiptInner = JSONObject().apply {
+                put("version", 1)
                 put("task_id", receipt.taskId.toHex())
+                put("client_did", receipt.clientDid ?: "")
+                put("client_node_id", receipt.clientNodeId.toHex())
+                receipt.providerId?.let { put("provider_id", it.toHex()) }
+                put("content_id", receipt.contentId.toHex())
+                put("proof_type", receipt.proofType)
+                put("bytes_verified", receipt.bytesVerified)
+                put("result_ok", receipt.resultOk)
+                put("started_at", receipt.startedAt)
+                put("finished_at", receipt.finishedAt)
                 put("receipt_nonce", receipt.receiptNonce.toHex())
-                put("signed_data", receipt.signedReceiptData.toBase64())
+                put("challenge_nonce", receipt.challengeNonce.toHex())
+            }
+            
+            val receiptObj = JSONObject().apply {
+                put("receipt", receiptInner)
+                put("sig_scheme", receipt.sigScheme)
+                put("signature", receipt.signature.toHex())
             }
             receiptsArray.put(receiptObj)
         }
         
         return JSONObject().apply {
+            put("version", 1)
+            put("client_did", receipts.firstOrNull()?.clientDid ?: "")
             put("receipts", receiptsArray)
-            put("count", receipts.size)
         }.toString()
     }
     
@@ -329,12 +565,47 @@ class SubmissionClient(
     }
     
     /**
+     * ChallengeToken parsed from base64 protobuf.
+     */
+    data class ChallengeToken(
+        val taskId: ByteArray,
+        val challengeNonce: ByteArray,
+        val expiresAt: Long,
+        val policy: ChallengePolicy?
+    ) {
+        override fun equals(other: Any?): Boolean {
+            if (this === other) return true
+            if (other !is ChallengeToken) return false
+            return taskId.contentEquals(other.taskId) &&
+                   challengeNonce.contentEquals(other.challengeNonce) &&
+                   expiresAt == other.expiresAt
+        }
+        
+        override fun hashCode(): Int {
+            var result = taskId.contentHashCode()
+            result = 31 * result + challengeNonce.contentHashCode()
+            result = 31 * result + expiresAt.hashCode()
+            return result
+        }
+    }
+    
+    /**
+     * Policy embedded in ChallengeToken.
+     */
+    data class ChallengePolicy(
+        val maxReceipts: Int,
+        val difficulty: Int
+    )
+    
+    /**
      * Response from challenge request.
      */
     data class ChallengeResponse(
         val nonce: ByteArray,
         val difficulty: Int,
-        val expiresAt: Long
+        val expiresAt: Long,
+        val taskId: ByteArray? = null,
+        val policy: ChallengePolicy? = null
     ) {
         override fun equals(other: Any?): Boolean {
             if (this === other) return true

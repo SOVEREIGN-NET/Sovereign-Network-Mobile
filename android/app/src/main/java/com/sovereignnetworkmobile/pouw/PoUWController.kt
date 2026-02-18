@@ -161,11 +161,16 @@ class PoUWController(
      * 
      * @param content The content bytes to process
      * @param contentHash The hash of the content (for verification)
+     * @param providerId Optional provider ID for the content
      * @return The created receipt entity
      * @throws PoUWError if processing fails
      */
     @Throws(PoUWError::class)
-    suspend fun submitContent(content: ByteArray, contentHash: ByteArray): ReceiptEntity {
+    suspend fun submitContent(
+        content: ByteArray, 
+        contentHash: ByteArray,
+        providerId: ByteArray? = null
+    ): ReceiptEntity {
         if (content.isEmpty()) {
             throw PoUWError.InvalidContent()
         }
@@ -178,9 +183,15 @@ class PoUWController(
         // Get or request challenge
         val challenge = getOrRequestChallenge()
         
+        // Record start time
+        val startedAt = System.currentTimeMillis() / 1000 // Convert to seconds
+        
         // Solve the challenge (do work)
         val workerNonce = solveChallenge(challenge) 
             ?: throw PoUWError.VerificationFailed()
+        
+        // Record finish time
+        val finishedAt = System.currentTimeMillis() / 1000 // Convert to seconds
         
         // Create and sign receipt
         val receiptNonce = verifierEngine.generateRandomNonce(32)
@@ -208,11 +219,23 @@ class PoUWController(
             publicKey = identitySigner.getPublicKey()
         )
         
-        // Save to store
+        // Save to store with all new fields
         val receipt = receiptStore.createReceipt(
             taskId = taskId,
             receiptNonce = receiptNonce,
-            signedReceiptData = signedReceiptData
+            signedReceiptData = signedReceiptData,
+            clientDid = identitySigner.getDid(),
+            clientNodeId = identitySigner.getNodeId(),
+            providerId = providerId,
+            contentId = contentHash,
+            challengeNonce = challenge.nonce,
+            sigScheme = "dilithium5", // IdentitySigner uses Dilithium5
+            signature = signature,
+            proofType = "hash",
+            bytesVerified = content.size.toLong(),
+            resultOk = true,
+            startedAt = startedAt,
+            finishedAt = finishedAt
         )
         
         Log.d(TAG, "Created receipt with nonce: ${receiptNonce.toHex()}")
@@ -230,7 +253,12 @@ class PoUWController(
         receiptNonce: ByteArray,
         challengeNonce: ByteArray,
         workerNonce: ByteArray,
-        contentHash: ByteArray
+        contentHash: ByteArray,
+        providerId: ByteArray? = null,
+        bytesVerified: Long = 0,
+        resultOk: Boolean = true,
+        startedAt: Long = 0,
+        finishedAt: Long = 0
     ): ReceiptEntity {
         val timestamp = System.currentTimeMillis()
         
@@ -257,7 +285,19 @@ class PoUWController(
         return receiptStore.createReceipt(
             taskId = taskId,
             receiptNonce = receiptNonce,
-            signedReceiptData = signedReceiptData
+            signedReceiptData = signedReceiptData,
+            clientDid = identitySigner.getDid(),
+            clientNodeId = identitySigner.getNodeId(),
+            providerId = providerId,
+            contentId = contentHash,
+            challengeNonce = challengeNonce,
+            sigScheme = "dilithium5",
+            signature = signature,
+            proofType = "hash",
+            bytesVerified = bytesVerified,
+            resultOk = resultOk,
+            startedAt = startedAt,
+            finishedAt = finishedAt
         )
     }
     

@@ -20,6 +20,9 @@ protocol IdentitySignerProtocol {
     
     /// Check if a valid identity is available
     var hasIdentity: Bool { get }
+    
+    /// Get the signature scheme used by this identity (ed25519 or dilithium5)
+    func getSignatureScheme() -> String
 }
 
 /// Implementation of identity signing using Rust FFI via ZhtpClient
@@ -148,6 +151,12 @@ final class IdentitySigner: IdentitySignerProtocol {
         queue.sync {
             self.cachedIdentity = loadIdentityFromHandleStore()
         }
+    }
+    
+    /// Get the signature scheme used by this identity
+    /// Currently always returns "dilithium5" as that's the scheme used for signing
+    func getSignatureScheme() -> String {
+        return "dilithium5"
     }
     
     // MARK: - Private Helpers

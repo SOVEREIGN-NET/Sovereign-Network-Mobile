@@ -11,10 +11,21 @@ import kotlinx.coroutines.flow.Flow
 /**
  * Room database for storing PoUW receipts.
  */
-@Database(entities = [ReceiptEntity::class], version = 1, exportSchema = false)
-@TypeConverters(ReceiptStateConverter::class)
+@Database(entities = [ReceiptEntity::class], version = 2, exportSchema = false)
+@TypeConverters(ReceiptStateConverter::class, ByteArrayConverter::class)
 abstract class ReceiptDatabase : RoomDatabase() {
     abstract fun receiptDao(): ReceiptDao
+}
+
+/**
+ * Type converter for ByteArray (stored as BLOB).
+ */
+class ByteArrayConverter {
+    @TypeConverter
+    fun fromByteArray(bytes: ByteArray): ByteArray = bytes
+    
+    @TypeConverter
+    fun toByteArray(bytes: ByteArray): ByteArray = bytes
 }
 
 /**
@@ -59,7 +70,9 @@ class ReceiptStore(context: Context) {
         context,
         ReceiptDatabase::class.java,
         DATABASE_NAME
-    ).build()
+    )
+    .fallbackToDestructiveMigration() // Allow destructive migration for development
+    .build()
     
     private val dao: ReceiptDao = database.receiptDao()
     
@@ -84,18 +97,54 @@ class ReceiptStore(context: Context) {
      * @param taskId The task identifier
      * @param receiptNonce Unique nonce for this receipt
      * @param signedReceiptData The signed receipt data
+     * @param clientDid The client's DID (e.g., "did:zhtp:alice")
+     * @param clientNodeId The client's node ID (32 bytes)
+     * @param providerId Optional provider ID
+     * @param contentId The content identifier
+     * @param challengeNonce The challenge nonce from the network
+     * @param sigScheme The signature scheme ("ed25519" or "dilithium5")
+     * @param signature The signature over the receipt data
+     * @param proofType The proof type (e.g., "hash")
+     * @param bytesVerified Number of bytes verified
+     * @param resultOk Whether the verification result was successful
+     * @param startedAt Start timestamp (seconds)
+     * @param finishedAt Finish timestamp (seconds)
      * @return The created ReceiptEntity
      */
     suspend fun createReceipt(
         taskId: ByteArray,
         receiptNonce: ByteArray,
-        signedReceiptData: ByteArray
+        signedReceiptData: ByteArray,
+        clientDid: String? = null,
+        clientNodeId: ByteArray = ByteArray(32),
+        providerId: ByteArray? = null,
+        contentId: ByteArray = ByteArray(0),
+        challengeNonce: ByteArray = ByteArray(0),
+        sigScheme: String = "ed25519",
+        signature: ByteArray = ByteArray(0),
+        proofType: String = "hash",
+        bytesVerified: Long = 0,
+        resultOk: Boolean = true,
+        startedAt: Long = 0,
+        finishedAt: Long = 0
     ): ReceiptEntity {
         val receipt = ReceiptEntity(
             receiptNonce = receiptNonce,
             taskId = taskId,
             state = ReceiptState.CREATED,
-            signedReceiptData = signedReceiptData
+            signedReceiptData = signedReceiptData,
+            clientDid = clientDid,
+            clientNodeId = clientNodeId,
+            providerId = providerId,
+            contentId = contentId,
+            challengeNonce = challengeNonce,
+            sigScheme = sigScheme,
+            signature = signature,
+            proofType = proofType,
+            bytesVerified = bytesVerified,
+            resultOk = resultOk,
+            startedAt = startedAt,
+            finishedAt = finishedAt
         )
         save(receipt)
         return receipt
@@ -170,13 +219,17 @@ class ReceiptStore(context: Context) {
                 if (error != null) {
                     // Update with error message - need to use a workaround since
                     // we don't have a direct update method
-                    val updated = ReceiptEntity(
-                        receiptNonce = receipt?.receiptNonce ?: nonce,
-                        taskId = receipt?.taskId ?: ByteArray(0),
+                    val updated = receipt?.copy(
                         state = ReceiptState.RETRY_WAIT,
-                        signedReceiptData = receipt?.signedReceiptData ?: ByteArray(0),
-                        createdAt = receipt?.createdAt ?: System.currentTimeMillis(),
-                        retryCount = (receipt?.retryCount ?: 0) + 1,
+                        retryCount = receipt.retryCount + 1,
+                        lastError = error
+                    ) ?: ReceiptEntity(
+                        receiptNonce = nonce,
+                        taskId = ByteArray(0),
+                        state = ReceiptState.RETRY_WAIT,
+                        signedReceiptData = ByteArray(0),
+                        createdAt = System.currentTimeMillis(),
+                        retryCount = 1,
                         lastError = error
                     )
                     dao.insert(updated)

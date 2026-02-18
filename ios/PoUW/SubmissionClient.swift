@@ -26,8 +26,8 @@ final class SubmissionClient: SubmissionClientProtocol {
         
         static let `default` = Configuration(
             nodeUrl: "",
-            challengeEndpoint: "/api/v1/pouw/challenge",
-            submitEndpoint: "/api/v1/pouw/submit",
+            challengeEndpoint: "/pouw/challenge",
+            submitEndpoint: "/pouw/submit",
             timeout: 30.0
         )
     }
@@ -70,20 +70,15 @@ final class SubmissionClient: SubmissionClientProtocol {
             throw PoUWError.identityNotFound
         }
         
-        // Build challenge request
-        let requestBody: [String: Any] = [
-            "did": did,
-            "capabilities": capabilities,
-            "timestamp": UInt64(Date().timeIntervalSince1970)
-        ]
+        // Build query parameters for GET request
+        let capsParam = capabilities.joined(separator: ",")
+        let queryPath = "\(config.challengeEndpoint)?cap=\(capsParam.addingPercentEncoding(withAllowedCharacters: .urlQueryAllowed) ?? capsParam)"
         
-        let bodyData = try JSONSerialization.data(withJSONObject: requestBody)
-        
-        // Make QUIC request
+        // Make QUIC GET request (no body for GET)
         let response = try await makeQuicRequest(
-            path: config.challengeEndpoint,
-            method: "POST",
-            body: bodyData
+            path: queryPath,
+            method: "GET",
+            body: nil
         )
         
         // Parse response
@@ -92,26 +87,91 @@ final class SubmissionClient: SubmissionClientProtocol {
         }
         
         // Parse challenge token from response
-        // Expected format: { "challenge": "base64", "expires_at": timestamp, "nonce": "base64", "signature": "base64" }
+        // Expected format: { "token": "base64-encoded-protobuf", "expires_at": timestamp }
         guard let json = try? JSONSerialization.jsonObject(with: response.body) as? [String: Any],
-              let challengeB64 = json["challenge"] as? String,
-              let challenge = Data(base64Encoded: challengeB64),
-              let expiresAtMs = json["expires_at"] as? UInt64,
-              let nonceB64 = json["nonce"] as? String,
-              let nonce = Data(base64Encoded: nonceB64),
-              let signatureB64 = json["signature"] as? String,
-              let serverSignature = Data(base64Encoded: signatureB64) else {
+              let tokenB64 = json["token"] as? String,
+              let tokenData = Data(base64Encoded: tokenB64),
+              let expiresAtSec = json["expires_at"] as? UInt64 else {
             throw PoUWError.serializationError
         }
         
-        let expiresAt = Date(timeIntervalSince1970: Double(expiresAtMs) / 1000)
+        // Parse protobuf ChallengeToken from token data
+        // Format: challenge (varint length + bytes) + nonce (varint length + bytes) + serverSignature (varint length + bytes)
+        let expiresAt = Date(timeIntervalSince1970: Double(expiresAtSec))
+        let parsedToken = try parseChallengeTokenProto(tokenData)
         
         return ChallengeToken(
-            challenge: challenge,
+            challenge: parsedToken.challenge,
             expiresAt: expiresAt,
-            nonce: nonce,
-            serverSignature: serverSignature
+            nonce: parsedToken.nonce,
+            serverSignature: parsedToken.serverSignature
         )
+    }
+    
+    /// Parse protobuf-encoded ChallengeToken
+    /// Simple protobuf parser for ChallengeToken message
+    private func parseChallengeTokenProto(_ data: Data) throws -> (challenge: Data, nonce: Data, serverSignature: Data) {
+        var offset = 0
+        
+        func readLengthDelimited() throws -> Data {
+            guard offset < data.count else {
+                throw PoUWError.serializationError
+            }
+            
+            // Read varint length
+            var length: UInt64 = 0
+            var shift: UInt64 = 0
+            while offset < data.count {
+                let byte = data[offset]
+                offset += 1
+                length |= UInt64(byte & 0x7F) << shift
+                if (byte & 0x80) == 0 {
+                    break
+                }
+                shift += 7
+            }
+            
+            guard offset + Int(length) <= data.count else {
+                throw PoUWError.serializationError
+            }
+            
+            let result = data.subdata(in: offset..<offset+Int(length))
+            offset += Int(length)
+            return result
+        }
+        
+        // Parse fields (field 1 = challenge, field 2 = nonce, field 3 = serverSignature)
+        var challenge: Data?
+        var nonce: Data?
+        var serverSignature: Data?
+        
+        while offset < data.count {
+            let tag = data[offset]
+            offset += 1
+            
+            let fieldNumber = (tag >> 3)
+            let wireType = tag & 0x07
+            
+            // Length-delimited fields (wire type 2)
+            if wireType == 2 {
+                let value = try readLengthDelimited()
+                switch fieldNumber {
+                case 1: challenge = value
+                case 2: nonce = value
+                case 3: serverSignature = value
+                default: break // Skip unknown fields
+                }
+            } else {
+                // Skip other wire types
+                throw PoUWError.serializationError
+            }
+        }
+        
+        guard let chal = challenge, let non = nonce, let sig = serverSignature else {
+            throw PoUWError.serializationError
+        }
+        
+        return (challenge: chal, nonce: non, serverSignature: sig)
     }
     
     /// Submit a batch of receipts
@@ -131,18 +191,33 @@ final class SubmissionClient: SubmissionClientProtocol {
             throw PoUWError.identityNotFound
         }
         
-        // Build submit request
-        let receiptData = batch.receipts.map { receipt in
+        // Build submit request per API spec
+        // Format: { "version": 1, "client_did": "...", "receipts": [...] }
+        let receiptData = batch.receipts.map { receipt -> [String: Any] in
             [
-                "nonce": receipt.receiptNonce.base64EncodedString(),
-                "task_id": receipt.taskId.base64EncodedString(),
-                "signed_data": receipt.signedReceiptData.base64EncodedString()
+                "receipt": [
+                    "version": 1,
+                    "task_id": receipt.taskId.hexEncodedString(),
+                    "client_did": did,
+                    "client_node_id": receipt.clientNodeId?.hexEncodedString() ?? "",
+                    "provider_id": receipt.providerId?.hexEncodedString() ?? "",
+                    "content_id": receipt.contentId?.hexEncodedString() ?? "",
+                    "proof_type": receipt.proofType,
+                    "bytes_verified": receipt.bytesVerified,
+                    "result_ok": receipt.resultOk,
+                    "started_at": receipt.startedAt,
+                    "finished_at": receipt.finishedAt,
+                    "receipt_nonce": receipt.receiptNonce.hexEncodedString(),
+                    "challenge_nonce": batch.challengeToken.nonce.hexEncodedString()
+                ],
+                "sig_scheme": receipt.sigScheme,
+                "signature": receipt.signature.hexEncodedString()
             ]
         }
         
         let requestBody: [String: Any] = [
-            "did": did,
-            "challenge": batch.challengeToken.challenge.base64EncodedString(),
+            "version": 1,
+            "client_did": did,
             "receipts": receiptData
         ]
         
@@ -156,36 +231,37 @@ final class SubmissionClient: SubmissionClientProtocol {
         )
         
         // Parse response
-        // Expected format: { "accepted": true/false, "message": "...", "accepted_receipts": [...], "rejected_receipts": [...] }
+        // Expected format: { "accepted": 1, "rejected": 0 }
         guard let json = try? JSONSerialization.jsonObject(with: response.body) as? [String: Any] else {
             throw PoUWError.serializationError
         }
         
-        let accepted = json["accepted"] as? Bool ?? false
-        let message = json["message"] as? String ?? ""
+        let acceptedCount = json["accepted"] as? Int ?? 0
+        let rejectedCount = json["rejected"] as? Int ?? 0
         
-        // Parse accepted receipt nonces
-        let acceptedReceipts: [Data] = (json["accepted_receipts"] as? [String])?.compactMap {
-            Data(base64Encoded: $0)
-        } ?? []
+        // Since API only returns counts, we map based on batch order
+        // First 'accepted' receipts are considered accepted, rest rejected
+        var acceptedReceipts: [Data] = []
+        var rejectedReceipts: [Data] = []
         
-        // Parse rejected receipt nonces
-        let rejectedReceipts: [Data] = (json["rejected_receipts"] as? [String])?.compactMap {
-            Data(base64Encoded: $0)
-        } ?? []
-        
-        // Parse rejection reasons
-        var rejectionReasons: [String: String] = [:]
-        if let reasons = json["rejection_reasons"] as? [String: String] {
-            rejectionReasons = reasons
+        for (index, receipt) in batch.receipts.enumerated() {
+            if index < acceptedCount {
+                acceptedReceipts.append(receipt.receiptNonce)
+            } else {
+                rejectedReceipts.append(receipt.receiptNonce)
+            }
         }
         
+        let message = "Accepted: \(acceptedCount), Rejected: \(rejectedCount)"
+        
         return SubmissionResponse(
-            accepted: accepted,
+            accepted: acceptedCount > 0,
             message: message,
+            acceptedCount: acceptedCount,
+            rejectedCount: rejectedCount,
             acceptedReceipts: acceptedReceipts,
             rejectedReceipts: rejectedReceipts,
-            rejectionReasons: rejectionReasons
+            rejectionReasons: [:]
         )
     }
     
@@ -195,7 +271,7 @@ final class SubmissionClient: SubmissionClientProtocol {
     private func makeQuicRequest(
         path: String,
         method: String,
-        body: Data
+        body: Data?
     ) async throws -> QuicResponse {
         let url = buildQuicUrl(path: path)
         
@@ -205,14 +281,20 @@ final class SubmissionClient: SubmissionClientProtocol {
         ]
         
         return try await withCheckedThrowingContinuation { continuation in
-            let options: NSDictionary = [
+            var optionsDict: [String: Any] = [
                 "method": method,
                 "headers": headers,
-                "body": String(data: body, encoding: .utf8) ?? "",
                 "timeout": config.timeout,
                 "insecure": false,
                 "alpn": "authenticated"
             ]
+            
+            // Only add body if provided (GET requests don't have body)
+            if let bodyData = body {
+                optionsDict["body"] = String(data: bodyData, encoding: .utf8) ?? ""
+            }
+            
+            let options: NSDictionary = optionsDict as NSDictionary
             
             NativeQuic().request(url, options: options, resolve: { result in
                 guard let dict = result as? [String: Any] else {
@@ -252,6 +334,15 @@ final class SubmissionClient: SubmissionClientProtocol {
         }
         
         return baseUrl + path
+    }
+}
+
+// MARK: - Data Extensions
+
+private extension Data {
+    /// Convert Data to hex-encoded string
+    func hexEncodedString() -> String {
+        return map { String(format: "%02x", $0) }.joined()
     }
 }
 

@@ -30,6 +30,36 @@ struct Receipt: Identifiable, Codable {
     /// Provider ID that served the content (if available)
     var providerId: Data?
     
+    /// Content ID (CID digest)
+    var contentId: Data?
+    
+    /// Client node ID (32 bytes from identity)
+    var clientNodeId: Data?
+    
+    /// Client DID
+    var clientDid: String?
+    
+    /// Proof type (e.g., "hash", "merkle", "signature")
+    var proofType: String
+    
+    /// Number of bytes verified
+    var bytesVerified: Int
+    
+    /// Whether the verification result was OK
+    var resultOk: Bool
+    
+    /// Start timestamp (Unix seconds)
+    var startedAt: UInt64
+    
+    /// Finish timestamp (Unix seconds)
+    var finishedAt: UInt64
+    
+    /// Signature scheme used (ed25519 or dilithium5)
+    var sigScheme: String
+    
+    /// Signature bytes (separate from signedReceiptData for API format)
+    var signature: Data
+    
     /// Computed property for Identifiable conformance
     var id: Data { receiptNonce }
     
@@ -39,6 +69,16 @@ struct Receipt: Identifiable, Codable {
         taskId: Data,
         signedReceiptData: Data,
         providerId: Data? = nil,
+        contentId: Data? = nil,
+        clientNodeId: Data? = nil,
+        clientDid: String? = nil,
+        proofType: String = "hash",
+        bytesVerified: Int = 0,
+        resultOk: Bool = true,
+        startedAt: UInt64 = 0,
+        finishedAt: UInt64 = 0,
+        sigScheme: String = "dilithium5",
+        signature: Data = Data(),
         state: ReceiptState = .created,
         createdAt: Date = Date(),
         retryCount: Int = 0,
@@ -48,6 +88,16 @@ struct Receipt: Identifiable, Codable {
         self.taskId = taskId
         self.signedReceiptData = signedReceiptData
         self.providerId = providerId
+        self.contentId = contentId
+        self.clientNodeId = clientNodeId
+        self.clientDid = clientDid
+        self.proofType = proofType
+        self.bytesVerified = bytesVerified
+        self.resultOk = resultOk
+        self.startedAt = startedAt
+        self.finishedAt = finishedAt
+        self.sigScheme = sigScheme
+        self.signature = signature
         self.state = state
         self.createdAt = createdAt
         self.retryCount = retryCount
@@ -119,11 +169,17 @@ struct ChallengeToken {
 
 /// Response from server after batch submission
 struct SubmissionResponse {
-    /// Whether the batch was accepted
+    /// Whether the batch was accepted (at least one receipt)
     let accepted: Bool
     
     /// Server message
     let message: String
+    
+    /// Number of accepted receipts
+    let acceptedCount: Int
+    
+    /// Number of rejected receipts
+    let rejectedCount: Int
     
     /// Receipt nonces that were accepted
     let acceptedReceipts: [Data]
@@ -133,4 +189,22 @@ struct SubmissionResponse {
     
     /// Error details for rejected receipts
     let rejectionReasons: [String: String]
+    
+    init(
+        accepted: Bool,
+        message: String,
+        acceptedCount: Int = 0,
+        rejectedCount: Int = 0,
+        acceptedReceipts: [Data],
+        rejectedReceipts: [Data],
+        rejectionReasons: [String: String]
+    ) {
+        self.accepted = accepted
+        self.message = message
+        self.acceptedCount = acceptedCount
+        self.rejectedCount = rejectedCount
+        self.acceptedReceipts = acceptedReceipts
+        self.rejectedReceipts = rejectedReceipts
+        self.rejectionReasons = rejectionReasons
+    }
 }

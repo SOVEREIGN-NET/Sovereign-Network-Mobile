@@ -61,8 +61,8 @@ final class PoUWController: PoUWControllerProtocol {
             self.submissionClient = SubmissionClient(
                 config: SubmissionClient.Configuration(
                     nodeUrl: "",
-                    challengeEndpoint: "/api/v1/pouw/challenge",
-                    submitEndpoint: "/api/v1/pouw/submit",
+                    challengeEndpoint: "/pouw/challenge",
+                    submitEndpoint: "/pouw/submit",
                     timeout: 30.0
                 ),
                 signer: signer
@@ -83,6 +83,17 @@ final class PoUWController: PoUWControllerProtocol {
             throw PoUWError.identityNotFound
         }
         
+        guard let did = signer.getDid() else {
+            throw PoUWError.identityNotFound
+        }
+        
+        guard let clientNodeId = signer.getNodeId() else {
+            throw PoUWError.identityNotFound
+        }
+        
+        // Record start time
+        let startedAt = UInt64(Date().timeIntervalSince1970)
+        
         // 1. Compute task ID (Blake3 hash of content)
         let taskId = computeBlake3(bytes)
         
@@ -92,36 +103,46 @@ final class PoUWController: PoUWControllerProtocol {
             throw PoUWError.verificationFailed
         }
         
+        // Record finish time
+        let finishedAt = UInt64(Date().timeIntervalSince1970)
+        
         // 3. Generate receipt nonce (16 bytes random)
         let nonce = generateSecureRandomBytes(count: 16)
         
-        // 4. Build receipt data
-        let timestamp = UInt64(Date().timeIntervalSince1970 * 1000) // milliseconds
-        
-        // 5. Sign the receipt
+        // 4. Sign the receipt
         let signature = try signer.signReceipt(
             taskId: taskId,
             nonce: nonce,
-            timestamp: timestamp,
+            timestamp: startedAt,
             providerId: providerId
         )
         
-        // 6. Build signed receipt data (protobuf format placeholder)
+        // 5. Build signed receipt data (protobuf format placeholder)
         // In Phase 3 with swift-protobuf, this will be proper protobuf serialization
         let signedReceipt = buildSignedReceipt(
             taskId: taskId,
             nonce: nonce,
-            timestamp: timestamp,
+            timestamp: startedAt,
             providerId: providerId,
             signature: signature
         )
         
-        // 7. Create and save receipt
+        // 6. Create and save receipt with all required fields per API spec
         let receipt = Receipt(
             receiptNonce: nonce,
             taskId: taskId,
             signedReceiptData: signedReceipt,
             providerId: providerId,
+            contentId: contentId,
+            clientNodeId: clientNodeId,
+            clientDid: did,
+            proofType: "hash",
+            bytesVerified: bytes.count,
+            resultOk: true,
+            startedAt: startedAt,
+            finishedAt: finishedAt,
+            sigScheme: signer.getSignatureScheme(),
+            signature: signature,
             state: .queued
         )
         
