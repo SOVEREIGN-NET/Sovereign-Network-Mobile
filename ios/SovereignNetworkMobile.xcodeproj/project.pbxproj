@@ -9,6 +9,8 @@
 /* Begin PBXBuildFile section */
 		13B07FBF1A68108700A75B9A /* Images.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = 13B07FB51A68108700A75B9A /* Images.xcassets */; };
 		301BAC732EB4C924003807B5 /* GoogleService-Info.plist in Resources */ = {isa = PBXBuildFile; fileRef = 301BAC722EB4C924003807B5 /* GoogleService-Info.plist */; };
+		302F8C652F48BB13005F30AF /* RCTPoUW.swift in Sources */ = {isa = PBXBuildFile; fileRef = 302F8C642F48BB13005F30AF /* RCTPoUW.swift */; };
+		302F8C6A2F48BB28005F30AF /* NativePoUW.m in Sources */ = {isa = PBXBuildFile; fileRef = 302F8C662F48BB28005F30AF /* NativePoUW.m */; };
 		303D4B5C2F31637F00647354 /* NativeIdentityProvisioningModule+Domain.swift in Sources */ = {isa = PBXBuildFile; fileRef = 303D4B5B2F31637F00647354 /* NativeIdentityProvisioningModule+Domain.swift */; };
 		303D4B5F2F31D5CF00647354 /* NativeZhtpApi.swift in Sources */ = {isa = PBXBuildFile; fileRef = 303D4B5D2F31D5CF00647354 /* NativeZhtpApi.swift */; };
 		303D4B602F31D5CF00647354 /* NativeZhtpApiModule.m in Sources */ = {isa = PBXBuildFile; fileRef = 303D4B5E2F31D5CF00647354 /* NativeZhtpApiModule.m */; };
@@ -79,6 +81,8 @@
 		13B07FB61A68108700A75B9A /* Info.plist */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = text.plist.xml; name = Info.plist; path = SovereignNetworkMobile/Info.plist; sourceTree = "<group>"; };
 		13B07FB81A68108700A75B9A /* PrivacyInfo.xcprivacy */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = text.plist.xml; name = PrivacyInfo.xcprivacy; path = SovereignNetworkMobile/PrivacyInfo.xcprivacy; sourceTree = "<group>"; };
 		301BAC722EB4C924003807B5 /* GoogleService-Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist.xml; path = "GoogleService-Info.plist"; sourceTree = "<group>"; };
+		302F8C642F48BB13005F30AF /* RCTPoUW.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RCTPoUW.swift; sourceTree = "<group>"; };
+		302F8C662F48BB28005F30AF /* NativePoUW.m */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.objc; path = NativePoUW.m; sourceTree = "<group>"; };
 		303D4B5B2F31637F00647354 /* NativeIdentityProvisioningModule+Domain.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "NativeIdentityProvisioningModule+Domain.swift"; sourceTree = "<group>"; };
 		303D4B5D2F31D5CF00647354 /* NativeZhtpApi.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = NativeZhtpApi.swift; sourceTree = "<group>"; };
 		303D4B5E2F31D5CF00647354 /* NativeZhtpApiModule.m */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.objc; path = NativeZhtpApiModule.m; sourceTree = "<group>"; };
@@ -147,6 +151,8 @@
 		13B07FAE1A68108700A75B9A /* SovereignNetworkMobile */ = {
 			isa = PBXGroup;
 			children = (
+				302F8C662F48BB28005F30AF /* NativePoUW.m */,
+				302F8C642F48BB13005F30AF /* RCTPoUW.swift */,
 				309A85B62F40DFF60019E972 /* DebugPrint.swift */,
 				309A85B42F40DFE50019E972 /* Web4SchemeHandler.swift */,
 				761780EC2CA45674006654EE /* AppDelegate.swift */,
@@ -460,6 +466,7 @@
 				303D4B5F2F31D5CF00647354 /* NativeZhtpApi.swift in Sources */,
 				303D4B602F31D5CF00647354 /* NativeZhtpApiModule.m in Sources */,
 				A1001F1A12B4D5A500A1F001 /* Web4ViewManager.m in Sources */,
+				302F8C6A2F48BB28005F30AF /* NativePoUW.m in Sources */,
 				30CB596C2EE88A1D00D6B4B7 /* NativeSettings.swift in Sources */,
 				30CB596D2EE88A1D00D6B4B7 /* NativeQuicModule.m in Sources */,
 				30CB596E2EE88A1D00D6B4B7 /* NativeSettings.m in Sources */,
@@ -483,6 +490,7 @@
 				3049D7D62F1F083C002C2DE5 /* IdentityHandleStore.swift in Sources */,
 				761780ED2CA45674006654EE /* AppDelegate.swift in Sources */,
 				303D4B5C2F31637F00647354 /* NativeIdentityProvisioningModule+Domain.swift in Sources */,
+				302F8C652F48BB13005F30AF /* RCTPoUW.swift in Sources */,
 				307F67BF2F30AFA5002F6C7D /* GeneratedConfig.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;

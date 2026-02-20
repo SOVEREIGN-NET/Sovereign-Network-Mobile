@@ -1,5 +1,12 @@
 import React, { useState } from 'react';
-import { View, TouchableOpacity, ScrollView, Alert, Modal, Clipboard } from 'react-native';
+import {
+  View,
+  TouchableOpacity,
+  ScrollView,
+  Alert,
+  Modal,
+  Clipboard,
+} from 'react-native';
 import { useFocusEffect } from '@react-navigation/native';
 import {
   Card,
@@ -19,13 +26,40 @@ import { colors, spacing, typography, borderRadius } from '../theme';
 import DomainRegistrationScreen from './DomainRegistrationScreen';
 
 // Wallet type info for display
-const WALLET_DISPLAY: Record<string, { icon: string; color: string; description: string }> = {
-  Primary: { icon: '💳', color: colors.primary, description: 'Main spending wallet' },
-  primary: { icon: '💳', color: colors.primary, description: 'Main spending wallet' },
-  UBI: { icon: '🌱', color: colors.success, description: 'Universal Basic Income' },
-  ubi: { icon: '🌱', color: colors.success, description: 'Universal Basic Income' },
-  Savings: { icon: '🏦', color: colors.warning, description: 'Long-term savings' },
-  savings: { icon: '🏦', color: colors.warning, description: 'Long-term savings' },
+const WALLET_DISPLAY: Record<
+  string,
+  { icon: string; color: string; description: string }
+> = {
+  Primary: {
+    icon: '💳',
+    color: colors.primary,
+    description: 'Main spending wallet',
+  },
+  primary: {
+    icon: '💳',
+    color: colors.primary,
+    description: 'Main spending wallet',
+  },
+  UBI: {
+    icon: '🌱',
+    color: colors.success,
+    description: 'Universal Basic Income',
+  },
+  ubi: {
+    icon: '🌱',
+    color: colors.success,
+    description: 'Universal Basic Income',
+  },
+  Savings: {
+    icon: '🏦',
+    color: colors.warning,
+    description: 'Long-term savings',
+  },
+  savings: {
+    icon: '🏦',
+    color: colors.warning,
+    description: 'Long-term savings',
+  },
 };
 
 // Format large numbers with commas
@@ -36,46 +70,61 @@ const formatBalance = (balance: number): string => {
 const SIDScreen = ({ navigation }: any) => {
   const { t } = useTranslation();
   const { currentIdentity, isLoading } = useAuth();
-  const { wallets, walletByType, totalBalance, loading: walletsLoading, refresh } = useWalletList();
+  const {
+    wallets,
+    walletByType,
+    totalBalance,
+    loading: walletsLoading,
+    refresh,
+  } = useWalletList();
   const [drawerVisible, setDrawerVisible] = useState(false);
   const [activeWalletTab, setActiveWalletTab] = useState('Tokens');
-  const [domainRegistrationModalVisible, setDomainRegistrationModalVisible] = useState(false);
+  const [domainRegistrationModalVisible, setDomainRegistrationModalVisible] =
+    useState(false);
 
   React.useEffect(() => {
     console.log('[SIDScreen] 💰 Wallet data updated:', {
       walletCount: wallets?.length || 0,
       totalBalance,
       loading: walletsLoading,
-      wallets: wallets?.map(w => ({ type: w.wallet_type, balance: w.total_balance })),
+      wallets: wallets?.map(w => ({
+        type: w.wallet_type,
+        balance: w.total_balance,
+      })),
     });
   }, [wallets, totalBalance, walletsLoading]);
 
   useFocusEffect(
     React.useCallback(() => {
       refresh();
-    }, [refresh])
+    }, [refresh]),
   );
 
   // UBI data from identity
-  const { data: ubiData } = useAsyncData(
-    async () => {
-      if (!currentIdentity?.did) {
-        return null;
-      }
+  const { data: ubiData } = useAsyncData(async () => {
+    if (!currentIdentity?.did) {
+      return null;
+    }
 
-      return {
-        daily_amount: 33,
-        monthly_amount: 1000,
-        eligible: true,
-        next_claim: null,
-        total_earned: currentIdentity.ubiEarned || 0,
-        claims_count: 0,
-      };
-    },
-    [currentIdentity?.did],
-  );
+    return {
+      daily_amount: 33,
+      monthly_amount: 1000,
+      eligible: true,
+      next_claim: null,
+      total_earned: currentIdentity.ubiEarned || 0,
+      claims_count: 0,
+    };
+  }, [currentIdentity?.did]);
 
   const drawerItems: DrawerItem[] = [
+    {
+      id: 'pouw',
+      label: 'PoUW Rewards',
+      icon: '',
+      onPress: () => {
+        navigation.navigate('PoUW');
+      },
+    },
     {
       id: 'history',
       label: 'History',
@@ -120,8 +169,12 @@ const SIDScreen = ({ navigation }: any) => {
     if (!id) return 'unknown';
 
     if (Array.isArray(id)) {
-      const hexString = id.map(byte => byte.toString(16).padStart(2, '0')).join('');
-      return `${hexString.substring(0, 12)}...${hexString.substring(hexString.length - 12)}`;
+      const hexString = id
+        .map(byte => byte.toString(16).padStart(2, '0'))
+        .join('');
+      return `${hexString.substring(0, 12)}...${hexString.substring(
+        hexString.length - 12,
+      )}`;
     }
 
     if (typeof id === 'string' && id !== '') {
@@ -145,11 +198,11 @@ const SIDScreen = ({ navigation }: any) => {
     }
   };
 
-
   return (
     <View style={{ flex: 1, backgroundColor: colors.bg_darkest }}>
       <HeaderBar
         onMenuPress={() => setDrawerVisible(true)}
+        onBalancePress={() => navigation.navigate('PoUW')}
       />
 
       <SideDrawer
@@ -163,8 +216,19 @@ const SIDScreen = ({ navigation }: any) => {
         <ScrollView showsVerticalScrollIndicator={false}>
           <Column gap="sm" style={{ paddingBottom: spacing.xl }}>
             {/* WALLET SECTION */}
-            <View style={{ paddingHorizontal: spacing.sm, marginBottom: spacing.sm }}>
-              <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-start' }}>
+            <View
+              style={{
+                paddingHorizontal: spacing.sm,
+                marginBottom: spacing.sm,
+              }}
+            >
+              <View
+                style={{
+                  flexDirection: 'row',
+                  justifyContent: 'space-between',
+                  alignItems: 'flex-start',
+                }}
+              >
                 <View>
                   <Text
                     style={{
@@ -248,10 +312,22 @@ const SIDScreen = ({ navigation }: any) => {
                     paddingVertical: spacing.sm,
                   }}
                 >
-                  <Text style={{ fontSize: typography.size.xs, color: colors.text_secondary, marginBottom: spacing.md }}>
+                  <Text
+                    style={{
+                      fontSize: typography.size.xs,
+                      color: colors.text_secondary,
+                      marginBottom: spacing.md,
+                    }}
+                  >
                     WALLET ADDRESS (for SOV transfers)
                   </Text>
-                  <View style={{ flexDirection: 'row', alignItems: 'center', marginBottom: spacing.lg }}>
+                  <View
+                    style={{
+                      flexDirection: 'row',
+                      alignItems: 'center',
+                      marginBottom: spacing.lg,
+                    }}
+                  >
                     <ScrollView
                       horizontal
                       showsHorizontalScrollIndicator={false}
@@ -262,7 +338,9 @@ const SIDScreen = ({ navigation }: any) => {
                         style={{
                           fontSize: typography.size.sm,
                           fontWeight: typography.weight.semibold,
-                          color: selectedWallet?.id ? colors.text_primary : colors.text_tertiary,
+                          color: selectedWallet?.id
+                            ? colors.text_primary
+                            : colors.text_tertiary,
                           letterSpacing: 0.5,
                           fontFamily: 'Courier',
                         }}
@@ -271,13 +349,29 @@ const SIDScreen = ({ navigation }: any) => {
                       </Text>
                     </ScrollView>
                     {selectedWallet?.id && (
-                      <TouchableOpacity onPress={() => copyToClipboard(selectedWallet.id)} style={{ marginLeft: spacing.sm }}>
-                        <Text style={{ fontSize: typography.size.xs, color: colors.primary }}>{t.wallet.actions.copy}</Text>
+                      <TouchableOpacity
+                        onPress={() => copyToClipboard(selectedWallet.id)}
+                        style={{ marginLeft: spacing.sm }}
+                      >
+                        <Text
+                          style={{
+                            fontSize: typography.size.xs,
+                            color: colors.primary,
+                          }}
+                        >
+                          {t.wallet.actions.copy}
+                        </Text>
                       </TouchableOpacity>
                     )}
                   </View>
 
-                  <Text style={{ fontSize: typography.size.xs, color: colors.text_secondary, marginBottom: spacing.md }}>
+                  <Text
+                    style={{
+                      fontSize: typography.size.xs,
+                      color: colors.text_secondary,
+                      marginBottom: spacing.md,
+                    }}
+                  >
                     YOUR DID (for token transfers & sharing)
                   </Text>
                   <View style={{ flexDirection: 'row', alignItems: 'center' }}>
@@ -300,15 +394,31 @@ const SIDScreen = ({ navigation }: any) => {
                       </Text>
                     </ScrollView>
                     {currentIdentity?.did && (
-                      <TouchableOpacity onPress={() => copyToClipboard(currentIdentity.did)} style={{ marginLeft: spacing.sm }}>
-                        <Text style={{ fontSize: typography.size.xs, color: colors.primary }}>{t.wallet.actions.copy}</Text>
+                      <TouchableOpacity
+                        onPress={() => copyToClipboard(currentIdentity.did)}
+                        style={{ marginLeft: spacing.sm }}
+                      >
+                        <Text
+                          style={{
+                            fontSize: typography.size.xs,
+                            color: colors.primary,
+                          }}
+                        >
+                          {t.wallet.actions.copy}
+                        </Text>
                       </TouchableOpacity>
                     )}
                   </View>
                 </View>
 
                 {/* Balance Section */}
-                <View style={{ paddingHorizontal: spacing.lg, paddingVertical: spacing.xs, alignItems: 'center' }}>
+                <View
+                  style={{
+                    paddingHorizontal: spacing.lg,
+                    paddingVertical: spacing.xs,
+                    alignItems: 'center',
+                  }}
+                >
                   <Text
                     style={{
                       fontSize: typography.size['5xl'],
@@ -320,11 +430,21 @@ const SIDScreen = ({ navigation }: any) => {
                     {formatBalance(totalBalance)}
                   </Text>
                   <Row style={{ alignItems: 'center', gap: spacing.sm }}>
-                    <Text style={{ fontSize: typography.size.sm, color: colors.text_secondary }}>
+                    <Text
+                      style={{
+                        fontSize: typography.size.sm,
+                        color: colors.text_secondary,
+                      }}
+                    >
                       {t.wallet.currency} (Total)
                     </Text>
                     {walletsLoading && (
-                      <Text style={{ fontSize: typography.size.xs, color: colors.text_tertiary }}>
+                      <Text
+                        style={{
+                          fontSize: typography.size.xs,
+                          color: colors.text_tertiary,
+                        }}
+                      >
                         Syncing...
                       </Text>
                     )}
@@ -393,28 +513,43 @@ const SIDScreen = ({ navigation }: any) => {
 
             {/* Wallet Tokens Tab - Always show skeleton, populate when data arrives */}
             {activeWalletTab === 'Tokens' && (
-              <View style={{ paddingHorizontal: spacing.sm, marginBottom: spacing.xs }}>
+              <View
+                style={{
+                  paddingHorizontal: spacing.sm,
+                  marginBottom: spacing.xs,
+                }}
+              >
                 <Column gap="xs">
-                  {(['Primary', 'UBI', 'Savings'] as const).map((walletType) => {
+                  {(['Primary', 'UBI', 'Savings'] as const).map(walletType => {
                     const display = WALLET_DISPLAY[walletType];
-                    const wallet = wallets.find((w: any) =>
-                      w.wallet_type === walletType || w.wallet_type?.toLowerCase() === walletType.toLowerCase()
+                    const wallet = wallets.find(
+                      (w: any) =>
+                        w.wallet_type === walletType ||
+                        w.wallet_type?.toLowerCase() ===
+                          walletType.toLowerCase(),
                     );
                     const hasData = !!wallet;
 
                     return (
-                      <TouchableOpacity
-                        key={walletType}
-                        activeOpacity={0.7}
-                      >
-                        <Card style={{ marginHorizontal: 0, opacity: hasData ? 1 : 0.6 }}>
+                      <TouchableOpacity key={walletType} activeOpacity={0.7}>
+                        <Card
+                          style={{
+                            marginHorizontal: 0,
+                            opacity: hasData ? 1 : 0.6,
+                          }}
+                        >
                           <View
                             style={{
                               paddingHorizontal: spacing.md,
                               paddingVertical: spacing.sm,
                             }}
                           >
-                            <Row style={{ justifyContent: 'space-between', alignItems: 'center' }}>
+                            <Row
+                              style={{
+                                justifyContent: 'space-between',
+                                alignItems: 'center',
+                              }}
+                            >
                               <Text
                                 style={{
                                   fontSize: typography.size.base,
@@ -431,10 +566,18 @@ const SIDScreen = ({ navigation }: any) => {
                                   color: display.color,
                                 }}
                               >
-                    {hasData ? formatBalance(wallet.total_balance || 0) : '—'}
+                                {hasData
+                                  ? formatBalance(wallet.total_balance || 0)
+                                  : '—'}
                               </Text>
                             </Row>
-                            <Row style={{ justifyContent: 'space-between', alignItems: 'center', marginTop: spacing.xs }}>
+                            <Row
+                              style={{
+                                justifyContent: 'space-between',
+                                alignItems: 'center',
+                                marginTop: spacing.xs,
+                              }}
+                            >
                               <Text
                                 style={{
                                   fontSize: typography.size.xs,
@@ -478,7 +621,7 @@ const SIDScreen = ({ navigation }: any) => {
                 { id: 'Tokens', label: t.wallet.tabs.tokens },
                 { id: 'NFTs', label: t.wallet.tabs.nfts },
                 { id: 'Activity', label: t.wallet.tabs.activity },
-              ].map((tabItem) => (
+              ].map(tabItem => (
                 <TouchableOpacity
                   key={tabItem.id}
                   onPress={() => setActiveWalletTab(tabItem.id)}
@@ -487,14 +630,23 @@ const SIDScreen = ({ navigation }: any) => {
                     alignItems: 'center',
                     paddingVertical: spacing.md,
                     borderRadius: borderRadius.base,
-                    backgroundColor: activeWalletTab === tabItem.id ? colors.bg_medium : 'transparent',
+                    backgroundColor:
+                      activeWalletTab === tabItem.id
+                        ? colors.bg_medium
+                        : 'transparent',
                   }}
                 >
                   <Text
                     style={{
                       fontSize: typography.size.xs,
-                      color: activeWalletTab === tabItem.id ? colors.primary : colors.text_secondary,
-                      fontWeight: activeWalletTab === tabItem.id ? typography.weight.semibold : typography.weight.normal,
+                      color:
+                        activeWalletTab === tabItem.id
+                          ? colors.primary
+                          : colors.text_secondary,
+                      fontWeight:
+                        activeWalletTab === tabItem.id
+                          ? typography.weight.semibold
+                          : typography.weight.normal,
                     }}
                   >
                     {tabItem.label}
@@ -506,31 +658,63 @@ const SIDScreen = ({ navigation }: any) => {
             {/* UBI Status Card */}
             {ubiData && (
               <View style={{ paddingHorizontal: spacing.sm }}>
-                <Card style={{ marginHorizontal: 0, backgroundColor: colors.success + '15', borderWidth: 1, borderColor: colors.success + '40' }}>
+                <Card
+                  style={{
+                    marginHorizontal: 0,
+                    backgroundColor: colors.success + '15',
+                    borderWidth: 1,
+                    borderColor: colors.success + '40',
+                  }}
+                >
                   <Column gap="xs">
                     <Row style={{ alignItems: 'center', gap: spacing.sm }}>
                       <Text style={{ fontSize: typography.size.xl }}>🌱</Text>
-                      <Text style={{ fontSize: typography.size.base, fontWeight: typography.weight.bold, color: colors.success }}>
+                      <Text
+                        style={{
+                          fontSize: typography.size.base,
+                          fontWeight: typography.weight.bold,
+                          color: colors.success,
+                        }}
+                      >
                         Universal Basic Income
                       </Text>
                     </Row>
                     <Row style={{ alignItems: 'center', gap: spacing.sm }}>
                       <Badge label="Coming soon" variant="info" size="sm" />
-                      <Text style={{ fontSize: typography.size.xs, color: colors.text_secondary }}>
+                      <Text
+                        style={{
+                          fontSize: typography.size.xs,
+                          color: colors.text_secondary,
+                        }}
+                      >
                         Coming soon
                       </Text>
                     </Row>
                   </Column>
 
-                  <View style={{ marginTop: spacing.md, backgroundColor: colors.bg_dark, padding: spacing.sm, borderRadius: borderRadius.sm }}>
-                    <Text style={{ fontSize: typography.size.xs, color: colors.text_secondary, lineHeight: 16 }}>
-                      UBI is calculated as an equal per-citizen share of 45% of all protocol transaction fees collected during the distribution period.
+                  <View
+                    style={{
+                      marginTop: spacing.md,
+                      backgroundColor: colors.bg_dark,
+                      padding: spacing.sm,
+                      borderRadius: borderRadius.sm,
+                    }}
+                  >
+                    <Text
+                      style={{
+                        fontSize: typography.size.xs,
+                        color: colors.text_secondary,
+                        lineHeight: 16,
+                      }}
+                    >
+                      UBI is calculated as an equal per-citizen share of 45% of
+                      all protocol transaction fees collected during the
+                      distribution period.
                     </Text>
                   </View>
                 </Card>
               </View>
             )}
-
           </Column>
         </ScrollView>
       </ScreenLayout>

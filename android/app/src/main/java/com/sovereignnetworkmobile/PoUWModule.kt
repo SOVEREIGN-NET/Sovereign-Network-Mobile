@@ -166,6 +166,41 @@ class PoUWModule(reactContext: ReactApplicationContext) :
     }
 
     /**
+     * Set the node URL for PoUW operations
+     */
+    @ReactMethod
+    fun setNodeUrl(nodeUrl: String, promise: Promise) {
+        try {
+            controller?.setNodeUrl(nodeUrl)
+            promise.resolve(nodeUrl)
+        } catch (e: Exception) {
+            promise.reject("SET_NODE_URL_ERROR", e.message, e)
+        }
+    }
+
+    /**
+     * Get a challenge token from the node
+     */
+    @ReactMethod
+    fun getChallenge(cap: String?, maxBytes: Double, maxReceipts: Double, promise: Promise) {
+        scope.launch {
+            try {
+                val result = controller?.getChallenge(cap, maxBytes.toLong(), maxReceipts.toInt())
+                if (result != null) {
+                    promise.resolve(Arguments.createMap().apply {
+                        putString("token", result.token)
+                        putDouble("expires_at", result.expiresAt.toDouble())
+                    })
+                } else {
+                    promise.reject("CHALLENGE_ERROR", "Failed to get challenge")
+                }
+            } catch (e: Exception) {
+                promise.reject("CHALLENGE_ERROR", e.message, e)
+            }
+        }
+    }
+
+    /**
      * Map PoUWError to React Native error codes
      */
     private fun mapPoUWError(error: PoUWError): Pair<String, String> {
