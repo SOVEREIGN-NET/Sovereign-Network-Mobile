@@ -44,6 +44,7 @@ import TransactionDetailScreen from '../screens/explorer/TransactionDetailScreen
 import IdentityDetailScreen from '../screens/explorer/IdentityDetailScreen';
 import WalletDetailScreen from '../screens/explorer/WalletDetailScreen';
 import SearchScreen from '../screens/explorer/SearchScreen';
+import PoUWScreen from '../screens/PoUWScreen';
 
 const Stack = createNativeStackNavigator();
 const Tab = createBottomTabNavigator();
@@ -51,9 +52,11 @@ const Tab = createBottomTabNavigator();
 const DashboardStack = () => {
   return (
     <Stack.Navigator
-      screenOptions={{
-        headerShown: false,
-      } as any}
+      screenOptions={
+        {
+          headerShown: false,
+        } as any
+      }
     >
       <Stack.Screen
         name="DashboardMain"
@@ -112,7 +115,6 @@ const DashboardStack = () => {
     </Stack.Navigator>
   );
 };
-
 
 const SIDStack = () => {
   return (
@@ -290,6 +292,14 @@ const SIDStack = () => {
           title: 'Domain Details',
         }}
       />
+      <Stack.Screen
+        name="PoUW"
+        component={PoUWScreen}
+        options={{
+          headerShown: false,
+          title: 'PoUW Rewards',
+        }}
+      />
     </Stack.Navigator>
   );
 };
@@ -325,26 +335,91 @@ const DAOStack = () => {
   );
 };
 
-
 // Tab Icon Components - Simple geometric icons using Views
 const HomeIcon = ({ color }: { color: string }) => (
-  <View style={{ width: 24, height: 24, justifyContent: 'center', alignItems: 'center' }}>
-    <View style={{ width: 14, height: 12, borderWidth: 1.5, borderColor: color, borderTopWidth: 0 }} />
-    <View style={{ width: 8, height: 8, borderWidth: 1.5, borderColor: color, marginTop: -6, marginLeft: 3 }} />
+  <View
+    style={{
+      width: 24,
+      height: 24,
+      justifyContent: 'center',
+      alignItems: 'center',
+    }}
+  >
+    <View
+      style={{
+        width: 14,
+        height: 12,
+        borderWidth: 1.5,
+        borderColor: color,
+        borderTopWidth: 0,
+      }}
+    />
+    <View
+      style={{
+        width: 8,
+        height: 8,
+        borderWidth: 1.5,
+        borderColor: color,
+        marginTop: -6,
+        marginLeft: 3,
+      }}
+    />
   </View>
 );
 
 const BriefcaseIcon = ({ color }: { color: string }) => (
-  <View style={{ width: 24, height: 24, justifyContent: 'center', alignItems: 'center' }}>
-    <View style={{ width: 14, height: 10, borderWidth: 1.5, borderColor: color }} />
-    <View style={{ width: 6, height: 4, borderWidth: 1, borderColor: color, position: 'absolute', top: 0, left: 9 }} />
+  <View
+    style={{
+      width: 24,
+      height: 24,
+      justifyContent: 'center',
+      alignItems: 'center',
+    }}
+  >
+    <View
+      style={{ width: 14, height: 10, borderWidth: 1.5, borderColor: color }}
+    />
+    <View
+      style={{
+        width: 6,
+        height: 4,
+        borderWidth: 1,
+        borderColor: color,
+        position: 'absolute',
+        top: 0,
+        left: 9,
+      }}
+    />
   </View>
 );
 
 const VoteIcon = ({ color }: { color: string }) => (
-  <View style={{ width: 24, height: 24, justifyContent: 'center', alignItems: 'center' }}>
-    <View style={{ width: 10, height: 10, borderRadius: 5, borderWidth: 1.5, borderColor: color }} />
-    <View style={{ width: 1.5, height: 6, backgroundColor: color, position: 'absolute', bottom: 2 }} />
+  <View
+    style={{
+      width: 24,
+      height: 24,
+      justifyContent: 'center',
+      alignItems: 'center',
+    }}
+  >
+    <View
+      style={{
+        width: 10,
+        height: 10,
+        borderRadius: 5,
+        borderWidth: 1.5,
+        borderColor: color,
+      }}
+    />
+    <View
+      style={{
+        width: 1.5,
+        height: 6,
+        backgroundColor: color,
+        position: 'absolute',
+        bottom: 2,
+      }}
+    />
   </View>
 );
 
@@ -355,44 +430,52 @@ const RootNavigator = () => {
   return (
     <NavigationContainer theme={navTheme}>
       <Tab.Navigator
-        screenOptions={{
-          headerShown: false,
-          tabBarStyle: {
-            backgroundColor: colors.bg_dark,
-            borderTopColor: colors.border,
-          },
-          tabBarActiveTintColor: colors.primary,
-          tabBarInactiveTintColor: colors.text_secondary,
-        } as any}
+        screenOptions={
+          {
+            headerShown: false,
+            tabBarStyle: {
+              backgroundColor: colors.bg_dark,
+              borderTopColor: colors.border,
+            },
+            tabBarActiveTintColor: colors.primary,
+            tabBarInactiveTintColor: colors.text_secondary,
+          } as any
+        }
       >
         <Tab.Screen
           name="DashboardTab"
           component={DashboardStack}
-          options={{
-            title: 'Dashboard',
-            tabBarLabel: 'Dashboard',
-            tabBarIcon: HomeIcon,
-          } as any}
+          options={
+            {
+              title: 'Dashboard',
+              tabBarLabel: 'Dashboard',
+              tabBarIcon: HomeIcon,
+            } as any
+          }
         />
         <Tab.Screen
           name="DAOTab"
           component={DAOStack}
-          options={{
-            title: 'DAO',
-            tabBarLabel: 'DAO',
-            tabBarIcon: VoteIcon,
-          } as any}
+          options={
+            {
+              title: 'DAO',
+              tabBarLabel: 'DAO',
+              tabBarIcon: VoteIcon,
+            } as any
+          }
         />
         <Tab.Screen
-        name="SIDTab"
-        component={SIDStack}
-        options={{
-          title: 'SID',
-          tabBarLabel: 'SID',
-          tabBarIcon: BriefcaseIcon,
-          unmountOnBlur: true,
-        } as any}
-      />
+          name="SIDTab"
+          component={SIDStack}
+          options={
+            {
+              title: 'SID',
+              tabBarLabel: 'SID',
+              tabBarIcon: BriefcaseIcon,
+              unmountOnBlur: true,
+            } as any
+          }
+        />
       </Tab.Navigator>
     </NavigationContainer>
   );

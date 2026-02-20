@@ -1,0 +1,160 @@
+syntax = "proto3";
+
+package pouw.v1;
+
+option swift_prefix = "PoUW";
+
+// ProofType defines the type of proof provided for verification work
+// Different proof types receive different reward multipliers
+enum ProofType {
+  // Simple hash verification - 1x reward
+  PROOF_HASH = 0;
+  // Merkle proof verification - 2x reward
+  PROOF_MERKLE = 1;
+  // Full signature verification - 3x reward
+  PROOF_SIGNATURE = 2;
+}
+
+// SignatureScheme defines the cryptographic signature algorithm used
+// Dilithium5 is preferred for post-quantum security
+enum SignatureScheme {
+  // Ed25519 signature scheme
+  ED25519 = 0;
+  // Dilithium5 post-quantum signature scheme (preferred)
+  DILITHIUM5 = 1;
+}
+
+// RejectionReason provides specific reasons for receipt rejection
+enum RejectionReason {
+  // Unknown or unspecified rejection reason
+  UNKNOWN = 0;
+  // Receipt has expired based on challenge token expiration
+  EXPIRED = 1;
+  // Receipt nonce has been seen before (replay attack)
+  REPLAY = 2;
+  // Receipt violates policy constraints
+  POLICY = 3;
+  // Invalid signature on the receipt
+  BAD_SIGNATURE = 4;
+  // Invalid or malformed proof data
+  BAD_PROOF = 5;
+}
+
+// Policy defines rate limiting and constraint parameters for a challenge
+message Policy {
+  // Maximum number of receipts allowed in a batch
+  uint32 max_receipts = 1;
+  // Maximum total bytes allowed across all receipts
+  uint64 max_bytes_total = 2;
+  // Minimum bytes that must be verified per receipt
+  uint64 min_bytes_per_receipt = 3;
+  // Allowed proof types for this challenge
+  repeated ProofType allowed_proof_types = 4;
+}
+
+// ChallengeToken is issued by a node to authorize a client to perform work
+// The client must use the challenge_nonce when generating receipts
+message ChallengeToken {
+  // Protocol version
+  uint32 version = 1;
+  // Node identifier (32 bytes)
+  bytes node_id = 2;
+  // Task identifier (16-32 bytes)
+  bytes task_id = 3;
+  // Challenge nonce for binding receipts to this challenge (16-32 bytes)
+  bytes challenge_nonce = 4;
+  // Unix timestamp when the challenge was issued (seconds)
+  int64 issued_at = 5;
+  // Unix timestamp when the challenge expires (seconds)
+  int64 expires_at = 6;
+  // Policy constraints for receipts using this challenge
+  Policy policy = 7;
+  // Node's signature over all other fields
+  bytes node_signature = 8;
+}
+
+// Aux contains auxiliary data for Merkle proofs
+message Aux {
+  // Merkle root hash
+  bytes merkle_root = 1;
+  // Proof digest for verification
+  bytes proof_digest = 2;
+}
+
+// Receipt represents a single verification result from a client
+message Receipt {
+  // Protocol version
+  uint32 version = 1;
+  // Task identifier (matches ChallengeToken.task_id)
+  bytes task_id = 2;
+  // Client's DID (e.g., did:zhtp:...)
+  string client_did = 3;
+  // Type of proof provided
+  ProofType proof_type = 4;
+  // Number of bytes verified in this receipt
+  uint64 bytes_verified = 5;
+  // Whether the verification succeeded
+  bool result_ok = 6;
+  // Timestamp when verification started (milliseconds)
+  int64 started_at = 7;
+  // Timestamp when verification completed (milliseconds)
+  int64 finished_at = 8;
+  // Challenge nonce from the ChallengeToken (binds receipt to challenge)
+  bytes challenge_nonce = 9;
+  // Unique nonce for this receipt (16-32 bytes)
+  bytes receipt_nonce = 10;
+  // Auxiliary data for Merkle proofs (optional)
+  Aux aux = 11;
+  // Client node identifier (32 bytes)
+  bytes client_node_id = 12;
+  // Provider that served content (optional)
+  bytes provider_id = 13;
+  // Content identifier (CID)
+  bytes content_id = 14;
+}
+
+// SignedReceipt is a Receipt with a cryptographic signature
+message SignedReceipt {
+  // The receipt being signed
+  Receipt receipt = 1;
+  // Signature scheme used
+  SignatureScheme sig_scheme = 2;
+  // Signature over the serialized receipt
+  bytes signature = 3;
+}
+
+// Rejection provides details about a rejected receipt
+message Rejection {
+  // Nonce of the rejected receipt
+  bytes receipt_nonce = 1;
+  // Reason for rejection
+  RejectionReason reason = 2;
+}
+
+// ReceiptBatch is a collection of signed receipts submitted together
+message ReceiptBatch {
+  // Protocol version
+  uint32 version = 1;
+  // Client's DID submitting the batch
+  string client_did = 2;
+  // Unique nonce for this batch (16-32 bytes)
+  bytes batch_nonce = 3;
+  // Signed receipts in this batch
+  repeated SignedReceipt receipts = 4;
+}
+
+// SubmissionResponse is returned by the node after processing a batch
+message SubmissionResponse {
+  // Nonces of accepted receipts
+  repeated bytes accepted = 1;
+  // Details of rejected receipts
+  repeated Rejection rejected = 2;
+  // Server timestamp (milliseconds)
+  int64 server_time = 3;
+}
+
+// HealthResponse is returned by the node health check endpoint
+message HealthResponse {
+  // Status: "ok" or error message
+  string status = 1;
+}

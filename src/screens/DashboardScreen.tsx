@@ -1,7 +1,16 @@
 import React, { useMemo, useState } from 'react';
 import { View, TextInput, Animated, Pressable } from 'react-native';
-import { useTrendingTokens, formatTokenPrice, formatChange, TokenData } from '../hooks/useTrendingTokens';
-import { useTrendingDapps, formatUserCount, getActivityColor } from '../hooks/useTrendingDapps';
+import {
+  useTrendingTokens,
+  formatTokenPrice,
+  formatChange,
+  TokenData,
+} from '../hooks/useTrendingTokens';
+import {
+  useTrendingDapps,
+  formatUserCount,
+  getActivityColor,
+} from '../hooks/useTrendingDapps';
 import {
   ActivityDot,
   Badge,
@@ -40,6 +49,15 @@ const DashboardScreen: React.FC<any> = ({ navigation }) => {
 
   const drawerItems: DrawerItem[] = useMemo(() => {
     const items: DrawerItem[] = [
+      {
+        id: 'pouw',
+        label: 'PoUW Rewards',
+        icon: '',
+        onPress: () => {
+          setDrawerVisible(false);
+          navigation.navigate('SIDTab', { screen: 'PoUW' });
+        },
+      },
       {
         id: 'history',
         label: 'History',
@@ -94,9 +112,21 @@ const DashboardScreen: React.FC<any> = ({ navigation }) => {
 
   return (
     <>
-      <HeaderBar onMenuPress={() => setDrawerVisible(true)} />
-      <ScreenLayout paddingTop={spacing.lg} paddingBottom={spacing.xl} safeAreaEdges={['bottom']}>
-        <SideDrawer visible={drawerVisible} onClose={() => setDrawerVisible(false)} items={drawerItems} title="Menu" />
+      <HeaderBar
+        onMenuPress={() => setDrawerVisible(true)}
+        onBalancePress={() => navigation.navigate('SIDTab', { screen: 'PoUW' })}
+      />
+      <ScreenLayout
+        paddingTop={spacing.lg}
+        paddingBottom={spacing.xl}
+        safeAreaEdges={['bottom']}
+      >
+        <SideDrawer
+          visible={drawerVisible}
+          onClose={() => setDrawerVisible(false)}
+          items={drawerItems}
+          title="Menu"
+        />
 
         <View style={{ alignItems: 'center', marginBottom: spacing.xl }}>
           <SShieldLogo size={80} />
@@ -163,12 +193,16 @@ const DashboardScreen: React.FC<any> = ({ navigation }) => {
         </View>
 
         <Card>
-          <Row justify="space-between" align="center" style={{ marginBottom: spacing.sm }}>
+          <Row
+            justify="space-between"
+            align="center"
+            style={{ marginBottom: spacing.sm }}
+          >
             <Text variant="h3">{trendingDapps.title}</Text>
             <Badge label="Live" variant="success" size="sm" />
           </Row>
           <Column gap="md">
-            {trendingDappsData.map((dapp) => {
+            {trendingDappsData.map(dapp => {
               const activityColor = getActivityColor(dapp.activityLevel);
               const glowBgColor = dapp.glowAnim.interpolate({
                 inputRange: [0, 1],
@@ -195,7 +229,10 @@ const DashboardScreen: React.FC<any> = ({ navigation }) => {
                       <Text variant="body" style={{ fontWeight: '600' }}>
                         {dapp.name}
                       </Text>
-                      <Text variant="caption" style={{ color: colors.text_secondary }}>
+                      <Text
+                        variant="caption"
+                        style={{ color: colors.text_secondary }}
+                      >
                         {dapp.desc}
                       </Text>
                     </Column>
@@ -221,11 +258,17 @@ const DashboardScreen: React.FC<any> = ({ navigation }) => {
                         ],
                       }}
                     >
-                      <Text variant="body" style={{ fontWeight: '600', color: colors.primary }}>
+                      <Text
+                        variant="body"
+                        style={{ fontWeight: '600', color: colors.primary }}
+                      >
                         {formatUserCount(dapp.activeUsers)}
                       </Text>
                     </Animated.View>
-                    <Text variant="caption" style={{ color: colors.text_secondary }}>
+                    <Text
+                      variant="caption"
+                      style={{ color: colors.text_secondary }}
+                    >
                       active users
                     </Text>
                   </Animated.View>
@@ -236,7 +279,11 @@ const DashboardScreen: React.FC<any> = ({ navigation }) => {
         </Card>
 
         <Card>
-          <Row justify="space-between" align="center" style={{ marginBottom: spacing.sm }}>
+          <Row
+            justify="space-between"
+            align="center"
+            style={{ marginBottom: spacing.sm }}
+          >
             <Text variant="h3">Explorer</Text>
             <Badge label="Featured" variant="info" size="sm" />
           </Row>
@@ -269,16 +316,25 @@ const DashboardScreen: React.FC<any> = ({ navigation }) => {
         </Card>
 
         <Card>
-          <Row justify="space-between" align="center" style={{ marginBottom: spacing.sm }}>
+          <Row
+            justify="space-between"
+            align="center"
+            style={{ marginBottom: spacing.sm }}
+          >
             <Text variant="h3">{trendingTokens.title}</Text>
             <Badge label="Live" variant="success" size="sm" />
           </Row>
           <Column gap="md">
-            {trendingTokensData.map((token) => {
+            {trendingTokensData.map(token => {
               const trendColor = getTrendColor(token.trend);
               const flashBgColor = token.priceFlash.interpolate({
                 inputRange: [0, 1],
-                outputRange: ['transparent', token.trend === 'up' ? 'rgba(81, 207, 102, 0.15)' : 'rgba(255, 107, 107, 0.15)'],
+                outputRange: [
+                  'transparent',
+                  token.trend === 'up'
+                    ? 'rgba(81, 207, 102, 0.15)'
+                    : 'rgba(255, 107, 107, 0.15)',
+                ],
               });
 
               return (
@@ -298,7 +354,10 @@ const DashboardScreen: React.FC<any> = ({ navigation }) => {
                     <Text variant="body" style={{ fontWeight: '600' }}>
                       {token.symbol}
                     </Text>
-                    <Text variant="caption" style={{ color: colors.text_secondary }}>
+                    <Text
+                      variant="caption"
+                      style={{ color: colors.text_secondary }}
+                    >
                       {token.name}
                     </Text>
                   </Column>
@@ -311,7 +370,10 @@ const DashboardScreen: React.FC<any> = ({ navigation }) => {
                       backgroundColor: flashBgColor,
                     }}
                   >
-                    <Text variant="body" style={{ fontWeight: '600', color: colors.text_primary }}>
+                    <Text
+                      variant="body"
+                      style={{ fontWeight: '600', color: colors.text_primary }}
+                    >
                       {formatTokenPrice(token.price)}
                     </Text>
                     <Row gap="xs" align="center">
@@ -347,8 +409,6 @@ const DashboardScreen: React.FC<any> = ({ navigation }) => {
             })}
           </Column>
         </Card>
-
-
       </ScreenLayout>
     </>
   );

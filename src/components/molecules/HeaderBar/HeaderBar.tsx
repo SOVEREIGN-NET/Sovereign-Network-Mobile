@@ -18,6 +18,7 @@ export interface HeaderBarProps {
   sovAddress?: string;
   isConnected?: boolean;
   onConnectionStatusChange?: (connected: boolean, latencyMs?: number) => void;
+  onBalancePress?: () => void;
 }
 
 const HeaderBar: React.FC<HeaderBarProps> = ({
@@ -25,6 +26,7 @@ const HeaderBar: React.FC<HeaderBarProps> = ({
   sovAddress,
   isConnected: isConnectedProp,
   onConnectionStatusChange,
+  onBalancePress,
 }) => {
   const insets = useSafeAreaInsets();
   const { t } = useTranslation();
@@ -147,10 +149,14 @@ const HeaderBar: React.FC<HeaderBarProps> = ({
           </View>
         </Pressable>
 
-        {/* Center: SOV Balance Counter */}
-        <View style={[styles.centerSection, styles.centerJustify]}>
+        {/* Center: SOV Balance Counter - Tappable */}
+        <Pressable
+          onPress={onBalancePress}
+          style={[styles.centerSection, styles.centerJustify]}
+          hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+        >
           <Text style={styles.sovLabel}>SOV {displayBalance}</Text>
-        </View>
+        </Pressable>
 
         {/* Right: Connection Status */}
         <Row style={styles.rightSection}>
@@ -160,13 +166,15 @@ const HeaderBar: React.FC<HeaderBarProps> = ({
               connectionStatus === 'checking'
                 ? styles.statusChecking
                 : connectionStatus === 'idle'
-                  ? styles.statusIdle
-                  : isConnected
-                    ? styles.statusConnected
-                    : styles.statusDisconnected,
+                ? styles.statusIdle
+                : isConnected
+                ? styles.statusConnected
+                : styles.statusDisconnected,
             ]}
           />
-          <Text style={{ color: colors.text_secondary }}>{getStatusText()}</Text>
+          <Text style={{ color: colors.text_secondary }}>
+            {getStatusText()}
+          </Text>
         </Row>
       </Row>
     </View>
