@@ -1,5 +1,11 @@
 import React, { useState, useEffect } from 'react';
-import { View, Alert, Pressable, useColorScheme, ScrollView } from 'react-native';
+import {
+  View,
+  Alert,
+  Pressable,
+  useColorScheme,
+  ScrollView,
+} from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import {
@@ -23,14 +29,17 @@ type Language = 'en' | 'es' | 'fr' | 'de';
 const SettingsScreen = ({ navigation }: any) => {
   const insets = useSafeAreaInsets();
   const { t } = useTranslation();
-  const { signOut, isLoading } = useAuth();
+  const { currentIdentity, signOut, isLoading } = useAuth();
   const deviceColorScheme = useColorScheme();
-  const { settings: nativeSettings, saveSettings: saveNativeSettings } = useNativeSettings();
+  const { settings: nativeSettings, saveSettings: saveNativeSettings } =
+    useNativeSettings();
 
   // Local state for settings (would be persisted in real app)
   const [theme, setTheme] = useState<Theme>('system');
   const [language, setLanguage] = useState<Language>('en');
-  const [fontSize, setFontSize] = useState<'small' | 'normal' | 'large'>('normal');
+  const [fontSize, setFontSize] = useState<'small' | 'normal' | 'large'>(
+    'normal',
+  );
   const [notificationsEnabled, setNotificationsEnabled] = useState(true);
   const [analyticsEnabled, setAnalyticsEnabled] = useState(true);
   const [showThemeOptions, setShowThemeOptions] = useState(false);
@@ -38,7 +47,9 @@ const SettingsScreen = ({ navigation }: any) => {
   const [showFontOptions, setShowFontOptions] = useState(false);
 
   // Developer settings (synced with native phone settings)
-  const [useMockData, setUseMockData] = useState(nativeSettings?.useMockData ?? APP_DEFAULTS.useMockData);
+  const [useMockData, setUseMockData] = useState(
+    nativeSettings?.useMockData ?? APP_DEFAULTS.useMockData,
+  );
 
   // Sync when native settings load
   useEffect(() => {
@@ -68,7 +79,7 @@ const SettingsScreen = ({ navigation }: any) => {
               } catch (error: any) {
                 Alert.alert(
                   t.settings.logout.errorTitle,
-                  error?.message || t.settings.logout.errorMessage
+                  error?.message || t.settings.logout.errorMessage,
                 );
                 console.error('Logout failed:', error);
               }
@@ -76,7 +87,7 @@ const SettingsScreen = ({ navigation }: any) => {
           },
           style: 'destructive',
         },
-      ]
+      ],
     );
   };
 
@@ -98,11 +109,14 @@ const SettingsScreen = ({ navigation }: any) => {
             setFontSize('normal');
             setNotificationsEnabled(true);
             setAnalyticsEnabled(true);
-            Alert.alert(t.settings.reset.successTitle, t.settings.reset.success);
+            Alert.alert(
+              t.settings.reset.successTitle,
+              t.settings.reset.success,
+            );
           },
           style: 'destructive',
         },
-      ]
+      ],
     );
   };
 
@@ -133,7 +147,9 @@ const SettingsScreen = ({ navigation }: any) => {
         : t.settings.display.themes.light;
     }
     const isDark = theme === 'dark';
-    return isDark ? t.settings.display.themes.dark : t.settings.display.themes.light;
+    return isDark
+      ? t.settings.display.themes.dark
+      : t.settings.display.themes.light;
   };
 
   const currentTheme = getThemeLabel();
@@ -158,613 +174,644 @@ const SettingsScreen = ({ navigation }: any) => {
 
       <ScreenLayout paddingTop={spacing.md}>
         <ScrollView showsVerticalScrollIndicator={false}>
-        <Column gap="xl">
-          {/* Display Settings */}
-          <Card>
-            <Text
-              style={{
-                fontSize: typography.size.sm,
-                fontWeight: typography.weight.semibold,
-                color: colors.text_primary,
-                marginBottom: spacing.md,
-              }}
-            >
-              {t.settings.display.title}
-            </Text>
-
-            <Column gap="md">
-              {/* Theme Selector */}
-              <View>
-                <Text
-                  style={{
-                    fontSize: typography.size.xs,
-                    fontWeight: typography.weight.semibold,
-                    color: colors.text_primary,
-                    marginBottom: spacing.sm,
-                  }}
-                >
-                  {t.settings.display.theme}
-                </Text>
-                <Pressable
-                  onPress={() => setShowThemeOptions(!showThemeOptions)}
-                  style={{
-                    backgroundColor: colors.bg_darker,
-                    padding: spacing.md,
-                    borderRadius: borderRadius.base,
-                    borderWidth: 1,
-                    borderColor: colors.border,
-                    flexDirection: 'row',
-                    justifyContent: 'space-between',
-                    alignItems: 'center',
-                  }}
-                >
-                  <Text style={{ color: colors.text_primary }}>
-                    {currentTheme}
-                  </Text>
-                  <Text style={{ color: colors.text_secondary }}>
-                    {showThemeOptions ? '▲' : '▼'}
-                  </Text>
-                </Pressable>
-
-                {showThemeOptions && (
-                  <Column gap="sm" style={{ marginTop: spacing.sm }}>
-                    {(['light', 'dark', 'system'] as const).map(t_option => (
-                      <Pressable
-                        key={t_option}
-                        onPress={() => {
-                          setTheme(t_option);
-                          setShowThemeOptions(false);
-                        }}
-                        style={{
-                          backgroundColor:
-                            theme === t_option ? colors.primary : colors.bg_darker,
-                          padding: spacing.md,
-                          borderRadius: borderRadius.base,
-                          borderWidth: 1,
-                          borderColor:
-                            theme === t_option ? colors.primary : colors.border,
-                        }}
-                      >
-                        <Text
-                          style={{
-                            color: theme === t_option ? colors.white : colors.text_primary,
-                          }}
-                        >
-                          {t.settings.display.themes[t_option]}
-                        </Text>
-                      </Pressable>
-                    ))}
-                  </Column>
-                )}
-              </View>
-
-              {/* Font Size Selector */}
-              <View>
-                <Text
-                  style={{
-                    fontSize: typography.size.xs,
-                    fontWeight: typography.weight.semibold,
-                    color: colors.text_primary,
-                    marginBottom: spacing.sm,
-                  }}
-                >
-                  {t.settings.display.fontSize}
-                </Text>
-                <Pressable
-                  onPress={() => setShowFontOptions(!showFontOptions)}
-                  style={{
-                    backgroundColor: colors.bg_darker,
-                    padding: spacing.md,
-                    borderRadius: borderRadius.base,
-                    borderWidth: 1,
-                    borderColor: colors.border,
-                    flexDirection: 'row',
-                    justifyContent: 'space-between',
-                    alignItems: 'center',
-                  }}
-                >
-                  <Text style={{ color: colors.text_primary }}>
-                    {fontSizeLabel}
-                  </Text>
-                  <Text style={{ color: colors.text_secondary }}>
-                    {showFontOptions ? '▲' : '▼'}
-                  </Text>
-                </Pressable>
-
-                {showFontOptions && (
-                  <Column gap="sm" style={{ marginTop: spacing.sm }}>
-                    {(['small', 'normal', 'large'] as const).map(size => (
-                      <Pressable
-                        key={size}
-                        onPress={() => {
-                          setFontSize(size);
-                          setShowFontOptions(false);
-                        }}
-                        style={{
-                          backgroundColor:
-                            fontSize === size ? colors.primary : colors.bg_darker,
-                          padding: spacing.md,
-                          borderRadius: borderRadius.base,
-                          borderWidth: 1,
-                          borderColor:
-                            fontSize === size ? colors.primary : colors.border,
-                        }}
-                      >
-                        <Text
-                          style={{
-                            color: fontSize === size ? colors.white : colors.text_primary,
-                            fontSize: getFontSizePixels(size),
-                          }}
-                        >
-                          {t.settings.display.fontSizes[size]}
-                        </Text>
-                      </Pressable>
-                    ))}
-                  </Column>
-                )}
-              </View>
-            </Column>
-          </Card>
-
-          {/* Developer Settings */}
-          <Card>
-            <Text
-              style={{
-                fontSize: typography.size.sm,
-                fontWeight: typography.weight.semibold,
-                color: colors.text_primary,
-                marginBottom: spacing.md,
-              }}
-            >
-              {t.settings.developer.title}
-            </Text>
-
-            <Column gap="md">
-              {/* Mock Data Toggle */}
-              <Row
+          <Column gap="xl">
+            {/* Display Settings */}
+            <Card>
+              <Text
                 style={{
-                  justifyContent: 'space-between',
-                  alignItems: 'center',
+                  fontSize: typography.size.sm,
+                  fontWeight: typography.weight.semibold,
+                  color: colors.text_primary,
+                  marginBottom: spacing.md,
                 }}
               >
-                <Column style={{ flex: 1 }}>
+                {t.settings.display.title}
+              </Text>
+
+              <Column gap="md">
+                {/* Theme Selector */}
+                <View>
                   <Text
                     style={{
-                      fontSize: typography.size.sm,
+                      fontSize: typography.size.xs,
                       fontWeight: typography.weight.semibold,
                       color: colors.text_primary,
+                      marginBottom: spacing.sm,
                     }}
                   >
-                    {t.settings.developer.mockData}
+                    {t.settings.display.theme}
+                  </Text>
+                  <Pressable
+                    onPress={() => setShowThemeOptions(!showThemeOptions)}
+                    style={{
+                      backgroundColor: colors.bg_darker,
+                      padding: spacing.md,
+                      borderRadius: borderRadius.base,
+                      borderWidth: 1,
+                      borderColor: colors.border,
+                      flexDirection: 'row',
+                      justifyContent: 'space-between',
+                      alignItems: 'center',
+                    }}
+                  >
+                    <Text style={{ color: colors.text_primary }}>
+                      {currentTheme}
+                    </Text>
+                    <Text style={{ color: colors.text_secondary }}>
+                      {showThemeOptions ? '▲' : '▼'}
+                    </Text>
+                  </Pressable>
+
+                  {showThemeOptions && (
+                    <Column gap="sm" style={{ marginTop: spacing.sm }}>
+                      {(['light', 'dark', 'system'] as const).map(t_option => (
+                        <Pressable
+                          key={t_option}
+                          onPress={() => {
+                            setTheme(t_option);
+                            setShowThemeOptions(false);
+                          }}
+                          style={{
+                            backgroundColor:
+                              theme === t_option
+                                ? colors.primary
+                                : colors.bg_darker,
+                            padding: spacing.md,
+                            borderRadius: borderRadius.base,
+                            borderWidth: 1,
+                            borderColor:
+                              theme === t_option
+                                ? colors.primary
+                                : colors.border,
+                          }}
+                        >
+                          <Text
+                            style={{
+                              color:
+                                theme === t_option
+                                  ? colors.white
+                                  : colors.text_primary,
+                            }}
+                          >
+                            {t.settings.display.themes[t_option]}
+                          </Text>
+                        </Pressable>
+                      ))}
+                    </Column>
+                  )}
+                </View>
+
+                {/* Font Size Selector */}
+                <View>
+                  <Text
+                    style={{
+                      fontSize: typography.size.xs,
+                      fontWeight: typography.weight.semibold,
+                      color: colors.text_primary,
+                      marginBottom: spacing.sm,
+                    }}
+                  >
+                    {t.settings.display.fontSize}
+                  </Text>
+                  <Pressable
+                    onPress={() => setShowFontOptions(!showFontOptions)}
+                    style={{
+                      backgroundColor: colors.bg_darker,
+                      padding: spacing.md,
+                      borderRadius: borderRadius.base,
+                      borderWidth: 1,
+                      borderColor: colors.border,
+                      flexDirection: 'row',
+                      justifyContent: 'space-between',
+                      alignItems: 'center',
+                    }}
+                  >
+                    <Text style={{ color: colors.text_primary }}>
+                      {fontSizeLabel}
+                    </Text>
+                    <Text style={{ color: colors.text_secondary }}>
+                      {showFontOptions ? '▲' : '▼'}
+                    </Text>
+                  </Pressable>
+
+                  {showFontOptions && (
+                    <Column gap="sm" style={{ marginTop: spacing.sm }}>
+                      {(['small', 'normal', 'large'] as const).map(size => (
+                        <Pressable
+                          key={size}
+                          onPress={() => {
+                            setFontSize(size);
+                            setShowFontOptions(false);
+                          }}
+                          style={{
+                            backgroundColor:
+                              fontSize === size
+                                ? colors.primary
+                                : colors.bg_darker,
+                            padding: spacing.md,
+                            borderRadius: borderRadius.base,
+                            borderWidth: 1,
+                            borderColor:
+                              fontSize === size
+                                ? colors.primary
+                                : colors.border,
+                          }}
+                        >
+                          <Text
+                            style={{
+                              color:
+                                fontSize === size
+                                  ? colors.white
+                                  : colors.text_primary,
+                              fontSize: getFontSizePixels(size),
+                            }}
+                          >
+                            {t.settings.display.fontSizes[size]}
+                          </Text>
+                        </Pressable>
+                      ))}
+                    </Column>
+                  )}
+                </View>
+              </Column>
+            </Card>
+
+            {/* Developer Settings */}
+            <Card>
+              <Text
+                style={{
+                  fontSize: typography.size.sm,
+                  fontWeight: typography.weight.semibold,
+                  color: colors.text_primary,
+                  marginBottom: spacing.md,
+                }}
+              >
+                {t.settings.developer.title}
+              </Text>
+
+              <Column gap="md">
+                {/* Mock Data Toggle */}
+                <Row
+                  style={{
+                    justifyContent: 'space-between',
+                    alignItems: 'center',
+                  }}
+                >
+                  <Column style={{ flex: 1 }}>
+                    <Text
+                      style={{
+                        fontSize: typography.size.sm,
+                        fontWeight: typography.weight.semibold,
+                        color: colors.text_primary,
+                      }}
+                    >
+                      {t.settings.developer.mockData}
+                    </Text>
+                    <Text
+                      style={{
+                        fontSize: typography.size.xs,
+                        color: colors.text_secondary,
+                        marginTop: spacing.xs,
+                      }}
+                    >
+                      {t.settings.developer.mockDataDescription}
+                    </Text>
+                  </Column>
+                  <Pressable
+                    onPress={() => setUseMockData(!useMockData)}
+                    style={{
+                      backgroundColor: useMockData
+                        ? colors.success
+                        : colors.bg_light,
+                      width: 50,
+                      height: 28,
+                      borderRadius: 14,
+                      justifyContent: 'center',
+                      alignItems: useMockData ? 'flex-end' : 'flex-start',
+                      paddingHorizontal: 2,
+                    }}
+                  >
+                    <View
+                      style={{
+                        width: 24,
+                        height: 24,
+                        borderRadius: 12,
+                        backgroundColor: colors.white,
+                      }}
+                    />
+                  </Pressable>
+                </Row>
+
+                {/* Node URL Configuration Info */}
+                <View
+                  style={{
+                    backgroundColor: colors.bg_darker,
+                    padding: spacing.md,
+                    borderRadius: borderRadius.base,
+                    borderWidth: 1,
+                    borderColor: colors.border,
+                  }}
+                >
+                  <Text
+                    style={{
+                      fontSize: typography.size.xs,
+                      fontWeight: typography.weight.semibold,
+                      color: colors.text_primary,
+                      marginBottom: spacing.xs,
+                    }}
+                  >
+                    Node URL Configuration
                   </Text>
                   <Text
                     style={{
                       fontSize: typography.size.xs,
                       color: colors.text_secondary,
-                      marginTop: spacing.xs,
+                      lineHeight: 18,
                     }}
                   >
-                    {t.settings.developer.mockDataDescription}
+                    Node URL is configured in .env file only.{'\n'}
+                    Current: {DEFAULT_SOV_NODE_URL}
+                    {'\n\n'}
+                    To change: Edit .env file and restart Metro bundler.
                   </Text>
-                </Column>
-                <Pressable
-                  onPress={() => setUseMockData(!useMockData)}
-                  style={{
-                    backgroundColor: useMockData ? colors.success : colors.bg_light,
-                    width: 50,
-                    height: 28,
-                    borderRadius: 14,
-                    justifyContent: 'center',
-                    alignItems: useMockData ? 'flex-end' : 'flex-start',
-                    paddingHorizontal: 2,
-                  }}
-                >
-                  <View
-                    style={{
-                      width: 24,
-                      height: 24,
-                      borderRadius: 12,
-                      backgroundColor: colors.white,
-                    }}
-                  />
-                </Pressable>
-              </Row>
+                </View>
 
-              {/* Node URL Configuration Info */}
-              <View
+                {/* Save Button */}
+                <Button
+                  variant="secondary"
+                  onPress={handleSaveDeveloperSettings}
+                >
+                  {t.settings.developer.save}
+                </Button>
+              </Column>
+            </Card>
+
+            {/* Language Settings */}
+            <Card>
+              <Text
+                style={{
+                  fontSize: typography.size.sm,
+                  fontWeight: typography.weight.semibold,
+                  color: colors.text_primary,
+                  marginBottom: spacing.md,
+                }}
+              >
+                {t.settings.language.title}
+              </Text>
+
+              <Pressable
+                onPress={() => setShowLanguageOptions(!showLanguageOptions)}
                 style={{
                   backgroundColor: colors.bg_darker,
                   padding: spacing.md,
                   borderRadius: borderRadius.base,
                   borderWidth: 1,
                   borderColor: colors.border,
+                  flexDirection: 'row',
+                  justifyContent: 'space-between',
+                  alignItems: 'center',
                 }}
               >
-                <Text
-                  style={{
-                    fontSize: typography.size.xs,
-                    fontWeight: typography.weight.semibold,
-                    color: colors.text_primary,
-                    marginBottom: spacing.xs,
-                  }}
-                >
-                  Node URL Configuration
+                <Text style={{ color: colors.text_primary }}>
+                  {languageLabel}
                 </Text>
-                <Text
-                  style={{
-                    fontSize: typography.size.xs,
-                    color: colors.text_secondary,
-                    lineHeight: 18,
-                  }}
-                >
-                  Node URL is configured in .env file only.{'\n'}
-                  Current: {DEFAULT_SOV_NODE_URL}{'\n\n'}
-                  To change: Edit .env file and restart Metro bundler.
+                <Text style={{ color: colors.text_secondary }}>
+                  {showLanguageOptions ? '▲' : '▼'}
                 </Text>
-              </View>
+              </Pressable>
 
-              {/* Save Button */}
-              <Button
-                variant="secondary"
-                onPress={handleSaveDeveloperSettings}
-              >
-                {t.settings.developer.save}
-              </Button>
-            </Column>
-          </Card>
-
-          {/* Language Settings */}
-          <Card>
-            <Text
-              style={{
-                fontSize: typography.size.sm,
-                fontWeight: typography.weight.semibold,
-                color: colors.text_primary,
-                marginBottom: spacing.md,
-              }}
-            >
-              {t.settings.language.title}
-            </Text>
-
-            <Pressable
-              onPress={() => setShowLanguageOptions(!showLanguageOptions)}
-              style={{
-                backgroundColor: colors.bg_darker,
-                padding: spacing.md,
-                borderRadius: borderRadius.base,
-                borderWidth: 1,
-                borderColor: colors.border,
-                flexDirection: 'row',
-                justifyContent: 'space-between',
-                alignItems: 'center',
-              }}
-            >
-              <Text style={{ color: colors.text_primary }}>
-                {languageLabel}
-              </Text>
-              <Text style={{ color: colors.text_secondary }}>
-                {showLanguageOptions ? '▲' : '▼'}
-              </Text>
-            </Pressable>
-
-            {showLanguageOptions && (
-              <Column gap="sm" style={{ marginTop: spacing.sm }}>
-                {(['en', 'es', 'fr', 'de'] as const).map(lang => (
-                  <Pressable
-                    key={lang}
-                    onPress={() => {
-                      setLanguage(lang);
-                      setShowLanguageOptions(false);
-                    }}
-                    style={{
-                      backgroundColor:
-                        language === lang ? colors.primary : colors.bg_darker,
-                      padding: spacing.md,
-                      borderRadius: borderRadius.base,
-                      borderWidth: 1,
-                      borderColor:
-                        language === lang ? colors.primary : colors.border,
-                    }}
-                  >
-                    <Text
+              {showLanguageOptions && (
+                <Column gap="sm" style={{ marginTop: spacing.sm }}>
+                  {(['en', 'es', 'fr', 'de'] as const).map(lang => (
+                    <Pressable
+                      key={lang}
+                      onPress={() => {
+                        setLanguage(lang);
+                        setShowLanguageOptions(false);
+                      }}
                       style={{
-                        color: language === lang ? colors.white : colors.text_primary,
+                        backgroundColor:
+                          language === lang ? colors.primary : colors.bg_darker,
+                        padding: spacing.md,
+                        borderRadius: borderRadius.base,
+                        borderWidth: 1,
+                        borderColor:
+                          language === lang ? colors.primary : colors.border,
                       }}
                     >
-                      {t.settings.languages[lang]}
+                      <Text
+                        style={{
+                          color:
+                            language === lang
+                              ? colors.white
+                              : colors.text_primary,
+                        }}
+                      >
+                        {t.settings.languages[lang]}
+                      </Text>
+                    </Pressable>
+                  ))}
+                </Column>
+              )}
+            </Card>
+
+            {/* Notification & Privacy Settings */}
+            <Card>
+              <Text
+                style={{
+                  fontSize: typography.size.sm,
+                  fontWeight: typography.weight.semibold,
+                  color: colors.text_primary,
+                  marginBottom: spacing.md,
+                }}
+              >
+                {t.settings.privacy.title}
+              </Text>
+
+              <Column gap="md">
+                {/* Notifications Toggle */}
+                <Row
+                  style={{
+                    justifyContent: 'space-between',
+                    alignItems: 'center',
+                  }}
+                >
+                  <Column style={{ flex: 1 }}>
+                    <Text
+                      style={{
+                        fontSize: typography.size.sm,
+                        fontWeight: typography.weight.semibold,
+                        color: colors.text_primary,
+                      }}
+                    >
+                      {t.settings.privacy.notifications}
                     </Text>
+                    <Text
+                      style={{
+                        fontSize: typography.size.xs,
+                        color: colors.text_secondary,
+                        marginTop: spacing.xs,
+                      }}
+                    >
+                      {t.settings.privacy.notificationsDescription}
+                    </Text>
+                  </Column>
+                  <Pressable
+                    onPress={() =>
+                      setNotificationsEnabled(!notificationsEnabled)
+                    }
+                    style={{
+                      backgroundColor: notificationsEnabled
+                        ? colors.success
+                        : colors.bg_light,
+                      width: 50,
+                      height: 28,
+                      borderRadius: 14,
+                      justifyContent: 'center',
+                      alignItems: notificationsEnabled
+                        ? 'flex-end'
+                        : 'flex-start',
+                      paddingHorizontal: 2,
+                    }}
+                  >
+                    <View
+                      style={{
+                        width: 24,
+                        height: 24,
+                        borderRadius: 12,
+                        backgroundColor: colors.white,
+                      }}
+                    />
                   </Pressable>
-                ))}
+                </Row>
+
+                {/* Analytics Toggle */}
+                <Row
+                  style={{
+                    justifyContent: 'space-between',
+                    alignItems: 'center',
+                  }}
+                >
+                  <Column style={{ flex: 1 }}>
+                    <Text
+                      style={{
+                        fontSize: typography.size.sm,
+                        fontWeight: typography.weight.semibold,
+                        color: colors.text_primary,
+                      }}
+                    >
+                      {t.settings.privacy.analytics}
+                    </Text>
+                    <Text
+                      style={{
+                        fontSize: typography.size.xs,
+                        color: colors.text_secondary,
+                        marginTop: spacing.xs,
+                      }}
+                    >
+                      {t.settings.privacy.analyticsDescription}
+                    </Text>
+                  </Column>
+                  <Pressable
+                    onPress={() => setAnalyticsEnabled(!analyticsEnabled)}
+                    style={{
+                      backgroundColor: analyticsEnabled
+                        ? colors.success
+                        : colors.bg_light,
+                      width: 50,
+                      height: 28,
+                      borderRadius: 14,
+                      justifyContent: 'center',
+                      alignItems: analyticsEnabled ? 'flex-end' : 'flex-start',
+                      paddingHorizontal: 2,
+                    }}
+                  >
+                    <View
+                      style={{
+                        width: 24,
+                        height: 24,
+                        borderRadius: 12,
+                        backgroundColor: colors.white,
+                      }}
+                    />
+                  </Pressable>
+                </Row>
               </Column>
-            )}
-          </Card>
+            </Card>
 
-          {/* Notification & Privacy Settings */}
-          <Card>
-            <Text
-              style={{
-                fontSize: typography.size.sm,
-                fontWeight: typography.weight.semibold,
-                color: colors.text_primary,
-                marginBottom: spacing.md,
-              }}
-            >
-              {t.settings.privacy.title}
-            </Text>
-
-            <Column gap="md">
-              {/* Notifications Toggle */}
-              <Row
+            {/* About & Info */}
+            <Card>
+              <Text
                 style={{
-                  justifyContent: 'space-between',
-                  alignItems: 'center',
+                  fontSize: typography.size.sm,
+                  fontWeight: typography.weight.semibold,
+                  color: colors.text_primary,
+                  marginBottom: spacing.md,
                 }}
               >
-                <Column style={{ flex: 1 }}>
-                  <Text
-                    style={{
-                      fontSize: typography.size.sm,
-                      fontWeight: typography.weight.semibold,
-                      color: colors.text_primary,
-                    }}
-                  >
-                    {t.settings.privacy.notifications}
-                  </Text>
-                  <Text
-                    style={{
-                      fontSize: typography.size.xs,
-                      color: colors.text_secondary,
-                      marginTop: spacing.xs,
-                    }}
-                  >
-                    {t.settings.privacy.notificationsDescription}
-                  </Text>
-                </Column>
-                <Pressable
-                  onPress={() => setNotificationsEnabled(!notificationsEnabled)}
+                {t.settings.about.title}
+              </Text>
+
+              <Column gap="md">
+                <View
                   style={{
-                    backgroundColor: notificationsEnabled
-                      ? colors.success
-                      : colors.bg_light,
-                    width: 50,
-                    height: 28,
-                    borderRadius: 14,
-                    justifyContent: 'center',
-                    alignItems: notificationsEnabled ? 'flex-end' : 'flex-start',
-                    paddingHorizontal: 2,
+                    backgroundColor: colors.bg_darker,
+                    padding: spacing.md,
+                    borderRadius: borderRadius.base,
                   }}
                 >
-                  <View
-                    style={{
-                      width: 24,
-                      height: 24,
-                      borderRadius: 12,
-                      backgroundColor: colors.white,
-                    }}
-                  />
-                </Pressable>
-              </Row>
+                  <Row style={{ justifyContent: 'space-between' }}>
+                    <Text style={{ color: colors.text_secondary }}>
+                      {t.settings.about.appName}
+                    </Text>
+                    <Text
+                      style={{
+                        color: colors.text_primary,
+                        fontWeight: typography.weight.semibold,
+                      }}
+                    >
+                      SOV Web4
+                    </Text>
+                  </Row>
+                </View>
 
-              {/* Analytics Toggle */}
-              <Row
-                style={{
-                  justifyContent: 'space-between',
-                  alignItems: 'center',
-                }}
-              >
-                <Column style={{ flex: 1 }}>
-                  <Text
-                    style={{
-                      fontSize: typography.size.sm,
-                      fontWeight: typography.weight.semibold,
-                      color: colors.text_primary,
-                    }}
-                  >
-                    {t.settings.privacy.analytics}
-                  </Text>
-                  <Text
-                    style={{
-                      fontSize: typography.size.xs,
-                      color: colors.text_secondary,
-                      marginTop: spacing.xs,
-                    }}
-                  >
-                    {t.settings.privacy.analyticsDescription}
-                  </Text>
-                </Column>
-                <Pressable
-                  onPress={() => setAnalyticsEnabled(!analyticsEnabled)}
+                <View
                   style={{
-                    backgroundColor: analyticsEnabled ? colors.success : colors.bg_light,
-                    width: 50,
-                    height: 28,
-                    borderRadius: 14,
-                    justifyContent: 'center',
-                    alignItems: analyticsEnabled ? 'flex-end' : 'flex-start',
-                    paddingHorizontal: 2,
+                    backgroundColor: colors.bg_darker,
+                    padding: spacing.md,
+                    borderRadius: borderRadius.base,
                   }}
                 >
-                  <View
-                    style={{
-                      width: 24,
-                      height: 24,
-                      borderRadius: 12,
-                      backgroundColor: colors.white,
-                    }}
-                  />
-                </Pressable>
-              </Row>
-            </Column>
-          </Card>
+                  <Row style={{ justifyContent: 'space-between' }}>
+                    <Text style={{ color: colors.text_secondary }}>
+                      {t.settings.about.version}
+                    </Text>
+                    <Text
+                      style={{
+                        color: colors.text_primary,
+                        fontWeight: typography.weight.semibold,
+                      }}
+                    >
+                      1.0.0
+                    </Text>
+                  </Row>
+                </View>
 
-          {/* About & Info */}
-          <Card>
-            <Text
-              style={{
-                fontSize: typography.size.sm,
-                fontWeight: typography.weight.semibold,
-                color: colors.text_primary,
-                marginBottom: spacing.md,
-              }}
-            >
-              {t.settings.about.title}
-            </Text>
+                <View
+                  style={{
+                    backgroundColor: colors.bg_darker,
+                    padding: spacing.md,
+                    borderRadius: borderRadius.base,
+                  }}
+                >
+                  <Row style={{ justifyContent: 'space-between' }}>
+                    <Text style={{ color: colors.text_secondary }}>
+                      {t.settings.about.buildDate}
+                    </Text>
+                    <Text
+                      style={{
+                        color: colors.text_primary,
+                        fontWeight: typography.weight.semibold,
+                      }}
+                    >
+                      {new Date().toLocaleDateString()}
+                    </Text>
+                  </Row>
+                </View>
 
-            <Column gap="md">
-              <View
+                <Button
+                  variant="outline"
+                  onPress={() =>
+                    Alert.alert(
+                      t.settings.about.termsTitle,
+                      t.settings.about.termsText,
+                    )
+                  }
+                >
+                  {t.settings.about.termsButton}
+                </Button>
+
+                <Button
+                  variant="outline"
+                  onPress={() =>
+                    Alert.alert(
+                      t.settings.about.privacyTitle,
+                      t.settings.about.privacyText,
+                    )
+                  }
+                >
+                  {t.settings.about.privacyButton}
+                </Button>
+              </Column>
+            </Card>
+
+            {/* Data Management */}
+            <Card>
+              <Text
                 style={{
-                  backgroundColor: colors.bg_darker,
-                  padding: spacing.md,
-                  borderRadius: borderRadius.base,
+                  fontSize: typography.size.sm,
+                  fontWeight: typography.weight.semibold,
+                  color: colors.text_primary,
+                  marginBottom: spacing.md,
                 }}
               >
-                <Row style={{ justifyContent: 'space-between' }}>
-                  <Text style={{ color: colors.text_secondary }}>
-                    {t.settings.about.appName}
-                  </Text>
-                  <Text
-                    style={{
-                      color: colors.text_primary,
-                      fontWeight: typography.weight.semibold,
-                    }}
-                  >
-                    SOV Web4
-                  </Text>
-                </Row>
-              </View>
+                {t.settings.data.title}
+              </Text>
 
-              <View
+              <Column gap="sm">
+                <Button
+                  variant="secondary"
+                  onPress={() => {
+                    Alert.alert(
+                      t.settings.cache.clearTitle,
+                      t.settings.cache.clearMessage,
+                    );
+                  }}
+                >
+                  {t.settings.data.clearCache}
+                </Button>
+              </Column>
+            </Card>
+
+            {/* Danger Zone */}
+            <Card>
+              <Text
                 style={{
-                  backgroundColor: colors.bg_darker,
-                  padding: spacing.md,
-                  borderRadius: borderRadius.base,
+                  fontSize: typography.size.sm,
+                  fontWeight: typography.weight.semibold,
+                  color: colors.error,
+                  marginBottom: spacing.md,
                 }}
               >
-                <Row style={{ justifyContent: 'space-between' }}>
-                  <Text style={{ color: colors.text_secondary }}>
-                    {t.settings.about.version}
-                  </Text>
-                  <Text
-                    style={{
-                      color: colors.text_primary,
-                      fontWeight: typography.weight.semibold,
-                    }}
-                  >
-                    1.0.0
-                  </Text>
-                </Row>
-              </View>
+                {t.settings.danger.title}
+              </Text>
 
-              <View
-                style={{
-                  backgroundColor: colors.bg_darker,
-                  padding: spacing.md,
-                  borderRadius: borderRadius.base,
-                }}
-              >
-                <Row style={{ justifyContent: 'space-between' }}>
-                  <Text style={{ color: colors.text_secondary }}>
-                    {t.settings.about.buildDate}
-                  </Text>
-                  <Text
-                    style={{
-                      color: colors.text_primary,
-                      fontWeight: typography.weight.semibold,
-                    }}
-                  >
-                    {new Date().toLocaleDateString()}
-                  </Text>
-                </Row>
-              </View>
+              <Column gap="sm">
+                <Button variant="secondary" onPress={handleResetSettings}>
+                  {t.settings.danger.resetSettings}
+                </Button>
 
-              <Button
-                variant="outline"
-                onPress={() =>
-                  Alert.alert(
-                    t.settings.about.termsTitle,
-                    t.settings.about.termsText
-                  )
-                }
-              >
-                {t.settings.about.termsButton}
-              </Button>
+                <Button
+                  variant="secondary"
+                  onPress={
+                    currentIdentity
+                      ? handleLogout
+                      : () => navigation.navigate('SignIn')
+                  }
+                  disabled={isLoading}
+                >
+                  {isLoading
+                    ? t.settings.danger.loggingOut
+                    : currentIdentity
+                    ? t.settings.danger.logout
+                    : 'Sign In or Create Account'}
+                </Button>
+              </Column>
+            </Card>
 
-              <Button
-                variant="outline"
-                onPress={() =>
-                  Alert.alert(
-                    t.settings.about.privacyTitle,
-                    t.settings.about.privacyText
-                  )
-                }
-              >
-                {t.settings.about.privacyButton}
-              </Button>
-            </Column>
-          </Card>
-
-          {/* Data Management */}
-          <Card>
-            <Text
-              style={{
-                fontSize: typography.size.sm,
-                fontWeight: typography.weight.semibold,
-                color: colors.text_primary,
-                marginBottom: spacing.md,
-              }}
-            >
-              {t.settings.data.title}
-            </Text>
-
-            <Column gap="sm">
-              <Button
-                variant="secondary"
-                onPress={() => {
-                  Alert.alert(
-                    t.settings.cache.clearTitle,
-                    t.settings.cache.clearMessage
-                  );
-                }}
-              >
-                {t.settings.data.clearCache}
-              </Button>
-            </Column>
-          </Card>
-
-          {/* Danger Zone */}
-          <Card>
-            <Text
-              style={{
-                fontSize: typography.size.sm,
-                fontWeight: typography.weight.semibold,
-                color: colors.error,
-                marginBottom: spacing.md,
-              }}
-            >
-              {t.settings.danger.title}
-            </Text>
-
-            <Column gap="sm">
-              <Button
-                variant="secondary"
-                onPress={handleResetSettings}
-              >
-                {t.settings.danger.resetSettings}
-              </Button>
-
-              <Button
-                variant="secondary"
-                onPress={handleLogout}
-                disabled={isLoading}
-              >
-                {isLoading ? t.settings.danger.loggingOut : t.settings.danger.logout}
-              </Button>
-            </Column>
-          </Card>
-
-          {/* Footer spacing */}
-          <View style={{ height: spacing.xl }} />
-        </Column>
+            {/* Footer spacing */}
+            <View style={{ height: spacing.xl }} />
+          </Column>
         </ScrollView>
       </ScreenLayout>
     </View>

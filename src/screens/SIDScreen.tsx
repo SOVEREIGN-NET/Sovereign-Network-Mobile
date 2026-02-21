@@ -160,7 +160,101 @@ const SIDScreen = ({ navigation }: any) => {
   ];
 
   if (!currentIdentity || isLoading) {
-    return <LoadingView />;
+    // Show loading while bootstrapping, or show sign-in CTA if no identity
+    if (isLoading) {
+      return <LoadingView />;
+    }
+    // Guest mode - show sign-in CTA
+    return (
+      <View style={{ flex: 1, backgroundColor: colors.bg_darkest }}>
+        <HeaderBar
+          onMenuPress={() => setDrawerVisible(true)}
+          onBalancePress={() => navigation.navigate('PoUW')}
+        />
+
+        <SideDrawer
+          visible={drawerVisible}
+          onClose={() => setDrawerVisible(false)}
+          items={drawerItems}
+          title="Menu"
+        />
+
+        <ScreenLayout paddingTop={spacing.md}>
+          <View
+            style={{
+              flex: 1,
+              justifyContent: 'center',
+              alignItems: 'center',
+              paddingHorizontal: spacing.lg,
+            }}
+          >
+            <Text style={{ fontSize: 48, marginBottom: spacing.md }}>🔐</Text>
+            <Text
+              style={{
+                fontSize: typography.size.xl,
+                fontWeight: typography.weight.semibold,
+                color: colors.text_primary,
+                marginBottom: spacing.sm,
+                textAlign: 'center',
+              }}
+            >
+              Sign in to access your wallet
+            </Text>
+            <Text
+              style={{
+                fontSize: typography.size.md,
+                color: colors.text_secondary,
+                marginBottom: spacing.xl,
+                textAlign: 'center',
+              }}
+            >
+              Create an identity to manage your wallets, domains, and more
+            </Text>
+            <TouchableOpacity
+              style={{
+                backgroundColor: colors.primary,
+                paddingVertical: spacing.md,
+                paddingHorizontal: spacing.xl,
+                borderRadius: borderRadius.md,
+                marginBottom: spacing.md,
+              }}
+              onPress={() => navigation.navigate('SignIn')}
+            >
+              <Text
+                style={{
+                  color: colors.text_primary,
+                  fontSize: typography.size.md,
+                  fontWeight: typography.weight.semibold,
+                }}
+              >
+                Sign In
+              </Text>
+            </TouchableOpacity>
+            <TouchableOpacity
+              style={{
+                backgroundColor: 'transparent',
+                paddingVertical: spacing.md,
+                paddingHorizontal: spacing.xl,
+                borderRadius: borderRadius.md,
+                borderWidth: 1,
+                borderColor: colors.primary,
+              }}
+              onPress={() => navigation.navigate('CreateIdentity')}
+            >
+              <Text
+                style={{
+                  color: colors.primary,
+                  fontSize: typography.size.md,
+                  fontWeight: typography.weight.medium,
+                }}
+              >
+                Create Account
+              </Text>
+            </TouchableOpacity>
+          </View>
+        </ScreenLayout>
+      </View>
+    );
   }
 
   const selectedWallet = walletByType.primary ?? wallets[0] ?? null;

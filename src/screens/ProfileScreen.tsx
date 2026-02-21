@@ -4,7 +4,13 @@
  */
 
 import React, { useState } from 'react';
-import { View, ScrollView, TouchableOpacity, Alert, Clipboard } from 'react-native';
+import {
+  View,
+  ScrollView,
+  TouchableOpacity,
+  Alert,
+  Clipboard,
+} from 'react-native';
 import {
   Card,
   Text,
@@ -28,19 +34,15 @@ const ProfileScreen = ({ navigation }: any) => {
   useAsyncData(async () => null, [currentIdentity?.did]);
 
   // Fetch UBI data for stats
-  const { data: ubiData } = useAsyncData(
-    async () => {
-      if (!currentIdentity?.did) {
-        return null;
-      }
+  const { data: ubiData } = useAsyncData(async () => {
+    if (!currentIdentity?.did) {
+      return null;
+    }
 
-      return {
-        total_earned: currentIdentity.ubiEarned || 0,
-      };
-    },
-    [currentIdentity?.did],
-  );
-
+    return {
+      total_earned: currentIdentity.ubiEarned || 0,
+    };
+  }, [currentIdentity?.did]);
 
   const handleLogout = () => {
     Alert.alert(
@@ -61,27 +63,93 @@ const ProfileScreen = ({ navigation }: any) => {
                 await signOut();
               } catch (error) {
                 console.error('Logout failed:', error);
-                Alert.alert(t.identity.logout.errorTitle, t.identity.logout.errorMessage);
+                Alert.alert(
+                  t.identity.logout.errorTitle,
+                  t.identity.logout.errorMessage,
+                );
               } finally {
                 setLoggingOut(false);
               }
             })();
           },
         },
-      ]
+      ],
     );
   };
 
   if (!currentIdentity || isLoading) {
-    return <LoadingView />;
+    // Guest mode - show sign-in prompt
+    if (isLoading) {
+      return <LoadingView />;
+    }
+    return (
+      <View style={{ flex: 1, backgroundColor: colors.bg_darkest }}>
+        <ScreenLayout paddingTop={spacing.lg}>
+          <View
+            style={{
+              flex: 1,
+              justifyContent: 'center',
+              alignItems: 'center',
+              paddingHorizontal: spacing.lg,
+            }}
+          >
+            <Text style={{ fontSize: 48, marginBottom: spacing.md }}>👤</Text>
+            <Text
+              style={{
+                fontSize: typography.size.xl,
+                fontWeight: typography.weight.semibold,
+                color: colors.text_primary,
+                marginBottom: spacing.sm,
+                textAlign: 'center',
+              }}
+            >
+              Sign in to view your profile
+            </Text>
+            <Text
+              style={{
+                fontSize: typography.size.md,
+                color: colors.text_secondary,
+                marginBottom: spacing.xl,
+                textAlign: 'center',
+              }}
+            >
+              Create an identity to personalize your experience
+            </Text>
+            <TouchableOpacity
+              style={{
+                backgroundColor: colors.primary,
+                paddingVertical: spacing.md,
+                paddingHorizontal: spacing.xl,
+                borderRadius: borderRadius.md,
+              }}
+              onPress={() => navigation.navigate('SignIn')}
+            >
+              <Text
+                style={{
+                  color: colors.text_primary,
+                  fontSize: typography.size.md,
+                  fontWeight: typography.weight.semibold,
+                }}
+              >
+                Sign In
+              </Text>
+            </TouchableOpacity>
+          </View>
+        </ScreenLayout>
+      </View>
+    );
   }
 
   const truncateId = (id: any) => {
     if (!id) return 'unknown';
 
     if (Array.isArray(id)) {
-      const hexString = id.map(byte => byte.toString(16).padStart(2, '0')).join('');
-      return `${hexString.substring(0, 12)}...${hexString.substring(hexString.length - 12)}`;
+      const hexString = id
+        .map(byte => byte.toString(16).padStart(2, '0'))
+        .join('');
+      return `${hexString.substring(0, 12)}...${hexString.substring(
+        hexString.length - 12,
+      )}`;
     }
 
     if (typeof id === 'string' && id !== '') {
@@ -136,19 +204,40 @@ const ProfileScreen = ({ navigation }: any) => {
                   marginBottom: spacing.md,
                 }}
               >
-                <Text style={{ fontSize: typography.size['5xl'], marginBottom: spacing.sm }}>
+                <Text
+                  style={{
+                    fontSize: typography.size['5xl'],
+                    marginBottom: spacing.sm,
+                  }}
+                >
                   {currentIdentity.avatar || '👤'}
                 </Text>
                 <Text variant="h2" style={{ marginBottom: spacing.xs }}>
                   {currentIdentity.displayName}
                 </Text>
                 {currentIdentity.username && (
-                  <Text style={{ fontSize: typography.size.sm, color: colors.primary, marginBottom: spacing.xs }}>
+                  <Text
+                    style={{
+                      fontSize: typography.size.sm,
+                      color: colors.primary,
+                      marginBottom: spacing.xs,
+                    }}
+                  >
                     @{currentIdentity.username}
                   </Text>
                 )}
-                <TouchableOpacity onPress={() => currentIdentity.did && copyToClipboard(currentIdentity.did)}>
-                  <Text variant="caption" style={{ color: colors.text_secondary, marginBottom: spacing.md }}>
+                <TouchableOpacity
+                  onPress={() =>
+                    currentIdentity.did && copyToClipboard(currentIdentity.did)
+                  }
+                >
+                  <Text
+                    variant="caption"
+                    style={{
+                      color: colors.text_secondary,
+                      marginBottom: spacing.md,
+                    }}
+                  >
                     {truncateId(currentIdentity.did)}
                   </Text>
                 </TouchableOpacity>
@@ -184,7 +273,9 @@ const ProfileScreen = ({ navigation }: any) => {
                   >
                     DECENTRALIZED IDENTITY (DID)
                   </Text>
-                  <TouchableOpacity onPress={() => copyToClipboard(currentIdentity.did)}>
+                  <TouchableOpacity
+                    onPress={() => copyToClipboard(currentIdentity.did)}
+                  >
                     <Text
                       style={{
                         fontSize: typography.size.xs,
@@ -215,11 +306,17 @@ const ProfileScreen = ({ navigation }: any) => {
                 />
                 <DetailRow
                   label={t.identity.details.citizenship}
-                  value={currentIdentity.citizenship ? t.identity.details.verified : t.identity.details.notVerified}
+                  value={
+                    currentIdentity.citizenship
+                      ? t.identity.details.verified
+                      : t.identity.details.notVerified
+                  }
                 />
                 <DetailRow
                   label={t.identity.details.created}
-                  value={new Date(currentIdentity.createdAt || '').toLocaleDateString()}
+                  value={new Date(
+                    currentIdentity.createdAt || '',
+                  ).toLocaleDateString()}
                 />
               </Column>
             </Card>
@@ -234,10 +331,7 @@ const ProfileScreen = ({ navigation }: any) => {
                   label={t.identity.stats.votingPower}
                   value={votingPowerFormatted}
                 />
-                <DetailRow
-                  label="Votes Cast"
-                  value={votesCast.toString()}
-                />
+                <DetailRow label="Votes Cast" value={votesCast.toString()} />
                 <DetailRow
                   label="Reputation Score"
                   value={reputationScore.toLocaleString()}
@@ -267,7 +361,13 @@ const ProfileScreen = ({ navigation }: any) => {
                     alignItems: 'center',
                   }}
                 >
-                  <View style={{ flexDirection: 'row', alignItems: 'center', gap: spacing.md }}>
+                  <View
+                    style={{
+                      flexDirection: 'row',
+                      alignItems: 'center',
+                      gap: spacing.md,
+                    }}
+                  >
                     <Text style={{ fontSize: typography.size.lg }}>🌐</Text>
                     <View>
                       <Text
@@ -290,7 +390,14 @@ const ProfileScreen = ({ navigation }: any) => {
                       </Text>
                     </View>
                   </View>
-                  <Text style={{ fontSize: typography.size.lg, color: colors.text_secondary }}>›</Text>
+                  <Text
+                    style={{
+                      fontSize: typography.size.lg,
+                      color: colors.text_secondary,
+                    }}
+                  >
+                    ›
+                  </Text>
                 </TouchableOpacity>
               </Column>
             </Card>
@@ -334,7 +441,9 @@ const ProfileScreen = ({ navigation }: any) => {
                   disabled={authLoading}
                   variant="danger"
                 >
-                  {authLoading ? t.identity.logout.buttonLoading : t.identity.logout.button}
+                  {authLoading
+                    ? t.identity.logout.buttonLoading
+                    : t.identity.logout.button}
                 </Button>
                 <Text
                   style={{
