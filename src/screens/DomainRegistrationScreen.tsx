@@ -5,20 +5,24 @@
  */
 
 import React, { useState, useCallback, useEffect } from 'react';
-import { View, ScrollView, TouchableOpacity, KeyboardAvoidingView, Platform } from 'react-native';
+import {
+  View,
+  ScrollView,
+  TouchableOpacity,
+  KeyboardAvoidingView,
+  Platform,
+} from 'react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import {
-  Button,
-  Card,
-  FormField,
-  Text,
-  LoadingView,
-} from '../components';
+import { Button, Card, FormField, Text, LoadingView } from '../components';
 import { colors, spacing, typography, borderRadius } from '../theme';
 import domainService from '../services/DomainService';
 import { useAuth } from '../hooks/useAuth';
-import { validateDomainFormat, validateDomainDuration, yearsToDays } from '../utils/domainValidation';
+import {
+  validateDomainFormat,
+  validateDomainDuration,
+  yearsToDays,
+} from '../utils/domainValidation';
 
 // Storage keys
 const REGISTERED_DOMAINS_KEY = 'sov:registered_domains';
@@ -37,7 +41,9 @@ interface DomainRegistrationScreenProps {
   onClose?: () => void;
 }
 
-const DomainRegistrationScreen: React.FC<DomainRegistrationScreenProps> = ({ onClose }) => {
+const DomainRegistrationScreen: React.FC<DomainRegistrationScreenProps> = ({
+  onClose,
+}) => {
   const insets = useSafeAreaInsets();
   const { currentIdentity } = useAuth();
 
@@ -46,7 +52,10 @@ const DomainRegistrationScreen: React.FC<DomainRegistrationScreenProps> = ({ onC
   const [years, setYears] = useState('1');
   const [errors, setErrors] = useState<RegisterFormErrors>({});
   const [loading, setLoading] = useState(false);
-  const [status, setStatus] = useState<SubmitStatus>({ type: null, message: '' });
+  const [status, setStatus] = useState<SubmitStatus>({
+    type: null,
+    message: '',
+  });
   const [availabilityStatus, setAvailabilityStatus] = useState<{
     available: boolean | null;
     checking: boolean;
@@ -56,7 +65,9 @@ const DomainRegistrationScreen: React.FC<DomainRegistrationScreenProps> = ({ onC
     checking: false,
   });
   const [durationPickerVisible, setDurationPickerVisible] = useState(false);
-  const [debounceTimer, setDebounceTimer] = useState<NodeJS.Timeout | null>(null);
+  const [debounceTimer, setDebounceTimer] = useState<NodeJS.Timeout | null>(
+    null,
+  );
   const [hasExistingDomain, setHasExistingDomain] = useState(false);
 
   useEffect(() => {
@@ -66,12 +77,21 @@ const DomainRegistrationScreen: React.FC<DomainRegistrationScreenProps> = ({ onC
           setHasExistingDomain(false);
           return;
         }
-        const storedDomainsJson = await AsyncStorage.getItem(REGISTERED_DOMAINS_KEY);
-        const storedDomains = storedDomainsJson ? JSON.parse(storedDomainsJson) : [];
-        const hasOwned = storedDomains.some((d: DomainData) => d.owner === currentIdentity.did);
+        const storedDomainsJson = await AsyncStorage.getItem(
+          REGISTERED_DOMAINS_KEY,
+        );
+        const storedDomains = storedDomainsJson
+          ? JSON.parse(storedDomainsJson)
+          : [];
+        const hasOwned = storedDomains.some(
+          (d: DomainData) => d.owner === currentIdentity.did,
+        );
         setHasExistingDomain(hasOwned);
       } catch (error) {
-        console.warn('[DomainRegistrationScreen] Failed to load existing domains:', error);
+        console.warn(
+          '[DomainRegistrationScreen] Failed to load existing domains:',
+          error,
+        );
         setHasExistingDomain(false);
       }
     };
@@ -88,7 +108,8 @@ const DomainRegistrationScreen: React.FC<DomainRegistrationScreenProps> = ({ onC
       const fullDomain = `${domain}.sov`;
       const domainValidation = validateDomainFormat(fullDomain);
       if (!domainValidation.valid) {
-        newErrors.domain = domainValidation.errors[0] || 'Invalid domain format';
+        newErrors.domain =
+          domainValidation.errors[0] || 'Invalid domain format';
       }
     }
 
@@ -117,9 +138,16 @@ const DomainRegistrationScreen: React.FC<DomainRegistrationScreenProps> = ({ onC
         checking: false,
         registrarFee: result.registrar_fee,
       });
-      console.log(`[DomainRegistrationScreen] Domain "${domainToCheck}" is ${result.available ? 'available' : 'taken'}`);
+      console.log(
+        `[DomainRegistrationScreen] Domain "${domainToCheck}" is ${
+          result.available ? 'available' : 'taken'
+        }`,
+      );
     } catch (error) {
-      console.warn('[DomainRegistrationScreen] Failed to check domain availability:', error);
+      console.warn(
+        '[DomainRegistrationScreen] Failed to check domain availability:',
+        error,
+      );
       setAvailabilityStatus({ available: null, checking: false });
     }
   }, []);
@@ -211,7 +239,11 @@ const DomainRegistrationScreen: React.FC<DomainRegistrationScreenProps> = ({ onC
         },
       };
 
-      console.log('[DomainRegistrationScreen] Registering domain:', { domain: fullDomain, durationDays, feeAmount });
+      console.log('[DomainRegistrationScreen] Registering domain:', {
+        domain: fullDomain,
+        durationDays,
+        feeAmount,
+      });
 
       setStatus({
         type: null,
@@ -225,11 +257,18 @@ const DomainRegistrationScreen: React.FC<DomainRegistrationScreenProps> = ({ onC
         content_mappings: contentMappings,
       });
 
-      console.log('[DomainRegistrationScreen] Domain registered:', response.tx_hash);
+      console.log(
+        '[DomainRegistrationScreen] Domain registered:',
+        response.tx_hash,
+      );
 
       // Store domain
-      const storedDomainsJson = await AsyncStorage.getItem(REGISTERED_DOMAINS_KEY);
-      const storedDomains = storedDomainsJson ? JSON.parse(storedDomainsJson) : [];
+      const storedDomainsJson = await AsyncStorage.getItem(
+        REGISTERED_DOMAINS_KEY,
+      );
+      const storedDomains = storedDomainsJson
+        ? JSON.parse(storedDomainsJson)
+        : [];
 
       const newDomain = {
         domain: response.domain,
@@ -240,12 +279,17 @@ const DomainRegistrationScreen: React.FC<DomainRegistrationScreenProps> = ({ onC
       };
 
       storedDomains.push(newDomain);
-      await AsyncStorage.setItem(REGISTERED_DOMAINS_KEY, JSON.stringify(storedDomains));
+      await AsyncStorage.setItem(
+        REGISTERED_DOMAINS_KEY,
+        JSON.stringify(storedDomains),
+      );
       setHasExistingDomain(true);
 
       setStatus({
         type: 'success',
-        message: `Domain registered. Expires: ${new Date(response.expires_at).toLocaleDateString()}`,
+        message: `Domain registered. Expires: ${new Date(
+          response.expires_at,
+        ).toLocaleDateString()}`,
       });
 
       setDomain('');
@@ -330,14 +374,18 @@ const DomainRegistrationScreen: React.FC<DomainRegistrationScreenProps> = ({ onC
               style={{
                 marginBottom: spacing.lg,
                 padding: spacing.md,
-                backgroundColor: status.type === 'success' ? `${colors.success}15` : `${colors.error}15`,
+                backgroundColor:
+                  status.type === 'success'
+                    ? `${colors.success}15`
+                    : `${colors.error}15`,
                 borderRadius: borderRadius.md,
               }}
             >
               <Text
                 style={{
                   fontSize: typography.size.sm,
-                  color: status.type === 'success' ? colors.success : colors.error,
+                  color:
+                    status.type === 'success' ? colors.success : colors.error,
                 }}
               >
                 {status.message}
@@ -361,7 +409,8 @@ const DomainRegistrationScreen: React.FC<DomainRegistrationScreenProps> = ({ onC
                 lineHeight: 20,
               }}
             >
-              Register a .sov domain to establish your web4 presence. Domains are yours for the selected duration and can be renewed.
+              Register a .sov domain to establish your web4 presence. Domains
+              are yours for the selected duration and can be renewed.
             </Text>
           </View>
           {hasExistingDomain && (
@@ -389,7 +438,8 @@ const DomainRegistrationScreen: React.FC<DomainRegistrationScreenProps> = ({ onC
                   marginTop: spacing.xs,
                 }}
               >
-                This identity already has a registered domain. Creating more is not allowed on mobile.
+                This identity already has a registered domain. Creating more is
+                not allowed on mobile.
               </Text>
             </View>
           )}
@@ -439,26 +489,34 @@ const DomainRegistrationScreen: React.FC<DomainRegistrationScreenProps> = ({ onC
             </View>
           )}
 
-          {domain && !availabilityStatus.checking && availabilityStatus.available !== null && (
-            <View
-              style={{
-                marginBottom: spacing.lg,
-                padding: spacing.md,
-                backgroundColor: availabilityStatus.available ? `${colors.success}15` : `${colors.error}15`,
-                borderRadius: borderRadius.md,
-              }}
-            >
-              <Text
+          {domain &&
+            !availabilityStatus.checking &&
+            availabilityStatus.available !== null && (
+              <View
                 style={{
-                  fontSize: typography.size.sm,
-                  color: availabilityStatus.available ? colors.success : colors.error,
-                  fontWeight: typography.weight.semibold,
+                  marginBottom: spacing.lg,
+                  padding: spacing.md,
+                  backgroundColor: availabilityStatus.available
+                    ? `${colors.success}15`
+                    : `${colors.error}15`,
+                  borderRadius: borderRadius.md,
                 }}
               >
-                {availabilityStatus.available ? '✓ Available' : '✗ Not available'}
-              </Text>
-            </View>
-          )}
+                <Text
+                  style={{
+                    fontSize: typography.size.sm,
+                    color: availabilityStatus.available
+                      ? colors.success
+                      : colors.error,
+                    fontWeight: typography.weight.semibold,
+                  }}
+                >
+                  {availabilityStatus.available
+                    ? '✓ Available'
+                    : '✗ Not available'}
+                </Text>
+              </View>
+            )}
 
           {/* Reserved Domain Warning */}
           {isReserved && (
@@ -599,7 +657,9 @@ const DomainRegistrationScreen: React.FC<DomainRegistrationScreenProps> = ({ onC
                   >
                     Select Duration
                   </Text>
-                  <TouchableOpacity onPress={() => setDurationPickerVisible(false)}>
+                  <TouchableOpacity
+                    onPress={() => setDurationPickerVisible(false)}
+                  >
                     <Text
                       style={{
                         fontSize: typography.size.lg,
@@ -614,11 +674,27 @@ const DomainRegistrationScreen: React.FC<DomainRegistrationScreenProps> = ({ onC
                 <View style={{ gap: spacing.xs, padding: spacing.md }}>
                   {[
                     { value: '1', label: '1 Year' },
-                    { value: '2', label: '2 Years (Coming soon)', disabled: true },
-                    { value: '3', label: '3 Years (Coming soon)', disabled: true },
-                    { value: '5', label: '5 Years (Coming soon)', disabled: true },
-                    { value: '10', label: '10 Years (Coming soon)', disabled: true },
-                  ].map((option) => (
+                    {
+                      value: '2',
+                      label: '2 Years (Coming soon)',
+                      disabled: true,
+                    },
+                    {
+                      value: '3',
+                      label: '3 Years (Coming soon)',
+                      disabled: true,
+                    },
+                    {
+                      value: '5',
+                      label: '5 Years (Coming soon)',
+                      disabled: true,
+                    },
+                    {
+                      value: '10',
+                      label: '10 Years (Coming soon)',
+                      disabled: true,
+                    },
+                  ].map(option => (
                     <TouchableOpacity
                       key={option.value}
                       disabled={option.disabled}
@@ -635,7 +711,11 @@ const DomainRegistrationScreen: React.FC<DomainRegistrationScreenProps> = ({ onC
                           padding: spacing.md,
                           borderRadius: borderRadius.md,
                           backgroundColor:
-                            years === option.value ? colors.primary : option.disabled ? colors.bg_darker : colors.bg_darkest,
+                            years === option.value
+                              ? colors.primary
+                              : option.disabled
+                              ? colors.bg_darker
+                              : colors.bg_darkest,
                           opacity: option.disabled ? 0.5 : 1,
                         }}
                       >
@@ -648,7 +728,10 @@ const DomainRegistrationScreen: React.FC<DomainRegistrationScreenProps> = ({ onC
                                 : option.disabled
                                 ? colors.text_secondary
                                 : colors.text_primary,
-                            fontWeight: years === option.value ? typography.weight.semibold : typography.weight.normal,
+                            fontWeight:
+                              years === option.value
+                                ? typography.weight.semibold
+                                : typography.weight.normal,
                           }}
                         >
                           {option.label}
@@ -664,15 +747,29 @@ const DomainRegistrationScreen: React.FC<DomainRegistrationScreenProps> = ({ onC
           {/* Register Button */}
           <Button
             onPress={handleRegister}
-            disabled={loading || availabilityStatus.available === false || !domain || hasExistingDomain}
+            disabled={
+              loading ||
+              availabilityStatus.available === false ||
+              !domain ||
+              hasExistingDomain ||
+              !currentIdentity
+            }
             style={{
               backgroundColor:
-                loading || availabilityStatus.available === false || !domain || hasExistingDomain
+                loading ||
+                availabilityStatus.available === false ||
+                !domain ||
+                hasExistingDomain ||
+                !currentIdentity
                   ? colors.text_secondary
                   : colors.primary,
             }}
           >
-            {loading ? 'Registering...' : 'Register Domain'}
+            {loading
+              ? 'Registering...'
+              : !currentIdentity
+              ? 'Sign In to Register'
+              : 'Register Domain'}
           </Button>
         </ScrollView>
       </View>

@@ -45,6 +45,8 @@ import IdentityDetailScreen from '../screens/explorer/IdentityDetailScreen';
 import WalletDetailScreen from '../screens/explorer/WalletDetailScreen';
 import SearchScreen from '../screens/explorer/SearchScreen';
 import PoUWScreen from '../screens/PoUWScreen';
+import SignInScreen from '../screens/SignInScreen';
+import CreateIdentityScreen from '../screens/CreateIdentityScreen';
 
 const Stack = createNativeStackNavigator();
 const Tab = createBottomTabNavigator();
@@ -111,6 +113,23 @@ const DashboardStack = () => {
         name="ExplorerSearch"
         component={SearchScreen}
         options={{ headerShown: false }}
+      />
+      {/* Auth screens - available without identity */}
+      <Stack.Screen
+        name="SignIn"
+        component={SignInScreen as any}
+        options={{
+          headerShown: false,
+          presentation: 'modal',
+        }}
+      />
+      <Stack.Screen
+        name="CreateIdentity"
+        component={CreateIdentityScreen as any}
+        options={{
+          headerShown: false,
+          presentation: 'modal',
+        }}
       />
     </Stack.Navigator>
   );

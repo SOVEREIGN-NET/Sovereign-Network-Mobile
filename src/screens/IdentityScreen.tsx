@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { View, Alert } from 'react-native';
+import { View, Alert, TouchableOpacity } from 'react-native';
 import {
   Card,
   Text,
@@ -25,20 +25,17 @@ const IdentityScreen = ({ navigation }: any) => {
   const [drawerVisible, setDrawerVisible] = useState(false);
 
   // Fetch identity details from API when identity changes
-  useAsyncData(
-    async () => {
-      try {
-        if (currentIdentity) {
-          const identity = await appService.getIdentity(currentIdentity.did);
-          return identity;
-        }
-      } catch (error) {
-        console.warn('Failed to fetch identity details from API:', error);
+  useAsyncData(async () => {
+    try {
+      if (currentIdentity) {
+        const identity = await appService.getIdentity(currentIdentity.did);
+        return identity;
       }
-      return null;
-    },
-    [currentIdentity],
-  );
+    } catch (error) {
+      console.warn('Failed to fetch identity details from API:', error);
+    }
+    return null;
+  }, [currentIdentity]);
 
   const drawerItems: DrawerItem[] = [
     {
@@ -94,31 +91,94 @@ const IdentityScreen = ({ navigation }: any) => {
                 await signOut();
               } catch (error) {
                 console.error('Logout failed:', error);
-                Alert.alert(t.identity.logout.errorTitle, t.identity.logout.errorMessage);
+                Alert.alert(
+                  t.identity.logout.errorTitle,
+                  t.identity.logout.errorMessage,
+                );
               } finally {
                 setLoggingOut(false);
               }
             })();
           },
         },
-      ]
+      ],
     );
   };
 
   if (authLoading || !currentIdentity) {
-    return <LoadingView />;
+    // Guest mode - show sign-in prompt
+    if (authLoading) {
+      return <LoadingView />;
+    }
+    return (
+      <View style={{ flex: 1, backgroundColor: colors.bg_darkest }}>
+        <ScreenLayout paddingTop={spacing.lg}>
+          <View
+            style={{
+              flex: 1,
+              justifyContent: 'center',
+              alignItems: 'center',
+              paddingHorizontal: spacing.lg,
+            }}
+          >
+            <Text style={{ fontSize: 48, marginBottom: spacing.md }}>🆔</Text>
+            <Text
+              style={{
+                fontSize: typography.size.xl,
+                fontWeight: typography.weight.semibold,
+                color: colors.text_primary,
+                marginBottom: spacing.sm,
+                textAlign: 'center',
+              }}
+            >
+              Sign in to view your identity
+            </Text>
+            <Text
+              style={{
+                fontSize: typography.size.md,
+                color: colors.text_secondary,
+                marginBottom: spacing.xl,
+                textAlign: 'center',
+              }}
+            >
+              Create or restore your identity to get started
+            </Text>
+            <TouchableOpacity
+              style={{
+                backgroundColor: colors.primary,
+                paddingVertical: spacing.md,
+                paddingHorizontal: spacing.xl,
+                borderRadius: borderRadius.md,
+              }}
+              onPress={() => navigation.navigate('SignIn')}
+            >
+              <Text
+                style={{
+                  color: colors.text_primary,
+                  fontSize: typography.size.md,
+                  fontWeight: typography.weight.semibold,
+                }}
+              >
+                Sign In
+              </Text>
+            </TouchableOpacity>
+          </View>
+        </ScreenLayout>
+      </View>
+    );
   }
 
   const isLoading = authLoading || loggingOut;
-  const votingPowerFormatted = currentIdentity.votingPower?.toLocaleString() || '0';
+  const votingPowerFormatted =
+    currentIdentity.votingPower?.toLocaleString() || '0';
   const ubiEarnedFormatted = currentIdentity.ubiEarned?.toFixed(2) || '0.00';
-  const walletCount = currentIdentity.wallets ? Object.keys(currentIdentity.wallets).length : 0;
+  const walletCount = currentIdentity.wallets
+    ? Object.keys(currentIdentity.wallets).length
+    : 0;
 
   return (
     <View style={{ flex: 1, backgroundColor: colors.bg_darkest }}>
-      <HeaderBar
-        onMenuPress={() => setDrawerVisible(true)}
-      />
+      <HeaderBar onMenuPress={() => setDrawerVisible(true)} />
 
       <SideDrawer
         visible={drawerVisible}
@@ -128,7 +188,7 @@ const IdentityScreen = ({ navigation }: any) => {
       />
 
       <ScreenLayout paddingTop={spacing.xl}>
-      <Column gap="xl">
+        <Column gap="xl">
           {/* Identity Card */}
           <Card>
             <View
@@ -140,13 +200,24 @@ const IdentityScreen = ({ navigation }: any) => {
                 marginBottom: spacing.md,
               }}
             >
-              <Text style={{ fontSize: typography.size['5xl'], marginBottom: spacing.sm }}>
+              <Text
+                style={{
+                  fontSize: typography.size['5xl'],
+                  marginBottom: spacing.sm,
+                }}
+              >
                 {currentIdentity.avatar || '👤'}
               </Text>
               <Text variant="h2" style={{ marginBottom: spacing.xs }}>
                 {currentIdentity.displayName}
               </Text>
-              <Text variant="caption" style={{ color: colors.text_secondary, marginBottom: spacing.md }}>
+              <Text
+                variant="caption"
+                style={{
+                  color: colors.text_secondary,
+                  marginBottom: spacing.md,
+                }}
+              >
                 {currentIdentity.did}
               </Text>
               <Button
@@ -166,11 +237,17 @@ const IdentityScreen = ({ navigation }: any) => {
               />
               <DetailRow
                 label={t.identity.details.citizenship}
-                value={currentIdentity.citizenship ? t.identity.details.verified : t.identity.details.notVerified}
+                value={
+                  currentIdentity.citizenship
+                    ? t.identity.details.verified
+                    : t.identity.details.notVerified
+                }
               />
               <DetailRow
                 label={t.identity.details.created}
-                value={new Date(currentIdentity.createdAt || '').toLocaleDateString()}
+                value={new Date(
+                  currentIdentity.createdAt || '',
+                ).toLocaleDateString()}
               />
             </Column>
           </Card>
@@ -239,7 +316,9 @@ const IdentityScreen = ({ navigation }: any) => {
                   borderColor: colors.error,
                 }}
               >
-                {isLoading ? t.identity.logout.buttonLoading : t.identity.logout.button}
+                {isLoading
+                  ? t.identity.logout.buttonLoading
+                  : t.identity.logout.button}
               </Button>
               <Text
                 style={{
@@ -253,8 +332,7 @@ const IdentityScreen = ({ navigation }: any) => {
               </Text>
             </Column>
           </Card>
-
-      </Column>
+        </Column>
       </ScreenLayout>
     </View>
   );

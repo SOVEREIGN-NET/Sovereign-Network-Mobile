@@ -6,9 +6,14 @@
 import React, { useEffect } from 'react';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
 import { StatusBar, View } from 'react-native';
-import { AuthProvider, AuthContext, ThemeProvider, useTheme, ApiProvider } from './src/context';
+import {
+  AuthProvider,
+  AuthContext,
+  ThemeProvider,
+  useTheme,
+  ApiProvider,
+} from './src/context';
 import RootNavigator from './src/navigation/RootNavigator';
-import AuthNavigator from './src/navigation/AuthNavigator';
 import { colors } from './src/theme';
 import { Text } from './src/components'; // NavigationContainer is handled by each navigator
 import { useTranslation } from './src/i18n';
@@ -31,7 +36,7 @@ function AppContent() {
     );
   }
 
-  const { isAuthenticated, isBootstrapping, migrationRequired } = authContext;
+  const { isBootstrapping } = authContext;
 
   // Show loading indicator while checking auth state
   if (isBootstrapping) {
@@ -61,11 +66,9 @@ function AppContent() {
   }
 
   // Show appropriate navigator based on auth state
-  // Note: NavigationContainer is handled by RootNavigator and AuthNavigator
-  if (isAuthenticated) {
-    return <RootNavigator />;
-  }
-  return <AuthNavigator initialRouteName={migrationRequired ? 'RecoverIdentity' : 'SignIn'} />;
+  // Always show RootNavigator - individual screens handle auth state
+  // This allows guests to browse public content (trending apps, explorer, DAO)
+  return <RootNavigator />;
 }
 
 /**
@@ -76,7 +79,10 @@ function AppWithTheme() {
 
   return (
     <>
-      <StatusBar barStyle="light-content" backgroundColor={themeColors.bg_darkest} />
+      <StatusBar
+        barStyle="light-content"
+        backgroundColor={themeColors.bg_darkest}
+      />
       <AuthProvider>
         <AppContent />
       </AuthProvider>
@@ -88,7 +94,6 @@ function AppWithTheme() {
  * Root App component with providers
  */
 function App() {
-
   // Initialize Firebase App Distribution for tester feedback (shake to send feedback)
   useEffect(() => {
     if (__DEV__) return; // Only enable in release builds

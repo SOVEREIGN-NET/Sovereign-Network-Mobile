@@ -115,6 +115,7 @@ const DashboardScreen: React.FC<any> = ({ navigation }) => {
       <HeaderBar
         onMenuPress={() => setDrawerVisible(true)}
         onBalancePress={() => navigation.navigate('SIDTab', { screen: 'PoUW' })}
+        showHamburger={false}
       />
       <ScreenLayout
         paddingTop={spacing.lg}

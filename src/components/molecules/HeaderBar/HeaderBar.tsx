@@ -19,6 +19,7 @@ export interface HeaderBarProps {
   isConnected?: boolean;
   onConnectionStatusChange?: (connected: boolean, latencyMs?: number) => void;
   onBalancePress?: () => void;
+  showHamburger?: boolean;
 }
 
 const HeaderBar: React.FC<HeaderBarProps> = ({
@@ -27,6 +28,7 @@ const HeaderBar: React.FC<HeaderBarProps> = ({
   isConnected: isConnectedProp,
   onConnectionStatusChange,
   onBalancePress,
+  showHamburger = true,
 }) => {
   const insets = useSafeAreaInsets();
   const { t } = useTranslation();
@@ -137,17 +139,19 @@ const HeaderBar: React.FC<HeaderBarProps> = ({
     <View style={styles.container}>
       <Row style={styles.contentRow}>
         {/* Hamburger Menu */}
-        <Pressable
-          onPress={onMenuPress}
-          style={styles.hamburger}
-          hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
-        >
-          <View style={styles.hamburgerIcon}>
-            <View style={styles.hamburgerLine} />
-            <View style={styles.hamburgerLine} />
-            <View style={styles.hamburgerLine} />
-          </View>
-        </Pressable>
+        {showHamburger && (
+          <Pressable
+            onPress={onMenuPress}
+            style={styles.hamburger}
+            hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+          >
+            <View style={styles.hamburgerIcon}>
+              <View style={styles.hamburgerLine} />
+              <View style={styles.hamburgerLine} />
+              <View style={styles.hamburgerLine} />
+            </View>
+          </Pressable>
+        )}
 
         {/* Center: SOV Balance Counter - Tappable */}
         <Pressable
