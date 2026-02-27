@@ -8,7 +8,6 @@ import {
   ActivityIndicator,
 } from 'react-native';
 import { usePoUW } from '../../hooks/usePoUW';
-import { isPoUWAvailable } from '../../native/PoUW';
 import { colors, spacing, typography, borderRadius } from '../../theme';
 
 export interface PoUWControlsProps {
@@ -30,27 +29,13 @@ export function PoUWControls({
   const [pending, setPending] = useState(0);
   const [lastError, setLastError] = useState<string | null>(null);
 
-  console.log('[PoUWControls] RENDER - pending:', pending);
-
   const updatePending = useCallback(async () => {
-    console.log(
-      '[PoUWControls] updatePending called, available:',
-      isPoUWAvailable(),
-    );
-    if (!isPoUWAvailable()) {
-      console.log('[PoUWControls] PoUW not available');
-      return;
-    }
     try {
-      console.log('[PoUWControls] Calling getPendingCount...');
       const count = await getPendingCount();
-      console.log('[PoUWControls] Got count:', count);
       setPending(count);
-      console.log('[PoUWControls] Set pending to:', count);
       setLastError(null);
       onPendingCountChange?.(count);
     } catch (e) {
-      console.log('[PoUWControls] Error getting count:', e);
       const message = e instanceof Error ? e.message : 'Unknown error';
       setLastError(message);
     }

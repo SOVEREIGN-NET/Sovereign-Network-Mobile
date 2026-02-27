@@ -1,5 +1,5 @@
 import React, { useState, useMemo, useEffect, useCallback, useRef } from 'react';
-import { View, ActivityIndicator, TextInput, Platform } from 'react-native';
+import { View, ActivityIndicator, TextInput } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import {
   Card,
@@ -13,9 +13,15 @@ import {
 } from '../components';
 import { useTranslation } from '../i18n';
 import { colors, spacing } from '../theme';
-import { DEFAULT_NODE_HOST, DEFAULT_NODE_PORT } from '../config';
+import {
+  DEFAULT_NODE_HOST,
+  DEFAULT_NODE_PORT,
+  DEFAULT_SOV_NODE_URL,
+} from '../config';
 import SShieldLogo from '../components/atoms/Logo';
-import { PoUW, isPoUWAvailable } from '../native/PoUW';
+import { PoUWController } from '../lib-client-react-native-js';
+import web4Client from '../services/Web4Client';
+import { getCurrentAuthSessionIdPrefix } from '../services/quic';
 
 const BrowserScreen = ({ route, navigation }: any) => {
   const { t } = useTranslation();
@@ -26,6 +32,25 @@ const BrowserScreen = ({ route, navigation }: any) => {
   const [webLoading, setWebLoading] = useState(true);
   const pouwVerificationInFlightRef = useRef(false);
   const pouwRecentVerificationRef = useRef<Map<string, number>>(new Map());
+  const pouwSeenKeyRef = useRef<Set<string>>(new Set());
+  const pouwControllerRef = useRef<PoUWController | null>(null);
+
+  useEffect(() => {
+    const controller = PoUWController.getInstance({
+      nodeApiBase: DEFAULT_SOV_NODE_URL,
+    });
+    pouwControllerRef.current = controller;
+
+    controller.start().catch(error => {
+      if (__DEV__) {
+        console.warn('[PoUW] controller.start failed:', error);
+      }
+    });
+
+    return () => {
+      controller.stop().catch(() => {});
+    };
+  }, []);
 
   const mockWebsites = t.browser.websites as Record<
     string,
@@ -259,8 +284,10 @@ const BrowserScreen = ({ route, navigation }: any) => {
               onLoadEnd={event => {
                 console.log('[🌐 Web4] onLoadEnd fired!');
                 setWebLoading(false);
-                if (isPoUWAvailable()) {
-                  console.log('[🌐 PoUW] Available, verifying...');
+                if (pouwControllerRef.current) {
+                  if (__DEV__) {
+                    console.log('[🌐 PoUW] Controller available, recording...');
+                  }
                   const loadedUrl =
                     event?.nativeEvent?.url ||
                     `zhtp://${web4Domain}/`;
@@ -295,54 +322,51 @@ const BrowserScreen = ({ route, navigation }: any) => {
                   pouwRecentVerificationRef.current.set(verificationKey, now);
                   pouwVerificationInFlightRef.current = true;
 
-                  PoUW.getPendingCount()
-                    .then(count => {
-                      console.log(
-                        '[🌐 PoUW] 📋 Pending receipts before verify:',
-                        count,
-                      );
-                    })
-                    .catch(e => {
-                      console.warn(
-                        '[🌐 PoUW] Get count before verify error:',
-                        e?.message || e,
-                      );
-                    });
+                  const routeKey = `${web4Domain}${loadedPath}`;
+                  const seenBefore = pouwSeenKeyRef.current.has(routeKey);
 
-                  // First get a challenge, then verify content
-                  PoUW.getChallenge()
-                    .then(challenge => {
-                      console.log('[🌐 PoUW] Got challenge:', challenge);
-                      return challenge;
-                    })
-                    .then(() => {
-                      console.log('[🌐 PoUW] Calling verifyDomainContent...', {
-                        domain: web4Domain,
-                        path: loadedPath,
-                      });
-                      return PoUW.verifyDomainContent(web4Domain, loadedPath).catch(
-                        err => {
-                          console.warn(
-                            '[🌐 PoUW] verifyDomainContent failed, using fallback:',
-                            err?.message || err,
-                          );
-                          const fallbackData = `${web4Domain}|${loadedPath}|${Date.now()}`;
-                          const fallbackBytes = new TextEncoder().encode(
-                            fallbackData,
-                          );
-                          return PoUW.verifyContent(
-                            new Uint8Array(),
-                            fallbackBytes,
-                          );
-                        },
+                  getCurrentAuthSessionIdPrefix({ forceRefresh: true })
+                    .then(async sidPrefix => {
+                      if (!sidPrefix) {
+                        throw new Error('Missing authenticated session id prefix');
+                      }
+                      const quicSessionId = new Uint8Array(8);
+                      for (let i = 0; i < 8; i++) {
+                        quicSessionId[i] = parseInt(
+                          sidPrefix.slice(i * 2, i * 2 + 2),
+                          16,
+                        );
+                      }
+                      const resolveResult = await web4Client.resolveDomain(
+                        web4Domain,
                       );
-                    })
-                    .then(result => {
-                      console.log('[🌐 PoUW] ✅ Verified:', web4Domain, result);
+                      const manifestCid =
+                        resolveResult.manifest_cid ||
+                        `unknown:${web4Domain}`;
+
+                      await pouwControllerRef.current?.recordWeb4ManifestRoute({
+                        manifestCid,
+                        domain: web4Domain,
+                        routeHops: 1,
+                        manifestSizeBytes: 1024,
+                        quicSessionId,
+                      });
+
+                      await pouwControllerRef.current?.recordWeb4ContentServed({
+                        manifestCid,
+                        domain: web4Domain,
+                        contentSizeBytes: 1024,
+                        servedFromCache: seenBefore,
+                        quicSessionId,
+                      });
+
+                      // Submit immediately while the refreshed session ID is still fresh.
+                      await pouwControllerRef.current?.flush();
+                      pouwSeenKeyRef.current.add(routeKey);
                     })
                     .catch(e => {
                       console.warn(
-                        '[🌐 PoUW] ❌ Verify error:',
+                        '[🌐 PoUW] ❌ Record error:',
                         e?.message || e,
                       );
                     })
@@ -352,32 +376,25 @@ const BrowserScreen = ({ route, navigation }: any) => {
 
                   // Check pending count after 3 seconds
                   setTimeout(() => {
-                    console.log('[🌐 PoUW] Checking pending count...');
-                    PoUW.getPendingCount()
-                      .then(count => {
-                        console.log('[🌐 PoUW] 📋 Pending receipts:', count);
-                      })
-                      .catch(e => {
-                        console.warn('[🌐 PoUW] Get count error:', e);
-                      });
+                    if (__DEV__) {
+                      console.log(
+                        '[🌐 PoUW] 📋 Pending receipts:',
+                        pouwControllerRef.current?.pendingCount ?? 0,
+                      );
+                    }
                   }, 3000);
                   setTimeout(() => {
-                    PoUW.getPendingCount()
-                      .then(count => {
-                        console.log(
-                          '[🌐 PoUW] 📋 Pending receipts after 8s:',
-                          count,
-                        );
-                      })
-                      .catch(e => {
-                        console.warn(
-                          '[🌐 PoUW] Get count after 8s error:',
-                          e?.message || e,
-                        );
-                      });
+                    if (__DEV__) {
+                      console.log(
+                        '[🌐 PoUW] 📋 Pending receipts after 8s:',
+                        pouwControllerRef.current?.pendingCount ?? 0,
+                      );
+                    }
                   }, 8000);
                 } else {
-                  console.log('[🌐 PoUW] Not available');
+                  if (__DEV__) {
+                    console.log('[🌐 PoUW] Controller not available');
+                  }
                 }
               }}
               onError={e => console.log('[🌐 Web4] onError:', e)}

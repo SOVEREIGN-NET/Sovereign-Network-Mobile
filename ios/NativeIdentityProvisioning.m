@@ -105,6 +105,13 @@ RCT_EXTERN_METHOD(quoteFeeForTxHex:(NSString *)txHex
 RCT_EXTERN_METHOD(getCurrentIdentityDid:(RCTPromiseResolveBlock)resolve
                   reject:(RCTPromiseRejectBlock)reject)
 
+RCT_EXTERN_METHOD(getPublicIdentity:(RCTPromiseResolveBlock)resolve
+                  reject:(RCTPromiseRejectBlock)reject)
+
+RCT_EXTERN_METHOD(signPouwReceipt:(NSString *)receiptJson
+                  resolve:(RCTPromiseResolveBlock)resolve
+                  reject:(RCTPromiseRejectBlock)reject)
+
 RCT_EXTERN_METHOD(getLocalIdentity:(NSString *)identityIdOrDid
                   resolve:(RCTPromiseResolveBlock)resolve
                   reject:(RCTPromiseRejectBlock)reject)

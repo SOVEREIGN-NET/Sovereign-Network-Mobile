@@ -34,6 +34,7 @@ class NativeQuic: NSObject {
   private let connectionLock = NSLock()
   private var quinnRequestQueue: [String: [QuinnQueuedRequest]] = [:]
   private var quinnHandshakeInProgress: Set<String> = []
+  private var quinnSessionIdPrefixByIdentity: [String: String] = [:]
   private final class AuthSessionBox {
     var session: AuthSession
 
@@ -200,6 +201,15 @@ class NativeQuic: NSObject {
     }
   }
 
+  @objc
+  func getCurrentSessionIdPrefix(_ identityId: String, resolve: @escaping RCTPromiseResolveBlock, reject: @escaping RCTPromiseRejectBlock) {
+    let normalized = normalizeIdentityId(identityId)
+    connectionLock.lock()
+    let value = quinnSessionIdPrefixByIdentity[normalized] ?? quinnSessionIdPrefixByIdentity[identityId]
+    connectionLock.unlock()
+    resolve(value)
+  }
+
   private func handleQuinnControlPlaneRequest(
     parsedUrl: (host: String, port: Int, path: String),
     method: String,
@@ -324,6 +334,10 @@ class NativeQuic: NSObject {
       case .success(let result):
         do {
           let macKey = try deriveMacKey(sessionKey: result.session.sessionKey, handshakeHash: result.session.handshakeHash)
+          let sessionPrefix = result.session.sessionId.prefix(8).map { String(format: "%02x", $0) }.joined()
+          self.connectionLock.lock()
+          self.quinnSessionIdPrefixByIdentity[identityId] = sessionPrefix
+          self.connectionLock.unlock()
           let session = AuthSession(
             sessionId: result.session.sessionId,
             macKey: macKey,
@@ -384,12 +398,16 @@ class NativeQuic: NSObject {
       switch requestResult {
       case .success(let (status, responseBody)):
         let bodyString = String(data: responseBody, encoding: .utf8) ?? ""
+        connectionLock.lock()
+        let sessionPrefix = quinnSessionIdPrefixByIdentity[identityId] ?? ""
+        connectionLock.unlock()
         let response: [String: Any] = [
           "status": Int(status),
           "statusText": status >= 200 && status < 300 ? "OK" : "Error",
           "headers": [:],
           "body": bodyString,
-          "ok": status >= 200 && status < 300
+          "ok": status >= 200 && status < 300,
+          "sessionIdPrefix": sessionPrefix
         ]
         request.resolve(response)
       case .failure(let error):

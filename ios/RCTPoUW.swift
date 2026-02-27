@@ -123,7 +123,7 @@ class RCTPoUW: NSObject {
       // Parse the JSON body
       guard let bodyData = bodyStr.data(using: .utf8),
             let bodyJson = try? JSONSerialization.jsonObject(with: bodyData) as? [String: Any] else {
-        print("[PoUW] getChallenge: failed to parse body or no token. bodyStr=" + String(bodyStr.prefix(100)))
+        print("[PoUW] getChallenge: failed to parse body or no token. body_len=" + String(bodyStr.count))
         reject("PARSE_ERROR", "Invalid challenge response body", nil)
         return
       }

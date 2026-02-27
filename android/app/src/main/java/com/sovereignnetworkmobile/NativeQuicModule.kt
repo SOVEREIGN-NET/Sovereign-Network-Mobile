@@ -36,6 +36,7 @@ class NativeQuicModule(reactContext: ReactApplicationContext) :
     private val connectionLock = Any()
     private val quinnRequestQueue: MutableMap<String, MutableList<QuinnQueuedRequest>> = mutableMapOf()
     private val quinnHandshakeInProgress: MutableSet<String> = mutableSetOf()
+    private val quinnSessionIdPrefixByIdentity: MutableMap<String, String> = mutableMapOf()
 
     override fun getName() = "NativeQuic"
 
@@ -223,6 +224,15 @@ class NativeQuicModule(reactContext: ReactApplicationContext) :
         }
     }
 
+    @ReactMethod
+    fun getCurrentSessionIdPrefix(identityId: String, promise: Promise) {
+        val normalized = normalizeIdentityId(identityId) ?: identityId
+        val value = synchronized(connectionLock) {
+            quinnSessionIdPrefixByIdentity[normalized]
+        }
+        promise.resolve(value)
+    }
+
     /**
      * Cancel all active requests
      */
@@ -322,6 +332,19 @@ class NativeQuicModule(reactContext: ReactApplicationContext) :
             }
 
             val handle = (handshake?.get("handle") as? Number)?.toLong() ?: 0L
+            val sessionIdPrefix = run {
+                val bytes = handshake?.get("session_id") as? ByteArray
+                if (bytes != null && bytes.size >= 8) {
+                    bytes.take(8).joinToString("") { b -> "%02x".format(b) }
+                } else {
+                    null
+                }
+            }
+            if (!sessionIdPrefix.isNullOrEmpty()) {
+                synchronized(connectionLock) {
+                    quinnSessionIdPrefixByIdentity[identityId] = sessionIdPrefix
+                }
+            }
             Log.d(TAG, "[🌐 Web4] Handshake ok handle=$handle identity_id=${maskIdentifier(identityId)}")
             drainQuinnQueue(identityId, handle)
         }
@@ -351,7 +374,10 @@ class NativeQuicModule(reactContext: ReactApplicationContext) :
             headersJson = request.headersJson,
             body = (request.body as String).toByteArray()
         )
-        handleStringResponse(result, request.promise)
+        val sessionIdPrefix = synchronized(connectionLock) {
+            quinnSessionIdPrefixByIdentity[identityId]
+        }
+        handleStringResponse(result, request.promise, sessionIdPrefix)
 
         drainQuinnQueue(identityId, handle)
     }
@@ -367,7 +393,7 @@ class NativeQuicModule(reactContext: ReactApplicationContext) :
         }
     }
 
-    private fun handleStringResponse(result: Map<String, Any?>?, promise: Promise) {
+    private fun handleStringResponse(result: Map<String, Any?>?, promise: Promise, sessionIdPrefix: String? = null) {
         val status = (result?.get("status") as? Number)?.toInt() ?: 0
         val statusText = result?.get("statusText") as? String ?: ""
         val responseBody = result?.get("body") as? String ?: ""
@@ -385,10 +411,13 @@ class NativeQuicModule(reactContext: ReactApplicationContext) :
             putMap("headers", WritableNativeMap())
             putString("body", responseBody)
             putBoolean("ok", ok)
+            if (!sessionIdPrefix.isNullOrEmpty()) {
+                putString("sessionIdPrefix", sessionIdPrefix)
+            }
         }
 
         if (!ok) {
-            Log.d(TAG, "[🌐 Web4] Response error status=$status body=${responseBody.take(300)}")
+            Log.d(TAG, "[🌐 Web4] Response error status=$status body_len=${responseBody.length}")
         }
         promise.resolve(responseMap)
     }

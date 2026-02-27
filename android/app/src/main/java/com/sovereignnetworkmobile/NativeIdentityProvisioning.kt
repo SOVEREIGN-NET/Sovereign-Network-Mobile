@@ -890,6 +890,53 @@ class NativeIdentityProvisioning(reactContext: ReactApplicationContext) :
         }
     }
 
+    @ReactMethod
+    fun getPublicIdentity(promise: Promise) {
+        executor.execute {
+            try {
+                val identity = getLatestIdentity()
+                if (identity == null) {
+                    promise.reject("NO_IDENTITY", "No active identity available")
+                    return@execute
+                }
+
+                promise.resolve(WritableNativeMap().apply {
+                    putString("did", identity.did)
+                    putString("publicKey", b64(identity.publicKey))
+                    putString("kyberPublicKey", b64(identity.kyberPublicKey))
+                    putString("nodeId", b64(identity.nodeId))
+                })
+            } catch (e: Exception) {
+                Log.e(TAG, "getPublicIdentity failed", e)
+                promise.reject("IDENTITY_ERROR", "Failed to read public identity: ${e.message}", e)
+            }
+        }
+    }
+
+    @ReactMethod
+    fun signPouwReceipt(receiptJson: String, promise: Promise) {
+        executor.execute {
+            try {
+                val identity = getLatestIdentity()
+                if (identity == null) {
+                    promise.reject("NO_IDENTITY", "No active identity for PoUW signing")
+                    return@execute
+                }
+
+                val signature = identity.signPoUWReceiptJson(receiptJson)
+                if (signature == null || signature.isEmpty()) {
+                    promise.reject("SIGNING_ERROR", "PoUW receipt signing failed")
+                    return@execute
+                }
+
+                promise.resolve(b64(signature))
+            } catch (e: Exception) {
+                Log.e(TAG, "signPouwReceipt failed", e)
+                promise.reject("SIGNING_ERROR", "Failed to sign PoUW receipt: ${e.message}", e)
+            }
+        }
+    }
+
     // ─── Helpers ───
 
     private fun getDeviceId(): String {

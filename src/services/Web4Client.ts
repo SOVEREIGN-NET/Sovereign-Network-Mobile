@@ -8,6 +8,7 @@ import { publicQuicRequest } from './quic';
 export interface Web4ResolveResponse {
   domain: string;
   manifest_cid?: string;
+  web4_manifest_cid?: string;
   error?: string;
 }
 
@@ -23,7 +24,7 @@ class Web4Client {
    */
   async resolveDomain(domain: string): Promise<Web4ResolveResponse> {
     try {
-      const data = await publicQuicRequest<Web4ResolveResponse>(
+      const data = await publicQuicRequest<Record<string, unknown>>(
         '/api/v1/web4/domains/resolve',
         {
           method: 'POST',
@@ -31,8 +32,31 @@ class Web4Client {
           headers: { 'content-type': 'application/json' },
         },
       );
-      console.log('[Web4Client] resolveDomain:', { domain, manifest_cid: data.manifest_cid });
-      return data;
+      const nested =
+        (typeof data.data === 'object' && data.data !== null
+          ? (data.data as Record<string, unknown>)
+          : undefined) ||
+        (typeof data.result === 'object' && data.result !== null
+          ? (data.result as Record<string, unknown>)
+          : undefined);
+
+      const manifestCid =
+        (typeof data.manifest_cid === 'string' ? data.manifest_cid : undefined) ||
+        (typeof data.web4_manifest_cid === 'string'
+          ? data.web4_manifest_cid
+          : undefined) ||
+        (nested && typeof nested.manifest_cid === 'string'
+          ? nested.manifest_cid
+          : undefined) ||
+        (nested && typeof nested.web4_manifest_cid === 'string'
+          ? nested.web4_manifest_cid
+          : undefined);
+      const result: Web4ResolveResponse = { domain, manifest_cid: manifestCid };
+      console.log('[Web4Client] resolveDomain:', {
+        domain,
+        manifest_cid: result.manifest_cid,
+      });
+      return result;
     } catch (error) {
       console.error('[Web4Client] resolveDomain failed:', error);
       return { domain, error: String(error) };

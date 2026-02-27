@@ -58,6 +58,13 @@ interface BackupFileResult {
   fileName?: string;
 }
 
+interface PublicIdentity {
+  did: string;
+  publicKey: string; // base64
+  kyberPublicKey: string; // base64
+  nodeId: string; // base64
+}
+
 /**
  * Native bridge to iOS identity provisioning
  * Only available on iOS platform
@@ -529,6 +536,41 @@ class NativeIdentityProvisioningBridge {
   }
 
   /**
+   * Get current public identity material.
+   */
+  async getPublicIdentity(): Promise<PublicIdentity> {
+    if (!this.nativeModule) {
+      throw new Error(
+        'NativeIdentityProvisioning not available on this platform',
+      );
+    }
+    if (!this.nativeModule.getPublicIdentity) {
+      throw new Error(
+        'NativeIdentityProvisioning.getPublicIdentity not available',
+      );
+    }
+    return await this.nativeModule.getPublicIdentity();
+  }
+
+  /**
+   * Sign PoUW receipt JSON via canonical Rust path (JSON -> Receipt -> bincode -> Dilithium5).
+   * Returns base64 signature for controller compatibility.
+   */
+  async signPouwReceipt(receiptJson: string): Promise<string> {
+    if (!this.nativeModule) {
+      throw new Error(
+        'NativeIdentityProvisioning not available on this platform',
+      );
+    }
+    if (!this.nativeModule.signPouwReceipt) {
+      throw new Error(
+        'NativeIdentityProvisioning.signPouwReceipt not available',
+      );
+    }
+    return await this.nativeModule.signPouwReceipt(receiptJson);
+  }
+
+  /**
    * Sign an arbitrary message with a specific cached identity (by DID)
    * Returns hex-encoded signature
    */
@@ -597,5 +639,8 @@ class NativeIdentityProvisioningBridge {
 export const nativeIdentityProvisioning =
   new NativeIdentityProvisioningBridge();
 
+// Canonical alias used by lib-client/react-native/js PoUWController.
+export const identityProvisioning = nativeIdentityProvisioning;
+
 // Export types for use throughout app
-export type { GeneratedIdentityData, ProvisioningResult };
+export type { GeneratedIdentityData, ProvisioningResult, PublicIdentity };

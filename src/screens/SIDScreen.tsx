@@ -72,7 +72,7 @@ const SIDScreen = ({ navigation }: any) => {
     refresh: refreshTokens,
   } = useUserTokenBalances();
   const [drawerVisible, setDrawerVisible] = useState(false);
-  const [activeWalletTab, setActiveWalletTab] = useState('Tokens');
+  const [activeWalletTab, setActiveWalletTab] = useState('Activity');
   const [domainRegistrationModalVisible, setDomainRegistrationModalVisible] =
     useState(false);
   const [selectedActivityTx, setSelectedActivityTx] =
@@ -239,6 +239,7 @@ const SIDScreen = ({ navigation }: any) => {
         <HeaderBar
           onMenuPress={() => setDrawerVisible(true)}
           onBalancePress={() => navigation.navigate('PoUW')}
+          showHamburger={false}
         />
 
         <SideDrawer
@@ -366,6 +367,7 @@ const SIDScreen = ({ navigation }: any) => {
       <HeaderBar
         onMenuPress={() => setDrawerVisible(true)}
         onBalancePress={() => navigation.navigate('PoUW')}
+        showHamburger={false}
       />
 
       <SideDrawer

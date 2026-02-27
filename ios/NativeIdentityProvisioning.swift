@@ -1566,6 +1566,49 @@ class NativeIdentityProvisioning: NSObject, UIDocumentPickerDelegate {
         }
     }
 
+    /// Get current identity public material for canonical JS PoUWController integration.
+    @objc
+    func getPublicIdentity(
+        _ resolve: @escaping RCTPromiseResolveBlock,
+        reject: @escaping RCTPromiseRejectBlock
+    ) {
+        queue.async {
+            guard let identity = IdentityHandleStore.shared.getLatestIdentity() as? Identity else {
+                reject("NO_IDENTITY", "No active identity available", nil)
+                return
+            }
+
+            resolve([
+                "did": identity.did,
+                "publicKey": Data(identity.publicKey).base64EncodedString(),
+                "kyberPublicKey": Data(identity.kyberPublicKey).base64EncodedString(),
+                "nodeId": Data(identity.nodeId).base64EncodedString(),
+            ])
+        }
+    }
+
+    /// Sign PoUW receipt JSON via Rust canonical path (JSON -> Receipt -> bincode -> Dilithium5).
+    @objc
+    func signPouwReceipt(
+        _ receiptJson: String,
+        resolve: @escaping RCTPromiseResolveBlock,
+        reject: @escaping RCTPromiseRejectBlock
+    ) {
+        queue.async {
+            do {
+                guard let identity = IdentityHandleStore.shared.getLatestIdentity() as? Identity else {
+                    reject("NO_IDENTITY", "No active identity for PoUW signing", nil)
+                    return
+                }
+
+                let signature = try ZhtpClient.signPoUWReceiptJson(receiptJson, using: identity)
+                resolve(Data(signature).base64EncodedString())
+            } catch {
+                reject("SIGNING_ERROR", "Failed to sign PoUW receipt: \(error)", nil)
+            }
+        }
+    }
+
     // MARK: - Module Configuration
 
     @objc

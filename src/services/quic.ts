@@ -23,6 +23,7 @@ import type {
 import { QuicError } from '../types/api';
 
 const { NativeQuic } = NativeModules;
+let latestAuthSessionIdPrefix: string | null = null;
 
 // ---------------------------------------------------------------------------
 // ALPN routing tables
@@ -100,6 +101,23 @@ function deriveIdentityIdFromBody(body: string | undefined): string | undefined 
   }
 }
 
+function normalizeIdentityId(value: string): string {
+  return value.startsWith('did:zhtp:')
+    ? value.substring('did:zhtp:'.length)
+    : value;
+}
+
+function toDid(value: string): string {
+  return value.startsWith('did:zhtp:') ? value : `did:zhtp:${value}`;
+}
+
+function redactDidInPath(path: string): string {
+  return path.replace(
+    /(did%3Azhtp%3A|did:zhtp:)[A-Za-z0-9%._:-]+/gi,
+    (_, prefix: string) => `${prefix}<redacted>`,
+  );
+}
+
 function populateIdentityFields(
   body: string | undefined,
   path: string,
@@ -171,10 +189,17 @@ async function rawRequest(
   };
 
   if (__DEV__) {
-    console.log('[quic] request:', method, path, `(${alpn})`);
+    console.log('[quic] request:', method, redactDidInPath(path), `(${alpn})`);
   }
 
   const response: QuicRawResponse = await NativeQuic.request(url, requestOptions);
+
+  if (alpn === 'authenticated') {
+    const sid = (response as any)?.sessionIdPrefix;
+    if (typeof sid === 'string' && /^[0-9a-fA-F]{16}$/.test(sid)) {
+      latestAuthSessionIdPrefix = sid.toLowerCase();
+    }
+  }
 
   if (__DEV__) {
     console.log('[quic] response:', response.status, response.statusText,
@@ -182,6 +207,41 @@ async function rawRequest(
   }
 
   return response;
+}
+
+export async function getCurrentAuthSessionIdPrefix(options?: {
+  forceRefresh?: boolean;
+}): Promise<string | null> {
+  const forceRefresh = options?.forceRefresh === true;
+  if (!forceRefresh && latestAuthSessionIdPrefix) return latestAuthSessionIdPrefix;
+  if (!NativeQuic?.getCurrentSessionIdPrefix) return null;
+
+  const identityId = await SecureIdentityStorage.getIdentityId();
+  if (!identityId) return null;
+
+  // Force a fresh authenticated request so native captures the newest session ID.
+  if (forceRefresh) {
+    try {
+      const did = toDid(normalizeIdentityId(identityId));
+      await rawRequest(`/api/v1/pouw/rewards/${encodeURIComponent(did)}`, {
+        method: 'GET',
+        alpnOverride: 'authenticated',
+      });
+    } catch {
+      // Best-effort refresh; fallback to native getter below.
+    }
+  }
+
+  try {
+    const sid = await NativeQuic.getCurrentSessionIdPrefix(identityId);
+    if (typeof sid === 'string' && /^[0-9a-fA-F]{16}$/.test(sid)) {
+      latestAuthSessionIdPrefix = sid.toLowerCase();
+      return latestAuthSessionIdPrefix;
+    }
+    return null;
+  } catch {
+    return null;
+  }
 }
 
 // ---------------------------------------------------------------------------
