@@ -11,7 +11,6 @@ import {
   ScreenLayout,
   FormField,
   LoadingView,
-  Select,
 } from '../components';
 import { useAuth, useWalletList } from '../hooks';
 import { useTranslation } from '../i18n';
@@ -21,7 +20,8 @@ import { TokenTransferRequest, SovTransferRequest } from '../types/token';
 import { humanToAtomic } from '../utils/tokenUnits';
 
 // Storage keys
-const CREATED_TOKENS_KEY = 'sov:created_tokens';
+const TRACKED_TOKENS_KEY = 'sov:tracked_tokens';
+const LEGACY_CREATED_TOKENS_KEY = 'sov:created_tokens';
 
 interface SendableToken {
   id: string; // token_id for custom, or 'SOV' for native
@@ -51,7 +51,9 @@ const SendTokensScreen = ({ navigation }: any) => {
 
   // Token list and balance state
   const [allTokens, setAllTokens] = useState<SendableToken[]>([]);
-  const [selectedToken, setSelectedToken] = useState<SendableToken | null>(null);
+  const [selectedToken, setSelectedToken] = useState<SendableToken | null>(
+    null,
+  );
   const [tokensLoading, setTokensLoading] = useState(true);
   const [tokensError, setTokensError] = useState<string | null>(null);
 
@@ -63,11 +65,29 @@ const SendTokensScreen = ({ navigation }: any) => {
   });
   const [errors, setErrors] = useState<TransferFormErrors>({});
   const [isTransferring, setIsTransferring] = useState(false);
-  const [selectedFromWallet, setSelectedFromWallet] = useState<string | null>(null);
-  const [transferStatus, setTransferStatus] = useState<{ type: 'success' | 'error' | null; message: string }>({
+  const [selectedFromWallet, setSelectedFromWallet] = useState<string | null>(
+    null,
+  );
+  const [transferStatus, setTransferStatus] = useState<{
+    type: 'success' | 'error' | null;
+    message: string;
+  }>({
     type: null,
     message: '',
   });
+
+  const getDefaultSovWalletId = useCallback((): string | null => {
+    if (!wallets || wallets.length === 0) {
+      return null;
+    }
+    const primaryWallet = wallets.find(
+      w => (w.wallet_type || '').toLowerCase() === 'primary',
+    );
+    return (primaryWallet || wallets[0])?.id ?? null;
+  }, [wallets]);
+
+  const shortenWalletId = (walletId: string) =>
+    `${walletId.substring(0, 12)}...${walletId.substring(walletId.length - 8)}`;
   // No hardcoded SOV token ID — resolved dynamically from /api/v1/token/balances
 
   const isHex = (value: string) => /^[0-9a-fA-F]+$/.test(value);
@@ -89,7 +109,7 @@ const SendTokensScreen = ({ navigation }: any) => {
   useFocusEffect(
     useCallback(() => {
       refreshWallets();
-    }, [refreshWallets])
+    }, [refreshWallets]),
   );
 
   // Re-load token list whenever wallet data changes (including after refresh)
@@ -114,7 +134,10 @@ const SendTokensScreen = ({ navigation }: any) => {
 
       // 1. Add SOV from wallets (sum all wallet balances)
       if (wallets && wallets.length > 0) {
-        const totalSovBalance = wallets.reduce((sum, wallet) => sum + (wallet.total_balance || 0), 0);
+        const totalSovBalance = wallets.reduce(
+          (sum, wallet) => sum + (wallet.total_balance || 0),
+          0,
+        );
         if (totalSovBalance > 0) {
           tokens.push({
             id: 'SOV',
@@ -150,7 +173,10 @@ const SendTokensScreen = ({ navigation }: any) => {
               sovEntry.token_id = token.token_id;
               sovEntry.decimals = decimals;
               // Use the higher balance (wallet endpoint may report different units)
-              console.log('[SendTokensScreen] SOV token_id resolved from balances:', token.token_id);
+              console.log(
+                '[SendTokensScreen] SOV token_id resolved from balances:',
+                token.token_id,
+              );
               tokenMap.set(token.token_id, sovEntry);
               return;
             }
@@ -171,12 +197,13 @@ const SendTokensScreen = ({ navigation }: any) => {
 
           // If we didn't have a wallet entry but got SOV from balances, add it
           if (!sovEntry) {
-            const sovFromBalances = allBalances.find((t: any) =>
-              String(t.symbol || '').toUpperCase() === 'SOV'
+            const sovFromBalances = allBalances.find(
+              (t: any) => String(t.symbol || '').toUpperCase() === 'SOV',
             );
             if (sovFromBalances) {
               const decimals = sovFromBalances.decimals || 8;
-              const balance = (sovFromBalances.balance || 0) / Math.pow(10, decimals);
+              const balance =
+                (sovFromBalances.balance || 0) / Math.pow(10, decimals);
               tokens.unshift({
                 id: 'SOV',
                 symbol: 'SOV',
@@ -190,40 +217,62 @@ const SendTokensScreen = ({ navigation }: any) => {
           }
         }
       } catch (customError) {
-        console.warn('[SendTokensScreen] Failed to load token balances (non-fatal):', customError);
+        console.warn(
+          '[SendTokensScreen] Failed to load token balances (non-fatal):',
+          customError,
+        );
       }
 
-      // 3. Load created tokens (even with 0 balance) - creator should see their tokens
+      // 3. Load tracked token IDs (includes legacy "created tokens" key migration)
       try {
-        const createdTokensJson = await AsyncStorage.getItem(CREATED_TOKENS_KEY);
-        if (createdTokensJson) {
-          const createdTokenIds: string[] = JSON.parse(createdTokensJson);
+        let trackedTokenIds: string[] = [];
+        const trackedTokensJson = await AsyncStorage.getItem(TRACKED_TOKENS_KEY);
+        if (trackedTokensJson) {
+          trackedTokenIds = JSON.parse(trackedTokensJson);
+        } else {
+          const legacyCreatedTokensJson = await AsyncStorage.getItem(
+            LEGACY_CREATED_TOKENS_KEY,
+          );
+          if (legacyCreatedTokensJson) {
+            trackedTokenIds = JSON.parse(legacyCreatedTokensJson);
+            await AsyncStorage.setItem(
+              TRACKED_TOKENS_KEY,
+              JSON.stringify(trackedTokenIds),
+            );
+            await AsyncStorage.removeItem(LEGACY_CREATED_TOKENS_KEY);
+          }
+        }
 
-          // Fetch token info for each created token
-          for (const tokenId of createdTokenIds) {
-            if (!tokenMap.has(tokenId)) {
-              // Token not in balance list, try to get info and add with 0 balance
-              try {
-                const tokenInfo = await tokenService.getTokenInfo(tokenId);
-                const sendableToken: SendableToken = {
-                  id: tokenId,
-                  symbol: tokenInfo.symbol || 'Token',
-                  name: tokenInfo.name || 'Unknown',
-                  balance: 0, // Creator's token with no balance
-                  type: 'custom',
-                  token_id: tokenId,
-                  decimals: tokenInfo.decimals ?? 0,
-                };
-                tokenMap.set(tokenId, sendableToken);
-                tokens.push(sendableToken);
-              } catch (infoError) {
-                console.warn('[SendTokensScreen] Failed to get info for created token:', tokenId);
-              }
+        // Fetch token info for each tracked token
+        for (const tokenId of trackedTokenIds) {
+          if (!tokenMap.has(tokenId)) {
+            // Token not in balance list, try to get info and add with 0 balance
+            try {
+              const tokenInfo = await tokenService.getTokenInfo(tokenId);
+              const sendableToken: SendableToken = {
+                id: tokenId,
+                symbol: tokenInfo.symbol || 'Token',
+                name: tokenInfo.name || 'Unknown',
+                balance: 0,
+                type: 'custom',
+                token_id: tokenId,
+                decimals: tokenInfo.decimals ?? 0,
+              };
+              tokenMap.set(tokenId, sendableToken);
+              tokens.push(sendableToken);
+            } catch (infoError) {
+              console.warn(
+                '[SendTokensScreen] Failed to get info for tracked token:',
+                tokenId,
+              );
             }
           }
         }
       } catch (storageError) {
-        console.warn('[SendTokensScreen] Failed to load created tokens from storage:', storageError);
+        console.warn(
+          '[SendTokensScreen] Failed to load tracked tokens from storage:',
+          storageError,
+        );
       }
 
       setAllTokens(tokens);
@@ -236,9 +285,8 @@ const SendTokensScreen = ({ navigation }: any) => {
 
       // Default from-wallet for SOV transfers
       if (wallets && wallets.length > 0 && !selectedFromWallet) {
-        setSelectedFromWallet(wallets[0].id);
+        setSelectedFromWallet(getDefaultSovWalletId());
       }
-
     } catch (error: any) {
       console.error('[SendTokensScreen] Failed to load tokens:', error);
       setTokensError(error.message || 'Failed to load tokens');
@@ -246,6 +294,21 @@ const SendTokensScreen = ({ navigation }: any) => {
       setTokensLoading(false);
     }
   };
+
+  useEffect(() => {
+    if (selectedToken?.type !== 'sov') {
+      return;
+    }
+    if (!wallets || wallets.length === 0) {
+      return;
+    }
+    const hasCurrentSelection = selectedFromWallet
+      ? wallets.some(w => w.id === selectedFromWallet)
+      : false;
+    if (!hasCurrentSelection) {
+      setSelectedFromWallet(getDefaultSovWalletId());
+    }
+  }, [selectedToken?.type, selectedFromWallet, wallets, getDefaultSovWalletId]);
 
   // Validate recipient based on token type
   const isValidSovRecipient = (value: string) => {
@@ -264,7 +327,8 @@ const SendTokensScreen = ({ navigation }: any) => {
         newErrors.recipient = 'Recipient wallet ID must be 64 hex characters';
       }
     } else if (!isValidRecipient(transferForm.recipient)) {
-      newErrors.recipient = 'Recipient must be DID (did:zhtp:...) or hex key id/pubkey';
+      newErrors.recipient =
+        'Recipient must be DID (did:zhtp:...) or hex key id/pubkey';
     }
 
     if (!transferForm.amount.trim()) {
@@ -277,7 +341,9 @@ const SendTokensScreen = ({ navigation }: any) => {
         // SOV: validate against per-wallet balance
         const sourceWallet = wallets?.find(w => w.id === selectedFromWallet);
         if (sourceWallet && amount > sourceWallet.available_balance) {
-          newErrors.amount = `Insufficient balance (${sourceWallet.available_balance.toFixed(2)})`;
+          newErrors.amount = `Insufficient balance (${sourceWallet.available_balance.toFixed(
+            2,
+          )})`;
         }
       } else if (selectedToken && amount > selectedToken.balance) {
         newErrors.amount = `Insufficient balance (${selectedToken.balance})`;
@@ -316,6 +382,7 @@ const SendTokensScreen = ({ navigation }: any) => {
           from_wallet_id: selectedFromWallet,
           to_wallet_id: transferForm.recipient.trim(),
           amount: baseUnits,
+          token_id: selectedToken.token_id || '',
         };
 
         await tokenService.transferSov(sovRequest);
@@ -400,7 +467,9 @@ const SendTokensScreen = ({ navigation }: any) => {
           {/* Error message */}
           {tokensError && (
             <Card style={{ backgroundColor: colors.error + '20' }}>
-              <Text style={{ color: colors.error, fontSize: typography.size.sm }}>
+              <Text
+                style={{ color: colors.error, fontSize: typography.size.sm }}
+              >
                 {tokensError}
               </Text>
               <Button
@@ -419,13 +488,17 @@ const SendTokensScreen = ({ navigation }: any) => {
             <Card
               style={{
                 backgroundColor:
-                  transferStatus.type === 'success' ? colors.success + '20' : colors.error + '20',
+                  transferStatus.type === 'success'
+                    ? colors.success + '20'
+                    : colors.error + '20',
               }}
             >
               <Text
                 style={{
                   color:
-                    transferStatus.type === 'success' ? colors.success : colors.error,
+                    transferStatus.type === 'success'
+                      ? colors.success
+                      : colors.error,
                   fontSize: typography.size.sm,
                 }}
               >
@@ -437,7 +510,13 @@ const SendTokensScreen = ({ navigation }: any) => {
           {/* Token Selection */}
           {allTokens.length > 0 ? (
             <View>
-              <Row style={{ justifyContent: 'space-between', alignItems: 'center', marginBottom: spacing.md }}>
+              <Row
+                style={{
+                  justifyContent: 'space-between',
+                  alignItems: 'center',
+                  marginBottom: spacing.md,
+                }}
+              >
                 <Text
                   style={{
                     fontSize: typography.size.xs,
@@ -472,7 +551,7 @@ const SendTokensScreen = ({ navigation }: any) => {
               </Row>
 
               <Column gap="xs">
-                {allTokens.map((token) => (
+                {allTokens.map(token => (
                   <TouchableOpacity
                     key={token.id}
                     onPress={() => {
@@ -480,7 +559,7 @@ const SendTokensScreen = ({ navigation }: any) => {
                       setTransferForm({ recipient: '', amount: '', memo: '' });
                       setErrors({});
                       if (token.type === 'sov' && wallets?.length > 0) {
-                        setSelectedFromWallet(wallets[0].id);
+                        setSelectedFromWallet(getDefaultSovWalletId());
                       }
                     }}
                     style={{
@@ -498,7 +577,12 @@ const SendTokensScreen = ({ navigation }: any) => {
                           : colors.border,
                     }}
                   >
-                    <Row style={{ justifyContent: 'space-between', alignItems: 'center' }}>
+                    <Row
+                      style={{
+                        justifyContent: 'space-between',
+                        alignItems: 'center',
+                      }}
+                    >
                       <Column gap="xs" style={{ flex: 1 }}>
                         <Row style={{ alignItems: 'center', gap: spacing.xs }}>
                           <Text
@@ -518,7 +602,7 @@ const SendTokensScreen = ({ navigation }: any) => {
                                 fontWeight: typography.weight.semibold,
                               }}
                             >
-                              (Created)
+                              (Tracked)
                             </Text>
                           )}
                         </Row>
@@ -547,7 +631,9 @@ const SendTokensScreen = ({ navigation }: any) => {
                             color: colors.text_secondary,
                           }}
                         >
-                          {token.balance === 0 && token.type === 'custom' ? 'No balance' : 'Available'}
+                          {token.balance === 0 && token.type === 'custom'
+                            ? 'No balance'
+                            : 'Available'}
                         </Text>
                       </Column>
                     </Row>
@@ -557,8 +643,11 @@ const SendTokensScreen = ({ navigation }: any) => {
             </View>
           ) : (
             <Card style={{ backgroundColor: colors.warning + '20' }}>
-              <Text style={{ color: colors.warning, fontSize: typography.size.sm }}>
-                No tokens found. Create or receive tokens to get started.
+              <Text
+                style={{ color: colors.warning, fontSize: typography.size.sm }}
+              >
+                No tokens available yet. Receive or add tracked token IDs to
+                get started.
               </Text>
             </Card>
           )}
@@ -577,8 +666,18 @@ const SendTokensScreen = ({ navigation }: any) => {
                 >
                   Balance
                 </Text>
-                <Row style={{ justifyContent: 'space-between', alignItems: 'center' }}>
-                  <Text style={{ fontSize: typography.size.lg, color: colors.text_secondary }}>
+                <Row
+                  style={{
+                    justifyContent: 'space-between',
+                    alignItems: 'center',
+                  }}
+                >
+                  <Text
+                    style={{
+                      fontSize: typography.size.lg,
+                      color: colors.text_secondary,
+                    }}
+                  >
                     {selectedToken.name} ({selectedToken.symbol})
                   </Text>
                   <Text
@@ -600,8 +699,8 @@ const SendTokensScreen = ({ navigation }: any) => {
                   padding: spacing.md,
                   backgroundColor: colors.bg_darker,
                   borderRadius: borderRadius.base,
-                  borderLeftWidth: 3,
-                  borderLeftColor: colors.primary,
+                  borderWidth: 1,
+                  borderColor: colors.border,
                 }}
               >
                 <Text
@@ -616,18 +715,107 @@ const SendTokensScreen = ({ navigation }: any) => {
                 >
                   {selectedToken.type === 'sov' ? 'Sending From' : 'Your DID'}
                 </Text>
-                {selectedToken.type === 'sov' && wallets && wallets.length > 0 ? (
-                  <Select
-                    label="Select Source Wallet"
-                    options={wallets.map(w => ({
-                      id: w.id,
-                      label: `${w.wallet_type} (${w.available_balance.toFixed(2)} SOV)`,
-                      description: w.id.substring(0, 16) + '...',
-                    }))}
-                    selectedId={selectedFromWallet || ''}
-                    onSelect={(id) => setSelectedFromWallet(String(id))}
-                    disabled={isTransferring}
-                  />
+                {selectedToken.type === 'sov' &&
+                wallets &&
+                wallets.length > 0 ? (
+                  <Column gap="sm">
+                    <Text
+                      style={{
+                        fontSize: typography.size.xs,
+                        color: colors.text_secondary,
+                      }}
+                    >
+                      Primary wallet is selected by default. Choose another
+                      wallet below.
+                    </Text>
+                    {wallets.map(wallet => {
+                      const isSelected = wallet.id === selectedFromWallet;
+                      const isPrimary =
+                        (wallet.wallet_type || '').toLowerCase() === 'primary';
+                      return (
+                        <TouchableOpacity
+                          key={wallet.id}
+                          onPress={() => setSelectedFromWallet(wallet.id)}
+                          disabled={isTransferring}
+                          style={{
+                            paddingVertical: spacing.sm,
+                            paddingHorizontal: spacing.md,
+                            borderRadius: borderRadius.base,
+                            borderWidth: 1,
+                            borderColor: isSelected
+                              ? colors.primary
+                              : colors.border_light,
+                            backgroundColor: isSelected
+                              ? colors.primary + '15'
+                              : colors.bg_medium,
+                          }}
+                        >
+                          <Row
+                            style={{
+                              justifyContent: 'space-between',
+                              alignItems: 'center',
+                            }}
+                          >
+                            <Column gap="xs" style={{ flex: 1 }}>
+                              <Row style={{ alignItems: 'center', gap: spacing.xs }}>
+                                <Text
+                                  style={{
+                                    fontSize: typography.size.sm,
+                                    color: colors.text_primary,
+                                    fontWeight: typography.weight.semibold,
+                                  }}
+                                >
+                                  {wallet.wallet_type} Wallet
+                                </Text>
+                                {isPrimary && (
+                                  <Text
+                                    style={{
+                                      fontSize: typography.size.xs,
+                                      color: colors.primary,
+                                      fontWeight: typography.weight.semibold,
+                                    }}
+                                  >
+                                    Default
+                                  </Text>
+                                )}
+                              </Row>
+                              <Text
+                                style={{
+                                  fontSize: typography.size.xs,
+                                  color: colors.text_secondary,
+                                  fontFamily: 'Courier',
+                                }}
+                              >
+                                {shortenWalletId(wallet.id)}
+                              </Text>
+                            </Column>
+                            <Column gap="xs" style={{ alignItems: 'flex-end' }}>
+                              <Text
+                                style={{
+                                  fontSize: typography.size.sm,
+                                  color: colors.text_primary,
+                                  fontWeight: typography.weight.semibold,
+                                }}
+                              >
+                                {wallet.available_balance.toFixed(2)} SOV
+                              </Text>
+                              <Text
+                                style={{
+                                  fontSize: typography.size.xs,
+                                  color: isSelected
+                                    ? colors.primary
+                                    : colors.text_tertiary,
+                                  fontWeight: typography.weight.semibold,
+                                }}
+                              >
+                                {isSelected ? 'Selected' : 'Tap to use'}
+                              </Text>
+                            </Column>
+                          </Row>
+                        </TouchableOpacity>
+                      );
+                    })}
+                  </Column>
                 ) : (
                   <Text
                     style={{
@@ -644,13 +832,21 @@ const SendTokensScreen = ({ navigation }: any) => {
 
               {/* Recipient Input - Changes based on token type */}
               <FormField
-                label={selectedToken.type === 'sov' ? 'Recipient Wallet ID' : 'Recipient DID or Key ID'}
-                placeholder={selectedToken.type === 'sov' ? '64 hex characters' : 'did:zhtp:... or 64/5184 hex'}
+                label={
+                  selectedToken.type === 'sov'
+                    ? 'Recipient Wallet ID'
+                    : 'Recipient DID or Key ID'
+                }
+                placeholder={
+                  selectedToken.type === 'sov'
+                    ? '64 hex characters'
+                    : 'did:zhtp:... or 64/5184 hex'
+                }
                 value={transferForm.recipient}
-                onChangeText={(text) => {
-                  setTransferForm((prev) => ({ ...prev, recipient: text }));
+                onChangeText={text => {
+                  setTransferForm(prev => ({ ...prev, recipient: text }));
                   if (errors.recipient) {
-                    setErrors((prev) => ({ ...prev, recipient: undefined }));
+                    setErrors(prev => ({ ...prev, recipient: undefined }));
                   }
                 }}
                 error={errors.recipient}
@@ -662,10 +858,10 @@ const SendTokensScreen = ({ navigation }: any) => {
                 label="Amount"
                 placeholder="0"
                 value={transferForm.amount}
-                onChangeText={(text) => {
-                  setTransferForm((prev) => ({ ...prev, amount: text }));
+                onChangeText={text => {
+                  setTransferForm(prev => ({ ...prev, amount: text }));
                   if (errors.amount) {
-                    setErrors((prev) => ({ ...prev, amount: undefined }));
+                    setErrors(prev => ({ ...prev, amount: undefined }));
                   }
                 }}
                 keyboardType="decimal-pad"
@@ -678,8 +874,8 @@ const SendTokensScreen = ({ navigation }: any) => {
                 label="Memo (Optional)"
                 placeholder="Add a note to this transfer"
                 value={transferForm.memo}
-                onChangeText={(text) => {
-                  setTransferForm((prev) => ({ ...prev, memo: text }));
+                onChangeText={text => {
+                  setTransferForm(prev => ({ ...prev, memo: text }));
                 }}
                 multiline
                 numberOfLines={2}

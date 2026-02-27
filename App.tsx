@@ -3,7 +3,7 @@
  * React Native cross-platform application for Web4 decentralized internet
  */
 
-import React, { useEffect } from 'react';
+import React from 'react';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
 import { StatusBar, View } from 'react-native';
 import {
@@ -18,7 +18,9 @@ import { colors } from './src/theme';
 import { Text } from './src/components'; // NavigationContainer is handled by each navigator
 import { useTranslation } from './src/i18n';
 import { config } from './src/config';
-import appDistribution from '@react-native-firebase/app-distribution';
+import { installLogGuard } from './src/utils/logging';
+
+installLogGuard();
 
 /**
  * AppContent component that uses auth context to determine which navigator to show
@@ -94,26 +96,6 @@ function AppWithTheme() {
  * Root App component with providers
  */
 function App() {
-  // Initialize Firebase App Distribution for tester feedback (shake to send feedback)
-  useEffect(() => {
-    if (__DEV__) return; // Only enable in release builds
-
-    const initAppDistribution = async () => {
-      try {
-        const isSignedIn = await appDistribution().isTesterSignedIn();
-        if (!isSignedIn) {
-          await appDistribution().signInTester();
-        }
-        // Note: checkForUpdate() can be called to check for new versions
-        // appDistribution().checkForUpdate();
-      } catch (error) {
-        console.log('[AppDistribution] Init error:', error);
-      }
-    };
-
-    initAppDistribution();
-  }, []);
-
   return (
     <SafeAreaProvider>
       <ThemeProvider>

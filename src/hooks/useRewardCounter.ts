@@ -1,8 +1,9 @@
 import { useState, useEffect, useCallback } from 'react';
 import { useAuth } from './useAuth';
 import appService, { PoUWRewardsResponse } from '../services/AppService';
+import { atomicToHuman } from '../utils/tokenUnits';
 
-const SOV_DECIMALS = 100_000_000;
+const SOV_DECIMALS = 8;
 
 export interface RewardCounterData {
   balance: number;
@@ -14,7 +15,14 @@ export interface RewardCounterData {
   refetch: () => void;
 }
 
-const toSOV = (rawAmount: number): number => rawAmount / SOV_DECIMALS;
+const toSOV = (rawAmount: number): number => atomicToHuman(rawAmount, SOV_DECIMALS);
+
+const formatSovBalance = (amount: number): string => {
+  if (amount <= 0) return '0';
+  if (amount >= 1) return amount.toLocaleString('en-US', { minimumFractionDigits: 3, maximumFractionDigits: 3 });
+  if (amount >= 0.001) return amount.toLocaleString('en-US', { minimumFractionDigits: 3, maximumFractionDigits: 6 });
+  return amount.toLocaleString('en-US', { minimumFractionDigits: 6, maximumFractionDigits: 8 });
+};
 
 /**
  * SOV counter for header bar.
@@ -64,7 +72,7 @@ export const useRewardCounter = (): RewardCounterData => {
   }, [fetchRewards]);
 
   const totalEarned = rewards ? toSOV(rewards.total_earned) : 0;
-  const displayBalance = totalEarned > 0 ? totalEarned.toFixed(3) : '0.000';
+  const displayBalance = formatSovBalance(totalEarned);
 
   return {
     balance: totalEarned,

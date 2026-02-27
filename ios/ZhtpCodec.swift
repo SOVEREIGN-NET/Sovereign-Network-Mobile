@@ -350,9 +350,7 @@ private func zhtp_decode_response_internal(_ cbor_bytes: Data, allowWireDetectio
 
     // Step 2: Decode CBOR to JSON-compatible value
     let jsonValue = try decodeCborValue(actualCbor)
-    print("[ZhtpCodec] CBOR decoded successfully")
-    print("[ZhtpCodec] Decoded JSON: \(jsonValue)")
-    print("[ZhtpCodec] Decoded type: \(type(of: jsonValue))")
+    print("[ZhtpCodec] CBOR decoded successfully, type=\(type(of: jsonValue))")
 
     // Log CBOR hex for debugging
     let hexString = actualCbor.prefix(64).map({ String(format: "%02x", $0) }).joined(separator: " ")
@@ -391,9 +389,7 @@ private func zhtp_decode_response_internal(_ cbor_bytes: Data, allowWireDetectio
             error_message: "Invalid CBOR response format"
         )
     }
-    if let jsonString = String(data: jsonData, encoding: .utf8) {
-        print("[ZhtpCodec] JSON string: \(jsonString)")
-    }
+    print("[ZhtpCodec] JSON converted, bytes=\(jsonData.count)")
     let decoder = JSONDecoder()
 
     // Check if this is the simplified error response format (server sends statusCode/body/headers)

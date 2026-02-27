@@ -9,9 +9,9 @@
 export interface TokenCreateRequest {
   name: string;
   symbol: string;
-  initial_supply: string | number;  // String to preserve exact value (no float precision loss)
+  initial_supply: string | number; // String to preserve exact value (no float precision loss)
   decimals: number;
-  max_supply: string | number | null;  // String to preserve exact value
+  max_supply: string | number | null; // String to preserve exact value
   creator_identity?: string; // Auto-derived from authenticated session, not client-supplied
 }
 
@@ -48,6 +48,7 @@ export interface TokenTransferRequest {
   from?: string; // Auto-derived from authenticated session, not client-supplied
   to: string; // Recipient DID
   amount: string | number; // String to preserve exact value (no float precision loss)
+  nonce?: number; // Optional: fetch from /api/v1/token/nonce/{token_id}/{address}
 }
 
 export interface TokenTransferResponse {
@@ -63,8 +64,10 @@ export interface TokenTransferResponse {
 
 export interface SovTransferRequest {
   from_wallet_id: string; // 64 hex chars (32 bytes)
-  to_wallet_id: string;   // 64 hex chars (32 bytes)
+  to_wallet_id: string; // 64 hex chars (32 bytes)
   amount: string | number; // Atomic units string
+  nonce?: number; // Optional: fetch from /api/v1/token/nonce/{token_id}/{wallet_id}
+  token_id: string; // SOV token_id (from balances response)
 }
 
 export interface SovTransferResponse {
@@ -74,6 +77,8 @@ export interface SovTransferResponse {
   to_wallet_id: string;
   from_balance: number;
   to_balance: number;
+  tx_hash?: string;
+  tx_status?: string;
 }
 
 // ============ GET TOKEN INFO ============

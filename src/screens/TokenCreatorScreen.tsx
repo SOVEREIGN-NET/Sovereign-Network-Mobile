@@ -20,7 +20,8 @@ import { useAuth } from '../hooks/useAuth';
 import { TokenCreateRequest } from '../types/token';
 
 // Storage keys
-const CREATED_TOKENS_KEY = 'sov:created_tokens';
+const TRACKED_TOKENS_KEY = 'sov:tracked_tokens';
+const LEGACY_CREATED_TOKENS_KEY = 'sov:created_tokens';
 
 interface CreateFormErrors {
   name?: string;
@@ -162,14 +163,30 @@ const TokenCreatorScreen: React.FC<TokenCreatorScreenProps> = ({ onClose }) => {
 
       const response = await tokenService.createToken(createRequest);
 
-      // Save created token ID to storage
+      // Save token ID to tracked storage (with legacy-key migration)
       try {
-        const createdTokensJson = await AsyncStorage.getItem(CREATED_TOKENS_KEY);
-        const createdTokens: string[] = createdTokensJson ? JSON.parse(createdTokensJson) : [];
-        if (!createdTokens.includes(response.token_id)) {
-          createdTokens.push(response.token_id);
-          await AsyncStorage.setItem(CREATED_TOKENS_KEY, JSON.stringify(createdTokens));
-          console.log('[TokenCreatorScreen] Saved created token ID:', response.token_id);
+        const trackedTokensJson = await AsyncStorage.getItem(TRACKED_TOKENS_KEY);
+        let trackedTokens: string[] = trackedTokensJson
+          ? JSON.parse(trackedTokensJson)
+          : [];
+
+        if (trackedTokens.length === 0) {
+          const legacyCreatedTokensJson = await AsyncStorage.getItem(
+            LEGACY_CREATED_TOKENS_KEY,
+          );
+          if (legacyCreatedTokensJson) {
+            trackedTokens = JSON.parse(legacyCreatedTokensJson);
+          }
+        }
+
+        if (!trackedTokens.includes(response.token_id)) {
+          trackedTokens.push(response.token_id);
+          await AsyncStorage.setItem(
+            TRACKED_TOKENS_KEY,
+            JSON.stringify(trackedTokens),
+          );
+          await AsyncStorage.removeItem(LEGACY_CREATED_TOKENS_KEY);
+          console.log('[TokenCreatorScreen] Saved tracked token ID:', response.token_id);
         }
       } catch (storageError) {
         console.warn('[TokenCreatorScreen] Failed to save token ID to storage:', storageError);

@@ -1,6 +1,6 @@
 /**
  * Token Management Screen
- * Manage created tokens - view status and delete tokens that no longer exist
+ * Manage tracked tokens - view status and remove token IDs that no longer exist
  */
 
 import React, { useState, useEffect, useCallback } from 'react';
@@ -17,7 +17,8 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import { colors } from '../theme/tokens';
 import tokenService from '../services/TokenService';
 
-const CREATED_TOKENS_KEY = 'sov:created_tokens';
+const TRACKED_TOKENS_KEY = 'sov:tracked_tokens';
+const LEGACY_CREATED_TOKENS_KEY = 'sov:created_tokens';
 
 interface TokenStatus {
   tokenId: string;
@@ -31,17 +32,46 @@ const TokenManagementScreen = ({ navigation }: any) => {
   const [tokens, setTokens] = useState<TokenStatus[]>([]);
   const [loading, setLoading] = useState(true);
 
+  const loadTrackedTokenIds = useCallback(async (): Promise<string[]> => {
+    const trackedTokensJson = await AsyncStorage.getItem(TRACKED_TOKENS_KEY);
+    if (trackedTokensJson) {
+      return JSON.parse(trackedTokensJson);
+    }
+
+    const legacyCreatedTokensJson = await AsyncStorage.getItem(
+      LEGACY_CREATED_TOKENS_KEY,
+    );
+    if (legacyCreatedTokensJson) {
+      const trackedTokenIds: string[] = JSON.parse(legacyCreatedTokensJson);
+      await AsyncStorage.setItem(
+        TRACKED_TOKENS_KEY,
+        JSON.stringify(trackedTokenIds),
+      );
+      await AsyncStorage.removeItem(LEGACY_CREATED_TOKENS_KEY);
+      return trackedTokenIds;
+    }
+
+    return [];
+  }, []);
+
+  const saveTrackedTokenIds = useCallback(async (tokenIds: string[]) => {
+    if (tokenIds.length > 0) {
+      await AsyncStorage.setItem(TRACKED_TOKENS_KEY, JSON.stringify(tokenIds));
+    } else {
+      await AsyncStorage.removeItem(TRACKED_TOKENS_KEY);
+    }
+    await AsyncStorage.removeItem(LEGACY_CREATED_TOKENS_KEY);
+  }, []);
+
   const loadTokens = useCallback(async () => {
     setLoading(true);
     try {
-      const createdTokensJson = await AsyncStorage.getItem(CREATED_TOKENS_KEY);
-      if (!createdTokensJson) {
+      const tokenIds = await loadTrackedTokenIds();
+      if (tokenIds.length === 0) {
         setTokens([]);
         setLoading(false);
         return;
       }
-
-      const tokenIds: string[] = JSON.parse(createdTokensJson);
       const tokenStatuses: TokenStatus[] = [];
 
       for (const tokenId of tokenIds) {
@@ -69,7 +99,7 @@ const TokenManagementScreen = ({ navigation }: any) => {
     } finally {
       setLoading(false);
     }
-  }, []);
+  }, [loadTrackedTokenIds]);
 
   useEffect(() => {
     loadTokens();
@@ -78,28 +108,20 @@ const TokenManagementScreen = ({ navigation }: any) => {
   const deleteToken = useCallback(async (tokenId: string) => {
     Alert.alert(
       'Delete Token',
-      `Remove token ID from your created tokens list?`,
+      `Remove this token ID from your tracked list?`,
       [
         { text: 'Cancel', onPress: () => {} },
         {
           text: 'Delete',
           onPress: async () => {
             try {
-              const createdTokensJson = await AsyncStorage.getItem(CREATED_TOKENS_KEY);
-              if (createdTokensJson) {
-                const tokenIds: string[] = JSON.parse(createdTokensJson);
-                const filtered = tokenIds.filter(id => id !== tokenId);
+              const tokenIds = await loadTrackedTokenIds();
+              const filtered = tokenIds.filter(id => id !== tokenId);
+              await saveTrackedTokenIds(filtered);
 
-                if (filtered.length > 0) {
-                  await AsyncStorage.setItem(CREATED_TOKENS_KEY, JSON.stringify(filtered));
-                } else {
-                  await AsyncStorage.removeItem(CREATED_TOKENS_KEY);
-                }
-
-                // Reload the list
-                await loadTokens();
-                Alert.alert('Deleted', 'Token ID removed from your list');
-              }
+              // Reload the list
+              await loadTokens();
+              Alert.alert('Deleted', 'Token ID removed from your tracked list');
             } catch (error: any) {
               Alert.alert('Error', 'Failed to delete token: ' + error.message);
             }
@@ -108,7 +130,7 @@ const TokenManagementScreen = ({ navigation }: any) => {
         },
       ]
     );
-  }, [loadTokens]);
+  }, [loadTokens, loadTrackedTokenIds, saveTrackedTokenIds]);
 
   const deleteAllInvalid = useCallback(async () => {
     const invalidTokens = tokens.filter(t => !t.exists);
@@ -119,7 +141,7 @@ const TokenManagementScreen = ({ navigation }: any) => {
 
     Alert.alert(
       'Delete Invalid Tokens',
-      `Remove ${invalidTokens.length} invalid token ID(s) from your list?`,
+      `Remove ${invalidTokens.length} invalid token ID(s) from your tracked list?`,
       [
         { text: 'Cancel', onPress: () => {} },
         {
@@ -127,12 +149,7 @@ const TokenManagementScreen = ({ navigation }: any) => {
           onPress: async () => {
             try {
               const validTokenIds = tokens.filter(t => t.exists).map(t => t.tokenId);
-
-              if (validTokenIds.length > 0) {
-                await AsyncStorage.setItem(CREATED_TOKENS_KEY, JSON.stringify(validTokenIds));
-              } else {
-                await AsyncStorage.removeItem(CREATED_TOKENS_KEY);
-              }
+              await saveTrackedTokenIds(validTokenIds);
 
               await loadTokens();
               Alert.alert('Deleted', `${invalidTokens.length} invalid token(s) removed`);
@@ -144,7 +161,7 @@ const TokenManagementScreen = ({ navigation }: any) => {
         },
       ]
     );
-  }, [tokens, loadTokens]);
+  }, [tokens, loadTokens, saveTrackedTokenIds]);
 
   if (loading) {
     return (
@@ -164,20 +181,20 @@ const TokenManagementScreen = ({ navigation }: any) => {
         <View style={styles.header}>
           <Text style={styles.title}>Token Management</Text>
           <Text style={styles.subtitle}>
-            {tokens.length} token{tokens.length !== 1 ? 's' : ''} created
+            {tokens.length} token{tokens.length !== 1 ? 's' : ''} tracked
           </Text>
         </View>
 
         {tokens.length === 0 ? (
           <View style={styles.emptyState}>
-            <Text style={styles.emptyText}>No created tokens yet</Text>
+            <Text style={styles.emptyText}>No tracked tokens yet</Text>
           </View>
         ) : (
           <>
             {/* Valid Tokens Section */}
             {validTokens.length > 0 && (
               <View style={styles.section}>
-                <Text style={styles.sectionTitle}>Valid Tokens ({validTokens.length})</Text>
+                <Text style={styles.sectionTitle}>Available Tokens ({validTokens.length})</Text>
                 {validTokens.map(token => (
                   <View key={token.tokenId} style={styles.tokenCard}>
                     <View style={styles.tokenInfo}>
@@ -205,7 +222,7 @@ const TokenManagementScreen = ({ navigation }: any) => {
             {invalidTokens.length > 0 && (
               <View style={styles.section}>
                 <Text style={[styles.sectionTitle, styles.invalidTitle]}>
-                  Invalid Tokens ({invalidTokens.length})
+                  Unavailable Tokens ({invalidTokens.length})
                 </Text>
                 <Text style={styles.invalidHint}>
                   These token IDs no longer exist on the network

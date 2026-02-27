@@ -1,6 +1,6 @@
 /**
  * My Tokens Screen
- * List user's created and owned tokens
+ * List user's tracked and owned tokens
  */
 
 import React, { useState } from 'react';
@@ -20,7 +20,8 @@ import { useAuth } from '../hooks/useAuth';
 import tokenService from '../services/TokenService';
 
 // Storage keys
-const CREATED_TOKENS_KEY = 'sov:created_tokens';
+const TRACKED_TOKENS_KEY = 'sov:tracked_tokens';
+const LEGACY_CREATED_TOKENS_KEY = 'sov:created_tokens';
 
 interface TokenWithInfo {
   token_id: string;
@@ -75,33 +76,46 @@ const MyTokensScreen = ({ navigation }: any) => {
         console.warn('[MyTokensScreen] Failed to load custom tokens with balance:', error);
       }
 
-      // 2. Load created tokens (even with 0 balance)
+      // 2. Load tracked token IDs (includes legacy "created tokens" key migration)
       try {
-        const createdTokensJson = await AsyncStorage.getItem(CREATED_TOKENS_KEY);
-        if (createdTokensJson) {
-          const createdTokenIds: string[] = JSON.parse(createdTokensJson);
+        let trackedTokenIds: string[] = [];
+        const trackedTokensJson = await AsyncStorage.getItem(TRACKED_TOKENS_KEY);
+        if (trackedTokensJson) {
+          trackedTokenIds = JSON.parse(trackedTokensJson);
+        } else {
+          const legacyCreatedTokensJson = await AsyncStorage.getItem(
+            LEGACY_CREATED_TOKENS_KEY,
+          );
+          if (legacyCreatedTokensJson) {
+            trackedTokenIds = JSON.parse(legacyCreatedTokensJson);
+            await AsyncStorage.setItem(
+              TRACKED_TOKENS_KEY,
+              JSON.stringify(trackedTokenIds),
+            );
+            await AsyncStorage.removeItem(LEGACY_CREATED_TOKENS_KEY);
+          }
+        }
 
-          for (const tokenId of createdTokenIds) {
-            if (!tokenMap.has(tokenId)) {
-              try {
-                const tokenInfo = await tokenService.getTokenInfo(tokenId);
-                const token: TokenWithInfo = {
-                  token_id: tokenId,
-                  name: tokenInfo.name || 'Unknown',
-                  symbol: tokenInfo.symbol || 'Token',
-                  total_supply: tokenInfo.total_supply || 0,
-                  balance: 0,
-                };
-                tokenMap.set(tokenId, token);
-                allTokens.push(token);
-              } catch (error) {
-                console.warn('[MyTokensScreen] Failed to get info for token:', tokenId, error);
-              }
+        for (const tokenId of trackedTokenIds) {
+          if (!tokenMap.has(tokenId)) {
+            try {
+              const tokenInfo = await tokenService.getTokenInfo(tokenId);
+              const token: TokenWithInfo = {
+                token_id: tokenId,
+                name: tokenInfo.name || 'Unknown',
+                symbol: tokenInfo.symbol || 'Token',
+                total_supply: tokenInfo.total_supply || 0,
+                balance: 0,
+              };
+              tokenMap.set(tokenId, token);
+              allTokens.push(token);
+            } catch (error) {
+              console.warn('[MyTokensScreen] Failed to get info for token:', tokenId, error);
             }
           }
         }
       } catch (error) {
-        console.warn('[MyTokensScreen] Failed to load created tokens:', error);
+        console.warn('[MyTokensScreen] Failed to load tracked tokens:', error);
       }
 
       setTokens(allTokens);
@@ -155,7 +169,7 @@ const MyTokensScreen = ({ navigation }: any) => {
                 textAlign: 'center',
               }}
             >
-              Create your first token in the SID tab
+              Receive, trade, or track token IDs to see them here
             </Text>
           </View>
         ) : (

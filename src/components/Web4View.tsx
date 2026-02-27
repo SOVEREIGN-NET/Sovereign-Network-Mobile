@@ -1,5 +1,11 @@
 import React, { useEffect, useRef } from 'react';
-import { requireNativeComponent, UIManager, Platform, ViewProps, NativeSyntheticEvent } from 'react-native';
+import {
+  requireNativeComponent,
+  UIManager,
+  Platform,
+  ViewProps,
+  NativeSyntheticEvent,
+} from 'react-native';
 
 type Web4NavigationEvent = NativeSyntheticEvent<{
   url: string;
@@ -25,13 +31,16 @@ export interface Web4ViewProps extends ViewProps {
   onNavigation?: (event: Web4NavigationEvent) => void;
   onLoadStart?: (event: Web4NavigationEvent) => void;
   onLoadEnd?: (event: Web4NavigationEvent) => void;
+  onContentVerified?: (event: { contentId: string; cid: string }) => void;
   onError?: (event: Web4ErrorEvent) => void;
 }
 
 const ComponentName = 'Web4View';
 
 const viewManagerConfig = UIManager.getViewManagerConfig(ComponentName);
-const NativeWeb4View = viewManagerConfig ? requireNativeComponent<Web4ViewProps>(ComponentName) : null;
+const NativeWeb4View = viewManagerConfig
+  ? requireNativeComponent<Web4ViewProps>(ComponentName)
+  : null;
 
 export const isWeb4ViewAvailable = !!viewManagerConfig;
 
@@ -60,10 +69,7 @@ export const Web4View: React.FC<Web4ViewProps> = props => {
   return (
     <NativeWeb4View
       {...props}
-      style={[
-        { backgroundColor: 'transparent' },
-        props.style,
-      ]}
+      style={[{ backgroundColor: 'transparent' }, props.style]}
     />
   );
 };

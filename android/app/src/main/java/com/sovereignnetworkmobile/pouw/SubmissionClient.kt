@@ -9,6 +9,7 @@ import kotlinx.coroutines.*
 import org.json.JSONArray
 import org.json.JSONObject
 import java.io.ByteArrayInputStream
+import java.nio.charset.StandardCharsets
 import java.util.concurrent.atomic.AtomicLong
 
 /**
@@ -20,10 +21,17 @@ import java.util.concurrent.atomic.AtomicLong
  * - Max 100 receipts per batch
  */
 class SubmissionClient(
-    private val nodeHost: String,
-    private val nodePort: Int = 443,
+    private var nodeHost: String,
+    private var nodePort: Int = 443,
+    private val identitySigner: IdentitySigner,
     private val insecure: Boolean = true
 ) {
+    fun setNodeUrl(url: String) {
+        val withoutScheme = url.removePrefix("https://").removePrefix("http://").removePrefix("quic://").trimEnd('/')
+        val parts = withoutScheme.split(":")
+        nodeHost = parts[0]
+        nodePort = if (parts.size > 1) parts[1].toIntOrNull() ?: 443 else 443
+    }
     
     companion object {
         private const val TAG = "PoUWSubmissionClient"
@@ -31,9 +39,12 @@ class SubmissionClient(
         private const val RATE_LIMIT_WINDOW_MS = 60_000L
         private const val MAX_BATCH_SIZE = 100
         private const val DEFAULT_TIMEOUT_SECS = 30
-        private const val CHALLENGE_PATH = "/pouw/challenge"
-        private const val SUBMIT_PATH = "/pouw/submit"
-        private const val BATCH_SUBMIT_PATH = "/pouw/batch"
+        private const val CHALLENGE_PATH = "/api/v1/pouw/challenge"
+        private const val SUBMIT_PATH = "/api/v1/pouw/submit"
+        private const val BATCH_SUBMIT_PATH = "/api/v1/pouw/submit"
+        private const val LEGACY_CHALLENGE_PATH = "/pouw/challenge"
+        private const val LEGACY_SUBMIT_PATH = "/pouw/submit"
+        private const val LEGACY_BATCH_SUBMIT_PATH = "/pouw/batch"
     }
     
     private val requestTimestamps = mutableListOf<Long>()
@@ -55,24 +66,41 @@ class SubmissionClient(
      * @throws PoUWError.SerializationError if response parsing fails
      */
     @Throws(PoUWError::class)
-    suspend fun requestChallenge(): ChallengeResponse {
+    suspend fun requestChallenge(
+        cap: String? = null,
+        maxBytes: Long = 0,
+        maxReceipts: Int = 0
+    ): ChallengeResponse {
         checkRateLimit()
-        
-        // Add cap query parameter for challenge capabilities
-        val url = buildQuicUrl("$CHALLENGE_PATH?cap=hash,merkle,signature")
+
+        val queryParams = mutableListOf<String>()
+        if (!cap.isNullOrBlank()) {
+            queryParams.add("cap=$cap")
+        }
+        if (maxBytes > 0) {
+            queryParams.add("max_bytes=$maxBytes")
+        }
+        if (maxReceipts > 0) {
+            queryParams.add("max_receipts=$maxReceipts")
+        }
+        val suffix = if (queryParams.isNotEmpty()) {
+            "?" + queryParams.joinToString("&")
+        } else {
+            ""
+        }
+        val primaryUrl = buildQuicUrl(CHALLENGE_PATH + suffix)
+        val legacyUrl = buildQuicUrl(LEGACY_CHALLENGE_PATH + suffix)
         
         return try {
-            val result = withContext(Dispatchers.IO) {
-                NativeQuicBridge.request(
-                    url = url,
-                    method = "GET",
-                    headersJson = "{}",
-                    body = "",
-                    timeoutSecs = DEFAULT_TIMEOUT_SECS,
-                    insecure = insecure,
-                    alpn = "public" // Public ALPN for challenge requests
-                )
-            }
+            val result = executeRequestWithPathFallback(
+                primaryUrl = primaryUrl,
+                legacyUrl = legacyUrl,
+                method = "GET",
+                headersJson = "{}",
+                body = "",
+                timeoutSecs = DEFAULT_TIMEOUT_SECS,
+                alpn = "public"
+            )
             
             recordRequest()
             
@@ -85,7 +113,7 @@ class SubmissionClient(
                 429 -> throw PoUWError.NetworkError(Exception("Rate limited by server"))
                 in 500..599 -> throw PoUWError.NetworkError(Exception("Server error: $status"))
                 0 -> throw PoUWError.NetworkError(Exception("QUIC error: $error"))
-                else -> throw PoUWError.NetworkError(Exception("HTTP $status"))
+                else -> throw PoUWError.NetworkError(Exception("Response status $status"))
             }
         } catch (e: PoUWError) {
             throw e
@@ -127,23 +155,24 @@ class SubmissionClient(
         
         checkRateLimit()
         
-        val url = buildQuicUrl(if (receipts.size == 1) SUBMIT_PATH else BATCH_SUBMIT_PATH)
+        val primaryPath = if (receipts.size == 1) SUBMIT_PATH else BATCH_SUBMIT_PATH
+        val legacyPath = if (receipts.size == 1) LEGACY_SUBMIT_PATH else LEGACY_BATCH_SUBMIT_PATH
+        val primaryUrl = buildQuicUrl(primaryPath)
+        val legacyUrl = buildQuicUrl(legacyPath)
         val body = buildBatchPayload(receipts)
         
         return try {
-            val result = withContext(Dispatchers.IO) {
-                NativeQuicBridge.request(
-                    url = url,
-                    method = "POST",
-                    headersJson = JSONObject().apply {
-                        put("content-type", "application/json")
-                    }.toString(),
-                    body = body,
-                    timeoutSecs = DEFAULT_TIMEOUT_SECS,
-                    insecure = insecure,
-                    alpn = "public" // Public ALPN for submission
-                )
-            }
+            val result = executeRequestWithPathFallback(
+                primaryUrl = primaryUrl,
+                legacyUrl = legacyUrl,
+                method = "POST",
+                headersJson = JSONObject().apply {
+                    put("content-type", "application/json")
+                }.toString(),
+                body = body,
+                timeoutSecs = DEFAULT_TIMEOUT_SECS,
+                alpn = "public"
+            )
             
             recordRequest()
             
@@ -157,7 +186,7 @@ class SubmissionClient(
                 429 -> throw PoUWError.NetworkError(Exception("Rate limited by server"))
                 in 500..599 -> throw PoUWError.NetworkError(Exception("Server error: $status"))
                 0 -> throw PoUWError.NetworkError(Exception("QUIC error: $error"))
-                else -> throw PoUWError.NetworkError(Exception("HTTP $status"))
+                else -> throw PoUWError.NetworkError(Exception("Response status $status"))
             }
         } catch (e: PoUWError) {
             throw e
@@ -220,6 +249,45 @@ class SubmissionClient(
     private fun buildQuicUrl(path: String): String {
         return "quic://$nodeHost:$nodePort$path"
     }
+
+    private suspend fun executeRequestWithPathFallback(
+        primaryUrl: String,
+        legacyUrl: String,
+        method: String,
+        headersJson: String,
+        body: String,
+        timeoutSecs: Int,
+        alpn: String
+    ): Map<*, *>? {
+        val primary = withContext(Dispatchers.IO) {
+            NativeQuicBridge.request(
+                url = primaryUrl,
+                method = method,
+                headersJson = headersJson,
+                body = body,
+                timeoutSecs = timeoutSecs,
+                insecure = insecure,
+                alpn = alpn
+            )
+        }
+        val primaryStatus = (primary?.get("status") as? Int) ?: 0
+        if (primaryStatus != 404) {
+            return primary
+        }
+
+        Log.w(TAG, "Primary PoUW path returned 404, retrying legacy path")
+        return withContext(Dispatchers.IO) {
+            NativeQuicBridge.request(
+                url = legacyUrl,
+                method = method,
+                headersJson = headersJson,
+                body = body,
+                timeoutSecs = timeoutSecs,
+                insecure = insecure,
+                alpn = alpn
+            )
+        }
+    }
     
     /**
      * Parses the challenge response from the network.
@@ -234,12 +302,27 @@ class SubmissionClient(
     private fun parseChallengeResponse(body: String): ChallengeResponse {
         return try {
             val json = JSONObject(body)
-            val tokenBase64 = json.getString("token")
+            val tokenRaw = (when {
+                json.has("token") -> json.optString("token", "")
+                json.has("challenge") -> json.optString("challenge", "")
+                json.has("data") && json.opt("data") is JSONObject ->
+                    (json.optJSONObject("data")?.optString("token", "")
+                        ?: json.optJSONObject("data")?.optString("challenge", ""))
+                json.has("result") && json.opt("result") is JSONObject ->
+                    (json.optJSONObject("result")?.optString("token", "")
+                        ?: json.optJSONObject("result")?.optString("challenge", ""))
+                else -> ""
+            })?.trim() ?: ""
             val expiresAt = json.optLong("expires_at", System.currentTimeMillis() / 1000 + 300)
-            
-            // Parse the base64-encoded ChallengeToken protobuf
-            val tokenBytes = Base64.decode(tokenBase64, Base64.DEFAULT)
-            val token = parseChallengeToken(tokenBytes)
+
+            if (tokenRaw.isEmpty()) {
+                throw IllegalStateException("Challenge response missing token/challenge field")
+            }
+
+            val token = parseChallengeTokenFlexible(tokenRaw)
+            if (token.challengeNonce.isEmpty()) {
+                throw IllegalStateException("Challenge token contained empty challenge_nonce")
+            }
             
             currentChallengeNonce = token.challengeNonce
             challengeExpirationTime = expiresAt * 1000 // Convert seconds to milliseconds
@@ -258,6 +341,144 @@ class SubmissionClient(
             throw PoUWError.SerializationError()
         }
     }
+
+    private fun parseChallengeTokenFlexible(token: String): ChallengeToken {
+        val trimmed = token.trim()
+        require(trimmed.isNotEmpty()) { "Empty challenge token" }
+
+        // 1) Raw JSON payload.
+        parseChallengeTokenJson(trimmed)?.let { return it }
+
+        // 2) Decode as base64/base64url and parse JSON/protobuf.
+        decodeBase64Maybe(trimmed)?.let { decoded ->
+            parseDecodedTokenPayload(decoded, 0)?.let { return it }
+        }
+
+        // 2b) Decode as hex payload and parse JSON/protobuf.
+        decodeHexMaybe(trimmed)?.let { decoded ->
+            parseDecodedTokenPayload(decoded, 0)?.let { return it }
+        }
+
+        // 3) JWT-like payload: try segment[1] then segment[0].
+        if (trimmed.contains('.')) {
+            val segments = trimmed.split('.')
+            val indexes = intArrayOf(1, 0)
+            for (idx in indexes) {
+                if (idx >= segments.size) continue
+                decodeBase64Maybe(segments[idx])?.let { decoded ->
+                    parseDecodedTokenPayload(decoded, 0)?.let { return it }
+                }
+            }
+        }
+
+        throw IllegalStateException("Unsupported challenge token format")
+    }
+
+    private fun parseDecodedTokenPayload(payload: ByteArray, depth: Int): ChallengeToken? {
+        parseChallengeTokenJson(payload.toString(StandardCharsets.UTF_8))?.let { return it }
+        parseChallengeToken(payload)?.let { return it }
+
+        if (depth < 2) {
+            val innerText = payload.toString(StandardCharsets.UTF_8).trim()
+            if (innerText.isNotEmpty()) {
+                decodeBase64Maybe(innerText)?.let { innerDecoded ->
+                    parseDecodedTokenPayload(innerDecoded, depth + 1)?.let { return it }
+                }
+                decodeHexMaybe(innerText)?.let { innerHex ->
+                    parseDecodedTokenPayload(innerHex, depth + 1)?.let { return it }
+                }
+            }
+        }
+        return null
+    }
+
+    private fun parseChallengeTokenJson(raw: String): ChallengeToken? {
+        return try {
+            val root = JSONObject(raw)
+            val taskRaw = findStringValue(root, setOf("task_id", "taskId"))
+            val nonceRaw = findStringValue(root, setOf("challenge_nonce", "challengeNonce"))
+            val taskId = normalizeIdentifierToBytes(taskRaw ?: return null) ?: return null
+            val challengeNonce = normalizeIdentifierToBytes(nonceRaw ?: return null) ?: return null
+            if (taskId.isEmpty() || challengeNonce.isEmpty()) return null
+
+            val expiresAt = root.optLong("expires_at", 0L)
+            ChallengeToken(
+                taskId = taskId,
+                challengeNonce = challengeNonce,
+                expiresAt = expiresAt,
+                policy = null
+            )
+        } catch (_: Exception) {
+            null
+        }
+    }
+
+    private fun findStringValue(value: Any?, keys: Set<String>): String? {
+        when (value) {
+            is JSONObject -> {
+                val iter = value.keys()
+                while (iter.hasNext()) {
+                    val key = iter.next()
+                    val candidate = value.opt(key)
+                    if (keys.contains(key) && candidate is String) {
+                        return candidate
+                    }
+                }
+                val iter2 = value.keys()
+                while (iter2.hasNext()) {
+                    val key = iter2.next()
+                    val found = findStringValue(value.opt(key), keys)
+                    if (found != null) return found
+                }
+            }
+            is JSONArray -> {
+                for (i in 0 until value.length()) {
+                    val found = findStringValue(value.opt(i), keys)
+                    if (found != null) return found
+                }
+            }
+        }
+        return null
+    }
+
+    private fun normalizeIdentifierToBytes(value: String): ByteArray? {
+        val trimmed = value.trim()
+        if (trimmed.isEmpty()) return null
+        val noPrefix = if (trimmed.startsWith("0x", true)) trimmed.substring(2) else trimmed
+
+        decodeHexMaybe(noPrefix)?.let { return it }
+        decodeBase64Maybe(noPrefix)?.let {
+            if (it.isNotEmpty()) return it
+        }
+        return null
+    }
+
+    private fun decodeBase64Maybe(value: String): ByteArray? {
+        val normalized = normalizeBase64(value.trim())
+        return try {
+            Base64.decode(normalized, Base64.DEFAULT)
+        } catch (_: IllegalArgumentException) {
+            null
+        }
+    }
+
+    private fun decodeHexMaybe(value: String): ByteArray? {
+        val trimmed = value.trim()
+        if (trimmed.isEmpty()) return null
+        val noPrefix = if (trimmed.startsWith("0x", true)) trimmed.substring(2) else trimmed
+        if (noPrefix.length % 2 != 0) return null
+        if (!noPrefix.matches(Regex("^[0-9a-fA-F]+$"))) return null
+        return noPrefix.chunked(2).map { it.toInt(16).toByte() }.toByteArray()
+    }
+
+    private fun normalizeBase64(value: String): String {
+        var normalized = value.replace('-', '+').replace('_', '/')
+        val remainder = normalized.length % 4
+        if (remainder != 0) {
+            normalized += "=".repeat(4 - remainder)
+        }
+        return normalized
+    }
     
     /**
      * Parses a ChallengeToken protobuf from bytes.
@@ -269,7 +490,7 @@ class SubmissionClient(
      * - expires_at: uint64 (field 3)
      * - policy: Policy message (field 4)
      */
-    private fun parseChallengeToken(bytes: ByteArray): ChallengeToken {
+    private fun parseChallengeToken(bytes: ByteArray): ChallengeToken? {
         val input = ByteArrayInputStream(bytes)
         var taskId: ByteArray? = null
         var challengeNonce: ByteArray? = null
@@ -284,37 +505,44 @@ class SubmissionClient(
             val wireType = tag and 0x07
             
             when (fieldNumber) {
-                1 -> { // task_id: bytes
+                3 -> { // task_id: bytes (current server schema)
                     if (wireType == 2) {
                         taskId = readLengthDelimited(input)
                     }
                 }
-                2 -> { // challenge_nonce: bytes
+                4 -> { // challenge_nonce: bytes (current server schema)
                     if (wireType == 2) {
                         challengeNonce = readLengthDelimited(input)
                     }
                 }
-                3 -> { // expires_at: varint
+                5 -> { // expires_at: varint (current server schema)
                     if (wireType == 0) {
                         expiresAt = readVarint(input)
                     }
                 }
-                4 -> { // policy: embedded message
+                6 -> { // policy: embedded message (current server schema)
                     if (wireType == 2) {
                         val policyBytes = readLengthDelimited(input)
                         policy = parsePolicy(policyBytes)
                     }
                 }
+                // Backward compatibility for earlier parser assumptions
+                1 -> if (wireType == 2) taskId = readLengthDelimited(input)
+                2 -> if (wireType == 2) challengeNonce = readLengthDelimited(input)
                 else -> {
                     // Skip unknown field
                     skipField(input, wireType)
                 }
             }
         }
-        
+
+        if (taskId == null || challengeNonce == null || taskId.isEmpty() || challengeNonce.isEmpty()) {
+            return null
+        }
+
         return ChallengeToken(
-            taskId = taskId ?: ByteArray(0),
-            challengeNonce = challengeNonce ?: ByteArray(0),
+            taskId = taskId,
+            challengeNonce = challengeNonce,
             expiresAt = expiresAt,
             policy = policy
         )
@@ -414,36 +642,49 @@ class SubmissionClient(
     private fun parseSubmitResponse(body: String, submittedReceipts: List<ReceiptEntity>): SubmitResponse {
         return try {
             val json = JSONObject(body)
-            val accepted = json.optInt("accepted", submittedReceipts.size)
-            val rejected = json.optInt("rejected", 0)
-            
-            // Calculate accepted/rejected nonces
-            val acceptedNonces = if (accepted >= submittedReceipts.size) {
-                submittedReceipts.map { it.receiptNonce }
-            } else {
-                // If not all accepted, first 'accepted' count are accepted
-                submittedReceipts.take(accepted).map { it.receiptNonce }
+
+            // Explicit success path: numeric accepted/rejected counters.
+            if (json.has("accepted") || json.has("rejected")) {
+                val accepted = json.optInt("accepted", 0).coerceIn(0, submittedReceipts.size)
+                val rejectedDefault = (submittedReceipts.size - accepted).coerceAtLeast(0)
+                val rejected = json.optInt("rejected", rejectedDefault).coerceIn(0, submittedReceipts.size - accepted)
+
+                val acceptedNonces = submittedReceipts.take(accepted).map { it.receiptNonce }
+                val rejectedNonces = submittedReceipts.drop(accepted).take(rejected).map { it.receiptNonce }
+
+                return SubmitResponse(
+                    success = true,
+                    acceptedCount = accepted,
+                    acceptedNonces = acceptedNonces,
+                    rejectedNonces = rejectedNonces
+                )
             }
-            
-            val rejectedNonces = if (rejected > 0) {
-                submittedReceipts.drop(accepted).map { it.receiptNonce }.take(rejected)
-            } else {
-                emptyList()
+
+            // Common rejection shapes from server (e.g., BadSig / Invalid request).
+            val hasError = json.has("error") || json.has("message") || json.has("code")
+            if (hasError) {
+                return SubmitResponse(
+                    success = false,
+                    acceptedCount = 0,
+                    acceptedNonces = emptyList(),
+                    rejectedNonces = submittedReceipts.map { it.receiptNonce }
+                )
             }
-            
+
+            // Unknown body shape - do not treat as accepted.
             SubmitResponse(
-                success = true,
-                acceptedCount = accepted,
-                acceptedNonces = acceptedNonces,
-                rejectedNonces = rejectedNonces
+                success = false,
+                acceptedCount = 0,
+                acceptedNonces = emptyList(),
+                rejectedNonces = submittedReceipts.map { it.receiptNonce }
             )
         } catch (e: Exception) {
-            // If parsing fails but HTTP was 200, assume success
+            // Parse failure should not be treated as acceptance.
             SubmitResponse(
-                success = true,
-                acceptedCount = submittedReceipts.size,
-                acceptedNonces = submittedReceipts.map { it.receiptNonce },
-                rejectedNonces = emptyList()
+                success = false,
+                acceptedCount = 0,
+                acceptedNonces = emptyList(),
+                rejectedNonces = submittedReceipts.map { it.receiptNonce }
             )
         }
     }
@@ -472,7 +713,7 @@ class SubmissionClient(
      *         "receipt_nonce": "hex-16-bytes",
      *         "challenge_nonce": "hex"
      *       },
-     *       "sig_scheme": "ed25519",
+     *       "sig_scheme": "dilithium5",
      *       "signature": "hex"
      *     }
      *   ]
@@ -487,7 +728,9 @@ class SubmissionClient(
                 put("task_id", receipt.taskId.toHex())
                 put("client_did", receipt.clientDid ?: "")
                 put("client_node_id", receipt.clientNodeId.toHex())
-                receipt.providerId?.let { put("provider_id", it.toHex()) }
+                // Server deserializer requires provider_id field presence.
+                // Use empty string when provider is unknown to preserve schema shape.
+                put("provider_id", receipt.providerId?.toHex() ?: "")
                 put("content_id", receipt.contentId.toHex())
                 put("proof_type", receipt.proofType)
                 put("bytes_verified", receipt.bytesVerified)
@@ -496,12 +739,14 @@ class SubmissionClient(
                 put("finished_at", receipt.finishedAt)
                 put("receipt_nonce", receipt.receiptNonce.toHex())
                 put("challenge_nonce", receipt.challengeNonce.toHex())
+                // iOS parity: include aux in receipt payload and signature input.
+                put("aux", "{}")
             }
             
             val receiptObj = JSONObject().apply {
                 put("receipt", receiptInner)
-                put("sig_scheme", receipt.sigScheme)
-                put("signature", receipt.signature.toHex())
+                put("sig_scheme", "dilithium5")
+                put("signature", signReceiptJson(receiptInner))
             }
             receiptsArray.put(receiptObj)
         }
@@ -511,6 +756,15 @@ class SubmissionClient(
             put("client_did", receipts.firstOrNull()?.clientDid ?: "")
             put("receipts", receiptsArray)
         }.toString()
+    }
+
+    /**
+     * Sign the exact receipt JSON that will be sent to the server.
+     * This mirrors iOS behavior and avoids signature mismatch from custom byte encodings.
+     */
+    private fun signReceiptJson(receiptJson: JSONObject): String {
+        val signature = identitySigner.signPoUWReceiptJson(receiptJson.toString())
+        return signature.toHex()
     }
     
     /**

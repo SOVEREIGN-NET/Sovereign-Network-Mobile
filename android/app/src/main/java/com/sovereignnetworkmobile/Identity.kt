@@ -103,6 +103,7 @@ class Identity private constructor(
 
         // ─── JNI: Signing ───
         @JvmStatic private external fun nativeSignMessage(handle: Long, message: ByteArray): ByteArray?
+        @JvmStatic private external fun nativeSignPoUWReceiptJson(handle: Long, receiptJson: String): ByteArray?
         @JvmStatic private external fun nativeSignRegistrationProof(handle: Long, timestamp: Long): ByteArray?
 
         // ─── JNI: Token transactions (returns hex-encoded signed tx) ───
@@ -118,7 +119,7 @@ class Identity private constructor(
 
         @JvmStatic private external fun nativeBuildTokenTransfer(
             handle: Long, tokenId: ByteArray, toPubkey: ByteArray,
-            amount: Long, chainId: Int
+            amount: Long, chainId: Int, nonce: Long
         ): String?
 
         @JvmStatic private external fun nativeBuildTokenBurn(
@@ -127,7 +128,7 @@ class Identity private constructor(
 
         @JvmStatic private external fun nativeBuildSovWalletTransfer(
             handle: Long, fromWalletId: ByteArray, toWalletId: ByteArray,
-            amount: Long, chainId: Int
+            amount: Long, chainId: Int, nonce: Long
         ): String?
 
         // ─── JNI: Domain requests (returns JSON for REST API) ───
@@ -154,7 +155,7 @@ class Identity private constructor(
         fun setFeeConfig(json: String): Pair<Long, Long>? {
             val heights = LongArray(2)
             val ok = nativeSetFeeConfigJsonEx(json, heights)
-            return if (ok == 0) Pair(heights[0], heights[1]) else null
+            return if (ok == 1) Pair(heights[0], heights[1]) else null
         }
 
         fun quoteFeeForTxHex(txHex: String): Long = nativeQuoteFeeForTxHex(txHex)
@@ -187,6 +188,9 @@ class Identity private constructor(
     /** Sign arbitrary message bytes with Dilithium5. Returns detached signature. */
     fun signMessage(message: ByteArray): ByteArray? = nativeSignMessage(handle, message)
 
+    /** Sign PoUW receipt JSON via canonical bincode serialization path in Rust. */
+    fun signPoUWReceiptJson(receiptJson: String): ByteArray? = nativeSignPoUWReceiptJson(handle, receiptJson)
+
     /** Sign registration proof for timestamp. Returns detached signature. */
     fun signRegistrationProof(timestamp: Long): ByteArray? = nativeSignRegistrationProof(handle, timestamp)
 
@@ -198,15 +202,25 @@ class Identity private constructor(
     fun buildTokenMint(tokenId: ByteArray, toPubkey: ByteArray, amount: Long, chainId: Int = 0x02): String? =
         nativeBuildTokenMint(handle, tokenId, toPubkey, amount, chainId)
 
-    fun buildTokenTransfer(tokenId: ByteArray, toPubkey: ByteArray, amount: Long, chainId: Int = 0x02): String? =
-        nativeBuildTokenTransfer(handle, tokenId, toPubkey, amount, chainId)
+    fun buildTokenTransfer(
+        tokenId: ByteArray,
+        toPubkey: ByteArray,
+        amount: Long,
+        chainId: Int = 0x02,
+        nonce: Long = 0L
+    ): String? = nativeBuildTokenTransfer(handle, tokenId, toPubkey, amount, chainId, nonce)
 
     fun buildTokenBurn(tokenId: ByteArray, amount: Long, chainId: Int = 0x02): String? =
         nativeBuildTokenBurn(handle, tokenId, amount, chainId)
 
     /** Build signed SOV wallet-to-wallet transfer. fromWalletId and toWalletId must each be 32 bytes. */
-    fun buildSovWalletTransfer(fromWalletId: ByteArray, toWalletId: ByteArray, amount: Long, chainId: Int = 0x02): String? =
-        nativeBuildSovWalletTransfer(handle, fromWalletId, toWalletId, amount, chainId)
+    fun buildSovWalletTransfer(
+        fromWalletId: ByteArray,
+        toWalletId: ByteArray,
+        amount: Long,
+        chainId: Int = 0x02,
+        nonce: Long = 0L
+    ): String? = nativeBuildSovWalletTransfer(handle, fromWalletId, toWalletId, amount, chainId, nonce)
 
     // ─── Domain requests (returns JSON for REST API) ───
 

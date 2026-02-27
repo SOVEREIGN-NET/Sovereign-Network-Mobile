@@ -49,6 +49,7 @@ class PoUWController(
         private const val DEFAULT_DIFFICULTY = 20 // 20 leading zero bits
         private const val MAX_WORK_TIME_MS = 30_000L // 30 seconds max per work unit
         private const val SUBMISSION_INTERVAL_MS = 5_000L // Submit every 5 seconds
+        private const val AUTO_SUBMIT_ENABLED = false // iOS parity: submit only on explicit flush()
         private const val CLEANUP_INTERVAL_MS = 60 * 60 * 1000L // Cleanup every hour
         private const val MAX_BATCH_SIZE = 100
         
@@ -67,7 +68,11 @@ class PoUWController(
     private val verifierEngine = VerifierEngine
     private val identitySigner: IdentitySigner = IdentitySigner(identity)
     private val receiptStore: ReceiptStore = ReceiptStore.getInstance(context)
-    private val submissionClient: SubmissionClient = SubmissionClient(nodeHost, nodePort)
+    private val submissionClient: SubmissionClient = SubmissionClient(
+        nodeHost = nodeHost,
+        nodePort = nodePort,
+        identitySigner = identitySigner
+    )
     
     // State
     private val _isRunning = AtomicBoolean(false)
@@ -84,6 +89,8 @@ class PoUWController(
         val totalRejected: Long = 0,
         val currentDifficulty: Int = DEFAULT_DIFFICULTY
     )
+
+    data class ChallengeResult(val token: String, val expiresAt: Long)
     
     private val _stats = MutableStateFlow(PoUWStats())
     val stats: StateFlow<PoUWStats> = _stats
@@ -107,16 +114,21 @@ class PoUWController(
             Log.i(TAG, "Starting PoUW controller")
             setInstance(this)
             
-            // Start submission loop
-            submissionJob = coroutineScope.launch {
-                while (isActive && _isRunning.get()) {
-                    try {
-                        processPendingSubmissions()
-                    } catch (e: Exception) {
-                        Log.e(TAG, "Submission loop error: ${e.message}", e)
+            // Optional background submission loop (disabled for iOS parity)
+            if (AUTO_SUBMIT_ENABLED) {
+                submissionJob = coroutineScope.launch {
+                    while (isActive && _isRunning.get()) {
+                        try {
+                            processPendingSubmissions()
+                        } catch (e: Exception) {
+                            Log.e(TAG, "Submission loop error: ${e.message}", e)
+                        }
+                        delay(SUBMISSION_INTERVAL_MS)
                     }
-                    delay(SUBMISSION_INTERVAL_MS)
                 }
+            } else {
+                submissionJob = null
+                Log.i(TAG, "Auto-submit disabled; receipts submit only via flushPending()")
             }
             
             // Start cleanup loop
@@ -187,15 +199,17 @@ class PoUWController(
         val startedAt = System.currentTimeMillis() / 1000 // Convert to seconds
         
         // Solve the challenge (do work)
-        val workerNonce = solveChallenge(challenge) 
+        val workerNonce = solveChallenge(challenge)
             ?: throw PoUWError.VerificationFailed()
         
         // Record finish time
         val finishedAt = System.currentTimeMillis() / 1000 // Convert to seconds
         
         // Create and sign receipt
-        val receiptNonce = verifierEngine.generateRandomNonce(32)
-        val taskId = contentHash.copyOf(32) // Use content hash as task ID
+        // iOS parity: receipt nonce is 16 bytes.
+        val receiptNonce = verifierEngine.generateRandomNonce(16)
+        // iOS/server parity: bind receipt to the challenge task_id, not content hash.
+        val taskId = challenge.taskId ?: throw PoUWError.SerializationError()
         val timestamp = System.currentTimeMillis()
         
         val signature = identitySigner.signReceipt(
@@ -343,8 +357,10 @@ class PoUWController(
             // Use cached challenge if valid
             return SubmissionClient.ChallengeResponse(
                 nonce = nonce,
-                difficulty = DEFAULT_DIFFICULTY,
-                expiresAt = System.currentTimeMillis() + 5 * 60 * 1000
+                difficulty = submissionClient.getCurrentPolicy()?.difficulty ?: DEFAULT_DIFFICULTY,
+                expiresAt = System.currentTimeMillis() + 5 * 60 * 1000,
+                taskId = submissionClient.getCurrentTaskId(),
+                policy = submissionClient.getCurrentPolicy()
             )
         }
         return submissionClient.requestChallenge()
@@ -519,6 +535,16 @@ class PoUWController(
         return joinToString("") { "%02x".format(it) }
     }
     
+    fun setNodeUrl(nodeUrl: String) {
+        submissionClient.setNodeUrl(nodeUrl)
+    }
+
+    suspend fun getChallenge(cap: String?, maxBytes: Long, maxReceipts: Int): ChallengeResult {
+        val response = submissionClient.requestChallenge(cap, maxBytes, maxReceipts)
+        val token = android.util.Base64.encodeToString(response.nonce, android.util.Base64.NO_WRAP)
+        return ChallengeResult(token = token, expiresAt = response.expiresAt)
+    }
+
     /**
      * Cleanup resources.
      */

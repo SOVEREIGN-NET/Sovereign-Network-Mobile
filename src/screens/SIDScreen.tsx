@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useMemo, useState } from 'react';
 import {
   View,
   TouchableOpacity,
@@ -20,52 +20,41 @@ import {
   DrawerItem,
   Badge,
 } from '../components';
-import { useAuth, useAsyncData, useWalletList } from '../hooks';
+import { useAuth, useAsyncData, useUserTokenBalances, useWalletList } from '../hooks';
 import { useTranslation } from '../i18n';
 import { colors, spacing, typography, borderRadius } from '../theme';
 import DomainRegistrationScreen from './DomainRegistrationScreen';
-
-// Wallet type info for display
-const WALLET_DISPLAY: Record<
-  string,
-  { icon: string; color: string; description: string }
-> = {
-  Primary: {
-    icon: '💳',
-    color: colors.primary,
-    description: 'Main spending wallet',
-  },
-  primary: {
-    icon: '💳',
-    color: colors.primary,
-    description: 'Main spending wallet',
-  },
-  UBI: {
-    icon: '🌱',
-    color: colors.success,
-    description: 'Universal Basic Income',
-  },
-  ubi: {
-    icon: '🌱',
-    color: colors.success,
-    description: 'Universal Basic Income',
-  },
-  Savings: {
-    icon: '🏦',
-    color: colors.warning,
-    description: 'Long-term savings',
-  },
-  savings: {
-    icon: '🏦',
-    color: colors.warning,
-    description: 'Long-term savings',
-  },
-};
+import appService, {
+  WalletTransaction,
+  WalletTransactionsResponse,
+} from '../services/AppService';
+import { QuicError } from '../types/api';
+import { atomicToHuman } from '../utils/tokenUnits';
 
 // Format large numbers with commas
 const formatBalance = (balance: number): string => {
   return balance.toLocaleString('en-US', { maximumFractionDigits: 2 });
 };
+
+const shortMiddle = (value: string | null | undefined, head = 8, tail = 6) => {
+  if (!value) return '-';
+  if (value.length <= head + tail + 1) return value;
+  return `${value.slice(0, head)}...${value.slice(-tail)}`;
+};
+
+const formatTxValue = (value: number): string => {
+  if (!Number.isFinite(value)) return '0';
+  const abs = Math.abs(value);
+  const looksAtomic = Number.isInteger(value) && abs >= 100_000;
+  const normalized = looksAtomic ? atomicToHuman(value) : value;
+  return normalized.toLocaleString('en-US', {
+    minimumFractionDigits: 0,
+    maximumFractionDigits: 8,
+  });
+};
+
+const FIXED_TAB_PANEL_HEIGHT = 320;
+const CORE_SYMBOLS = new Set(['SOV', 'UBI', 'SAVINGS']);
 
 const SIDScreen = ({ navigation }: any) => {
   const { t } = useTranslation();
@@ -77,10 +66,88 @@ const SIDScreen = ({ navigation }: any) => {
     loading: walletsLoading,
     refresh,
   } = useWalletList();
+  const {
+    tokens,
+    loading: tokensLoading,
+    refresh: refreshTokens,
+  } = useUserTokenBalances();
   const [drawerVisible, setDrawerVisible] = useState(false);
-  const [activeWalletTab, setActiveWalletTab] = useState('Tokens');
+  const [activeWalletTab, setActiveWalletTab] = useState('Activity');
   const [domainRegistrationModalVisible, setDomainRegistrationModalVisible] =
     useState(false);
+  const [selectedActivityTx, setSelectedActivityTx] =
+    useState<WalletTransaction | null>(null);
+
+  const identityHex = useMemo(() => {
+    const did = currentIdentity?.did;
+    if (!did) return '';
+    if (did.startsWith('did:zhtp:')) return did.substring('did:zhtp:'.length);
+    return did;
+  }, [currentIdentity?.did]);
+
+  const customOwnedTokens = useMemo(
+    () =>
+      tokens.filter(token => {
+        const symbol = (token.symbol || '').toUpperCase();
+        const name = (token.name || '').toUpperCase();
+        return !CORE_SYMBOLS.has(symbol) && !CORE_SYMBOLS.has(name);
+      }),
+    [tokens],
+  );
+
+  const {
+    data: activityData,
+    loading: activityLoading,
+    retry: refreshActivity,
+  } = useAsyncData<WalletTransactionsResponse>(
+    async () => {
+      if (!identityHex || identityHex.length !== 64) {
+        return {
+          identity_id: identityHex,
+          total_transactions: 0,
+          transactions: [],
+          status: 'identity_not_found',
+        };
+      }
+      try {
+        const data = await appService.getWalletTransactions(identityHex);
+        return {
+          ...data,
+          transactions: [...(data.transactions || [])].sort(
+            (a, b) => (b.timestamp || 0) - (a.timestamp || 0),
+          ),
+        };
+      } catch (error) {
+        if (
+          error instanceof QuicError &&
+          error.status === 400 &&
+          String(error.body || '').includes('Identity ID must be 32 bytes')
+        ) {
+          return {
+            identity_id: identityHex,
+            total_transactions: 0,
+            transactions: [],
+            status: 'identity_not_found',
+          };
+        }
+        if (error instanceof QuicError && error.status === 404) {
+          return {
+            identity_id: identityHex,
+            total_transactions: 0,
+            transactions: [],
+            status: 'identity_not_found',
+          };
+        }
+        throw error;
+      }
+    },
+    [identityHex],
+    {
+      identity_id: identityHex,
+      total_transactions: 0,
+      transactions: [],
+    },
+  );
 
   React.useEffect(() => {
     console.log('[SIDScreen] 💰 Wallet data updated:', {
@@ -97,7 +164,9 @@ const SIDScreen = ({ navigation }: any) => {
   useFocusEffect(
     React.useCallback(() => {
       refresh();
-    }, [refresh]),
+      refreshTokens();
+      refreshActivity();
+    }, [refresh, refreshTokens, refreshActivity]),
   );
 
   // UBI data from identity
@@ -170,6 +239,7 @@ const SIDScreen = ({ navigation }: any) => {
         <HeaderBar
           onMenuPress={() => setDrawerVisible(true)}
           onBalancePress={() => navigation.navigate('PoUW')}
+          showHamburger={false}
         />
 
         <SideDrawer
@@ -297,6 +367,7 @@ const SIDScreen = ({ navigation }: any) => {
       <HeaderBar
         onMenuPress={() => setDrawerVisible(true)}
         onBalancePress={() => navigation.navigate('PoUW')}
+        showHamburger={false}
       />
 
       <SideDrawer
@@ -307,7 +378,10 @@ const SIDScreen = ({ navigation }: any) => {
       />
 
       <ScreenLayout paddingTop={spacing.md}>
-        <ScrollView showsVerticalScrollIndicator={false}>
+        <ScrollView
+          showsVerticalScrollIndicator={false}
+          nestedScrollEnabled
+        >
           <Column gap="sm" style={{ paddingBottom: spacing.xl }}>
             {/* WALLET SECTION */}
             <View
@@ -605,148 +679,317 @@ const SIDScreen = ({ navigation }: any) => {
               </TouchableOpacity>
             </View>
 
-            {/* Wallet Tokens Tab - Always show skeleton, populate when data arrives */}
-            {activeWalletTab === 'Tokens' && (
-              <View
-                style={{
-                  paddingHorizontal: spacing.sm,
-                  marginBottom: spacing.xs,
-                }}
-              >
-                <Column gap="xs">
-                  {(['Primary', 'UBI', 'Savings'] as const).map(walletType => {
-                    const display = WALLET_DISPLAY[walletType];
-                    const wallet = wallets.find(
-                      (w: any) =>
-                        w.wallet_type === walletType ||
-                        w.wallet_type?.toLowerCase() ===
-                          walletType.toLowerCase(),
-                    );
-                    const hasData = !!wallet;
-
-                    return (
-                      <TouchableOpacity key={walletType} activeOpacity={0.7}>
-                        <Card
-                          style={{
-                            marginHorizontal: 0,
-                            opacity: hasData ? 1 : 0.6,
-                          }}
-                        >
-                          <View
-                            style={{
-                              paddingHorizontal: spacing.md,
-                              paddingVertical: spacing.sm,
-                            }}
-                          >
-                            <Row
-                              style={{
-                                justifyContent: 'space-between',
-                                alignItems: 'center',
-                              }}
-                            >
-                              <Text
-                                style={{
-                                  fontSize: typography.size.base,
-                                  fontWeight: typography.weight.semibold,
-                                  color: colors.text_primary,
-                                }}
-                              >
-                                {walletType} Wallet
-                              </Text>
-                              <Text
-                                style={{
-                                  fontSize: typography.size.lg,
-                                  fontWeight: typography.weight.bold,
-                                  color: display.color,
-                                }}
-                              >
-                                {hasData
-                                  ? formatBalance(wallet.total_balance || 0)
-                                  : '—'}
-                              </Text>
-                            </Row>
-                            <Row
-                              style={{
-                                justifyContent: 'space-between',
-                                alignItems: 'center',
-                                marginTop: spacing.xs,
-                              }}
-                            >
-                              <Text
-                                style={{
-                                  fontSize: typography.size.xs,
-                                  color: colors.text_secondary,
-                                }}
-                              >
-                                {display.description}
-                              </Text>
-                              <Text
-                                style={{
-                                  fontSize: typography.size.xs,
-                                  color: colors.text_tertiary,
-                                }}
-                              >
-                                SOV
-                              </Text>
-                            </Row>
-                          </View>
-                        </Card>
-                      </TouchableOpacity>
-                    );
-                  })}
-                </Column>
-              </View>
-            )}
-
-            {/* Wallet Bottom Tab Bar */}
+            {/* Tabbed Wallet Content (fixed height, internal scroll) */}
             <View
               style={{
                 marginHorizontal: spacing.sm,
-                marginTop: 0,
-                flexDirection: 'row',
-                gap: spacing.md,
                 backgroundColor: colors.bg_darker,
                 borderRadius: borderRadius.lg,
-                paddingVertical: spacing.md,
-                paddingHorizontal: spacing.md,
+                borderWidth: 1,
+                borderColor: colors.border,
+                overflow: 'hidden',
               }}
             >
-              {[
-                { id: 'Tokens', label: t.wallet.tabs.tokens },
-                { id: 'NFTs', label: t.wallet.tabs.nfts },
-                { id: 'Activity', label: t.wallet.tabs.activity },
-              ].map(tabItem => (
-                <TouchableOpacity
-                  key={tabItem.id}
-                  onPress={() => setActiveWalletTab(tabItem.id)}
-                  style={{
-                    flex: 1,
-                    alignItems: 'center',
-                    paddingVertical: spacing.md,
-                    borderRadius: borderRadius.base,
-                    backgroundColor:
-                      activeWalletTab === tabItem.id
-                        ? colors.bg_medium
-                        : 'transparent',
-                  }}
-                >
-                  <Text
+              <View
+                style={{
+                  flexDirection: 'row',
+                  gap: spacing.md,
+                  paddingHorizontal: spacing.md,
+                  paddingTop: spacing.md,
+                  paddingBottom: spacing.sm,
+                }}
+              >
+                {[
+                  { id: 'Tokens', label: t.wallet.tabs.tokens },
+                  { id: 'NFTs', label: t.wallet.tabs.nfts },
+                  { id: 'Activity', label: t.wallet.tabs.activity },
+                ].map(tabItem => (
+                  <TouchableOpacity
+                    key={tabItem.id}
+                    onPress={() => setActiveWalletTab(tabItem.id)}
                     style={{
-                      fontSize: typography.size.xs,
-                      color:
+                      flex: 1,
+                      alignItems: 'center',
+                      paddingVertical: spacing.sm,
+                      borderRadius: borderRadius.base,
+                      backgroundColor:
                         activeWalletTab === tabItem.id
-                          ? colors.primary
-                          : colors.text_secondary,
-                      fontWeight:
-                        activeWalletTab === tabItem.id
-                          ? typography.weight.semibold
-                          : typography.weight.normal,
+                          ? colors.bg_medium
+                          : 'transparent',
                     }}
                   >
-                    {tabItem.label}
-                  </Text>
-                </TouchableOpacity>
-              ))}
+                    <Text
+                      style={{
+                        fontSize: typography.size.xs,
+                        color:
+                          activeWalletTab === tabItem.id
+                            ? colors.primary
+                            : colors.text_secondary,
+                        fontWeight:
+                          activeWalletTab === tabItem.id
+                            ? typography.weight.semibold
+                            : typography.weight.normal,
+                      }}
+                    >
+                      {tabItem.label}
+                    </Text>
+                  </TouchableOpacity>
+                ))}
+              </View>
+
+              <View
+                style={{
+                  height: FIXED_TAB_PANEL_HEIGHT,
+                  paddingHorizontal: spacing.md,
+                  paddingBottom: spacing.md,
+                }}
+              >
+                {activeWalletTab === 'Tokens' && (
+                  <>
+                    {tokensLoading ? (
+                      <View
+                        style={{
+                          flex: 1,
+                          justifyContent: 'center',
+                          alignItems: 'center',
+                        }}
+                      >
+                        <Text style={{ color: colors.text_secondary }}>
+                          Loading tokens...
+                        </Text>
+                      </View>
+                    ) : customOwnedTokens.length === 0 ? (
+                      <View
+                        style={{
+                          flex: 1,
+                          justifyContent: 'center',
+                          alignItems: 'center',
+                        }}
+                      >
+                        <Text style={{ color: colors.text_secondary }}>
+                          No tokens available
+                        </Text>
+                      </View>
+                    ) : (
+                      <ScrollView
+                        style={{ flex: 1 }}
+                        showsVerticalScrollIndicator
+                        nestedScrollEnabled
+                        contentContainerStyle={{ gap: spacing.sm }}
+                      >
+                        {customOwnedTokens.map(token => (
+                          <Card key={token.token_id} style={{ marginHorizontal: 0 }}>
+                            <View
+                              style={{
+                                paddingHorizontal: spacing.md,
+                                paddingVertical: spacing.sm,
+                              }}
+                            >
+                              <Row
+                                style={{
+                                  justifyContent: 'space-between',
+                                  alignItems: 'center',
+                                }}
+                              >
+                                <View style={{ flex: 1, paddingRight: spacing.sm }}>
+                                  <Text
+                                    style={{
+                                      fontSize: typography.size.base,
+                                      fontWeight: typography.weight.semibold,
+                                      color: colors.text_primary,
+                                    }}
+                                  >
+                                    {token.symbol}
+                                  </Text>
+                                  <Text
+                                    numberOfLines={1}
+                                    style={{
+                                      fontSize: typography.size.xs,
+                                      color: colors.text_secondary,
+                                    }}
+                                  >
+                                    {token.name || token.token_id}
+                                  </Text>
+                                </View>
+                                <Text
+                                  style={{
+                                    fontSize: typography.size.base,
+                                    fontWeight: typography.weight.bold,
+                                    color: colors.text_primary,
+                                  }}
+                                >
+                                  {formatBalance(token.balance)}
+                                </Text>
+                              </Row>
+                            </View>
+                          </Card>
+                        ))}
+                      </ScrollView>
+                    )}
+                  </>
+                )}
+
+                {activeWalletTab === 'NFTs' && (
+                  <View
+                    style={{
+                      flex: 1,
+                      justifyContent: 'center',
+                      alignItems: 'center',
+                    }}
+                  >
+                    <Text style={{ color: colors.text_secondary }}>
+                      No NFTs available
+                    </Text>
+                  </View>
+                )}
+
+                {activeWalletTab === 'Activity' && (
+                  <>
+                    {activityLoading ? (
+                      <View
+                        style={{
+                          flex: 1,
+                          justifyContent: 'center',
+                          alignItems: 'center',
+                        }}
+                      >
+                        <Text style={{ color: colors.text_secondary }}>
+                          Loading activity...
+                        </Text>
+                      </View>
+                    ) : !activityData?.transactions?.length ? (
+                      <View
+                        style={{
+                          flex: 1,
+                          justifyContent: 'center',
+                          alignItems: 'center',
+                        }}
+                      >
+                        <Text style={{ color: colors.text_secondary }}>
+                          No activity available
+                        </Text>
+                      </View>
+                    ) : (
+                      <ScrollView
+                        style={{ flex: 1 }}
+                        showsVerticalScrollIndicator
+                        nestedScrollEnabled
+                      >
+                        {activityData.transactions.map((tx: WalletTransaction, index: number) => {
+                          const isPending = tx.status === 'pending';
+                          const statusBg = isPending
+                            ? `${colors.warning}22`
+                            : `${colors.success}22`;
+                          const statusColor = isPending
+                            ? colors.warning
+                            : colors.success;
+                          return (
+                            <TouchableOpacity
+                              key={tx.tx_hash}
+                              activeOpacity={0.75}
+                              onPress={() => setSelectedActivityTx(tx)}
+                              style={{
+                                backgroundColor:
+                                  index % 2 === 0 ? colors.bg_darker : colors.bg_dark,
+                                borderBottomWidth:
+                                  index === activityData.transactions.length - 1 ? 0 : 1,
+                                borderBottomColor: colors.border,
+                              }}
+                            >
+                              <View
+                                style={{
+                                  paddingHorizontal: spacing.md,
+                                  paddingVertical: spacing.sm,
+                                  gap: spacing.xs,
+                                }}
+                              >
+                                <Row
+                                  style={{
+                                    justifyContent: 'space-between',
+                                    alignItems: 'center',
+                                  }}
+                                >
+                                  <Text
+                                    style={{
+                                      fontSize: typography.size.xs,
+                                      fontWeight: typography.weight.semibold,
+                                      color: colors.text_primary,
+                                    }}
+                                  >
+                                    {tx.tx_type}
+                                  </Text>
+                                  <View
+                                    style={{
+                                      borderRadius: borderRadius.full,
+                                      backgroundColor: statusBg,
+                                      paddingHorizontal: 6,
+                                      paddingVertical: 1,
+                                    }}
+                                  >
+                                    <Text
+                                      style={{
+                                        fontSize: 10,
+                                        color: statusColor,
+                                        fontWeight: typography.weight.semibold,
+                                      }}
+                                    >
+                                      {tx.status}
+                                    </Text>
+                                  </View>
+                                </Row>
+                                <Row
+                                  style={{
+                                    justifyContent: 'space-between',
+                                    alignItems: 'center',
+                                  }}
+                                >
+                                  <Text
+                                    style={{
+                                      fontSize: 11,
+                                      color: colors.text_secondary,
+                                    }}
+                                  >
+                                    {new Date((tx.timestamp || 0) * 1000).toLocaleString()}
+                                  </Text>
+                                  <Text
+                                    style={{
+                                      fontSize: typography.size.xs,
+                                      fontWeight: typography.weight.semibold,
+                                      color: colors.text_primary,
+                                    }}
+                                  >
+                                    {formatTxValue(Number(tx.amount || 0))}
+                                  </Text>
+                                </Row>
+                                <Text
+                                  style={{
+                                    fontSize: 10,
+                                    color: colors.text_secondary,
+                                  }}
+                                >
+                                  Fee {formatTxValue(Number(tx.fee || 0))}
+                                  {'  '}
+                                  From {shortMiddle(tx.from_wallet)}
+                                </Text>
+                                <Text
+                                  numberOfLines={1}
+                                  style={{
+                                    fontSize: 10,
+                                    color: colors.text_tertiary,
+                                    marginTop: 2,
+                                  }}
+                                >
+                                  To {shortMiddle(tx.to_address)}
+                                </Text>
+                              </View>
+                            </TouchableOpacity>
+                          );
+                        })}
+                      </ScrollView>
+                    )}
+                  </>
+                )}
+              </View>
             </View>
 
             {/* UBI Status Card */}
@@ -822,6 +1065,109 @@ const SIDScreen = ({ navigation }: any) => {
           <DomainRegistrationScreen
             onClose={() => setDomainRegistrationModalVisible(false)}
           />
+        </View>
+      </Modal>
+
+      <Modal
+        visible={!!selectedActivityTx}
+        animationType="slide"
+        transparent
+        onRequestClose={() => setSelectedActivityTx(null)}
+      >
+        <View
+          style={{
+            flex: 1,
+            backgroundColor: 'rgba(0,0,0,0.45)',
+            justifyContent: 'center',
+            padding: spacing.md,
+          }}
+        >
+          <View
+            style={{
+              backgroundColor: colors.bg_dark,
+              borderRadius: borderRadius.lg,
+              borderWidth: 1,
+              borderColor: colors.border,
+              padding: spacing.md,
+              gap: spacing.sm,
+            }}
+          >
+            <Text
+              style={{
+                fontSize: typography.size.lg,
+                fontWeight: typography.weight.semibold,
+                color: colors.text_primary,
+              }}
+            >
+              Transaction Details
+            </Text>
+            <Text style={{ color: colors.text_secondary, fontSize: typography.size.xs }}>
+              Type: {selectedActivityTx?.tx_type || '-'}
+            </Text>
+            <Text style={{ color: colors.text_secondary, fontSize: typography.size.xs }}>
+              Status: {selectedActivityTx?.status || '-'}
+            </Text>
+            <Text style={{ color: colors.text_secondary, fontSize: typography.size.xs }}>
+              Amount: {formatTxValue(Number(selectedActivityTx?.amount || 0))}
+            </Text>
+            <Text style={{ color: colors.text_secondary, fontSize: typography.size.xs }}>
+              Fee: {formatTxValue(Number(selectedActivityTx?.fee || 0))}
+            </Text>
+            <Text style={{ color: colors.text_secondary, fontSize: typography.size.xs }}>
+              From: {selectedActivityTx?.from_wallet || '-'}
+            </Text>
+            <Text style={{ color: colors.text_secondary, fontSize: typography.size.xs }}>
+              To: {selectedActivityTx?.to_address || '-'}
+            </Text>
+            <Text
+              selectable
+              style={{
+                color: colors.text_primary,
+                fontSize: typography.size.xs,
+                fontFamily: 'Courier',
+              }}
+            >
+              Hash: {selectedActivityTx?.tx_hash || '-'}
+            </Text>
+
+            <Row style={{ gap: spacing.sm, marginTop: spacing.sm }}>
+              <TouchableOpacity
+                style={{
+                  flex: 1,
+                  paddingVertical: spacing.sm,
+                  borderRadius: borderRadius.base,
+                  borderWidth: 1,
+                  borderColor: colors.border,
+                  alignItems: 'center',
+                }}
+                onPress={() => setSelectedActivityTx(null)}
+              >
+                <Text style={{ color: colors.text_secondary }}>Close</Text>
+              </TouchableOpacity>
+              <TouchableOpacity
+                style={{
+                  flex: 1,
+                  paddingVertical: spacing.sm,
+                  borderRadius: borderRadius.base,
+                  backgroundColor: colors.primary,
+                  alignItems: 'center',
+                }}
+                onPress={() => {
+                  const hash = selectedActivityTx?.tx_hash;
+                  setSelectedActivityTx(null);
+                  if (!hash) return;
+                  navigation.navigate('DashboardTab', {
+                    screen: 'ExplorerSearch',
+                    params: { query: hash },
+                  });
+                }}
+              >
+                <Text style={{ color: colors.bg_darkest, fontWeight: typography.weight.semibold }}>
+                  Open in Explorer
+                </Text>
+              </TouchableOpacity>
+            </Row>
+          </View>
         </View>
       </Modal>
     </View>

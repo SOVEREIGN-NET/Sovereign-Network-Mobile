@@ -114,23 +114,6 @@ const DashboardStack = () => {
         component={SearchScreen}
         options={{ headerShown: false }}
       />
-      {/* Auth screens - available without identity */}
-      <Stack.Screen
-        name="SignIn"
-        component={SignInScreen as any}
-        options={{
-          headerShown: false,
-          presentation: 'modal',
-        }}
-      />
-      <Stack.Screen
-        name="CreateIdentity"
-        component={CreateIdentityScreen as any}
-        options={{
-          headerShown: false,
-          presentation: 'modal',
-        }}
-      />
     </Stack.Navigator>
   );
 };
@@ -167,7 +150,7 @@ const SIDStack = () => {
         component={SendTokensScreen}
         options={{
           headerShown: true,
-          title: 'Send SOV',
+          title: 'Send Token',
           headerBackTitle: '',
           headerStyle: { backgroundColor: colors.bg_dark },
           headerTintColor: colors.text_primary,
@@ -220,27 +203,57 @@ const SIDStack = () => {
       <Stack.Screen
         name="ProfileEdit"
         component={ProfileEditScreen}
-        options={{ title: 'Edit Profile', headerBackTitle: 'Back' }}
+        options={{
+          headerShown: true,
+          title: 'Edit Profile',
+          headerBackTitle: '',
+          headerStyle: { backgroundColor: colors.bg_dark },
+          headerTintColor: colors.text_primary,
+        }}
       />
       <Stack.Screen
         name="IdentitySettings"
         component={IdentitySettingsScreen}
-        options={{ title: 'Identity Settings', headerBackTitle: 'Back' }}
+        options={{
+          headerShown: true,
+          title: 'Identity Settings',
+          headerBackTitle: '',
+          headerStyle: { backgroundColor: colors.bg_dark },
+          headerTintColor: colors.text_primary,
+        }}
       />
       <Stack.Screen
         name="AppSettings"
         component={SettingsScreen}
-        options={{ title: 'App Settings', headerBackTitle: 'Back' }}
+        options={{
+          headerShown: true,
+          title: 'App Settings',
+          headerBackTitle: '',
+          headerStyle: { backgroundColor: colors.bg_dark },
+          headerTintColor: colors.text_primary,
+        }}
       />
       <Stack.Screen
         name="BackupIdentity"
         component={BackupIdentityScreen as any}
-        options={{ title: 'Backup Identity', headerBackTitle: 'Back' }}
+        options={{
+          headerShown: true,
+          title: 'Backup Identity',
+          headerBackTitle: '',
+          headerStyle: { backgroundColor: colors.bg_dark },
+          headerTintColor: colors.text_primary,
+        }}
       />
       <Stack.Screen
         name="BiometricVerification"
         component={BiometricVerificationScreen as any}
-        options={{ title: 'Biometric Authentication', headerBackTitle: 'Back' }}
+        options={{
+          headerShown: true,
+          title: 'Biometric Authentication',
+          headerBackTitle: '',
+          headerStyle: { backgroundColor: colors.bg_dark },
+          headerTintColor: colors.text_primary,
+        }}
       />
       <Stack.Screen
         name="Profile"
@@ -297,8 +310,11 @@ const SIDStack = () => {
         name="MyDomains"
         component={MyDomainsScreen}
         options={{
-          headerShown: false,
+          headerShown: true,
           title: 'My Domains',
+          headerBackTitle: '',
+          headerStyle: { backgroundColor: colors.bg_dark },
+          headerTintColor: colors.text_primary,
           presentation: 'modal',
           animation: 'slide_from_bottom',
         }}
@@ -307,8 +323,11 @@ const SIDStack = () => {
         name="DomainDetail"
         component={DomainDetailScreen}
         options={{
-          headerShown: false,
+          headerShown: true,
           title: 'Domain Details',
+          headerBackTitle: '',
+          headerStyle: { backgroundColor: colors.bg_dark },
+          headerTintColor: colors.text_primary,
         }}
       />
       <Stack.Screen
@@ -442,61 +461,106 @@ const VoteIcon = ({ color }: { color: string }) => (
   </View>
 );
 
+const AuthStack = () => {
+  return (
+    <Stack.Navigator
+      screenOptions={{
+        headerShown: false,
+      }}
+    >
+      <Stack.Screen
+        name="SignIn"
+        component={SignInScreen as any}
+        options={{
+          headerShown: false,
+          presentation: 'modal',
+        }}
+      />
+      <Stack.Screen
+        name="CreateIdentity"
+        component={CreateIdentityScreen as any}
+        options={{
+          headerShown: false,
+          presentation: 'modal',
+        }}
+      />
+    </Stack.Navigator>
+  );
+};
+
 const RootNavigator = () => {
   const scheme = useColorScheme();
   const navTheme = scheme === 'dark' ? DarkTheme : DefaultTheme;
 
   return (
     <NavigationContainer theme={navTheme}>
-      <Tab.Navigator
-        screenOptions={
+      <Stack.Navigator screenOptions={{ headerShown: false }}>
+        <Stack.Screen name="MainTabs" component={MainTabs} />
+        <Stack.Screen
+          name="SignIn"
+          component={SignInScreen as any}
+          options={{ presentation: 'modal' }}
+        />
+        <Stack.Screen
+          name="CreateIdentity"
+          component={CreateIdentityScreen as any}
+          options={{ presentation: 'modal' }}
+        />
+      </Stack.Navigator>
+    </NavigationContainer>
+  );
+};
+
+const MainTabs = () => {
+  return (
+    <Tab.Navigator
+      screenOptions={
+        {
+          headerShown: false,
+          tabBarStyle: {
+            backgroundColor: colors.bg_dark,
+            borderTopColor: colors.border,
+          },
+          tabBarActiveTintColor: colors.primary,
+          tabBarInactiveTintColor: colors.text_secondary,
+        } as any
+      }
+    >
+      <Tab.Screen
+        name="DashboardTab"
+        component={DashboardStack}
+        options={
           {
-            headerShown: false,
-            tabBarStyle: {
-              backgroundColor: colors.bg_dark,
-              borderTopColor: colors.border,
-            },
-            tabBarActiveTintColor: colors.primary,
-            tabBarInactiveTintColor: colors.text_secondary,
+            title: 'Dashboard',
+            tabBarLabel: 'Dashboard',
+            tabBarIcon: HomeIcon,
           } as any
         }
-      >
-        <Tab.Screen
-          name="DashboardTab"
-          component={DashboardStack}
-          options={
-            {
-              title: 'Dashboard',
-              tabBarLabel: 'Dashboard',
-              tabBarIcon: HomeIcon,
-            } as any
-          }
-        />
-        <Tab.Screen
-          name="DAOTab"
-          component={DAOStack}
-          options={
-            {
-              title: 'DAO',
-              tabBarLabel: 'DAO',
-              tabBarIcon: VoteIcon,
-            } as any
-          }
-        />
-        <Tab.Screen
-          name="SIDTab"
-          component={SIDStack}
-          options={
-            {
-              title: 'SID',
-              tabBarLabel: 'SID',
-              tabBarIcon: BriefcaseIcon,
-              unmountOnBlur: true,
-            } as any
-          }
-        />
-      </Tab.Navigator>
-    </NavigationContainer>
+      />
+      <Tab.Screen
+        name="DAOTab"
+        component={DAOStack}
+        options={
+          {
+            title: 'DAO',
+            tabBarLabel: 'DAO',
+            tabBarIcon: VoteIcon,
+          } as any
+        }
+      />
+      <Tab.Screen
+        name="SIDTab"
+        component={SIDStack}
+        options={
+          {
+            title: 'SID',
+            tabBarLabel: 'SID',
+            tabBarIcon: BriefcaseIcon,
+            unmountOnBlur: true,
+          } as any
+        }
+      />
+    </Tab.Navigator>
   );
 };
 

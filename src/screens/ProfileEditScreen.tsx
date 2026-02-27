@@ -34,26 +34,30 @@ const ProfileEditScreen = ({ navigation }: any) => {
 
   const handleSave = async () => {
     setError(null);
+    const lockedDisplayName = (
+      currentIdentity?.displayName ||
+      displayName
+    ).trim();
 
-    // Validation
-    if (!displayName.trim()) {
+    // Validation (display name is locked, but still required for payload)
+    if (!lockedDisplayName) {
       setError(t.identity.profile.validation.displayNameRequired);
       return;
     }
 
-    if (displayName.trim().length < 2) {
+    if (lockedDisplayName.length < 2) {
       setError(t.identity.profile.validation.displayNameTooShort);
       return;
     }
 
-    if (displayName.trim().length > 50) {
+    if (lockedDisplayName.length > 50) {
       setError(t.identity.profile.validation.displayNameTooLong);
       return;
     }
 
     setIsSaving(true);
     try {
-      await updateProfile(displayName.trim(), selectedAvatar);
+      await updateProfile(lockedDisplayName, selectedAvatar);
       Alert.alert('Success', t.identity.profile.success.profileUpdated);
       navigation?.goBack();
     } catch (err: any) {
@@ -145,45 +149,12 @@ const ProfileEditScreen = ({ navigation }: any) => {
             placeholder={t.identity.profile.displayNamePlaceholder}
             value={displayName}
             onChangeText={setDisplayName}
-            editable={!isLoading && !isSaving}
+            editable={false}
             maxLength={50}
-            helperText={t.identity.profile.characterCounter.replace('{current}', displayName.length.toString())}
+            helperText="Display name cannot be edited."
             containerStyle={{ marginBottom: 0 }}
           />
         </Card>
-
-          {/* Info Card */}
-          <Card>
-            <View
-              style={{
-                backgroundColor: colors.bg_darker,
-                padding: spacing.md,
-                borderRadius: borderRadius.base,
-                borderLeftWidth: 4,
-                borderLeftColor: colors.info,
-              }}
-            >
-              <Text
-                style={{
-                  fontSize: typography.size.xs,
-                  fontWeight: typography.weight.semibold,
-                  color: colors.info,
-                  marginBottom: spacing.sm,
-                }}
-              >
-                {t.identity.profile.info.title}
-              </Text>
-              <Text
-                style={{
-                  fontSize: typography.size.xs,
-                  color: colors.text_secondary,
-                  lineHeight: typography.size.sm * 1.5,
-                }}
-              >
-                {t.identity.profile.info.description}
-              </Text>
-            </View>
-          </Card>
 
         {/* Action Buttons - use ActionFooter import */}
         <Button

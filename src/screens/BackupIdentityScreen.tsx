@@ -4,7 +4,7 @@
  */
 
 import React, { useState, useCallback } from 'react';
-import { View, Pressable, Share, Alert } from 'react-native';
+import { View, Pressable, Share, Alert, Platform } from 'react-native';
 import { NativeStackScreenProps } from '@react-navigation/native-stack';
 import {
   Card,
@@ -24,6 +24,7 @@ import { useTranslation } from '../i18n';
 import { colors, spacing, borderRadius, typography } from '../theme';
 import type { IdentityStackParamList } from '../types/navigation';
 import { maskIdentifier } from '../utils/maskIdentifier';
+import { nativeIdentityProvisioning } from '../services/NativeIdentityProvisioning';
 
 type BackupIdentityScreenProps = NativeStackScreenProps<
   IdentityStackParamList,
@@ -45,6 +46,8 @@ const BackupIdentityScreen = ({ navigation }: BackupIdentityScreenProps) => {
   const [showPassword, setShowPassword] = useState(false);
   const [creating, setCreating] = useState(false);
   const [backupError, setBackupError] = useState<string | null>(null);
+  const [backupFileUri, setBackupFileUri] = useState<string | null>(null);
+  const [backupFilePath, setBackupFilePath] = useState<string | null>(null);
 
   const [seedPhrase, setSeedPhrase] = useState<string>('');
 
@@ -108,13 +111,31 @@ const BackupIdentityScreen = ({ navigation }: BackupIdentityScreenProps) => {
     setCreating(true);
 
     try {
-      // In production, this would call RealAuthService.exportBackup()
-      // For now, we simulate it since exportBackup is an async operation
-      // that would be called via the auth service
-      console.log('✅ Backup file created for identity:', maskIdentifier(currentIdentity.did));
+      const identityLookup = currentIdentity.identityId || currentIdentity.did;
+      const did = currentIdentity.did.trim();
+      const normalizedDid = did.startsWith('did:zhtp:') ? did.substring('did:zhtp:'.length) : did;
 
-      // Simulate backup creation
-      await new Promise((resolve) => setTimeout(resolve, 1000));
+      const keystoreBase64 =
+        await nativeIdentityProvisioning.exportKeystoreBase64(identityLookup);
+      const backupPayload = {
+        version: 1,
+        type: 'zhtp_identity_backup',
+        created_at: new Date().toISOString(),
+        did,
+        identity_id: currentIdentity.identityId || normalizedDid,
+        keystore_base64: keystoreBase64,
+      };
+      const serialized = JSON.stringify(backupPayload, null, 2);
+
+      const fileName = `sov-identity-backup-${normalizedDid.slice(0, 12)}-${Date.now()}.zkdid.json`;
+      const fileResult = await nativeIdentityProvisioning.createBackupFile(
+        fileName,
+        serialized,
+      );
+
+      setBackupFileUri(fileResult.uri || `file://${fileResult.path}`);
+      setBackupFilePath(fileResult.path);
+      console.log('✅ Backup file created for identity:', maskIdentifier(did));
 
       setBackupCreated(true);
       Alert.alert(
@@ -131,14 +152,30 @@ const BackupIdentityScreen = ({ navigation }: BackupIdentityScreenProps) => {
 
   const handleDownloadBackup = useCallback(async () => {
     try {
+      if (!backupFileUri) {
+        Alert.alert('Backup Not Ready', 'Create the backup file first.');
+        return;
+      }
+
+      if (Platform.OS === 'ios' && backupFilePath) {
+        const result = await nativeIdentityProvisioning.exportBackupFile(
+          backupFilePath,
+        );
+        if (!result?.saved && !result?.cancelled) {
+          Alert.alert('Export Failed', 'Could not save backup file.');
+        }
+        return;
+      }
+
       await Share.share({
-        message: 'Your encrypted backup file',
+        url: backupFileUri,
         title: 'Download Backup',
       });
     } catch (error) {
-      console.error('Failed to download backup:', error);
+      console.error('Failed to share backup file:', error);
+      Alert.alert('Share Failed', 'Could not share backup file. Please try again.');
     }
-  }, []);
+  }, [backupFilePath, backupFileUri]);
 
   if (isLoading) {
     return <LoadingView message={t.app.loading} />;

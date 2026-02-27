@@ -89,8 +89,6 @@ export const en = {
       items: [
         { symbol: 'SOV', name: 'Sovereign Network Token', price: '$2.34' },
         { symbol: 'ZGOV', name: 'Governance Token', price: '$5.67' },
-        { symbol: 'ZDEFI', name: 'DeFi Protocol Token', price: '$1.89' },
-        { symbol: 'ZNFT', name: 'NFT Marketplace Token', price: '$3.12' },
       ],
     },
     bounties: {
@@ -600,7 +598,7 @@ export const en = {
     settings: {
       title: 'Wallet Settings',
       walletDetails: 'Wallet Details',
-      exportWallet: 'Export Wallet',
+      exportWallet: 'Export Recovery File',
       viewRecoveryOptions: 'View Recovery Options',
       copyId: 'Copy ID',
       copied: 'Copied',

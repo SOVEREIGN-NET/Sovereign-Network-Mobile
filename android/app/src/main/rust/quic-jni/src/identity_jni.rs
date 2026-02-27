@@ -7,6 +7,7 @@
 use jni::objects::{JByteArray, JClass, JString};
 use jni::sys::{jint, jlong};
 use jni::JNIEnv;
+use serde::{Deserialize, Serialize};
 
 use zhtp_client::identity::{
     deserialize_identity, get_seed_phrase, restore_identity_from_phrase, serialize_identity,
@@ -26,6 +27,54 @@ unsafe fn handle_ref(handle: jlong) -> &'static Identity {
 
 fn jstring_to_string(env: &mut JNIEnv, s: &JString) -> Option<String> {
     env.get_string(s).ok().map(|s| s.into())
+}
+
+#[derive(Serialize, Deserialize)]
+#[serde(rename_all = "lowercase")]
+enum PouwProofType {
+    Hash,
+    Merkle,
+    Signature,
+    Web4ManifestRoute,
+    Web4ContentServed,
+}
+
+#[derive(Serialize, Deserialize)]
+struct PouwReceipt {
+    pub version: u32,
+    #[serde(with = "pouw_hex")]
+    pub task_id: Vec<u8>,
+    pub client_did: String,
+    #[serde(with = "pouw_hex")]
+    pub client_node_id: Vec<u8>,
+    #[serde(with = "pouw_hex")]
+    pub provider_id: Vec<u8>,
+    #[serde(with = "pouw_hex")]
+    pub content_id: Vec<u8>,
+    pub proof_type: PouwProofType,
+    pub bytes_verified: u64,
+    pub result_ok: bool,
+    pub started_at: u64,
+    pub finished_at: u64,
+    #[serde(with = "pouw_hex")]
+    pub receipt_nonce: Vec<u8>,
+    #[serde(with = "pouw_hex")]
+    pub challenge_nonce: Vec<u8>,
+    #[serde(default)]
+    pub aux: Option<String>,
+}
+
+mod pouw_hex {
+    use serde::{Deserialize, Deserializer, Serializer};
+
+    pub fn serialize<S: Serializer>(bytes: &Vec<u8>, s: S) -> Result<S::Ok, S::Error> {
+        s.serialize_str(&hex::encode(bytes))
+    }
+
+    pub fn deserialize<'de, D: Deserializer<'de>>(d: D) -> Result<Vec<u8>, D::Error> {
+        let s = String::deserialize(d)?;
+        hex::decode(&s).map_err(serde::de::Error::custom)
+    }
 }
 
 // ─── Lifecycle ─────────────────────────────────────────────────────────────────
@@ -54,7 +103,9 @@ pub extern "system" fn Java_com_sovereignnetworkmobile_Identity_nativeGenerateId
 }
 
 #[no_mangle]
-pub extern "system" fn Java_com_sovereignnetworkmobile_Identity_nativeRestoreIdentityFromPhrase<'local>(
+pub extern "system" fn Java_com_sovereignnetworkmobile_Identity_nativeRestoreIdentityFromPhrase<
+    'local,
+>(
     mut env: JNIEnv<'local>,
     _class: JClass<'local>,
     phrase: JString<'local>,
@@ -79,7 +130,9 @@ pub extern "system" fn Java_com_sovereignnetworkmobile_Identity_nativeRestoreIde
 }
 
 #[no_mangle]
-pub extern "system" fn Java_com_sovereignnetworkmobile_Identity_nativeDeserializeIdentity<'local>(
+pub extern "system" fn Java_com_sovereignnetworkmobile_Identity_nativeDeserializeIdentity<
+    'local,
+>(
     mut env: JNIEnv<'local>,
     _class: JClass<'local>,
     json: JString<'local>,
@@ -127,7 +180,9 @@ pub extern "system" fn Java_com_sovereignnetworkmobile_Identity_nativeIdentityGe
 }
 
 #[no_mangle]
-pub extern "system" fn Java_com_sovereignnetworkmobile_Identity_nativeIdentityGetDeviceId<'local>(
+pub extern "system" fn Java_com_sovereignnetworkmobile_Identity_nativeIdentityGetDeviceId<
+    'local,
+>(
     mut env: JNIEnv<'local>,
     _class: JClass<'local>,
     handle: jlong,
@@ -140,7 +195,9 @@ pub extern "system" fn Java_com_sovereignnetworkmobile_Identity_nativeIdentityGe
 }
 
 #[no_mangle]
-pub extern "system" fn Java_com_sovereignnetworkmobile_Identity_nativeIdentityGetPublicKey<'local>(
+pub extern "system" fn Java_com_sovereignnetworkmobile_Identity_nativeIdentityGetPublicKey<
+    'local,
+>(
     mut env: JNIEnv<'local>,
     _class: JClass<'local>,
     handle: jlong,
@@ -154,7 +211,9 @@ pub extern "system" fn Java_com_sovereignnetworkmobile_Identity_nativeIdentityGe
 }
 
 #[no_mangle]
-pub extern "system" fn Java_com_sovereignnetworkmobile_Identity_nativeIdentityGetKyberPublicKey<'local>(
+pub extern "system" fn Java_com_sovereignnetworkmobile_Identity_nativeIdentityGetKyberPublicKey<
+    'local,
+>(
     mut env: JNIEnv<'local>,
     _class: JClass<'local>,
     handle: jlong,
@@ -216,7 +275,9 @@ pub extern "system" fn Java_com_sovereignnetworkmobile_Identity_nativeIdentitySe
 }
 
 #[no_mangle]
-pub extern "system" fn Java_com_sovereignnetworkmobile_Identity_nativeIdentityToHandshakeJson<'local>(
+pub extern "system" fn Java_com_sovereignnetworkmobile_Identity_nativeIdentityToHandshakeJson<
+    'local,
+>(
     mut env: JNIEnv<'local>,
     _class: JClass<'local>,
     handle: jlong,
@@ -235,7 +296,9 @@ pub extern "system" fn Java_com_sovereignnetworkmobile_Identity_nativeIdentityTo
 }
 
 #[no_mangle]
-pub extern "system" fn Java_com_sovereignnetworkmobile_Identity_nativeIdentityGetSeedPhrase<'local>(
+pub extern "system" fn Java_com_sovereignnetworkmobile_Identity_nativeIdentityGetSeedPhrase<
+    'local,
+>(
     mut env: JNIEnv<'local>,
     _class: JClass<'local>,
     handle: jlong,
@@ -254,7 +317,9 @@ pub extern "system" fn Java_com_sovereignnetworkmobile_Identity_nativeIdentityGe
 }
 
 #[no_mangle]
-pub extern "system" fn Java_com_sovereignnetworkmobile_Identity_nativeExportKeystoreBase64<'local>(
+pub extern "system" fn Java_com_sovereignnetworkmobile_Identity_nativeExportKeystoreBase64<
+    'local,
+>(
     mut env: JNIEnv<'local>,
     _class: JClass<'local>,
     handle: jlong,
@@ -305,7 +370,53 @@ pub extern "system" fn Java_com_sovereignnetworkmobile_Identity_nativeSignMessag
 }
 
 #[no_mangle]
-pub extern "system" fn Java_com_sovereignnetworkmobile_Identity_nativeSignRegistrationProof<'local>(
+pub extern "system" fn Java_com_sovereignnetworkmobile_Identity_nativeSignPoUWReceiptJson<'local>(
+    mut env: JNIEnv<'local>,
+    _class: JClass<'local>,
+    handle: jlong,
+    receipt_json: JString<'local>,
+) -> JByteArray<'local> {
+    if handle == 0 {
+        return JByteArray::default();
+    }
+
+    let receipt_json_str = match jstring_to_string(&mut env, &receipt_json) {
+        Some(s) => s,
+        None => return JByteArray::default(),
+    };
+
+    let receipt: PouwReceipt = match serde_json::from_str(&receipt_json_str) {
+        Ok(r) => r,
+        Err(e) => {
+            log::error!("[Identity JNI] signPoUWReceiptJson parse failed: {}", e);
+            return JByteArray::default();
+        }
+    };
+
+    let canonical_bytes = match bincode::serialize(&receipt) {
+        Ok(b) => b,
+        Err(e) => {
+            log::error!("[Identity JNI] signPoUWReceiptJson bincode failed: {}", e);
+            return JByteArray::default();
+        }
+    };
+
+    let identity = unsafe { handle_ref(handle) };
+    match sign_message(identity, &canonical_bytes) {
+        Ok(sig) => env
+            .byte_array_from_slice(&sig)
+            .unwrap_or_else(|_| JByteArray::default()),
+        Err(e) => {
+            log::error!("[Identity JNI] signPoUWReceiptJson signing failed: {}", e);
+            JByteArray::default()
+        }
+    }
+}
+
+#[no_mangle]
+pub extern "system" fn Java_com_sovereignnetworkmobile_Identity_nativeSignRegistrationProof<
+    'local,
+>(
     mut env: JNIEnv<'local>,
     _class: JClass<'local>,
     handle: jlong,
@@ -337,6 +448,7 @@ pub extern "system" fn Java_com_sovereignnetworkmobile_Identity_nativeBuildToken
     symbol: JString<'local>,
     initial_supply: jlong,
     decimals: jint,
+    treasury_recipient: JByteArray<'local>,
     chain_id: jint,
 ) -> JString<'local> {
     if handle == 0 {
@@ -351,12 +463,22 @@ pub extern "system" fn Java_com_sovereignnetworkmobile_Identity_nativeBuildToken
         Some(s) => s,
         None => return JString::default(),
     };
+
+    let treasury_arr: Vec<u8> = env
+        .convert_byte_array(treasury_recipient)
+        .unwrap_or_default();
+    let mut treasury_arr_32 = [0u8; 32];
+    if treasury_arr.len() >= 32 {
+        treasury_arr_32.copy_from_slice(&treasury_arr[..32]);
+    }
+
     match zhtp_client::build_create_token_tx(
         identity,
         &name_str,
         &symbol_str,
         initial_supply as u64,
         decimals as u8,
+        treasury_arr_32,
         chain_id as u8,
     ) {
         Ok(hex) => env.new_string(&hex).unwrap_or_default(),
@@ -410,6 +532,7 @@ pub extern "system" fn Java_com_sovereignnetworkmobile_Identity_nativeBuildToken
     to_pubkey: JByteArray<'local>,
     amount: jlong,
     chain_id: jint,
+    nonce: jlong,
 ) -> JString<'local> {
     if handle == 0 {
         return JString::default();
@@ -426,8 +549,14 @@ pub extern "system" fn Java_com_sovereignnetworkmobile_Identity_nativeBuildToken
     let len = std::cmp::min(to.len(), 32);
     to_arr[..len].copy_from_slice(&to[..len]);
 
-    match zhtp_client::build_transfer_tx(identity, &tid_arr, &to_arr, amount as u64, chain_id as u8)
-    {
+    match zhtp_client::build_transfer_tx(
+        identity,
+        &tid_arr,
+        &to_arr,
+        amount as u64,
+        chain_id as u8,
+        nonce as u64,
+    ) {
         Ok(hex) => env.new_string(&hex).unwrap_or_default(),
         Err(e) => {
             log::error!("[Identity JNI] buildTokenTransfer failed: {}", e);
@@ -467,7 +596,9 @@ pub extern "system" fn Java_com_sovereignnetworkmobile_Identity_nativeBuildToken
 // ─── Domain requests (returns JSON for REST API) ────────────────────────────────
 
 #[no_mangle]
-pub extern "system" fn Java_com_sovereignnetworkmobile_Identity_nativeBuildDomainRegisterRequest<'local>(
+pub extern "system" fn Java_com_sovereignnetworkmobile_Identity_nativeBuildDomainRegisterRequest<
+    'local,
+>(
     mut env: JNIEnv<'local>,
     _class: JClass<'local>,
     handle: jlong,
@@ -500,7 +631,9 @@ pub extern "system" fn Java_com_sovereignnetworkmobile_Identity_nativeBuildDomai
 }
 
 #[no_mangle]
-pub extern "system" fn Java_com_sovereignnetworkmobile_Identity_nativeBuildDomainUpdateRequest<'local>(
+pub extern "system" fn Java_com_sovereignnetworkmobile_Identity_nativeBuildDomainUpdateRequest<
+    'local,
+>(
     mut env: JNIEnv<'local>,
     _class: JClass<'local>,
     handle: jlong,
@@ -525,12 +658,7 @@ pub extern "system" fn Java_com_sovereignnetworkmobile_Identity_nativeBuildDomai
         None => return JString::default(),
     };
 
-    match zhtp_client::build_domain_update_request(
-        identity,
-        &domain_str,
-        &new_cid,
-        &expected_cid,
-    ) {
+    match zhtp_client::build_domain_update_request(identity, &domain_str, &new_cid, &expected_cid) {
         Ok(json) => env.new_string(&json).unwrap_or_default(),
         Err(e) => {
             log::error!("[Identity JNI] buildDomainUpdateRequest failed: {}", e);
@@ -540,7 +668,9 @@ pub extern "system" fn Java_com_sovereignnetworkmobile_Identity_nativeBuildDomai
 }
 
 #[no_mangle]
-pub extern "system" fn Java_com_sovereignnetworkmobile_Identity_nativeBuildDomainTransferRequest<'local>(
+pub extern "system" fn Java_com_sovereignnetworkmobile_Identity_nativeBuildDomainTransferRequest<
+    'local,
+>(
     mut env: JNIEnv<'local>,
     _class: JClass<'local>,
     handle: jlong,
@@ -572,7 +702,9 @@ pub extern "system" fn Java_com_sovereignnetworkmobile_Identity_nativeBuildDomai
 // ─── Deprecated secret key getters (legacy handshake path only) ────────────────
 
 #[no_mangle]
-pub extern "system" fn Java_com_sovereignnetworkmobile_Identity_nativeIdentityGetDilithiumSk<'local>(
+pub extern "system" fn Java_com_sovereignnetworkmobile_Identity_nativeIdentityGetDilithiumSk<
+    'local,
+>(
     mut env: JNIEnv<'local>,
     _class: JClass<'local>,
     handle: jlong,
@@ -600,7 +732,9 @@ pub extern "system" fn Java_com_sovereignnetworkmobile_Identity_nativeIdentityGe
 }
 
 #[no_mangle]
-pub extern "system" fn Java_com_sovereignnetworkmobile_Identity_nativeIdentityGetMasterSeed<'local>(
+pub extern "system" fn Java_com_sovereignnetworkmobile_Identity_nativeIdentityGetMasterSeed<
+    'local,
+>(
     mut env: JNIEnv<'local>,
     _class: JClass<'local>,
     handle: jlong,

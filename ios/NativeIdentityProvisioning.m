@@ -29,6 +29,19 @@ RCT_EXTERN_METHOD(getSeedPhraseForBackup:(NSString *)did
                   resolve:(RCTPromiseResolveBlock)resolve
                   reject:(RCTPromiseRejectBlock)reject)
 
+RCT_EXTERN_METHOD(exportKeystoreBase64:(NSString *)identityIdOrDid
+                  resolve:(RCTPromiseResolveBlock)resolve
+                  reject:(RCTPromiseRejectBlock)reject)
+
+RCT_EXTERN_METHOD(createBackupFile:(NSString *)fileName
+                  content:(NSString *)content
+                  resolve:(RCTPromiseResolveBlock)resolve
+                  reject:(RCTPromiseRejectBlock)reject)
+
+RCT_EXTERN_METHOD(exportBackupFile:(NSString *)filePath
+                  resolve:(RCTPromiseResolveBlock)resolve
+                  reject:(RCTPromiseRejectBlock)reject)
+
 RCT_EXTERN_METHOD(restoreIdentityFromPhrase:(NSString *)phrase
                   resolve:(RCTPromiseResolveBlock)resolve
                   reject:(RCTPromiseRejectBlock)reject)
@@ -44,6 +57,10 @@ RCT_EXTERN_METHOD(signTokenMintTransaction:(NSDictionary *)params
                   reject:(RCTPromiseRejectBlock)reject)
 
 RCT_EXTERN_METHOD(signTokenTransferTransaction:(NSDictionary *)params
+                  resolve:(RCTPromiseResolveBlock)resolve
+                  reject:(RCTPromiseRejectBlock)reject)
+
+RCT_EXTERN_METHOD(signTokenBurnTransaction:(NSDictionary *)params
                   resolve:(RCTPromiseResolveBlock)resolve
                   reject:(RCTPromiseRejectBlock)reject)
 
@@ -86,6 +103,13 @@ RCT_EXTERN_METHOD(quoteFeeForTxHex:(NSString *)txHex
                   reject:(RCTPromiseRejectBlock)reject)
 
 RCT_EXTERN_METHOD(getCurrentIdentityDid:(RCTPromiseResolveBlock)resolve
+                  reject:(RCTPromiseRejectBlock)reject)
+
+RCT_EXTERN_METHOD(getPublicIdentity:(RCTPromiseResolveBlock)resolve
+                  reject:(RCTPromiseRejectBlock)reject)
+
+RCT_EXTERN_METHOD(signPouwReceipt:(NSString *)receiptJson
+                  resolve:(RCTPromiseResolveBlock)resolve
                   reject:(RCTPromiseRejectBlock)reject)
 
 RCT_EXTERN_METHOD(getLocalIdentity:(NSString *)identityIdOrDid

@@ -1,6 +1,8 @@
 package com.sovereignnetworkmobile
 
 import android.provider.Settings
+import android.net.Uri
+import android.os.Environment
 import android.util.Base64
 import android.util.Log
 import com.facebook.react.bridge.Promise
@@ -9,6 +11,8 @@ import com.facebook.react.bridge.ReactContextBaseJavaModule
 import com.facebook.react.bridge.ReactMethod
 import com.facebook.react.bridge.ReadableMap
 import com.facebook.react.bridge.WritableNativeMap
+import org.json.JSONObject
+import java.io.File
 import java.util.UUID
 import java.util.concurrent.Executor
 import java.util.concurrent.Executors
@@ -417,10 +421,17 @@ class NativeIdentityProvisioning(reactContext: ReactApplicationContext) :
 
                 val tokenIdBytes = hexToBytes(tokenId)
                 val toAddressBytes = hexToBytes(toAddress)
+                val senderAddress = normalizeDidToAddress(identity.did)
+                val nonce = fetchTokenTransferNonce(tokenId.lowercase(), senderAddress)
 
-                Log.d(TAG, "Building token transfer transaction: $tokenId -> $toAddress")
+                Log.d(TAG, "Building token transfer transaction: $tokenId -> $toAddress (nonce=$nonce)")
 
-                val hexSignedTx = identity.buildTokenTransfer(tokenIdBytes, toAddressBytes, amount)
+                val hexSignedTx = identity.buildTokenTransfer(
+                    tokenIdBytes,
+                    toAddressBytes,
+                    amount,
+                    nonce = nonce,
+                )
                 if (hexSignedTx == null) {
                     promise.reject("SIGNING_ERROR", "Failed to build token transfer transaction")
                     return@execute
@@ -437,6 +448,42 @@ class NativeIdentityProvisioning(reactContext: ReactApplicationContext) :
     }
 
     @ReactMethod
+    fun signTokenBurnTransaction(params: ReadableMap, promise: Promise) {
+        executor.execute {
+            try {
+                val tokenId = params.getString("tokenId") ?: ""
+                val amount = parseAmount(params, "amount")
+                    ?: run {
+                        promise.reject("INVALID_PARAMS", "amount must be a valid integer string or number")
+                        return@execute
+                    }
+
+                val identity = getLatestIdentity()
+                if (identity == null) {
+                    promise.reject("IDENTITY_ERROR", "No identity available for signing")
+                    return@execute
+                }
+
+                val tokenIdBytes = hexToBytes(tokenId)
+                Log.d(TAG, "Building token burn transaction: $tokenId amount=$amount")
+
+                val hexSignedTx = identity.buildTokenBurn(tokenIdBytes, amount)
+                if (hexSignedTx == null) {
+                    promise.reject("SIGNING_ERROR", "Failed to build token burn transaction")
+                    return@execute
+                }
+
+                promise.resolve(WritableNativeMap().apply {
+                    putString("signed_tx", hexSignedTx)
+                })
+            } catch (e: Exception) {
+                Log.e(TAG, "Token burn signing failed", e)
+                promise.reject("IDENTITY_ERROR", "Failed to sign token burn: ${e.message}", e)
+            }
+        }
+    }
+
+    @ReactMethod
     fun signSovWalletTransferTransaction(params: ReadableMap, promise: Promise) {
         executor.execute {
             try {
@@ -447,6 +494,11 @@ class NativeIdentityProvisioning(reactContext: ReactApplicationContext) :
                         promise.reject("INVALID_PARAMS", "amount must be a valid integer string or number")
                         return@execute
                     }
+                val chainId = if (params.hasKey("chainId") && !params.isNull("chainId")) {
+                    params.getInt("chainId")
+                } else {
+                    0x02
+                }
 
                 // Validate wallet IDs are 64 hex chars (32 bytes each)
                 if (fromWalletIdHex.length != 64 || !fromWalletIdHex.matches(Regex("[0-9a-fA-F]+"))) {
@@ -466,10 +518,20 @@ class NativeIdentityProvisioning(reactContext: ReactApplicationContext) :
 
                 val fromWalletId = hexToBytes(fromWalletIdHex)
                 val toWalletId = hexToBytes(toWalletIdHex)
+                
+                // Parse nonce from JS params (required)
+                val nonceParam = params.getDouble("nonce")
+                val nonce = nonceParam.toLong()
+                
+                Log.d(TAG, "Building SOV wallet transfer: $fromWalletIdHex -> $toWalletIdHex (nonce=$nonce)")
 
-                Log.d(TAG, "Building SOV wallet transfer: $fromWalletIdHex -> $toWalletIdHex")
-
-                val hexSignedTx = identity.buildSovWalletTransfer(fromWalletId, toWalletId, amount)
+                val hexSignedTx = identity.buildSovWalletTransfer(
+                    fromWalletId,
+                    toWalletId,
+                    amount,
+                    chainId = chainId,
+                    nonce = nonce,
+                )
                 if (hexSignedTx == null) {
                     promise.reject("SIGNING_ERROR", "Failed to build SOV wallet transfer transaction")
                     return@execute
@@ -734,8 +796,28 @@ class NativeIdentityProvisioning(reactContext: ReactApplicationContext) :
     fun exportKeystoreBase64(did: String, promise: Promise) {
         executor.execute {
             try {
-                val identity = cachedIdentities[did]
+                val trimmed = did.trim()
+                if (trimmed.isEmpty()) {
+                    promise.reject("IDENTITY_ERROR", "Missing identity id or DID")
+                    return@execute
+                }
+
+                val normalized = normalizeIdentityId(trimmed)
+                val prefixedDid = if (trimmed.startsWith("did:zhtp:")) trimmed else "did:zhtp:$normalized"
+
+                val identity = cachedIdentities[trimmed]
+                    ?: cachedIdentities[prefixedDid]
+                    ?: cachedIdentities[normalized]
+                    ?: getLatestIdentity()
                 if (identity == null) {
+                    promise.reject("IDENTITY_ERROR", "Identity not found for DID")
+                    return@execute
+                }
+
+                val matchesQuery = identity.did == trimmed ||
+                    identity.did == prefixedDid ||
+                    identity.did.endsWith(normalized)
+                if (!matchesQuery) {
                     promise.reject("IDENTITY_ERROR", "Identity not found for DID")
                     return@execute
                 }
@@ -750,6 +832,36 @@ class NativeIdentityProvisioning(reactContext: ReactApplicationContext) :
             } catch (e: Exception) {
                 Log.e(TAG, "Export keystore base64 failed", e)
                 promise.reject("IDENTITY_ERROR", "Failed to export keystore: ${e.message}", e)
+            }
+        }
+    }
+
+    @ReactMethod
+    fun createBackupFile(fileName: String, content: String, promise: Promise) {
+        executor.execute {
+            try {
+                val safeFileName = fileName
+                    .replace(Regex("[^A-Za-z0-9._-]"), "_")
+                    .ifBlank { "sov-identity-backup.zkdid.json" }
+                val downloadsRoot =
+                    reactApplicationContext.getExternalFilesDir(Environment.DIRECTORY_DOWNLOADS)
+                        ?: reactApplicationContext.cacheDir
+                val backupDir = File(downloadsRoot, "backups")
+                if (!backupDir.exists()) {
+                    backupDir.mkdirs()
+                }
+
+                val file = File(backupDir, safeFileName)
+                file.writeText(content, Charsets.UTF_8)
+
+                promise.resolve(WritableNativeMap().apply {
+                    putString("path", file.absolutePath)
+                    putString("uri", Uri.fromFile(file).toString())
+                    putString("fileName", safeFileName)
+                })
+            } catch (e: Exception) {
+                Log.e(TAG, "Create backup file failed", e)
+                promise.reject("BACKUP_FILE_ERROR", "Failed to create backup file: ${e.message}", e)
             }
         }
     }
@@ -774,6 +886,53 @@ class NativeIdentityProvisioning(reactContext: ReactApplicationContext) :
             } catch (e: Exception) {
                 Log.e(TAG, "getCurrentIdentityDid failed", e)
                 promise.resolve(null)
+            }
+        }
+    }
+
+    @ReactMethod
+    fun getPublicIdentity(promise: Promise) {
+        executor.execute {
+            try {
+                val identity = getLatestIdentity()
+                if (identity == null) {
+                    promise.reject("NO_IDENTITY", "No active identity available")
+                    return@execute
+                }
+
+                promise.resolve(WritableNativeMap().apply {
+                    putString("did", identity.did)
+                    putString("publicKey", b64(identity.publicKey))
+                    putString("kyberPublicKey", b64(identity.kyberPublicKey))
+                    putString("nodeId", b64(identity.nodeId))
+                })
+            } catch (e: Exception) {
+                Log.e(TAG, "getPublicIdentity failed", e)
+                promise.reject("IDENTITY_ERROR", "Failed to read public identity: ${e.message}", e)
+            }
+        }
+    }
+
+    @ReactMethod
+    fun signPouwReceipt(receiptJson: String, promise: Promise) {
+        executor.execute {
+            try {
+                val identity = getLatestIdentity()
+                if (identity == null) {
+                    promise.reject("NO_IDENTITY", "No active identity for PoUW signing")
+                    return@execute
+                }
+
+                val signature = identity.signPoUWReceiptJson(receiptJson)
+                if (signature == null || signature.isEmpty()) {
+                    promise.reject("SIGNING_ERROR", "PoUW receipt signing failed")
+                    return@execute
+                }
+
+                promise.resolve(b64(signature))
+            } catch (e: Exception) {
+                Log.e(TAG, "signPouwReceipt failed", e)
+                promise.reject("SIGNING_ERROR", "Failed to sign PoUW receipt: ${e.message}", e)
             }
         }
     }
@@ -815,6 +974,100 @@ class NativeIdentityProvisioning(reactContext: ReactApplicationContext) :
 
     private fun b64(data: ByteArray): String {
         return Base64.encodeToString(data, Base64.NO_WRAP)
+    }
+
+    private fun normalizeDidToAddress(did: String): String {
+        val trimmed = did.trim()
+        return if (trimmed.startsWith("did:zhtp:")) {
+            trimmed.removePrefix("did:zhtp:")
+        } else {
+            trimmed
+        }
+    }
+
+    private fun fetchTokenTransferNonce(tokenIdHex: String, senderAddress: String): Long {
+        val host = com.sovereignnetworkmobile.config.GeneratedConfig.NODE_HOST
+        val port = com.sovereignnetworkmobile.config.GeneratedConfig.NODE_PORT
+        val path = "/api/v1/token/nonce/$tokenIdHex/$senderAddress"
+        val url = "quic://$host:$port$path"
+
+        val result = NativeQuicBridge.request(
+            url = url,
+            method = "GET",
+            headersJson = "{}",
+            body = "",
+            timeoutSecs = 15,
+            insecure = true,
+            alpn = "public",
+        ) ?: throw IllegalStateException("Nonce request returned null")
+
+        val status = (result["status"] as? Number)?.toInt() ?: 0
+        val body = result["body"] as? String ?: ""
+        val error = result["error"] as? String
+        if (status != 200) {
+            throw IllegalStateException("Nonce request failed status=$status error=${error ?: "unknown"}")
+        }
+
+        val json = JSONObject(body)
+        val nonce = extractNonce(json)
+            ?: throw IllegalStateException("Nonce response missing nonce field")
+        return nonce
+    }
+
+    private fun fetchSovTokenId(): String {
+        val host = com.sovereignnetworkmobile.config.GeneratedConfig.NODE_HOST
+        val port = com.sovereignnetworkmobile.config.GeneratedConfig.NODE_PORT
+        val url = "quic://$host:$port/api/v1/token/list"
+
+        val result = NativeQuicBridge.request(
+            url = url,
+            method = "GET",
+            headersJson = "{}",
+            body = "",
+            timeoutSecs = 15,
+            insecure = true,
+            alpn = "public",
+        ) ?: throw IllegalStateException("SOV token lookup returned null")
+
+        val status = (result["status"] as? Number)?.toInt() ?: 0
+        val body = result["body"] as? String ?: ""
+        val error = result["error"] as? String
+        if (status != 200) {
+            throw IllegalStateException("SOV token lookup failed status=$status error=${error ?: "unknown"}")
+        }
+
+        val json = JSONObject(body)
+        val tokens = json.optJSONArray("tokens")
+            ?: throw IllegalStateException("Token list response missing tokens")
+
+        for (i in 0 until tokens.length()) {
+            val token = tokens.optJSONObject(i) ?: continue
+            val symbol = token.optString("symbol", "")
+            val tokenId = token.optString("token_id", "")
+            if (symbol.equals("SOV", ignoreCase = true) && tokenId.length == 64) {
+                return tokenId.lowercase()
+            }
+        }
+
+        throw IllegalStateException("SOV token not found in token list")
+    }
+
+    private fun extractNonce(json: JSONObject): Long? {
+        val keys = listOf("nonce", "next_nonce", "account_nonce")
+        for (key in keys) {
+            if (!json.has(key)) continue
+            val value = json.opt(key) ?: continue
+            when (value) {
+                is Number -> return value.toLong()
+                is String -> value.toLongOrNull()?.let { return it }
+            }
+        }
+        val nestedKeys = listOf("data", "result")
+        for (nested in nestedKeys) {
+            val nestedObj = json.optJSONObject(nested) ?: continue
+            extractNonce(nestedObj)?.let { return it }
+        }
+        return null
     }
 
     private fun hexToBytes(hex: String): ByteArray {

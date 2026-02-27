@@ -4,7 +4,7 @@
  * Minimal, elegant design consistent with TokenCreatorScreen
  */
 
-import React, { useState, useCallback, useEffect } from 'react';
+import React, { useState, useCallback, useEffect, useRef } from 'react';
 import {
   View,
   ScrollView,
@@ -45,7 +45,7 @@ const DomainRegistrationScreen: React.FC<DomainRegistrationScreenProps> = ({
   onClose,
 }) => {
   const insets = useSafeAreaInsets();
-  const { currentIdentity } = useAuth();
+  const { currentIdentity, isBootstrapping, loadIdentityOnDemand } = useAuth();
 
   // FORM STATE
   const [domain, setDomain] = useState('');
@@ -69,11 +69,57 @@ const DomainRegistrationScreen: React.FC<DomainRegistrationScreenProps> = ({
     null,
   );
   const [hasExistingDomain, setHasExistingDomain] = useState(false);
+  const [resolvedIdentityDid, setResolvedIdentityDid] = useState<string | null>(
+    currentIdentity?.did ?? null,
+  );
+  const [identityLoading, setIdentityLoading] = useState(false);
+  const [identityError, setIdentityError] = useState<string | null>(null);
+  const identityLoadAttemptedRef = useRef(false);
+
+  useEffect(() => {
+    setResolvedIdentityDid(currentIdentity?.did ?? null);
+  }, [currentIdentity?.did]);
+
+  const ensureIdentityAvailable = useCallback(async (): Promise<string | null> => {
+    if (isBootstrapping || resolvedIdentityDid) {
+      return resolvedIdentityDid;
+    }
+
+    setIdentityLoading(true);
+    setIdentityError(null);
+    try {
+      const identity = await loadIdentityOnDemand();
+      if (identity?.did) {
+        setResolvedIdentityDid(identity.did);
+        return identity.did;
+      } else {
+        setIdentityError('Unlock identity to register domain');
+      }
+    } catch (error) {
+      console.warn('[DomainRegistrationScreen] Failed to load identity:', error);
+      setIdentityError('Unable to access identity');
+    } finally {
+      setIdentityLoading(false);
+    }
+    return null;
+  }, [isBootstrapping, loadIdentityOnDemand, resolvedIdentityDid]);
+
+  useEffect(() => {
+    if (identityLoadAttemptedRef.current) {
+      return;
+    }
+    if (isBootstrapping || resolvedIdentityDid) {
+      return;
+    }
+
+    identityLoadAttemptedRef.current = true;
+    ensureIdentityAvailable();
+  }, [ensureIdentityAvailable, isBootstrapping, resolvedIdentityDid]);
 
   useEffect(() => {
     const loadExisting = async () => {
       try {
-        if (!currentIdentity?.did) {
+        if (!resolvedIdentityDid) {
           setHasExistingDomain(false);
           return;
         }
@@ -84,7 +130,7 @@ const DomainRegistrationScreen: React.FC<DomainRegistrationScreenProps> = ({
           ? JSON.parse(storedDomainsJson)
           : [];
         const hasOwned = storedDomains.some(
-          (d: DomainData) => d.owner === currentIdentity.did,
+          (d: DomainData) => d.owner === resolvedIdentityDid,
         );
         setHasExistingDomain(hasOwned);
       } catch (error) {
@@ -96,7 +142,7 @@ const DomainRegistrationScreen: React.FC<DomainRegistrationScreenProps> = ({
       }
     };
     loadExisting();
-  }, [currentIdentity?.did]);
+  }, [resolvedIdentityDid]);
 
   // Validate registration form
   const validateForm = (): boolean => {
@@ -202,21 +248,14 @@ const DomainRegistrationScreen: React.FC<DomainRegistrationScreenProps> = ({
       return;
     }
 
-    if (!currentIdentity?.did) {
+    const ownerDid = resolvedIdentityDid ?? (await ensureIdentityAvailable());
+    if (!ownerDid) {
       setStatus({
         type: 'error',
-        message: 'Identity not available',
+        message: 'Unlock identity to register domain',
       });
       return;
     }
-    if (hasExistingDomain) {
-      setStatus({
-        type: 'error',
-        message: 'Limit reached: one domain per identity.',
-      });
-      return;
-    }
-
     if (availabilityStatus.available === false) {
       setStatus({
         type: 'error',
@@ -252,7 +291,7 @@ const DomainRegistrationScreen: React.FC<DomainRegistrationScreenProps> = ({
 
       const response = await domainService.registerDomain({
         domain: fullDomain,
-        owner: currentIdentity.did,
+        owner: ownerDid,
         fee: feeAmount,
         content_mappings: contentMappings,
       });
@@ -314,7 +353,7 @@ const DomainRegistrationScreen: React.FC<DomainRegistrationScreenProps> = ({
   const validationResult = validateDomainFormat(fullDomainForValidation);
   const isReserved = validationResult.isReserved;
 
-  if (!currentIdentity) {
+  if (isBootstrapping || identityLoading) {
     return <LoadingView />;
   }
 
@@ -369,6 +408,40 @@ const DomainRegistrationScreen: React.FC<DomainRegistrationScreenProps> = ({
           keyboardShouldPersistTaps="handled"
         >
           {/* Status Message */}
+          {identityError && (
+            <View
+              style={{
+                marginBottom: spacing.lg,
+                padding: spacing.md,
+                backgroundColor: `${colors.warning}15`,
+                borderRadius: borderRadius.md,
+              }}
+            >
+              <Text
+                style={{
+                  fontSize: typography.size.sm,
+                  color: colors.warning,
+                }}
+              >
+                {identityError}
+              </Text>
+              <TouchableOpacity
+                onPress={ensureIdentityAvailable}
+                style={{ marginTop: spacing.sm }}
+              >
+                <Text
+                  style={{
+                    fontSize: typography.size.sm,
+                    color: colors.primary,
+                    fontWeight: typography.weight.semibold,
+                  }}
+                >
+                  Unlock Identity
+                </Text>
+              </TouchableOpacity>
+            </View>
+          )}
+
           {status.message && (
             <View
               style={{
@@ -452,7 +525,7 @@ const DomainRegistrationScreen: React.FC<DomainRegistrationScreenProps> = ({
             onChangeText={handleDomainChange}
             onBlur={handleDomainBlur}
             error={errors.domain}
-            editable={!loading && !hasExistingDomain}
+            editable={!loading}
             autoCapitalize="none"
             autoCorrect={false}
             rightIcon={
@@ -751,24 +824,22 @@ const DomainRegistrationScreen: React.FC<DomainRegistrationScreenProps> = ({
               loading ||
               availabilityStatus.available === false ||
               !domain ||
-              hasExistingDomain ||
-              !currentIdentity
+              !resolvedIdentityDid
             }
             style={{
               backgroundColor:
                 loading ||
                 availabilityStatus.available === false ||
                 !domain ||
-                hasExistingDomain ||
-                !currentIdentity
+                !resolvedIdentityDid
                   ? colors.text_secondary
                   : colors.primary,
             }}
           >
             {loading
               ? 'Registering...'
-              : !currentIdentity
-              ? 'Sign In to Register'
+              : !resolvedIdentityDid
+              ? 'Unlock Identity to Register'
               : 'Register Domain'}
           </Button>
         </ScrollView>

@@ -6,7 +6,6 @@ import com.facebook.react.ReactApplication
 import com.facebook.react.ReactHost
 import com.facebook.react.ReactNativeApplicationEntryPoint.loadReactNative
 import com.facebook.react.defaults.DefaultReactHost.getDefaultReactHost
-import com.google.firebase.FirebaseApp
 
 class MainApplication : Application(), ReactApplication {
 
@@ -22,6 +21,7 @@ class MainApplication : Application(), ReactApplication {
           add(NativeQuicPackage())
           add(NativeZhtpApiPackage())
           add(NativeIdentityProvisioningPackage())
+          add(PoUWPackage())
           add(Web4Package())
         },
     )
@@ -29,7 +29,6 @@ class MainApplication : Application(), ReactApplication {
 
   override fun onCreate() {
     super.onCreate()
-    FirebaseApp.initializeApp(this)
     loadReactNative(this)
   }
 }

@@ -3,9 +3,11 @@
  * Direct QUIC-based domain operations (register, check availability, manage, etc.)
  */
 
-import { quicRequest, quicRequestRaw } from './quic';
+import { quicRequest } from './quic';
 import { nativeIdentityProvisioning } from './NativeIdentityProvisioning';
+import tokenService from './TokenService';
 import { maskIdentifier } from '../utils/maskIdentifier';
+import { CHAIN_ID, SOV_TOKEN_ID } from '../config';
 import type {
   DomainRegisterRequest,
   DomainRegisterResponse,
@@ -20,6 +22,46 @@ import type {
 } from '../types/domain';
 
 class DomainService {
+  private normalizeIdentityId(identityOrDid: string): string {
+    return identityOrDid.startsWith('did:zhtp:')
+      ? identityOrDid.substring('did:zhtp:'.length)
+      : identityOrDid;
+  }
+
+  private async getPrimaryWalletId(ownerDid: string): Promise<string> {
+    const identityId = this.normalizeIdentityId(ownerDid);
+    const walletList = await quicRequest<{
+      wallets?: Array<{
+        wallet_id?: string;
+        id?: string;
+        wallet_type?: string;
+      }>;
+    }>(`/api/v1/wallet/list/${identityId}`);
+
+    const primaryWallet = walletList.wallets?.find(
+      wallet => (wallet.wallet_type || '').toLowerCase() === 'primary',
+    );
+    const walletId = primaryWallet?.wallet_id || primaryWallet?.id;
+    if (!walletId) {
+      throw new Error('Primary wallet not found for identity');
+    }
+    return walletId;
+  }
+
+  private async getDaoTreasuryWalletId(): Promise<string> {
+    const data = await quicRequest<{
+      treasury?: {
+        treasury_wallet_id?: string | null;
+      };
+    }>('/api/v1/dao/treasury/status');
+
+    const treasuryWalletId = data.treasury?.treasury_wallet_id;
+    if (!treasuryWalletId) {
+      throw new Error('DAO treasury wallet id is not available');
+    }
+    return treasuryWalletId;
+  }
+
   /**
    * GET /api/v1/web4/domains/status/{domain}
    * Check domain availability.
@@ -43,29 +85,68 @@ class DomainService {
     return {
       available: !data.found,
       classification: data.classification,
-      reason: data.found ? `Domain is already registered by ${data.owner_did}` : undefined,
+      reason: data.found
+        ? `Domain is already registered by ${data.owner_did}`
+        : undefined,
       registrar_fee: data.registrar_fee,
     };
   }
 
   /**
-   * POST /api/v1/web4/domains/register — Dilithium-signed
-   * lib-client builds the complete signed request body (domain, owner, content_mappings, signature, timestamp, fee)
+   * POST /api/v1/web4/domains/register
+   * Domain registration now requires a canonical fee payment transaction.
    */
-  async registerDomain(request: DomainRegisterRequest): Promise<DomainRegisterResponse> {
+  async registerDomain(
+    request: DomainRegisterRequest,
+  ): Promise<DomainRegisterResponse> {
     console.log('[DomainService] Registering domain:', request.domain);
-    const contentMappingsJson = request.content_mappings
-      ? JSON.stringify(request.content_mappings)
-      : null;
-    const signingResult = await nativeIdentityProvisioning.signDomainRegisterRequest({
+
+    const fee =
+      Number.isFinite(request.fee) && request.fee > 0 ? request.fee : 10;
+    const timestamp = Math.floor(Date.now() / 1000);
+    const [ownerPrimaryWalletId, daoTreasuryWalletId] = await Promise.all([
+      this.getPrimaryWalletId(request.owner),
+      this.getDaoTreasuryWalletId(),
+    ]);
+
+    const nonce = await tokenService.getTokenNonce(
+      SOV_TOKEN_ID || '',
+      ownerPrimaryWalletId,
+    );
+
+    const feePaymentTx =
+      await nativeIdentityProvisioning.signSovWalletTransferTransaction({
+        fromWalletId: ownerPrimaryWalletId,
+        toWalletId: daoTreasuryWalletId,
+        amount: fee,
+        nonce: nonce,
+        chainId: CHAIN_ID,
+      });
+
+    const signatureMessage = `${request.domain}|${timestamp}|${fee}`;
+    const signature = await nativeIdentityProvisioning.signMessage(
+      signatureMessage,
+    );
+
+    const payload = JSON.stringify({
       domain: request.domain,
-      contentMappingsJson,
+      owner: request.owner,
+      content_mappings: request.content_mappings ?? {},
+      metadata: request.metadata ?? null,
+      signature,
+      timestamp,
+      fee,
+      fee_payment_tx: feePaymentTx.signed_tx,
     });
-    console.log('[DomainService] Register request built, json length:', signingResult.request_json.length);
+
+    console.log(
+      '[DomainService] Register request built, json length:',
+      payload.length,
+    );
 
     const data = await quicRequest<DomainRegisterResponse>(
       '/api/v1/web4/domains/register',
-      { method: 'POST', body: signingResult.request_json },
+      { method: 'POST', body: payload },
     );
     console.log('[DomainService] Domain registered:', data.domain);
     return data;
@@ -94,7 +175,11 @@ class DomainService {
       );
     } catch (error: unknown) {
       // 404 means domain doesn't exist — return "available" status
-      if (error instanceof Error && 'status' in error && (error as any).status === 404) {
+      if (
+        error instanceof Error &&
+        'status' in error &&
+        (error as any).status === 404
+      ) {
         return { domain, available: true, classification: 'commercial' };
       }
       throw error;
@@ -115,14 +200,20 @@ class DomainService {
    * POST /api/v1/web4/domains/update — Dilithium-signed
    * lib-client builds the complete signed request body (domain, new_manifest_cid, expected_previous_manifest_cid, signature, timestamp)
    */
-  async updateDomain(request: DomainUpdateRequest): Promise<DomainUpdateResponse> {
+  async updateDomain(
+    request: DomainUpdateRequest,
+  ): Promise<DomainUpdateResponse> {
     console.log('[DomainService] Updating domain:', request.domain);
-    const signingResult = await nativeIdentityProvisioning.signDomainUpdateRequest({
-      domain: request.domain,
-      newManifestCid: request.new_manifest_cid,
-      expectedPreviousManifestCid: request.expected_previous_manifest_cid,
-    });
-    console.log('[DomainService] Update request built, json length:', signingResult.request_json.length);
+    const signingResult =
+      await nativeIdentityProvisioning.signDomainUpdateRequest({
+        domain: request.domain,
+        newManifestCid: request.new_manifest_cid,
+        expectedPreviousManifestCid: request.expected_previous_manifest_cid,
+      });
+    console.log(
+      '[DomainService] Update request built, json length:',
+      signingResult.request_json.length,
+    );
 
     const data = await quicRequest<DomainUpdateResponse>(
       '/api/v1/web4/domains/update',
@@ -135,7 +226,9 @@ class DomainService {
   /**
    * POST /api/v1/web4/domains/{domain}/rollback
    */
-  async rollbackDomain(request: DomainRollbackRequest): Promise<DomainRollbackResponse> {
+  async rollbackDomain(
+    request: DomainRollbackRequest,
+  ): Promise<DomainRollbackResponse> {
     console.log('[DomainService] Rolling back domain:', request.domain);
     const data = await quicRequest<DomainRollbackResponse>(
       `/api/v1/web4/domains/${request.domain}/rollback`,

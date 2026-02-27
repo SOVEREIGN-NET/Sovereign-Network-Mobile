@@ -52,6 +52,19 @@ interface LocalIdentityResult {
   error?: string;
 }
 
+interface BackupFileResult {
+  path: string;
+  uri?: string;
+  fileName?: string;
+}
+
+interface PublicIdentity {
+  did: string;
+  publicKey: string; // base64
+  kyberPublicKey: string; // base64
+  nodeId: string; // base64
+}
+
 /**
  * Native bridge to iOS identity provisioning
  * Only available on iOS platform
@@ -65,10 +78,18 @@ class NativeIdentityProvisioningBridge {
       if (!this.nativeModule) {
         console.warn('⚠️ NativeIdentityProvisioning module not found');
       } else if (__DEV__) {
-        const hasSignForDid = typeof this.nativeModule.signMessageForDid === 'function';
-        const hasSignFromSeed = typeof this.nativeModule.signMessageFromSeed === 'function';
-        console.log('[NativeIdentityProvisioning] signMessageForDid available:', hasSignForDid);
-        console.log('[NativeIdentityProvisioning] signMessageFromSeed available:', hasSignFromSeed);
+        const hasSignForDid =
+          typeof this.nativeModule.signMessageForDid === 'function';
+        const hasSignFromSeed =
+          typeof this.nativeModule.signMessageFromSeed === 'function';
+        console.log(
+          '[NativeIdentityProvisioning] signMessageForDid available:',
+          hasSignForDid,
+        );
+        console.log(
+          '[NativeIdentityProvisioning] signMessageFromSeed available:',
+          hasSignFromSeed,
+        );
       }
     }
   }
@@ -77,9 +98,13 @@ class NativeIdentityProvisioningBridge {
    * Generate identity locally on device
    * Returns generated identity - TypeScript then handles QUIC server registration
    */
-  async generateLocalIdentity(displayName: string): Promise<GeneratedIdentityData> {
+  async generateLocalIdentity(
+    displayName: string,
+  ): Promise<GeneratedIdentityData> {
     if (!this.nativeModule) {
-      throw new Error('NativeIdentityProvisioning not available on this platform');
+      throw new Error(
+        'NativeIdentityProvisioning not available on this platform',
+      );
     }
 
     return await this.nativeModule.generateLocalIdentity(displayName);
@@ -89,9 +114,14 @@ class NativeIdentityProvisioningBridge {
    * Provision identity (alias for generateLocalIdentity for backwards compatibility)
    * Generates keys locally, returns generated identity for QUIC server registration
    */
-  async provisionIdentity(displayName: string, serverUrl: string): Promise<GeneratedIdentityData> {
+  async provisionIdentity(
+    displayName: string,
+    serverUrl: string,
+  ): Promise<GeneratedIdentityData> {
     if (!this.nativeModule) {
-      throw new Error('NativeIdentityProvisioning not available on this platform');
+      throw new Error(
+        'NativeIdentityProvisioning not available on this platform',
+      );
     }
 
     // Call native provisionIdentity which generates keys and caches them
@@ -102,24 +132,40 @@ class NativeIdentityProvisioningBridge {
    * Create registration proof with signature for QUIC POST
    * Called after generating identity to get the proof data for server registration
    */
-  async createRegistrationProof(displayName: string, didData: any): Promise<any> {
+  async createRegistrationProof(
+    displayName: string,
+    didData: any,
+  ): Promise<any> {
     if (!this.nativeModule) {
-      throw new Error('NativeIdentityProvisioning not available on this platform');
+      throw new Error(
+        'NativeIdentityProvisioning not available on this platform',
+      );
     }
 
-    return await this.nativeModule.createRegistrationProof(displayName, didData);
+    return await this.nativeModule.createRegistrationProof(
+      displayName,
+      didData,
+    );
   }
 
   /**
    * Store provisioned identity after server registration
    * Called after successful QUIC POST to /api/v1/identity/register
    */
-  async storeProvisionedIdentity(identityId: string, didData: any): Promise<ProvisioningResult> {
+  async storeProvisionedIdentity(
+    identityId: string,
+    didData: any,
+  ): Promise<ProvisioningResult> {
     if (!this.nativeModule) {
-      throw new Error('NativeIdentityProvisioning not available on this platform');
+      throw new Error(
+        'NativeIdentityProvisioning not available on this platform',
+      );
     }
 
-    return await this.nativeModule.storeProvisionedIdentity(identityId, didData);
+    return await this.nativeModule.storeProvisionedIdentity(
+      identityId,
+      didData,
+    );
   }
 
   /**
@@ -127,7 +173,9 @@ class NativeIdentityProvisioningBridge {
    */
   async restoreIdentityToHandleStore(identityId: string): Promise<any> {
     if (!this.nativeModule) {
-      throw new Error('NativeIdentityProvisioning not available on this platform');
+      throw new Error(
+        'NativeIdentityProvisioning not available on this platform',
+      );
     }
 
     return await this.nativeModule.restoreIdentityToHandleStore(identityId);
@@ -136,9 +184,13 @@ class NativeIdentityProvisioningBridge {
   /**
    * Check for local identity materials without server access
    */
-  async getLocalIdentity(identityIdOrDid: string): Promise<LocalIdentityResult> {
+  async getLocalIdentity(
+    identityIdOrDid: string,
+  ): Promise<LocalIdentityResult> {
     if (!this.nativeModule) {
-      throw new Error('NativeIdentityProvisioning not available on this platform');
+      throw new Error(
+        'NativeIdentityProvisioning not available on this platform',
+      );
     }
 
     if (!this.nativeModule.getLocalIdentity) {
@@ -154,7 +206,9 @@ class NativeIdentityProvisioningBridge {
    */
   async getSeedPhraseForBackup(did: string): Promise<string> {
     if (!this.nativeModule) {
-      throw new Error('NativeIdentityProvisioning not available on this platform');
+      throw new Error(
+        'NativeIdentityProvisioning not available on this platform',
+      );
     }
 
     return await this.nativeModule.getSeedPhraseForBackup(did);
@@ -163,16 +217,88 @@ class NativeIdentityProvisioningBridge {
   /**
    * Get 24-word seed phrase from locally stored identity materials
    */
-  async getSeedPhraseFromStoredIdentity(identityIdOrDid: string): Promise<string> {
+  async getSeedPhraseFromStoredIdentity(
+    identityIdOrDid: string,
+  ): Promise<string> {
     if (!this.nativeModule) {
-      throw new Error('NativeIdentityProvisioning not available on this platform');
+      throw new Error(
+        'NativeIdentityProvisioning not available on this platform',
+      );
     }
 
     if (!this.nativeModule.getSeedPhraseFromStoredIdentity) {
-      throw new Error('NativeIdentityProvisioning.getSeedPhraseFromStoredIdentity not available');
+      throw new Error(
+        'NativeIdentityProvisioning.getSeedPhraseFromStoredIdentity not available',
+      );
     }
 
-    return await this.nativeModule.getSeedPhraseFromStoredIdentity(identityIdOrDid);
+    return await this.nativeModule.getSeedPhraseFromStoredIdentity(
+      identityIdOrDid,
+    );
+  }
+
+  /**
+   * Export identity keystore as a base64 blob for backup payload generation.
+   */
+  async exportKeystoreBase64(identityIdOrDid: string): Promise<string> {
+    if (!this.nativeModule) {
+      throw new Error(
+        'NativeIdentityProvisioning not available on this platform',
+      );
+    }
+
+    if (!this.nativeModule.exportKeystoreBase64) {
+      throw new Error(
+        'NativeIdentityProvisioning.exportKeystoreBase64 not available',
+      );
+    }
+
+    return await this.nativeModule.exportKeystoreBase64(identityIdOrDid);
+  }
+
+  /**
+   * Create a backup file on-device and return its URI/path for sharing.
+   */
+  async createBackupFile(
+    fileName: string,
+    content: string,
+  ): Promise<BackupFileResult> {
+    if (!this.nativeModule) {
+      throw new Error(
+        'NativeIdentityProvisioning not available on this platform',
+      );
+    }
+
+    if (!this.nativeModule.createBackupFile) {
+      throw new Error(
+        'NativeIdentityProvisioning.createBackupFile not available',
+      );
+    }
+
+    return await this.nativeModule.createBackupFile(fileName, content);
+  }
+
+  /**
+   * iOS-only: open system export picker to save backup file to Files/Downloads.
+   */
+  async exportBackupFile(filePath: string): Promise<{
+    saved: boolean;
+    cancelled?: boolean;
+    destination?: string;
+  }> {
+    if (!this.nativeModule) {
+      throw new Error(
+        'NativeIdentityProvisioning not available on this platform',
+      );
+    }
+
+    if (!this.nativeModule.exportBackupFile) {
+      throw new Error(
+        'NativeIdentityProvisioning.exportBackupFile not available',
+      );
+    }
+
+    return await this.nativeModule.exportBackupFile(filePath);
   }
 
   /**
@@ -181,7 +307,9 @@ class NativeIdentityProvisioningBridge {
    */
   async restoreIdentityFromPhrase(phrase: string): Promise<any> {
     if (!this.nativeModule) {
-      throw new Error('NativeIdentityProvisioning not available on this platform');
+      throw new Error(
+        'NativeIdentityProvisioning not available on this platform',
+      );
     }
 
     return await this.nativeModule.restoreIdentityFromPhrase(phrase);
@@ -200,7 +328,9 @@ class NativeIdentityProvisioningBridge {
     maxSupply: number | null;
   }): Promise<{ signed_tx: string }> {
     if (!this.nativeModule) {
-      throw new Error('NativeIdentityProvisioning not available on this platform');
+      throw new Error(
+        'NativeIdentityProvisioning not available on this platform',
+      );
     }
 
     return await this.nativeModule.signTokenCreateTransaction(params);
@@ -216,7 +346,9 @@ class NativeIdentityProvisioningBridge {
     recipientDid: string;
   }): Promise<{ signed_tx: string }> {
     if (!this.nativeModule) {
-      throw new Error('NativeIdentityProvisioning not available on this platform');
+      throw new Error(
+        'NativeIdentityProvisioning not available on this platform',
+      );
     }
 
     return await this.nativeModule.signTokenMintTransaction(params);
@@ -230,12 +362,32 @@ class NativeIdentityProvisioningBridge {
     tokenId: string;
     toAddress: string;
     amount: number;
+    nonce: number;
   }): Promise<{ signed_tx: string }> {
     if (!this.nativeModule) {
-      throw new Error('NativeIdentityProvisioning not available on this platform');
+      throw new Error(
+        'NativeIdentityProvisioning not available on this platform',
+      );
     }
 
     return await this.nativeModule.signTokenTransferTransaction(params);
+  }
+
+  /**
+   * Sign a token burn transaction with Dilithium keypair
+   * Returns hex-encoded signed transaction ready for API
+   */
+  async signTokenBurnTransaction(params: {
+    tokenId: string;
+    amount: number;
+  }): Promise<{ signed_tx: string }> {
+    if (!this.nativeModule) {
+      throw new Error(
+        'NativeIdentityProvisioning not available on this platform',
+      );
+    }
+
+    return await this.nativeModule.signTokenBurnTransaction(params);
   }
 
   /**
@@ -247,9 +399,13 @@ class NativeIdentityProvisioningBridge {
     fromWalletId: string;
     toWalletId: string;
     amount: number;
+    nonce: number;
+    chainId?: number;
   }): Promise<{ signed_tx: string }> {
     if (!this.nativeModule) {
-      throw new Error('NativeIdentityProvisioning not available on this platform');
+      throw new Error(
+        'NativeIdentityProvisioning not available on this platform',
+      );
     }
 
     return await this.nativeModule.signSovWalletTransferTransaction(params);
@@ -265,7 +421,9 @@ class NativeIdentityProvisioningBridge {
     chainHeight: number;
   }> {
     if (!this.nativeModule) {
-      throw new Error('NativeIdentityProvisioning not available on this platform');
+      throw new Error(
+        'NativeIdentityProvisioning not available on this platform',
+      );
     }
     return await this.nativeModule.setFeeConfig(configJson);
   }
@@ -276,7 +434,9 @@ class NativeIdentityProvisioningBridge {
    */
   async quoteFeeForTxHex(txHex: string): Promise<number> {
     if (!this.nativeModule) {
-      throw new Error('NativeIdentityProvisioning not available on this platform');
+      throw new Error(
+        'NativeIdentityProvisioning not available on this platform',
+      );
     }
     return await this.nativeModule.quoteFeeForTxHex(txHex);
   }
@@ -290,11 +450,15 @@ class NativeIdentityProvisioningBridge {
     contentMappingsJson?: string | null;
   }): Promise<{ request_json: string }> {
     if (!this.nativeModule) {
-      throw new Error('NativeIdentityProvisioning not available on this platform');
+      throw new Error(
+        'NativeIdentityProvisioning not available on this platform',
+      );
     }
 
     if (!this.nativeModule.signDomainRegisterRequest) {
-      throw new Error('NativeIdentityProvisioning.signDomainRegisterRequest not available');
+      throw new Error(
+        'NativeIdentityProvisioning.signDomainRegisterRequest not available',
+      );
     }
 
     return await this.nativeModule.signDomainRegisterRequest(params);
@@ -310,11 +474,15 @@ class NativeIdentityProvisioningBridge {
     expectedPreviousManifestCid: string;
   }): Promise<{ request_json: string }> {
     if (!this.nativeModule) {
-      throw new Error('NativeIdentityProvisioning not available on this platform');
+      throw new Error(
+        'NativeIdentityProvisioning not available on this platform',
+      );
     }
 
     if (!this.nativeModule.signDomainUpdateRequest) {
-      throw new Error('NativeIdentityProvisioning.signDomainUpdateRequest not available');
+      throw new Error(
+        'NativeIdentityProvisioning.signDomainUpdateRequest not available',
+      );
     }
 
     return await this.nativeModule.signDomainUpdateRequest(params);
@@ -329,11 +497,15 @@ class NativeIdentityProvisioningBridge {
     toOwnerDid: string;
   }): Promise<{ request_json: string }> {
     if (!this.nativeModule) {
-      throw new Error('NativeIdentityProvisioning not available on this platform');
+      throw new Error(
+        'NativeIdentityProvisioning not available on this platform',
+      );
     }
 
     if (!this.nativeModule.signDomainTransferRequest) {
-      throw new Error('NativeIdentityProvisioning.signDomainTransferRequest not available');
+      throw new Error(
+        'NativeIdentityProvisioning.signDomainTransferRequest not available',
+      );
     }
 
     return await this.nativeModule.signDomainTransferRequest(params);
@@ -345,7 +517,9 @@ class NativeIdentityProvisioningBridge {
    */
   async signMessage(message: string): Promise<string> {
     if (!this.nativeModule) {
-      throw new Error('NativeIdentityProvisioning not available on this platform');
+      throw new Error(
+        'NativeIdentityProvisioning not available on this platform',
+      );
     }
 
     if (!this.nativeModule.signMessage) {
@@ -354,9 +528,46 @@ class NativeIdentityProvisioningBridge {
 
     const result = await this.nativeModule.signMessage(message);
     if (!result?.signature) {
-      throw new Error('NativeIdentityProvisioning.signMessage returned no signature');
+      throw new Error(
+        'NativeIdentityProvisioning.signMessage returned no signature',
+      );
     }
     return result.signature;
+  }
+
+  /**
+   * Get current public identity material.
+   */
+  async getPublicIdentity(): Promise<PublicIdentity> {
+    if (!this.nativeModule) {
+      throw new Error(
+        'NativeIdentityProvisioning not available on this platform',
+      );
+    }
+    if (!this.nativeModule.getPublicIdentity) {
+      throw new Error(
+        'NativeIdentityProvisioning.getPublicIdentity not available',
+      );
+    }
+    return await this.nativeModule.getPublicIdentity();
+  }
+
+  /**
+   * Sign PoUW receipt JSON via canonical Rust path (JSON -> Receipt -> bincode -> Dilithium5).
+   * Returns base64 signature for controller compatibility.
+   */
+  async signPouwReceipt(receiptJson: string): Promise<string> {
+    if (!this.nativeModule) {
+      throw new Error(
+        'NativeIdentityProvisioning not available on this platform',
+      );
+    }
+    if (!this.nativeModule.signPouwReceipt) {
+      throw new Error(
+        'NativeIdentityProvisioning.signPouwReceipt not available',
+      );
+    }
+    return await this.nativeModule.signPouwReceipt(receiptJson);
   }
 
   /**
@@ -365,14 +576,20 @@ class NativeIdentityProvisioningBridge {
    */
   async signMessageForDid(did: string, message: string): Promise<string> {
     if (!this.nativeModule) {
-      throw new Error('NativeIdentityProvisioning not available on this platform');
+      throw new Error(
+        'NativeIdentityProvisioning not available on this platform',
+      );
     }
     if (!this.nativeModule.signMessageForDid) {
-      throw new Error('NativeIdentityProvisioning.signMessageForDid not available');
+      throw new Error(
+        'NativeIdentityProvisioning.signMessageForDid not available',
+      );
     }
     const result = await this.nativeModule.signMessageForDid(did, message);
     if (!result?.signature) {
-      throw new Error('NativeIdentityProvisioning.signMessageForDid returned no signature');
+      throw new Error(
+        'NativeIdentityProvisioning.signMessageForDid returned no signature',
+      );
     }
     return result.signature;
   }
@@ -383,31 +600,47 @@ class NativeIdentityProvisioningBridge {
    */
   async signMessageFromSeed(phrase: string, message: string): Promise<string> {
     if (!this.nativeModule) {
-      throw new Error('NativeIdentityProvisioning not available on this platform');
+      throw new Error(
+        'NativeIdentityProvisioning not available on this platform',
+      );
     }
     if (!this.nativeModule.signMessageFromSeed) {
-      throw new Error('NativeIdentityProvisioning.signMessageFromSeed not available');
+      throw new Error(
+        'NativeIdentityProvisioning.signMessageFromSeed not available',
+      );
     }
     const startedAt = Date.now();
     // Avoid logging sensitive values (seed phrase / message contents).
-    console.log('[NativeIdentityProvisioning] signMessageFromSeed calling native', {
-      phraseWordCount: phrase.trim().split(/\s+/).filter(Boolean).length,
-      messageLen: message.length,
-    });
+    console.log(
+      '[NativeIdentityProvisioning] signMessageFromSeed calling native',
+      {
+        phraseWordCount: phrase.trim().split(/\s+/).filter(Boolean).length,
+        messageLen: message.length,
+      },
+    );
     const result = await this.nativeModule.signMessageFromSeed(phrase, message);
-    console.log('[NativeIdentityProvisioning] signMessageFromSeed native returned', {
-      elapsedMs: Date.now() - startedAt,
-      hasSignature: Boolean(result?.signature),
-    });
+    console.log(
+      '[NativeIdentityProvisioning] signMessageFromSeed native returned',
+      {
+        elapsedMs: Date.now() - startedAt,
+        hasSignature: Boolean(result?.signature),
+      },
+    );
     if (!result?.signature) {
-      throw new Error('NativeIdentityProvisioning.signMessageFromSeed returned no signature');
+      throw new Error(
+        'NativeIdentityProvisioning.signMessageFromSeed returned no signature',
+      );
     }
     return result.signature;
   }
 }
 
 // Export singleton instance
-export const nativeIdentityProvisioning = new NativeIdentityProvisioningBridge();
+export const nativeIdentityProvisioning =
+  new NativeIdentityProvisioningBridge();
+
+// Canonical alias used by lib-client/react-native/js PoUWController.
+export const identityProvisioning = nativeIdentityProvisioning;
 
 // Export types for use throughout app
-export type { GeneratedIdentityData, ProvisioningResult };
+export type { GeneratedIdentityData, ProvisioningResult, PublicIdentity };

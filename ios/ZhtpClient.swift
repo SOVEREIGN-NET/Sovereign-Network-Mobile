@@ -62,6 +62,10 @@ private func cSignRegistrationProof(_ handle: UnsafeMutableRawPointer, _ timesta
 @_silgen_name("zhtp_client_sign_message")
 private func cSignMessage(_ handle: UnsafeMutableRawPointer, _ message: UnsafeRawPointer, _ messageLen: Int) -> ByteBuffer
 
+// Sign PoUW receipt JSON (Rust canonical path: JSON -> Receipt -> bincode -> Dilithium signature)
+@_silgen_name("zhtp_client_sign_pouw_receipt_json")
+private func cSignPoUWReceiptJson(_ handle: UnsafeMutableRawPointer, _ receiptJson: UnsafeRawPointer, _ receiptJsonLen: Int) -> ByteBuffer
+
 // Sign UHP challenge (keeps private keys in Rust)
 @_silgen_name("zhtp_client_sign_uhp_challenge")
 private func cSignUhpChallenge(_ handle: UnsafeMutableRawPointer, _ challenge: UnsafeRawPointer, _ challengeLen: Int) -> ByteBuffer
@@ -112,7 +116,8 @@ private func cBuildTokenTransfer(
     _ toPubkey: UnsafePointer<UInt8>?,
     _ toPubkeyLen: Int,
     _ amount: UInt64,
-    _ chainId: UInt8
+    _ chainId: UInt8,
+    _ nonce: UInt64
 ) -> UnsafeMutablePointer<CChar>?
 
 /// Build signed token mint transaction
@@ -153,7 +158,8 @@ private func cBuildSovWalletTransfer(
     _ fromWalletId: UnsafePointer<UInt8>?,  // 32 bytes
     _ toWalletId: UnsafePointer<UInt8>?,    // 32 bytes
     _ amount: UInt64,
-    _ chainId: UInt8
+    _ chainId: UInt8,
+    _ nonce: UInt64
 ) -> UnsafeMutablePointer<CChar>?
 
 // MARK: - C FFI Declarations: Domain transactions (handle is opaque IdentityHandle*)
@@ -629,6 +635,29 @@ public class ZhtpClient {
         return Array(UnsafeBufferPointer(start: sigData.assumingMemoryBound(to: UInt8.self), count: buf.len))
     }
 
+    /// Sign PoUW receipt JSON using Rust canonical serialization path.
+    /// This guarantees parity with server verification (bincode::serialize(receipt)).
+    public static func signPoUWReceiptJson(_ receiptJson: String, using identity: Identity) throws -> [UInt8] {
+        guard let jsonData = receiptJson.data(using: .utf8) else {
+            throw ClientError.signingError("Failed to encode PoUW receipt JSON")
+        }
+
+        let buf = jsonData.withUnsafeBytes { dataPtr in
+            cSignPoUWReceiptJson(
+                identity.getHandle(),
+                dataPtr.baseAddress ?? UnsafeRawPointer(bitPattern: 0)!,
+                jsonData.count
+            )
+        }
+        defer { cBufferFree(buf) }
+
+        guard let sigData = buf.data, buf.len > 0 else {
+            throw ClientError.signingError("Failed to sign PoUW receipt JSON")
+        }
+
+        return Array(UnsafeBufferPointer(start: sigData.assumingMemoryBound(to: UInt8.self), count: buf.len))
+    }
+
     // MARK: Token transactions — handle is opaque IdentityHandle*
 
     /// Build signed token transfer transaction (returns hex-encoded string ready for API)
@@ -636,6 +665,7 @@ public class ZhtpClient {
         tokenId: Data,
         toPublicKey: Data,
         amount: UInt64,
+        nonce: UInt64,
         using identity: Identity,
         chainId: UInt8 = 0x02  // testnet
     ) throws -> String {
@@ -647,7 +677,8 @@ public class ZhtpClient {
                     toPubkeyPtr.baseAddress?.assumingMemoryBound(to: UInt8.self),
                     toPublicKey.count,
                     amount,
-                    chainId
+                    chainId,
+                    nonce
                 )
             }
         }) else {
@@ -737,9 +768,12 @@ public class ZhtpClient {
         fromWalletId: Data,
         toWalletId: Data,
         amount: UInt64,
+        nonce: UInt64,
         using identity: Identity,
         chainId: UInt8 = 0x02  // testnet
     ) throws -> String {
+        print("[ZhtpClient] buildSovWalletTransfer called with nonce = \(nonce), amount = \(amount)")
+        
         guard fromWalletId.count == 32 else {
             throw ClientError.signingError("fromWalletId must be exactly 32 bytes, got \(fromWalletId.count)")
         }
@@ -754,7 +788,8 @@ public class ZhtpClient {
                     fromPtr.baseAddress?.assumingMemoryBound(to: UInt8.self),
                     toPtr.baseAddress?.assumingMemoryBound(to: UInt8.self),
                     amount,
-                    chainId
+                    chainId,
+                    nonce
                 )
             }
         }) else {
@@ -856,7 +891,7 @@ public class ZhtpClient {
         let ok = json.withCString { cStr in
             cSetFeeConfigJsonEx(cStr, &updatedAt, &chainHeight)
         }
-        guard ok == 0 else {
+        guard ok == 1 else {
             throw ClientError.cryptoError("Failed to set fee config (code: \(ok))")
         }
         return (updatedAt, chainHeight)
