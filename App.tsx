@@ -19,6 +19,9 @@ import { Text } from './src/components'; // NavigationContainer is handled by ea
 import { useTranslation } from './src/i18n';
 import { config } from './src/config';
 import appDistribution from '@react-native-firebase/app-distribution';
+import { installLogGuard } from './src/utils/logging';
+
+installLogGuard();
 
 /**
  * AppContent component that uses auth context to determine which navigator to show
