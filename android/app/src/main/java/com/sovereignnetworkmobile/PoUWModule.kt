@@ -3,9 +3,13 @@ package com.sovereignnetworkmobile
 import android.util.Base64
 import android.util.Log
 import com.facebook.react.bridge.*
+import com.sovereignnetworkmobile.config.GeneratedConfig
 import com.sovereignnetworkmobile.pouw.PoUWController
 import com.sovereignnetworkmobile.pouw.model.PoUWError
+import com.sovereignnetworkmobile.web4.Web4Client
+import com.sovereignnetworkmobile.web4.Web4ManifestFile
 import kotlinx.coroutines.*
+import java.security.MessageDigest
 
 /**
  * React Native Bridge for PoUW (Proof-of-Useful-Work)
@@ -20,14 +24,13 @@ import kotlinx.coroutines.*
  *
  * RN is a button + lifecycle trigger, nothing more.
  *
- * TODO: Integrate with initialized PoUWController from MainApplication
- * The controller should be provided via dependency injection or singleton access
  */
 class PoUWModule(reactContext: ReactApplicationContext) :
     ReactContextBaseJavaModule(reactContext) {
 
     companion object {
         private const val TAG = "PoUWModule"
+        private const val MIN_VERIFIED_BYTES = 1024
     }
 
     override fun getName() = "PoUW"
@@ -37,12 +40,54 @@ class PoUWModule(reactContext: ReactApplicationContext) :
      */
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.Default)
 
-    /**
-     * Lazy initialization of PoUWController
-     * TODO: Replace with proper dependency injection from MainApplication
-     */
-    private val controller: PoUWController? by lazy {
-        PoUWController.getInstance()
+    @Volatile
+    private var controller: PoUWController? = null
+    private var controllerIdentityId: String? = null
+    private var loadedIdentity: Identity? = null
+    private var loadedIdentityId: String? = null
+
+    @Synchronized
+    private fun ensureController(): PoUWController? {
+        val currentIdentityId = IdentityStore.getCurrentIdentityId(reactApplicationContext) ?: return null
+        val normalizedIdentityId = normalizeIdentityId(currentIdentityId)
+
+        if (loadedIdentity == null || loadedIdentityId != normalizedIdentityId) {
+            loadedIdentity?.close()
+            loadedIdentity = IdentityStore.loadIdentity(reactApplicationContext, normalizedIdentityId)
+            loadedIdentityId = if (loadedIdentity != null) normalizedIdentityId else null
+        }
+
+        val identity = loadedIdentity ?: return null
+        val existingController = controller
+
+        if (existingController == null || controllerIdentityId != normalizedIdentityId) {
+            existingController?.destroy()
+            val created = PoUWController(
+                context = reactApplicationContext,
+                identity = identity,
+                nodeHost = GeneratedConfig.NODE_HOST,
+                nodePort = GeneratedConfig.NODE_PORT
+            )
+            created.start()
+            controller = created
+            controllerIdentityId = normalizedIdentityId
+            return created
+        }
+
+        if (!existingController.isRunning) {
+            existingController.start()
+        }
+
+        return existingController
+    }
+
+    private fun normalizeIdentityId(identityIdOrDid: String): String {
+        val trimmed = identityIdOrDid.trim()
+        return if (trimmed.startsWith("did:zhtp:")) {
+            trimmed.removePrefix("did:zhtp:")
+        } else {
+            trimmed
+        }
     }
 
     /**
@@ -60,27 +105,37 @@ class PoUWModule(reactContext: ReactApplicationContext) :
         providerId: String?,
         promise: Promise
     ) {
-        val ctrl = controller
+        val ctrl = ensureController()
         if (ctrl == null) {
-            promise.reject("CONTROLLER_NOT_INITIALIZED", "PoUWController not initialized")
+            promise.reject(
+                "CONTROLLER_NOT_INITIALIZED",
+                "PoUWController not initialized (no active identity)"
+            )
             return
         }
 
         scope.launch {
             try {
-                // Decode base64 inputs
-                val contentIdBytes = try {
-                    Base64.decode(contentId, Base64.NO_WRAP)
-                } catch (e: IllegalArgumentException) {
-                    promise.reject("INVALID_CONTENT_ID", "Failed to decode contentId from base64: ${e.message}")
-                    return@launch
-                }
-
                 val bytesData = try {
                     Base64.decode(bytes, Base64.NO_WRAP)
                 } catch (e: IllegalArgumentException) {
                     promise.reject("INVALID_BYTES", "Failed to decode bytes from base64: ${e.message}")
                     return@launch
+                }
+
+                val contentIdBytes = if (contentId.isBlank()) {
+                    // iOS parity: when contentId is missing, derive content hash from bytes.
+                    MessageDigest.getInstance("SHA-256").digest(bytesData)
+                } else {
+                    try {
+                        Base64.decode(contentId, Base64.NO_WRAP)
+                    } catch (e: IllegalArgumentException) {
+                        promise.reject(
+                            "INVALID_CONTENT_ID",
+                            "Failed to decode contentId from base64: ${e.message}"
+                        )
+                        return@launch
+                    }
                 }
 
                 val providerIdBytes = providerId?.let {
@@ -92,11 +147,27 @@ class PoUWModule(reactContext: ReactApplicationContext) :
                     }
                 }
 
+                if (bytesData.size < MIN_VERIFIED_BYTES) {
+                    promise.resolve(Arguments.createMap().apply {
+                        putBoolean("eligible", false)
+                        putString("reason", "min_bytes")
+                        putDouble("min_bytes_required", MIN_VERIFIED_BYTES.toDouble())
+                        putDouble("bytes_verified", bytesData.size.toDouble())
+                        putString("proof_type", "hash")
+                    })
+                    return@launch
+                }
+
                 // Call controller to submit content
                 // Note: Android's submitContent combines verification and recording
-                ctrl.submitContent(bytesData, contentIdBytes)
+                val receipt = ctrl.submitContent(bytesData, contentIdBytes, providerIdBytes)
 
-                promise.resolve(null)
+                promise.resolve(Arguments.createMap().apply {
+                    putBoolean("eligible", true)
+                    putString("receipt_id", receipt.receiptNonce.toHex())
+                    putDouble("bytes_verified", bytesData.size.toDouble())
+                    putString("proof_type", "hash")
+                })
             } catch (e: PoUWError) {
                 val (code, message) = mapPoUWError(e)
                 promise.reject(code, message)
@@ -107,6 +178,8 @@ class PoUWModule(reactContext: ReactApplicationContext) :
         }
     }
 
+    private fun ByteArray.toHex(): String = joinToString("") { b -> "%02x".format(b) }
+
     /**
      * Flush pending receipts to the server
      *
@@ -114,9 +187,12 @@ class PoUWModule(reactContext: ReactApplicationContext) :
      */
     @ReactMethod
     fun flush(promise: Promise) {
-        val ctrl = controller
+        val ctrl = ensureController()
         if (ctrl == null) {
-            promise.reject("CONTROLLER_NOT_INITIALIZED", "PoUWController not initialized")
+            promise.reject(
+                "CONTROLLER_NOT_INITIALIZED",
+                "PoUWController not initialized (no active identity)"
+            )
             return
         }
 
@@ -141,9 +217,9 @@ class PoUWModule(reactContext: ReactApplicationContext) :
      */
     @ReactMethod
     fun getPendingCount(promise: Promise) {
-        val ctrl = controller
+        val ctrl = ensureController()
         if (ctrl == null) {
-            promise.reject("CONTROLLER_NOT_INITIALIZED", "PoUWController not initialized")
+            promise.resolve(0)
             return
         }
 
@@ -163,6 +239,17 @@ class PoUWModule(reactContext: ReactApplicationContext) :
      */
     fun destroy() {
         scope.cancel()
+        controller?.destroy()
+        controller = null
+        controllerIdentityId = null
+        loadedIdentity?.close()
+        loadedIdentity = null
+        loadedIdentityId = null
+    }
+
+    override fun invalidate() {
+        super.invalidate()
+        destroy()
     }
 
     /**
@@ -171,8 +258,16 @@ class PoUWModule(reactContext: ReactApplicationContext) :
     @ReactMethod
     fun setNodeUrl(nodeUrl: String, promise: Promise) {
         try {
-            controller?.setNodeUrl(nodeUrl)
-            promise.resolve(nodeUrl)
+            val ctrl = ensureController()
+            if (ctrl == null) {
+                promise.reject(
+                    "CONTROLLER_NOT_INITIALIZED",
+                    "PoUWController not initialized (no active identity)"
+                )
+                return
+            }
+            ctrl.setNodeUrl(nodeUrl)
+            promise.resolve(nodeUrl.trim())
         } catch (e: Exception) {
             promise.reject("SET_NODE_URL_ERROR", e.message, e)
         }
@@ -183,21 +278,122 @@ class PoUWModule(reactContext: ReactApplicationContext) :
      */
     @ReactMethod
     fun getChallenge(cap: String?, maxBytes: Double, maxReceipts: Double, promise: Promise) {
+        val ctrl = ensureController()
+        if (ctrl == null) {
+            promise.reject(
+                "CONTROLLER_NOT_INITIALIZED",
+                "PoUWController not initialized (no active identity)"
+            )
+            return
+        }
+
         scope.launch {
             try {
-                val result = controller?.getChallenge(cap, maxBytes.toLong(), maxReceipts.toInt())
-                if (result != null) {
-                    promise.resolve(Arguments.createMap().apply {
-                        putString("token", result.token)
-                        putDouble("expires_at", result.expiresAt.toDouble())
-                    })
-                } else {
-                    promise.reject("CHALLENGE_ERROR", "Failed to get challenge")
-                }
+                val result = ctrl.getChallenge(cap, maxBytes.toLong(), maxReceipts.toInt())
+                promise.resolve(Arguments.createMap().apply {
+                    putString("token", result.token)
+                    putDouble("expires_at", result.expiresAt.toDouble())
+                })
             } catch (e: Exception) {
                 promise.reject("CHALLENGE_ERROR", e.message, e)
             }
         }
+    }
+
+    @ReactMethod
+    fun verifyDomainContent(domain: String, path: String?, providerId: String?, promise: Promise) {
+        val ctrl = ensureController()
+        if (ctrl == null) {
+            promise.reject(
+                "CONTROLLER_NOT_INITIALIZED",
+                "PoUWController not initialized (no active identity)"
+            )
+            return
+        }
+
+        val domainNormalized = domain.trim().lowercase()
+        val pathNormalized = normalizeManifestPath(path ?: "/")
+        if (domainNormalized.isEmpty()) {
+            promise.reject("INVALID_INPUT", "Domain is required")
+            return
+        }
+
+        scope.launch {
+            try {
+                val baseUrl = "quic://${GeneratedConfig.NODE_HOST}:${GeneratedConfig.NODE_PORT}"
+                val client = Web4Client(baseUrl = baseUrl, timeoutSecs = 30, insecure = true)
+
+                val resolved = client.resolveDomain(domainNormalized)
+                val manifest = client.fetchManifest(resolved.manifest_cid)
+                val selected = selectManifestFile(manifest.files, pathNormalized)
+                    ?: throw IllegalStateException("No file entry found for $domainNormalized$pathNormalized")
+                val bytesData = client.fetchBlob(selected.cid)
+
+                if (bytesData.size < MIN_VERIFIED_BYTES) {
+                    promise.resolve(Arguments.createMap().apply {
+                        putBoolean("eligible", false)
+                        putString("reason", "min_bytes")
+                        putDouble("min_bytes_required", MIN_VERIFIED_BYTES.toDouble())
+                        putDouble("bytes_verified", bytesData.size.toDouble())
+                        putString("proof_type", "hash")
+                        putString("domain", domainNormalized)
+                        putString("path", selected.path)
+                        putString("cid", selected.cid)
+                    })
+                    return@launch
+                }
+
+                val contentHash = MessageDigest.getInstance("SHA-256").digest(bytesData)
+                val providerIdBytes = providerId?.takeIf { it.isNotBlank() }?.let {
+                    try {
+                        Base64.decode(it, Base64.NO_WRAP)
+                    } catch (e: IllegalArgumentException) {
+                        null
+                    }
+                }
+
+                val receipt = ctrl.submitContent(bytesData, contentHash, providerIdBytes)
+                promise.resolve(Arguments.createMap().apply {
+                    putBoolean("eligible", true)
+                    putString("receipt_id", receipt.receiptNonce.toHex())
+                    putDouble("bytes_verified", bytesData.size.toDouble())
+                    putString("proof_type", "hash")
+                    putString("domain", domainNormalized)
+                    putString("path", selected.path)
+                    putString("cid", selected.cid)
+                })
+            } catch (e: PoUWError) {
+                val (code, message) = mapPoUWError(e)
+                promise.reject(code, message)
+            } catch (e: Exception) {
+                Log.e(TAG, "verifyDomainContent error", e)
+                promise.reject("WEB4_ERROR", "Failed to verify domain content: ${e.message}", e)
+            }
+        }
+    }
+
+    private fun selectManifestFile(files: List<Web4ManifestFile>, preferredPath: String): Web4ManifestFile? {
+        if (files.isEmpty()) return null
+
+        val normalized = normalizeManifestPath(preferredPath)
+        val normalizedNoSlash = if (normalized.startsWith("/")) normalized.substring(1) else normalized
+
+        files.firstOrNull { normalizeManifestPath(it.path) == normalized }?.let { return it }
+        files.firstOrNull { normalizeManifestPath(it.path) == normalizedNoSlash }?.let { return it }
+
+        files.firstOrNull { normalizeManifestPath(it.path) == "/index.html" }?.let { return it }
+        files.firstOrNull { normalizeManifestPath(it.path) == "index.html" }?.let { return it }
+
+        return files
+            .filter { it.size >= MIN_VERIFIED_BYTES.toLong() }
+            .maxByOrNull { it.size }
+            ?: files.maxByOrNull { it.size }
+    }
+
+    private fun normalizeManifestPath(path: String): String {
+        val trimmed = path.trim()
+        if (trimmed.isEmpty() || trimmed == "/") return "/index.html"
+        return trimmed
     }
 
     /**

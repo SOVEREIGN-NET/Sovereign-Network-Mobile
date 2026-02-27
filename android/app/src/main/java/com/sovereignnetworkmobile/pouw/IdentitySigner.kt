@@ -41,6 +41,29 @@ class IdentitySigner(private val identity: Identity) {
             throw PoUWError.SignatureError()
         }
     }
+
+    /**
+     * Signs a PoUW receipt JSON payload using the canonical Rust path:
+     * JSON -> Receipt struct -> bincode -> Dilithium5 signature.
+     */
+    @Throws(PoUWError::class)
+    fun signPoUWReceiptJson(receiptJson: String): ByteArray {
+        if (receiptJson.isBlank()) {
+            throw PoUWError.SignatureError()
+        }
+
+        return try {
+            val signature = identity.signPoUWReceiptJson(receiptJson)
+            if (signature == null || signature.isEmpty()) {
+                Log.e(TAG, "Identity.signPoUWReceiptJson returned null or empty signature")
+                throw PoUWError.SignatureError()
+            }
+            signature
+        } catch (e: Exception) {
+            Log.e(TAG, "PoUW JSON signing failed: ${e.message}", e)
+            throw PoUWError.SignatureError()
+        }
+    }
     
     /**
      * Signs a PoUW receipt with the required fields.

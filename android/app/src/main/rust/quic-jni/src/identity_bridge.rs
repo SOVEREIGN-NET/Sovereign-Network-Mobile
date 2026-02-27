@@ -1,10 +1,10 @@
 use anyhow::Result;
+use serde_json::json;
 use zhtp_client::identity::{
     deserialize_identity, get_seed_phrase, restore_identity_from_phrase, serialize_identity,
     sign_message, sign_registration_proof, Identity,
 };
 use zhtp_client::{generate_identity, get_public_identity};
-use serde_json::json;
 
 pub struct GeneratedIdentity {
     pub did: String,
@@ -41,7 +41,10 @@ pub fn generate_identity_bundle(device_id: &str) -> Result<GeneratedIdentity> {
     })
 }
 
-pub fn sign_registration_proof_from_identity(identity_json: &str, timestamp: u64) -> Result<Vec<u8>> {
+pub fn sign_registration_proof_from_identity(
+    identity_json: &str,
+    timestamp: u64,
+) -> Result<Vec<u8>> {
     let identity = deserialize_identity(identity_json)?;
     Ok(sign_registration_proof(&identity, timestamp)?)
 }
@@ -61,7 +64,10 @@ pub fn get_seed_phrase_from_identity(identity_json: &str) -> Result<String> {
     Ok(get_seed_phrase(&identity)?)
 }
 
-pub fn restore_identity_bundle_from_phrase(phrase: &str, device_id: &str) -> Result<GeneratedIdentity> {
+pub fn restore_identity_bundle_from_phrase(
+    phrase: &str,
+    device_id: &str,
+) -> Result<GeneratedIdentity> {
     let identity = restore_identity_from_phrase(phrase, device_id.to_string())?;
     let public = get_public_identity(&identity);
     let identity_json = serialize_identity(&identity)?;
@@ -84,7 +90,10 @@ pub fn restore_identity_bundle_from_phrase(phrase: &str, device_id: &str) -> Res
 
 pub fn identity_to_handshake_json(identity: &Identity) -> Result<String> {
     let key_id = zhtp_client::crypto::Blake3::hash(&identity.public_key);
-    let id_hex = identity.did.strip_prefix("did:zhtp:").unwrap_or(&identity.did);
+    let id_hex = identity
+        .did
+        .strip_prefix("did:zhtp:")
+        .unwrap_or(&identity.did);
     let id_bytes: Vec<u8> = hex::decode(id_hex).unwrap_or_else(|_| key_id.to_vec());
     let dao_member_id = format!("dao:{}", id_hex);
 
@@ -164,11 +173,20 @@ pub fn build_token_create_transaction(
     symbol: &str,
     initial_supply: u64,
     decimals: u8,
+    treasury_recipient: [u8; 32],
     chain_id: u8,
 ) -> Result<String> {
     let identity = deserialize_identity(identity_json)?;
-    zhtp_client::build_create_token_tx(&identity, name, symbol, initial_supply, decimals, chain_id)
-        .map_err(|e| anyhow::anyhow!("Failed to build token create transaction: {}", e))
+    zhtp_client::build_create_token_tx(
+        &identity,
+        name,
+        symbol,
+        initial_supply,
+        decimals,
+        treasury_recipient,
+        chain_id,
+    )
+    .map_err(|e| anyhow::anyhow!("Failed to build token create transaction: {}", e))
 }
 
 /// Build a signed token mint transaction (hex-encoded)
@@ -206,6 +224,7 @@ pub fn build_token_transfer_transaction(
     to_pubkey: &[u8],
     amount: u64,
     chain_id: u8,
+    nonce: u64,
 ) -> Result<String> {
     let identity = deserialize_identity(identity_json)?;
 
@@ -223,7 +242,7 @@ pub fn build_token_transfer_transaction(
         to_arr[..to_pubkey.len()].copy_from_slice(to_pubkey);
     }
 
-    zhtp_client::build_transfer_tx(&identity, &token_id_arr, &to_arr, amount, chain_id)
+    zhtp_client::build_transfer_tx(&identity, &token_id_arr, &to_arr, amount, chain_id, nonce)
         .map_err(|e| anyhow::anyhow!("Failed to build token transfer transaction: {}", e))
 }
 

@@ -65,20 +65,15 @@ export function getUseMockService(): boolean {
 /**
  * Set feature flag state (called from Developer Settings)
  */
-export function setUseMockService(value: boolean): void {
-  if (cachedUseMockService !== value) {
-    cachedUseMockService = value;
-    // Persist to storage
-    const key = 'zhtp_use_mock_service';
-    if (value === (process.env.REACT_APP_USE_MOCK_AUTH === 'true' && __DEV__)) {
-      // If setting back to default, remove from storage
-      storage.removeItem(key).catch(err => console.warn('Failed to clear mock service setting:', err));
-    } else {
-      // Otherwise persist the override
-      storage.setItem(key, JSON.stringify(value)).catch(err => console.warn('Failed to save mock service setting:', err));
-    }
-    // Notify all listeners
-    notifyMockServiceListeners(value);
+export function setUseMockService(_value: boolean): void {
+  // Mock mode is disabled across all builds.
+  const enforcedValue = false;
+  if (cachedUseMockService !== enforcedValue) {
+    cachedUseMockService = enforcedValue;
+    storage.removeItem('zhtp_use_mock_service').catch(err =>
+      console.warn('Failed to clear mock service setting:', err),
+    );
+    notifyMockServiceListeners(enforcedValue);
   }
 }
 

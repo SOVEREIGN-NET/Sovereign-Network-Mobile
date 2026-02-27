@@ -5,26 +5,32 @@
 
 @interface RCT_EXTERN_MODULE(RCTPoUW, NSObject)
 
-RCT_EXTERN_METHOD(verifyContent:(NSString *)contentId
-                  bytes:(NSString *)bytes
-                  providerId:(NSString *)providerId
-                  resolver:(RCTPromiseResolveBlock)resolve
-                  rejecter:(RCTPromiseRejectBlock)reject)
+RCT_EXTERN_METHOD(verifyContent:(id)contentId
+                  bytes:(id)bytes
+                  providerId:(id)providerId
+                  resolve:(RCTPromiseResolveBlock)resolve
+                  reject:(RCTPromiseRejectBlock)reject)
 
 RCT_EXTERN_METHOD(flush:(RCTPromiseResolveBlock)resolve
-                  rejecter:(RCTPromiseRejectBlock)reject)
+                  reject:(RCTPromiseRejectBlock)reject)
 
 RCT_EXTERN_METHOD(getPendingCount:(RCTPromiseResolveBlock)resolve
-                  rejecter:(RCTPromiseRejectBlock)reject)
+                  reject:(RCTPromiseRejectBlock)reject)
 
-RCT_EXTERN_METHOD(setNodeUrl:(NSString *)nodeUrl
-                  resolver:(RCTPromiseResolveBlock)resolve
-                  rejecter:(RCTPromiseRejectBlock)reject)
+RCT_EXTERN_METHOD(setNodeUrl:(id)nodeUrl
+                  resolve:(RCTPromiseResolveBlock)resolve
+                  reject:(RCTPromiseRejectBlock)reject)
 
-RCT_EXTERN_METHOD(getChallenge:(NSString *)cap
+RCT_EXTERN_METHOD(getChallenge:(id)cap
                   maxBytes:(double)maxBytes
                   maxReceipts:(double)maxReceipts
-                  resolver:(RCTPromiseResolveBlock)resolve
-                  rejecter:(RCTPromiseRejectBlock)reject)
+                  resolve:(RCTPromiseResolveBlock)resolve
+                  reject:(RCTPromiseRejectBlock)reject)
+
+RCT_EXTERN_METHOD(verifyDomainContent:(id)domain
+                  path:(id)path
+                  providerId:(id)providerId
+                  resolve:(RCTPromiseResolveBlock)resolve
+                  reject:(RCTPromiseRejectBlock)reject)
 
 @end

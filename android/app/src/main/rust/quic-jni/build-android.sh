@@ -3,7 +3,7 @@
 # This builds the quic-jni JNI wrapper which uses lib-client from The-Sovereign-Network
 # Requires: Rust with Android targets, Android NDK
 
-set -e
+set -euo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 cd "$SCRIPT_DIR"
@@ -50,7 +50,7 @@ echo "   NDK: $NDK_HOME"
 echo "   Output: $OUTPUT_DIR"
 echo ""
 
-if [ -n "$ANDROID_ABIS" ]; then
+if [ -n "${ANDROID_ABIS:-}" ]; then
     IFS=',' read -r -a ABI_LIST <<< "$ANDROID_ABIS"
     FILTERED_TARGETS=()
     for target_info in "${TARGETS[@]}"; do

@@ -188,6 +188,36 @@ const ProfileScreen = ({ navigation }: any) => {
   const reputationScore = 0;
   const authLoading = isLoading || loggingOut;
 
+  const formatCreatedDate = (raw: unknown): string | null => {
+    if (raw === null || raw === undefined) return null;
+
+    let parsed: Date | null = null;
+
+    if (typeof raw === 'number' && Number.isFinite(raw)) {
+      if (raw <= 0) return null;
+      // Node timestamps are often seconds; JS Date expects milliseconds.
+      const ms = raw < 1_000_000_000_000 ? raw * 1000 : raw;
+      parsed = new Date(ms);
+    } else if (typeof raw === 'string') {
+      const trimmed = raw.trim();
+      if (!trimmed) return null;
+      if (/^\d+$/.test(trimmed)) {
+        const numeric = Number(trimmed);
+        if (!Number.isFinite(numeric) || numeric <= 0) return null;
+        const ms = numeric < 1_000_000_000_000 ? numeric * 1000 : numeric;
+        parsed = new Date(ms);
+      } else {
+        parsed = new Date(trimmed);
+      }
+    }
+
+    if (!parsed || Number.isNaN(parsed.getTime())) return null;
+    if (parsed.getUTCFullYear() <= 1970) return null;
+    return parsed.toLocaleDateString();
+  };
+
+  const createdDate = formatCreatedDate(currentIdentity.createdAt);
+
   return (
     <ScreenLayout paddingTop={spacing.md}>
       <ScrollView showsVerticalScrollIndicator={false}>
@@ -312,12 +342,12 @@ const ProfileScreen = ({ navigation }: any) => {
                       : t.identity.details.notVerified
                   }
                 />
-                <DetailRow
-                  label={t.identity.details.created}
-                  value={new Date(
-                    currentIdentity.createdAt || '',
-                  ).toLocaleDateString()}
-                />
+                {createdDate && (
+                  <DetailRow
+                    label={t.identity.details.created}
+                    value={createdDate}
+                  />
+                )}
               </Column>
             </Card>
           </View>

@@ -12,7 +12,7 @@
  * RN is a button + lifecycle trigger, nothing more.
  */
 
-import { NativeModules, Platform } from 'react-native';
+import { NativeModules } from 'react-native';
 
 /**
  * Native module interface (internal - uses base64 strings for byte arrays)
@@ -22,17 +22,39 @@ interface PoUWNativeModule {
     contentId: string,
     bytes: string,
     providerId?: string,
-  ): Promise<void>;
+  ): Promise<{
+    eligible: boolean;
+    reason?: string;
+    min_bytes_required?: number;
+    bytes_verified?: number;
+    proof_type?: string;
+    receipt_id?: string;
+  }>;
   flush(): Promise<void>;
   getPendingCount(): Promise<number>;
   setNodeUrl(nodeUrl: string): Promise<string>;
   getChallenge(
-    cap: string | null,
+    cap: string | undefined | null,
     maxBytes: number,
     maxReceipts: number,
   ): Promise<{
     token: string;
     expires_at: number;
+  }>;
+  verifyDomainContent?(
+    domain: string,
+    path?: string,
+    providerId?: string,
+  ): Promise<{
+    eligible: boolean;
+    reason?: string;
+    min_bytes_required?: number;
+    bytes_verified?: number;
+    proof_type?: string;
+    receipt_id?: string;
+    domain?: string;
+    path?: string;
+    cid?: string;
   }>;
 }
 
@@ -51,7 +73,14 @@ export interface PoUWInterface {
     contentId: Uint8Array,
     bytes: Uint8Array,
     providerId?: Uint8Array,
-  ): Promise<void>;
+  ): Promise<{
+    eligible: boolean;
+    reason?: string;
+    min_bytes_required?: number;
+    bytes_verified?: number;
+    proof_type?: string;
+    receipt_id?: string;
+  }>;
 
   /**
    * Flush pending receipts to the server
@@ -78,6 +107,25 @@ export interface PoUWInterface {
   ): Promise<{
     token: string;
     expires_at: number;
+  }>;
+
+  /**
+   * Verify real Web4 content bytes for a domain/path (native resolver + blob fetch).
+   */
+  verifyDomainContent(
+    domain: string,
+    path?: string,
+    providerId?: string,
+  ): Promise<{
+    eligible: boolean;
+    reason?: string;
+    min_bytes_required?: number;
+    bytes_verified?: number;
+    proof_type?: string;
+    receipt_id?: string;
+    domain?: string;
+    path?: string;
+    cid?: string;
   }>;
 }
 
@@ -129,21 +177,26 @@ export const PoUW: PoUWInterface = {
     contentId: Uint8Array,
     bytes: Uint8Array,
     providerId?: Uint8Array,
-  ): Promise<void> {
+  ): Promise<{
+    eligible: boolean;
+    reason?: string;
+    min_bytes_required?: number;
+    bytes_verified?: number;
+    proof_type?: string;
+    receipt_id?: string;
+  }> {
     if (!PoUWNative) {
       return Promise.reject(new Error('PoUW native module not available'));
     }
 
     // Validate inputs
-    if (!contentId || contentId.length === 0) {
-      return Promise.reject(new Error('contentId is required'));
-    }
     if (!bytes || bytes.length === 0) {
       return Promise.reject(new Error('bytes is required'));
     }
 
-    // Convert Uint8Array to base64 for native bridge
-    const contentIdB64 = toBase64(contentId);
+    // contentId can be empty - native will compute hash from bytes
+    const contentIdB64 =
+      contentId && contentId.length > 0 ? toBase64(contentId) : '';
     const bytesB64 = toBase64(bytes);
     const providerIdB64 = providerId ? toBase64(providerId) : undefined;
 
@@ -203,10 +256,39 @@ export const PoUW: PoUWInterface = {
     }
 
     return PoUWNative.getChallenge(
-      cap ?? null,
+      cap ?? undefined,
       maxBytes ?? 0,
       maxReceipts ?? 0,
     );
+  },
+
+  verifyDomainContent(
+    domain: string,
+    path?: string,
+    providerId?: string,
+  ): Promise<{
+    eligible: boolean;
+    reason?: string;
+    min_bytes_required?: number;
+    bytes_verified?: number;
+    proof_type?: string;
+    receipt_id?: string;
+    domain?: string;
+    path?: string;
+    cid?: string;
+  }> {
+    if (!PoUWNative) {
+      return Promise.reject(new Error('PoUW native module not available'));
+    }
+    if (!PoUWNative.verifyDomainContent) {
+      return Promise.reject(
+        new Error('PoUW verifyDomainContent is not available on this platform'),
+      );
+    }
+    if (!domain || !domain.trim()) {
+      return Promise.reject(new Error('domain is required'));
+    }
+    return PoUWNative.verifyDomainContent(domain.trim(), path ?? '/', providerId);
   },
 };
 

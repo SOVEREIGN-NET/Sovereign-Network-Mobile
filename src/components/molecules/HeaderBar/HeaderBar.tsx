@@ -75,6 +75,19 @@ const HeaderBar: React.FC<HeaderBarProps> = ({
       flexDirection: 'row',
       alignItems: 'center',
       justifyContent: 'space-between',
+      position: 'relative',
+      minHeight: 40,
+    },
+    sideSlot: {
+      minWidth: 92,
+      flexDirection: 'row',
+      alignItems: 'center',
+    },
+    leftSlot: {
+      justifyContent: 'flex-start',
+    },
+    rightSlot: {
+      justifyContent: 'flex-end',
     },
     hamburger: {
       padding: spacing.sm,
@@ -91,9 +104,12 @@ const HeaderBar: React.FC<HeaderBarProps> = ({
       borderRadius: 1,
     },
     centerSection: {
-      flex: 1,
+      position: 'absolute',
+      left: 0,
+      right: 0,
+      top: 0,
+      bottom: 0,
       alignItems: 'center',
-      marginHorizontal: spacing.md,
       flexDirection: 'row',
       gap: spacing.md,
     },
@@ -131,7 +147,7 @@ const HeaderBar: React.FC<HeaderBarProps> = ({
     },
     rightSection: {
       padding: spacing.sm,
-      marginRight: -spacing.sm,
+      marginRight: 0,
     },
   });
 
@@ -139,47 +155,52 @@ const HeaderBar: React.FC<HeaderBarProps> = ({
     <View style={styles.container}>
       <Row style={styles.contentRow}>
         {/* Hamburger Menu */}
-        {showHamburger && (
-          <Pressable
-            onPress={onMenuPress}
-            style={styles.hamburger}
-            hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
-          >
-            <View style={styles.hamburgerIcon}>
-              <View style={styles.hamburgerLine} />
-              <View style={styles.hamburgerLine} />
-              <View style={styles.hamburgerLine} />
-            </View>
-          </Pressable>
-        )}
+        <View style={[styles.sideSlot, styles.leftSlot]}>
+          {showHamburger && (
+            <Pressable
+              onPress={onMenuPress}
+              style={styles.hamburger}
+              hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+            >
+              <View style={styles.hamburgerIcon}>
+                <View style={styles.hamburgerLine} />
+                <View style={styles.hamburgerLine} />
+                <View style={styles.hamburgerLine} />
+              </View>
+            </Pressable>
+          )}
+        </View>
 
         {/* Center: SOV Balance Counter - Tappable */}
         <Pressable
           onPress={onBalancePress}
           style={[styles.centerSection, styles.centerJustify]}
+          pointerEvents="box-only"
           hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
         >
           <Text style={styles.sovLabel}>SOV {displayBalance}</Text>
         </Pressable>
 
         {/* Right: Connection Status */}
-        <Row style={styles.rightSection}>
-          <View
-            style={[
-              styles.statusIndicator,
-              connectionStatus === 'checking'
-                ? styles.statusChecking
-                : connectionStatus === 'idle'
-                ? styles.statusIdle
-                : isConnected
-                ? styles.statusConnected
-                : styles.statusDisconnected,
-            ]}
-          />
-          <Text style={{ color: colors.text_secondary }}>
-            {getStatusText()}
-          </Text>
-        </Row>
+        <View style={[styles.sideSlot, styles.rightSlot]}>
+          <Row style={styles.rightSection}>
+            <View
+              style={[
+                styles.statusIndicator,
+                connectionStatus === 'checking'
+                  ? styles.statusChecking
+                  : connectionStatus === 'idle'
+                  ? styles.statusIdle
+                  : isConnected
+                  ? styles.statusConnected
+                  : styles.statusDisconnected,
+              ]}
+            />
+            <Text style={{ color: colors.text_secondary }}>
+              {getStatusText()}
+            </Text>
+          </Row>
+        </View>
       </Row>
     </View>
   );

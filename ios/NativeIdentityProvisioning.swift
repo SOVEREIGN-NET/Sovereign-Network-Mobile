@@ -1,6 +1,7 @@
 import Foundation
 import React
 import CryptoKit
+import UIKit
 
 // MARK: - Generated Identity Structure (now uses lib-client)
 
@@ -39,9 +40,11 @@ class GeneratedIdentity {
 /// Exposes device-based identity provisioning to JavaScript
 /// All private keys stay on device - only public keys sent to server
 @objc(NativeIdentityProvisioning)
-class NativeIdentityProvisioning: NSObject {
+class NativeIdentityProvisioning: NSObject, UIDocumentPickerDelegate {
     private let queue = DispatchQueue(label: "com.sovereignnetwork.identity-provisioning", qos: .userInitiated)
     private var cachedIdentities: [String: GeneratedIdentity] = [:]  // Cache for temporary storage
+    private var backupExportResolve: RCTPromiseResolveBlock?
+    private var backupExportReject: RCTPromiseRejectBlock?
 
     // MARK: - Identity Generation
 
@@ -334,6 +337,127 @@ class NativeIdentityProvisioning: NSObject {
         }
     }
 
+    /// Export identity keystore blob as base64 for backup payload generation.
+    /// JavaScript API: await NativeIdentityProvisioning.exportKeystoreBase64(identityIdOrDid)
+    @objc
+    func exportKeystoreBase64(
+        _ identityIdOrDid: String,
+        resolve: @escaping RCTPromiseResolveBlock,
+        reject: @escaping RCTPromiseRejectBlock
+    ) {
+        queue.async { [weak self] in
+            guard let self = self else {
+                reject("IDENTITY_ERROR", "Module deallocated", nil)
+                return
+            }
+
+            let trimmed = identityIdOrDid.trimmingCharacters(in: .whitespacesAndNewlines)
+            if trimmed.isEmpty {
+                reject("IDENTITY_ERROR", "Missing identity id or DID", nil)
+                return
+            }
+
+            do {
+                guard let identity = self.resolveIdentity(identityIdOrDid: trimmed) else {
+                    reject("IDENTITY_ERROR", "Identity not found for backup export", nil)
+                    return
+                }
+                let base64 = try ZhtpClient.exportKeystoreBase64(identity)
+                resolve(base64)
+            } catch {
+                reject("IDENTITY_ERROR", "Failed to export keystore: \(error)", nil)
+            }
+        }
+    }
+
+    /// Persist a backup payload to an on-device file and return URI/path for sharing.
+    /// JavaScript API: await NativeIdentityProvisioning.createBackupFile(fileName, content)
+    @objc
+    func createBackupFile(
+        _ fileName: String,
+        content: String,
+        resolve: @escaping RCTPromiseResolveBlock,
+        reject: @escaping RCTPromiseRejectBlock
+    ) {
+        queue.async {
+            let safeFileName = fileName
+                .replacingOccurrences(of: "/", with: "_")
+                .replacingOccurrences(of: ":", with: "_")
+                .replacingOccurrences(of: "\\", with: "_")
+
+            guard let docsDir = FileManager.default.urls(for: .documentDirectory, in: .userDomainMask).first else {
+                reject("BACKUP_FILE_ERROR", "Documents directory unavailable", nil)
+                return
+            }
+
+            let backupDir = docsDir.appendingPathComponent("Backups", isDirectory: true)
+            let fileUrl = backupDir.appendingPathComponent(safeFileName)
+
+            do {
+                guard let data = content.data(using: .utf8) else {
+                    reject("BACKUP_FILE_ERROR", "Failed to encode backup content", nil)
+                    return
+                }
+                try FileManager.default.createDirectory(at: backupDir, withIntermediateDirectories: true, attributes: nil)
+                try data.write(to: fileUrl, options: .atomic)
+
+                resolve([
+                    "path": fileUrl.path,
+                    "uri": fileUrl.absoluteString,
+                    "fileName": safeFileName
+                ])
+            } catch {
+                reject("BACKUP_FILE_ERROR", "Failed to create backup file: \(error)", nil)
+            }
+        }
+    }
+
+    /// Present iOS document export picker so users can save backup to Files/Downloads.
+    /// JavaScript API: await NativeIdentityProvisioning.exportBackupFile(filePath)
+    @objc
+    func exportBackupFile(
+        _ filePath: String,
+        resolve: @escaping RCTPromiseResolveBlock,
+        reject: @escaping RCTPromiseRejectBlock
+    ) {
+        DispatchQueue.main.async {
+            let sourcePath = filePath.trimmingCharacters(in: .whitespacesAndNewlines)
+            guard !sourcePath.isEmpty else {
+                reject("BACKUP_EXPORT_ERROR", "Missing backup file path", nil)
+                return
+            }
+
+            guard FileManager.default.fileExists(atPath: sourcePath) else {
+                reject("BACKUP_EXPORT_ERROR", "Backup file does not exist", nil)
+                return
+            }
+
+            guard self.backupExportResolve == nil else {
+                reject("BACKUP_EXPORT_ERROR", "Another backup export is in progress", nil)
+                return
+            }
+
+            guard let presenter = self.topViewController() else {
+                reject("BACKUP_EXPORT_ERROR", "Unable to open export picker", nil)
+                return
+            }
+
+            self.backupExportResolve = resolve
+            self.backupExportReject = reject
+
+            let sourceUrl = URL(fileURLWithPath: sourcePath)
+            let picker: UIDocumentPickerViewController
+            if #available(iOS 14.0, *) {
+                picker = UIDocumentPickerViewController(forExporting: [sourceUrl], asCopy: true)
+            } else {
+                picker = UIDocumentPickerViewController(url: sourceUrl, in: .exportToService)
+            }
+            picker.delegate = self
+            picker.modalPresentationStyle = .formSheet
+            presenter.present(picker, animated: true)
+        }
+    }
+
     /// Restore identity from a 24-word master seed phrase
     /// JavaScript API: await NativeIdentityProvisioning.restoreIdentityFromPhrase(phrase)
     @objc
@@ -407,6 +531,111 @@ class NativeIdentityProvisioning: NSObject {
     }
 
     // MARK: - Helper Functions
+
+    private func topViewController(base: UIViewController? = nil) -> UIViewController? {
+        let root: UIViewController?
+        if let base = base {
+            root = base
+        } else {
+            root = UIApplication.shared.connectedScenes
+                .compactMap { $0 as? UIWindowScene }
+                .flatMap { $0.windows }
+                .first(where: { $0.isKeyWindow })?
+                .rootViewController
+        }
+
+        if let nav = root as? UINavigationController {
+            return topViewController(base: nav.visibleViewController)
+        }
+        if let tab = root as? UITabBarController, let selected = tab.selectedViewController {
+            return topViewController(base: selected)
+        }
+        if let presented = root?.presentedViewController {
+            return topViewController(base: presented)
+        }
+        return root
+    }
+
+    private func clearBackupExportCallbacks() {
+        self.backupExportResolve = nil
+        self.backupExportReject = nil
+    }
+
+    func documentPicker(_ controller: UIDocumentPickerViewController, didPickDocumentsAt urls: [URL]) {
+        let resolve = self.backupExportResolve
+        defer { clearBackupExportCallbacks() }
+        if let destination = urls.first {
+            resolve?([
+                "saved": true,
+                "destination": destination.path
+            ])
+        } else {
+            resolve?([
+                "saved": true
+            ])
+        }
+    }
+
+    func documentPickerWasCancelled(_ controller: UIDocumentPickerViewController) {
+        let resolve = self.backupExportResolve
+        defer { clearBackupExportCallbacks() }
+        resolve?([
+            "saved": false,
+            "cancelled": true
+        ])
+    }
+
+    private func resolveIdentity(identityIdOrDid: String) -> Identity? {
+        let trimmed = identityIdOrDid.trimmingCharacters(in: .whitespacesAndNewlines)
+        if trimmed.isEmpty {
+            return nil
+        }
+
+        let identityId = trimmed.hasPrefix("did:zhtp:") ? String(trimmed.dropFirst(9)) : trimmed
+        let prefixedDid = trimmed.hasPrefix("did:zhtp:") ? trimmed : "did:zhtp:\(identityId)"
+
+        if let cached = self.cachedIdentities[trimmed]?.libClientIdentity as? Identity {
+            return cached
+        }
+        if let cached = self.cachedIdentities[prefixedDid]?.libClientIdentity as? Identity {
+            return cached
+        }
+        if let cached = self.cachedIdentities[identityId]?.libClientIdentity as? Identity {
+            return cached
+        }
+
+        if let identity = IdentityHandleStore.shared.retrieve(by: trimmed) as? Identity {
+            return identity
+        }
+        if let identity = IdentityHandleStore.shared.retrieve(by: identityId) as? Identity {
+            return identity
+        }
+
+        if let identity = IdentityHandleStore.shared.getLatestIdentity() as? Identity {
+            if identity.did == trimmed || identity.did == prefixedDid || identity.did.hasSuffix(identityId) {
+                return identity
+            }
+        }
+
+        let keychainQuery: [String: Any] = [
+            kSecClass as String: kSecClassGenericPassword,
+            kSecAttrService as String: "com.sovereign.zhtp",
+            kSecAttrAccount as String: "identity_serialized_\(identityId)",
+            kSecReturnData as String: true
+        ]
+
+        var result: CFTypeRef?
+        let status = SecItemCopyMatching(keychainQuery as CFDictionary, &result)
+        if status == errSecSuccess,
+           let data = result as? Data,
+           let jsonString = String(data: data, encoding: .utf8),
+           let identity = try? ZhtpClient.deserializeIdentity(jsonString) {
+            try? IdentityHandleStore.shared.store(identity: identity, identityId: identityId)
+            return identity
+        }
+
+        return nil
+    }
 
     // MARK: - Private Implementation
 
@@ -849,9 +1078,25 @@ class NativeIdentityProvisioning: NSObject {
                     return
                 }
 
+                // Parse nonce - required for transaction
+                var nonceValue: UInt64 = 0
+                if let nonceStr = params["nonce"] as? String {
+                    guard let parsed = UInt64(nonceStr) else {
+                        reject("INVALID_PARAMS", "nonce must be a valid integer string", nil)
+                        return
+                    }
+                    nonceValue = parsed
+                } else if let nonceNum = params["nonce"] as? NSNumber {
+                    nonceValue = nonceNum.uint64Value
+                } else {
+                    reject("INVALID_PARAMS", "nonce is required (string or number)", nil)
+                    return
+                }
+
                 print("[NativeIdentityProvisioning] Building signed token transfer transaction")
                 print("[NativeIdentityProvisioning]   Token ID: \(tokenId)")
                 print("[NativeIdentityProvisioning]   Amount: \(amountValue)")
+                print("[NativeIdentityProvisioning]   Nonce: \(nonceValue)")
                 print("[NativeIdentityProvisioning]   To: \(toAddress)")
 
                 guard let identityAny = IdentityHandleStore.shared.getLatestIdentity(),
@@ -872,6 +1117,7 @@ class NativeIdentityProvisioning: NSObject {
                     tokenId: tokenIdData,
                     toPublicKey: toPubkey,
                     amount: amountValue,
+                    nonce: nonceValue,
                     using: identity,
                     chainId: 0x02  // testnet
                 )
@@ -899,6 +1145,66 @@ class NativeIdentityProvisioning: NSObject {
         }
     }
 
+    /// Sign a token burn transaction with Dilithium keypair
+    @objc
+    func signTokenBurnTransaction(
+        _ params: NSDictionary,
+        resolve: @escaping RCTPromiseResolveBlock,
+        reject: @escaping RCTPromiseRejectBlock
+    ) {
+        queue.async { [weak self] in
+            guard self != nil else {
+                reject("IDENTITY_ERROR", "Module deallocated", nil)
+                return
+            }
+
+            do {
+                guard let tokenId = params["tokenId"] as? String else {
+                    reject("INVALID_PARAMS", "Missing tokenId", nil)
+                    return
+                }
+
+                var amountValue: UInt64 = 0
+                if let amountStr = params["amount"] as? String {
+                    guard let parsed = UInt64(amountStr) else {
+                        reject("INVALID_PARAMS", "amount must be a valid integer string", nil)
+                        return
+                    }
+                    amountValue = parsed
+                } else if let amountNum = params["amount"] as? NSNumber {
+                    amountValue = amountNum.uint64Value
+                } else {
+                    reject("INVALID_PARAMS", "amount must be a string or number", nil)
+                    return
+                }
+
+                guard let identityAny = IdentityHandleStore.shared.getLatestIdentity(),
+                      let identity = identityAny as? Identity else {
+                    reject("NO_IDENTITY", "No active identity for signing", nil)
+                    return
+                }
+
+                guard let tokenIdData = Data(fromHexString: tokenId) else {
+                    reject("INVALID_PARAMS", "Invalid token ID format", nil)
+                    return
+                }
+
+                let hexSignedTx = try ZhtpClient.buildTokenBurn(
+                    tokenId: tokenIdData,
+                    amount: amountValue,
+                    using: identity,
+                    chainId: 0x02
+                )
+
+                resolve(["signed_tx": hexSignedTx])
+
+            } catch {
+                print("[NativeIdentityProvisioning] ❌ Burn signing failed: \(error)")
+                reject("SIGNING_ERROR", "Failed to sign burn transaction: \(error)", nil)
+            }
+        }
+    }
+
     /// Sign a SOV wallet-to-wallet transfer transaction with Dilithium keypair
     /// Uses wallet IDs (32 bytes each) instead of token_id + pubkey
     @objc
@@ -907,6 +1213,8 @@ class NativeIdentityProvisioning: NSObject {
         resolve: @escaping RCTPromiseResolveBlock,
         reject: @escaping RCTPromiseRejectBlock
     ) {
+        print("[NativeIdentityProvisioning] 🚨 signSovWalletTransferTransaction CALLED!")
+        print("[NativeIdentityProvisioning] 🚨 params: \(params)")
         queue.async { [weak self] in
             do {
                 guard let fromWalletIdHex = params["fromWalletId"] as? String,
@@ -930,6 +1238,29 @@ class NativeIdentityProvisioning: NSObject {
                     return
                 }
 
+                // Parse nonce - required for transaction
+                var nonceValue: UInt64 = 0
+                if let nonceStr = params["nonce"] as? String {
+                    guard let parsed = UInt64(nonceStr) else {
+                        reject("INVALID_PARAMS", "nonce must be a valid integer string", nil)
+                        return
+                    }
+                    nonceValue = parsed
+                } else if let nonceNum = params["nonce"] as? NSNumber {
+                    nonceValue = nonceNum.uint64Value
+                } else {
+                    reject("INVALID_PARAMS", "nonce is required (string or number)", nil)
+                    return
+                }
+
+                var chainId: UInt8 = 0x02
+                if let chainIdNum = params["chainId"] as? NSNumber {
+                    chainId = UInt8(truncating: chainIdNum)
+                } else if let chainIdStr = params["chainId"] as? String,
+                          let parsedChainId = UInt8(chainIdStr) {
+                    chainId = parsedChainId
+                }
+
                 // Validate and decode wallet IDs (must be 64 hex chars = 32 bytes each)
                 guard let fromWalletId = Data(fromHexString: fromWalletIdHex), fromWalletId.count == 32 else {
                     reject("INVALID_PARAMS", "fromWalletId must be 64 hex characters (32 bytes)", nil)
@@ -940,10 +1271,21 @@ class NativeIdentityProvisioning: NSObject {
                     return
                 }
 
+                print("[NativeIdentityProvisioning] >>> PARSED nonce from JS: \(nonceValue)")
+                print("[NativeIdentityProvisioning] >>> PASSING nonce to ZhtpClient: \(nonceValue)")
+                
+                // DEBUG: Log all params as hex string for verification
+                print("[NativeIdentityProvisioning] DEBUG: fromWalletIdHex = \(fromWalletIdHex)")
+                print("[NativeIdentityProvisioning] DEBUG: toWalletIdHex = \(toWalletIdHex)")
+                print("[NativeIdentityProvisioning] DEBUG: amountValue = \(amountValue)")
+                print("[NativeIdentityProvisioning] DEBUG: nonceValue = \(nonceValue)")
+                print("[NativeIdentityProvisioning] DEBUG: chainId = \(chainId)")
+
                 print("[NativeIdentityProvisioning] Building signed SOV wallet transfer transaction")
                 print("[NativeIdentityProvisioning]   From: \(fromWalletIdHex)")
                 print("[NativeIdentityProvisioning]   To: \(toWalletIdHex)")
                 print("[NativeIdentityProvisioning]   Amount: \(amountValue)")
+                print("[NativeIdentityProvisioning]   Nonce: \(nonceValue)")
 
                 guard let identityAny = IdentityHandleStore.shared.getLatestIdentity(),
                       let identity = identityAny as? Identity else {
@@ -955,8 +1297,9 @@ class NativeIdentityProvisioning: NSObject {
                     fromWalletId: fromWalletId,
                     toWalletId: toWalletId,
                     amount: amountValue,
+                    nonce: nonceValue,
                     using: identity,
-                    chainId: 0x02  // testnet
+                    chainId: chainId
                 )
 
                 print("[NativeIdentityProvisioning] SOV wallet transfer transaction built and signed")

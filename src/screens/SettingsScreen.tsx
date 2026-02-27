@@ -3,11 +3,8 @@ import {
   View,
   Alert,
   Pressable,
-  useColorScheme,
   ScrollView,
 } from 'react-native';
-import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import AsyncStorage from '@react-native-async-storage/async-storage';
 import {
   Card,
   Text,
@@ -15,50 +12,29 @@ import {
   Column,
   Row,
   ScreenLayout,
-  HeaderBar,
 } from '../components';
-import { useAuth, useNativeSettings } from '../hooks';
+import { useAuth } from '../hooks';
 import { useTranslation } from '../i18n';
 import { colors, spacing, typography, borderRadius } from '../theme';
 import { setUseMockService } from '../context/AuthContext';
-import { DEFAULT_SOV_NODE_URL, APP_DEFAULTS } from '../config';
+import { DEFAULT_SOV_NODE_URL } from '../config';
 
-type Theme = 'light' | 'dark' | 'system';
 type Language = 'en' | 'es' | 'fr' | 'de';
 
 const SettingsScreen = ({ navigation }: any) => {
-  const insets = useSafeAreaInsets();
   const { t } = useTranslation();
   const { currentIdentity, signOut, isLoading } = useAuth();
-  const deviceColorScheme = useColorScheme();
-  const { settings: nativeSettings, saveSettings: saveNativeSettings } =
-    useNativeSettings();
 
   // Local state for settings (would be persisted in real app)
-  const [theme, setTheme] = useState<Theme>('system');
   const [language, setLanguage] = useState<Language>('en');
-  const [fontSize, setFontSize] = useState<'small' | 'normal' | 'large'>(
-    'normal',
-  );
   const [notificationsEnabled, setNotificationsEnabled] = useState(true);
   const [analyticsEnabled, setAnalyticsEnabled] = useState(true);
-  const [showThemeOptions, setShowThemeOptions] = useState(false);
   const [showLanguageOptions, setShowLanguageOptions] = useState(false);
-  const [showFontOptions, setShowFontOptions] = useState(false);
 
-  // Developer settings (synced with native phone settings)
-  const [useMockData, setUseMockData] = useState(
-    nativeSettings?.useMockData ?? APP_DEFAULTS.useMockData,
-  );
-
-  // Sync when native settings load
+  // Force mock-data feature disabled in all builds.
   useEffect(() => {
-    if (nativeSettings) {
-      setUseMockData(nativeSettings.useMockData);
-      // Sync global feature flag
-      setUseMockService(nativeSettings.useMockData);
-    }
-  }, [nativeSettings]);
+    setUseMockService(false);
+  }, []);
 
   const handleLogout = () => {
     Alert.alert(
@@ -104,9 +80,7 @@ const SettingsScreen = ({ navigation }: any) => {
         {
           text: t.settings.reset.confirm,
           onPress: () => {
-            setTheme('system');
             setLanguage('en');
-            setFontSize('normal');
             setNotificationsEnabled(true);
             setAnalyticsEnabled(true);
             Alert.alert(
@@ -120,222 +94,13 @@ const SettingsScreen = ({ navigation }: any) => {
     );
   };
 
-  const handleSaveDeveloperSettings = async () => {
-    try {
-      // Save useMockData to AsyncStorage
-      await AsyncStorage.setItem('useMockData', useMockData.toString());
-
-      // Also save to native phone settings
-      await saveNativeSettings({
-        useMockData,
-      });
-
-      // Update the global feature flag
-      setUseMockService(useMockData);
-
-      Alert.alert(t.settings.developer.saved, `Mock Data: ${useMockData}`);
-    } catch (error) {
-      Alert.alert('Error', 'Failed to save developer settings');
-      console.error('Failed to save developer settings:', error);
-    }
-  };
-
-  const getThemeLabel = () => {
-    if (theme === 'system') {
-      return deviceColorScheme === 'dark'
-        ? t.settings.display.themes.dark
-        : t.settings.display.themes.light;
-    }
-    const isDark = theme === 'dark';
-    return isDark
-      ? t.settings.display.themes.dark
-      : t.settings.display.themes.light;
-  };
-
-  const currentTheme = getThemeLabel();
-
-  const fontSizeLabel = t.settings.display.fontSizes[fontSize];
-
   const languageLabel = t.settings.languages[language];
-
-  const getFontSizePixels = (size: 'small' | 'normal' | 'large'): number => {
-    if (size === 'small') return 12;
-    if (size === 'normal') return 14;
-    return 16;
-  };
 
   return (
     <View style={{ flex: 1, backgroundColor: colors.bg_darkest }}>
-      <HeaderBar
-        onMenuPress={() => {
-          // Settings doesn't have a drawer menu
-        }}
-      />
-
       <ScreenLayout paddingTop={spacing.md}>
         <ScrollView showsVerticalScrollIndicator={false}>
           <Column gap="xl">
-            {/* Display Settings */}
-            <Card>
-              <Text
-                style={{
-                  fontSize: typography.size.sm,
-                  fontWeight: typography.weight.semibold,
-                  color: colors.text_primary,
-                  marginBottom: spacing.md,
-                }}
-              >
-                {t.settings.display.title}
-              </Text>
-
-              <Column gap="md">
-                {/* Theme Selector */}
-                <View>
-                  <Text
-                    style={{
-                      fontSize: typography.size.xs,
-                      fontWeight: typography.weight.semibold,
-                      color: colors.text_primary,
-                      marginBottom: spacing.sm,
-                    }}
-                  >
-                    {t.settings.display.theme}
-                  </Text>
-                  <Pressable
-                    onPress={() => setShowThemeOptions(!showThemeOptions)}
-                    style={{
-                      backgroundColor: colors.bg_darker,
-                      padding: spacing.md,
-                      borderRadius: borderRadius.base,
-                      borderWidth: 1,
-                      borderColor: colors.border,
-                      flexDirection: 'row',
-                      justifyContent: 'space-between',
-                      alignItems: 'center',
-                    }}
-                  >
-                    <Text style={{ color: colors.text_primary }}>
-                      {currentTheme}
-                    </Text>
-                    <Text style={{ color: colors.text_secondary }}>
-                      {showThemeOptions ? '▲' : '▼'}
-                    </Text>
-                  </Pressable>
-
-                  {showThemeOptions && (
-                    <Column gap="sm" style={{ marginTop: spacing.sm }}>
-                      {(['light', 'dark', 'system'] as const).map(t_option => (
-                        <Pressable
-                          key={t_option}
-                          onPress={() => {
-                            setTheme(t_option);
-                            setShowThemeOptions(false);
-                          }}
-                          style={{
-                            backgroundColor:
-                              theme === t_option
-                                ? colors.primary
-                                : colors.bg_darker,
-                            padding: spacing.md,
-                            borderRadius: borderRadius.base,
-                            borderWidth: 1,
-                            borderColor:
-                              theme === t_option
-                                ? colors.primary
-                                : colors.border,
-                          }}
-                        >
-                          <Text
-                            style={{
-                              color:
-                                theme === t_option
-                                  ? colors.white
-                                  : colors.text_primary,
-                            }}
-                          >
-                            {t.settings.display.themes[t_option]}
-                          </Text>
-                        </Pressable>
-                      ))}
-                    </Column>
-                  )}
-                </View>
-
-                {/* Font Size Selector */}
-                <View>
-                  <Text
-                    style={{
-                      fontSize: typography.size.xs,
-                      fontWeight: typography.weight.semibold,
-                      color: colors.text_primary,
-                      marginBottom: spacing.sm,
-                    }}
-                  >
-                    {t.settings.display.fontSize}
-                  </Text>
-                  <Pressable
-                    onPress={() => setShowFontOptions(!showFontOptions)}
-                    style={{
-                      backgroundColor: colors.bg_darker,
-                      padding: spacing.md,
-                      borderRadius: borderRadius.base,
-                      borderWidth: 1,
-                      borderColor: colors.border,
-                      flexDirection: 'row',
-                      justifyContent: 'space-between',
-                      alignItems: 'center',
-                    }}
-                  >
-                    <Text style={{ color: colors.text_primary }}>
-                      {fontSizeLabel}
-                    </Text>
-                    <Text style={{ color: colors.text_secondary }}>
-                      {showFontOptions ? '▲' : '▼'}
-                    </Text>
-                  </Pressable>
-
-                  {showFontOptions && (
-                    <Column gap="sm" style={{ marginTop: spacing.sm }}>
-                      {(['small', 'normal', 'large'] as const).map(size => (
-                        <Pressable
-                          key={size}
-                          onPress={() => {
-                            setFontSize(size);
-                            setShowFontOptions(false);
-                          }}
-                          style={{
-                            backgroundColor:
-                              fontSize === size
-                                ? colors.primary
-                                : colors.bg_darker,
-                            padding: spacing.md,
-                            borderRadius: borderRadius.base,
-                            borderWidth: 1,
-                            borderColor:
-                              fontSize === size
-                                ? colors.primary
-                                : colors.border,
-                          }}
-                        >
-                          <Text
-                            style={{
-                              color:
-                                fontSize === size
-                                  ? colors.white
-                                  : colors.text_primary,
-                              fontSize: getFontSizePixels(size),
-                            }}
-                          >
-                            {t.settings.display.fontSizes[size]}
-                          </Text>
-                        </Pressable>
-                      ))}
-                    </Column>
-                  )}
-                </View>
-              </Column>
-            </Card>
-
             {/* Developer Settings */}
             <Card>
               <Text
@@ -350,58 +115,6 @@ const SettingsScreen = ({ navigation }: any) => {
               </Text>
 
               <Column gap="md">
-                {/* Mock Data Toggle */}
-                <Row
-                  style={{
-                    justifyContent: 'space-between',
-                    alignItems: 'center',
-                  }}
-                >
-                  <Column style={{ flex: 1 }}>
-                    <Text
-                      style={{
-                        fontSize: typography.size.sm,
-                        fontWeight: typography.weight.semibold,
-                        color: colors.text_primary,
-                      }}
-                    >
-                      {t.settings.developer.mockData}
-                    </Text>
-                    <Text
-                      style={{
-                        fontSize: typography.size.xs,
-                        color: colors.text_secondary,
-                        marginTop: spacing.xs,
-                      }}
-                    >
-                      {t.settings.developer.mockDataDescription}
-                    </Text>
-                  </Column>
-                  <Pressable
-                    onPress={() => setUseMockData(!useMockData)}
-                    style={{
-                      backgroundColor: useMockData
-                        ? colors.success
-                        : colors.bg_light,
-                      width: 50,
-                      height: 28,
-                      borderRadius: 14,
-                      justifyContent: 'center',
-                      alignItems: useMockData ? 'flex-end' : 'flex-start',
-                      paddingHorizontal: 2,
-                    }}
-                  >
-                    <View
-                      style={{
-                        width: 24,
-                        height: 24,
-                        borderRadius: 12,
-                        backgroundColor: colors.white,
-                      }}
-                    />
-                  </Pressable>
-                </Row>
-
                 {/* Node URL Configuration Info */}
                 <View
                   style={{
@@ -435,14 +148,6 @@ const SettingsScreen = ({ navigation }: any) => {
                     To change: Edit .env file and restart Metro bundler.
                   </Text>
                 </View>
-
-                {/* Save Button */}
-                <Button
-                  variant="secondary"
-                  onPress={handleSaveDeveloperSettings}
-                >
-                  {t.settings.developer.save}
-                </Button>
               </Column>
             </Card>
 

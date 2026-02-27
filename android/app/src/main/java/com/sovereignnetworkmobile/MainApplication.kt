@@ -22,6 +22,7 @@ class MainApplication : Application(), ReactApplication {
           add(NativeQuicPackage())
           add(NativeZhtpApiPackage())
           add(NativeIdentityProvisioningPackage())
+          add(PoUWPackage())
           add(Web4Package())
         },
     )

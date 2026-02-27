@@ -4,20 +4,28 @@
  */
 
 import React, { useState, useEffect } from 'react';
-import { View, Pressable, Text as RNText, Alert, NativeModules } from 'react-native';
+import {
+  View,
+  Pressable,
+  Text as RNText,
+  Alert,
+  NativeModules,
+} from 'react-native';
 import LinearGradient from 'react-native-linear-gradient';
 import MaskedView from '@react-native-masked-view/masked-view';
 import { NativeStackScreenProps } from '@react-navigation/native-stack';
+import { CommonActions } from '@react-navigation/native';
 import {
   Card,
-  Text, Column,
+  Text,
+  Column,
   Row,
   LoadingView,
   ScreenLayout,
   FormField,
   ErrorAlert,
   ActionFooter,
-  Badge
+  Badge,
 } from '../components';
 import { useAuth, useNodeConnection } from '../hooks';
 import { useTranslation } from '../i18n';
@@ -49,7 +57,8 @@ const SignInScreen = ({ navigation }: SignInScreenProps) => {
       try {
         // 1. Direct native path: IdentityStore.getCurrentIdentityId → loadIdentity → Rust deser → DID
         if (NativeModules.NativeIdentityProvisioning) {
-          const nativeDid: string | null = await NativeModules.NativeIdentityProvisioning.getCurrentIdentityDid();
+          const nativeDid: string | null =
+            await NativeModules.NativeIdentityProvisioning.getCurrentIdentityDid();
           if (nativeDid && isValidDid(nativeDid)) {
             if (__DEV__) console.log('[SignIn] Pre-fill DID from native store');
             setDid(nativeDid);
@@ -62,7 +71,9 @@ const SignInScreen = ({ navigation }: SignInScreenProps) => {
           if (__DEV__) console.log('[SignIn] Pre-fill DID from keychain');
           setDid(creds.did);
         } else if (creds?.did) {
-          console.warn('[SignIn] Keychain DID failed validation — not pre-filling');
+          console.warn(
+            '[SignIn] Keychain DID failed validation — not pre-filling',
+          );
         }
       } catch {
         // Pre-fill is best-effort
@@ -82,7 +93,9 @@ const SignInScreen = ({ navigation }: SignInScreenProps) => {
 
     // Validate DID format — catches AES-CBC silent corruption from react-native-keychain
     if (did.trim().startsWith('did:zhtp:') && !isValidDid(did.trim())) {
-      setLocalError('DID appears corrupted (non-hex characters detected). Please recover your identity.');
+      setLocalError(
+        'DID appears corrupted (non-hex characters detected). Please recover your identity.',
+      );
       return;
     }
 
@@ -97,7 +110,8 @@ const SignInScreen = ({ navigation }: SignInScreenProps) => {
       // Reset form on success
       setDid('');
       setPassphrase('');
-      // App.tsx will detect authenticated state and switch to RootNavigator
+      // Navigate back - since SignIn is presented as modal, goBack will return to the main tabs
+      navigation.goBack();
     } catch (err: any) {
       setLocalError(err.message || t.auth.signIn.errors.signInFailed);
     }
@@ -118,11 +132,13 @@ const SignInScreen = ({ navigation }: SignInScreenProps) => {
     <ScreenLayout>
       <Column gap="xl">
         {/* Welcome Header */}
-        <View style={{
-          alignItems: 'center',
-          paddingVertical: spacing.xl,
-          marginBottom: spacing.xxs,
-        }}>
+        <View
+          style={{
+            alignItems: 'center',
+            paddingVertical: spacing.xl,
+            marginBottom: spacing.xxs,
+          }}
+        >
           <Text
             style={{
               fontSize: typography.size['2xl'],
@@ -179,7 +195,9 @@ const SignInScreen = ({ navigation }: SignInScreenProps) => {
         {/* Node Connection Status - Tap to retry, Long press for full protocol check */}
         <View>
           <Card>
-            <Row style={{ justifyContent: 'space-between', alignItems: 'center' }}>
+            <Row
+              style={{ justifyContent: 'space-between', alignItems: 'center' }}
+            >
               <Column gap="xs" style={{ flex: 1 }}>
                 <Text
                   style={{
@@ -201,8 +219,16 @@ const SignInScreen = ({ navigation }: SignInScreenProps) => {
                 </Text>
               </Column>
               <Badge
-                label={hasChecked ? (isConnected ? t.app.connected : t.app.disconnected) : t.app.notChecked}
-                variant={hasChecked ? (isConnected ? 'success' : 'error') : 'default'}
+                label={
+                  hasChecked
+                    ? isConnected
+                      ? t.app.connected
+                      : t.app.disconnected
+                    : t.app.notChecked
+                }
+                variant={
+                  hasChecked ? (isConnected ? 'success' : 'error') : 'default'
+                }
               />
             </Row>
           </Card>
@@ -252,7 +278,9 @@ const SignInScreen = ({ navigation }: SignInScreenProps) => {
                       color: colors.primary,
                     }}
                   >
-                    {showPassword ? t.auth.signIn.passphraseShowHide.hide : t.auth.signIn.passphraseShowHide.show}
+                    {showPassword
+                      ? t.auth.signIn.passphraseShowHide.hide
+                      : t.auth.signIn.passphraseShowHide.show}
                   </Text>
                 </Pressable>
               </Row>
@@ -277,7 +305,9 @@ const SignInScreen = ({ navigation }: SignInScreenProps) => {
         <ActionFooter
           actions={[
             {
-              label: isLoading ? t.auth.signIn.buttonLoading : t.auth.signIn.button,
+              label: isLoading
+                ? t.auth.signIn.buttonLoading
+                : t.auth.signIn.button,
               onPress: () => {
                 handleSignIn().catch(() => {});
               },
@@ -296,17 +326,23 @@ const SignInScreen = ({ navigation }: SignInScreenProps) => {
               variant: 'secondary',
               disabled: isLoading,
             },
-            ...__DEV__ ? [{
-              label: '🧹 Clean Identities',
-              onPress: () => {
-                NativeModules.NativeIdentityProvisioning.cleanKeystoreDirectory();
-                Alert.alert('✅ Cleaned', 'All identities removed. Create a new one.');
-              },
-              variant: 'secondary' as const,
-            }] : [],
+            ...(__DEV__
+              ? [
+                  {
+                    label: '🧹 Clean Identities',
+                    onPress: () => {
+                      NativeModules.NativeIdentityProvisioning.cleanKeystoreDirectory();
+                      Alert.alert(
+                        '✅ Cleaned',
+                        'All identities removed. Create a new one.',
+                      );
+                    },
+                    variant: 'secondary' as const,
+                  },
+                ]
+              : []),
           ]}
         />
-
       </Column>
     </ScreenLayout>
   );

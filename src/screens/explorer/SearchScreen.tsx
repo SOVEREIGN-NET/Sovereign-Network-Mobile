@@ -41,18 +41,35 @@ const SearchScreen: React.FC<any> = ({ navigation, route }) => {
 
   const navigateToResult = () => {
     if (!data) return;
-    switch (data.result_type) {
+    const type = String(data.result_type || '').toLowerCase();
+    switch (type) {
       case 'block':
         navigation.navigate('BlockDetail', { hashOrHeight: data.query });
         break;
+      case 'tx':
       case 'transaction':
-        navigation.navigate('TransactionDetail', { hash: data.query });
+      case 'transaction_hash': {
+        const txHash =
+          data?.result?.tx_hash ||
+          data?.result?.hash ||
+          data?.result?.transaction_hash ||
+          data.query;
+        navigation.navigate('TransactionDetail', { hash: txHash });
         break;
+      }
       case 'identity':
+      case 'did':
         navigation.navigate('IdentityDetail', { did: data.query });
         break;
       case 'wallet':
+      case 'address':
         navigation.navigate('WalletDetail', { ownerId: data.query });
+        break;
+      default:
+        // Best effort: if query resembles tx hash, open transaction detail directly.
+        if (/^[a-f0-9]{32,}$/i.test(data.query)) {
+          navigation.navigate('TransactionDetail', { hash: data.query });
+        }
         break;
     }
   };

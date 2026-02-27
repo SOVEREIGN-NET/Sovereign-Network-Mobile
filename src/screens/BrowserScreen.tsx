@@ -1,29 +1,54 @@
-import React, { useState, useMemo, useEffect, useCallback } from 'react';
-import { View, ActivityIndicator, TextInput } from 'react-native';
+import React, { useState, useMemo, useEffect, useCallback, useRef } from 'react';
+import { View, ActivityIndicator, TextInput, Platform } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { Card, Text, Button, Column, ScreenLayout, FormField, Web4View, isWeb4ViewAvailable } from '../components';
+import {
+  Card,
+  Text,
+  Button,
+  Column,
+  ScreenLayout,
+  FormField,
+  Web4View,
+  isWeb4ViewAvailable,
+} from '../components';
 import { useTranslation } from '../i18n';
 import { colors, spacing } from '../theme';
 import { DEFAULT_NODE_HOST, DEFAULT_NODE_PORT } from '../config';
 import SShieldLogo from '../components/atoms/Logo';
+import { PoUW, isPoUWAvailable } from '../native/PoUW';
 
 const BrowserScreen = ({ route, navigation }: any) => {
   const { t } = useTranslation();
-  const [urlInput, setUrlInput] = useState(route?.params?.url || 'zhtp://central.sov');
+  const [urlInput, setUrlInput] = useState(
+    route?.params?.url || 'zhtp://central.sov',
+  );
   const [loading, setLoading] = useState(false);
   const [webLoading, setWebLoading] = useState(true);
+  const pouwVerificationInFlightRef = useRef(false);
+  const pouwRecentVerificationRef = useRef<Map<string, number>>(new Map());
 
-  const mockWebsites = t.browser.websites as Record<string, { title: string; description: string; content: string }>;
+  const mockWebsites = t.browser.websites as Record<
+    string,
+    { title: string; description: string; content: string }
+  >;
 
   const suggestedSites = [
-    { url: 'zhtp://network.sovereign', ...t.browser.suggestedSitesList.networkHub },
+    {
+      url: 'zhtp://network.sovereign',
+      ...t.browser.suggestedSitesList.networkHub,
+    },
     { url: 'dao://governance', ...t.browser.suggestedSitesList.daoPortal },
     { url: 'mesh://nodes.local', ...t.browser.suggestedSitesList.meshNetwork },
-    { url: 'zk://identity.sovereign', ...t.browser.suggestedSitesList.zkIdentity },
+    {
+      url: 'zk://identity.sovereign',
+      ...t.browser.suggestedSitesList.zkIdentity,
+    },
     { url: 'zhtp://chat.sovereign', ...t.browser.suggestedSitesList.chat },
   ];
 
-  const [browserContent, setBrowserContent] = useState(mockWebsites['zhtp://central.sov']);
+  const [browserContent, setBrowserContent] = useState(
+    mockWebsites['zhtp://central.sov'],
+  );
   const isZhtp = useMemo(() => {
     const normalized = (urlInput ?? '').toString().trim().toLowerCase();
     return normalized.startsWith('zhtp://');
@@ -31,7 +56,9 @@ const BrowserScreen = ({ route, navigation }: any) => {
   const web4Domain = useMemo(() => {
     if (!isZhtp) return '';
     try {
-      const normalized = (urlInput ?? '').toString().replace(/^zhtp:\/\//i, 'https://');
+      const normalized = (urlInput ?? '')
+        .toString()
+        .replace(/^zhtp:\/\//i, 'https://');
       const parsed = new URL(normalized);
       const domain = parsed.hostname;
       if (__DEV__) {
@@ -40,7 +67,10 @@ const BrowserScreen = ({ route, navigation }: any) => {
       return domain;
     } catch (error) {
       if (__DEV__) {
-        console.error('[🌐 Web4] BrowserScreen: Failed to extract domain:', error);
+        console.error(
+          '[🌐 Web4] BrowserScreen: Failed to extract domain:',
+          error,
+        );
       }
       return '';
     }
@@ -64,24 +94,40 @@ const BrowserScreen = ({ route, navigation }: any) => {
           mockWebsites[normalizedUrl] || {
             title: t.browser.errors.notFound,
             description: t.browser.errors.notResolved,
-            content: t.browser.errors.couldNotResolve.replace('{domain}', normalizedUrl),
+            content: t.browser.errors.couldNotResolve.replace(
+              '{domain}',
+              normalizedUrl,
+            ),
           },
         );
         setLoading(false);
       }, 500);
     },
-    [mockWebsites, t.browser.errors.couldNotResolve, t.browser.errors.notFound, t.browser.errors.notResolved, urlInput],
+    [
+      mockWebsites,
+      t.browser.errors.couldNotResolve,
+      t.browser.errors.notFound,
+      t.browser.errors.notResolved,
+      urlInput,
+    ],
   );
 
   useEffect(() => {
     if (route?.params?.url) {
       handleNavigate(route.params.url);
     }
-  }, [route?.params?.url]);
+  }, [handleNavigate, route?.params?.url]);
 
   const renderZhtp = () => (
-      <View style={{ flex: 1, backgroundColor: colors.bg_darkest }}>
-        <View style={{ paddingHorizontal: spacing.sm, paddingTop: spacing.sm, paddingBottom: spacing.xs, backgroundColor: colors.bg_darkest }}>
+    <View style={{ flex: 1, backgroundColor: colors.bg_darkest }}>
+      <View
+        style={{
+          paddingHorizontal: spacing.sm,
+          paddingTop: spacing.sm,
+          paddingBottom: spacing.xs,
+          backgroundColor: colors.bg_darkest,
+        }}
+      >
         <View
           style={{
             flexDirection: 'row',
@@ -105,7 +151,9 @@ const BrowserScreen = ({ route, navigation }: any) => {
               borderRadius: 18,
             }}
           >
-            <Text style={{ fontSize: 18, color: colors.text_secondary }}>✕</Text>
+            <Text style={{ fontSize: 18, color: colors.text_secondary }}>
+              ✕
+            </Text>
           </Button>
 
           {/* URL bar with reload inside */}
@@ -156,7 +204,16 @@ const BrowserScreen = ({ route, navigation }: any) => {
                 backgroundColor: 'transparent',
               }}
             >
-              <Text style={{ fontSize: 16, color: webLoading ? colors.text_tertiary : colors.text_secondary }}>↻</Text>
+              <Text
+                style={{
+                  fontSize: 16,
+                  color: webLoading
+                    ? colors.text_tertiary
+                    : colors.text_secondary,
+                }}
+              >
+                ↻
+              </Text>
             </Button>
           </View>
 
@@ -179,7 +236,13 @@ const BrowserScreen = ({ route, navigation }: any) => {
           </Button>
         </View>
       </View>
-      <View style={{ flex: 1, backgroundColor: colors.bg_darkest, paddingBottom: 0 }}>
+      <View
+        style={{
+          flex: 1,
+          backgroundColor: colors.bg_darkest,
+          paddingBottom: 0,
+        }}
+      >
         {isWeb4ViewAvailable && web4Domain ? (
           <View style={{ flex: 1, backgroundColor: colors.bg_darkest }}>
             <Web4View
@@ -189,9 +252,135 @@ const BrowserScreen = ({ route, navigation }: any) => {
               nodePort={DEFAULT_NODE_PORT}
               cacheLimitMb={150}
               allowHttpsExternal={false}
-              onLoadStart={() => setWebLoading(true)}
-              onLoadEnd={() => setWebLoading(false)}
-              onError={() => setWebLoading(false)}
+              onLoadStart={() => {
+                console.log('[🌐 Web4] onLoadStart');
+                setWebLoading(true);
+              }}
+              onLoadEnd={event => {
+                console.log('[🌐 Web4] onLoadEnd fired!');
+                setWebLoading(false);
+                if (isPoUWAvailable()) {
+                  console.log('[🌐 PoUW] Available, verifying...');
+                  const loadedUrl =
+                    event?.nativeEvent?.url ||
+                    `zhtp://${web4Domain}/`;
+                  let loadedPath = '/';
+                  try {
+                    const parsed = new URL(
+                      loadedUrl.replace(/^zhtp:\/\//i, 'https://'),
+                    );
+                    loadedPath = parsed.pathname || '/';
+                  } catch {
+                    loadedPath = '/';
+                  }
+
+                  const verificationKey = `${web4Domain}${loadedPath}`;
+                  const now = Date.now();
+                  const lastVerifiedAt =
+                    pouwRecentVerificationRef.current.get(verificationKey) ?? 0;
+                  if (pouwVerificationInFlightRef.current) {
+                    console.log(
+                      '[🌐 PoUW] Skipping duplicate verify (in flight):',
+                      verificationKey,
+                    );
+                    return;
+                  }
+                  if (now - lastVerifiedAt < 8000) {
+                    console.log(
+                      '[🌐 PoUW] Skipping duplicate verify (cooldown):',
+                      verificationKey,
+                    );
+                    return;
+                  }
+                  pouwRecentVerificationRef.current.set(verificationKey, now);
+                  pouwVerificationInFlightRef.current = true;
+
+                  PoUW.getPendingCount()
+                    .then(count => {
+                      console.log(
+                        '[🌐 PoUW] 📋 Pending receipts before verify:',
+                        count,
+                      );
+                    })
+                    .catch(e => {
+                      console.warn(
+                        '[🌐 PoUW] Get count before verify error:',
+                        e?.message || e,
+                      );
+                    });
+
+                  // First get a challenge, then verify content
+                  PoUW.getChallenge()
+                    .then(challenge => {
+                      console.log('[🌐 PoUW] Got challenge:', challenge);
+                      return challenge;
+                    })
+                    .then(() => {
+                      console.log('[🌐 PoUW] Calling verifyDomainContent...', {
+                        domain: web4Domain,
+                        path: loadedPath,
+                      });
+                      return PoUW.verifyDomainContent(web4Domain, loadedPath).catch(
+                        err => {
+                          console.warn(
+                            '[🌐 PoUW] verifyDomainContent failed, using fallback:',
+                            err?.message || err,
+                          );
+                          const fallbackData = `${web4Domain}|${loadedPath}|${Date.now()}`;
+                          const fallbackBytes = new TextEncoder().encode(
+                            fallbackData,
+                          );
+                          return PoUW.verifyContent(
+                            new Uint8Array(),
+                            fallbackBytes,
+                          );
+                        },
+                      );
+                    })
+                    .then(result => {
+                      console.log('[🌐 PoUW] ✅ Verified:', web4Domain, result);
+                    })
+                    .catch(e => {
+                      console.warn(
+                        '[🌐 PoUW] ❌ Verify error:',
+                        e?.message || e,
+                      );
+                    })
+                    .finally(() => {
+                      pouwVerificationInFlightRef.current = false;
+                    });
+
+                  // Check pending count after 3 seconds
+                  setTimeout(() => {
+                    console.log('[🌐 PoUW] Checking pending count...');
+                    PoUW.getPendingCount()
+                      .then(count => {
+                        console.log('[🌐 PoUW] 📋 Pending receipts:', count);
+                      })
+                      .catch(e => {
+                        console.warn('[🌐 PoUW] Get count error:', e);
+                      });
+                  }, 3000);
+                  setTimeout(() => {
+                    PoUW.getPendingCount()
+                      .then(count => {
+                        console.log(
+                          '[🌐 PoUW] 📋 Pending receipts after 8s:',
+                          count,
+                        );
+                      })
+                      .catch(e => {
+                        console.warn(
+                          '[🌐 PoUW] Get count after 8s error:',
+                          e?.message || e,
+                        );
+                      });
+                  }, 8000);
+                } else {
+                  console.log('[🌐 PoUW] Not available');
+                }
+              }}
+              onError={e => console.log('[🌐 Web4] onError:', e)}
             />
             {webLoading && (
               <View
@@ -209,15 +398,24 @@ const BrowserScreen = ({ route, navigation }: any) => {
               >
                 <SShieldLogo size={64} />
                 <View style={{ marginTop: spacing.sm }}>
-                  <ActivityIndicator size="small" color={colors.text_secondary} />
+                  <ActivityIndicator
+                    size="small"
+                    color={colors.text_secondary}
+                  />
                 </View>
               </View>
             )}
           </View>
         ) : (
-          <View style={{ flex: 1, padding: spacing.md, justifyContent: 'center' }}>
-            <Text variant="body" style={{ color: colors.text_secondary, textAlign: 'center' }}>
-              Web runtime not available on this build. Please rebuild native binaries.
+          <View
+            style={{ flex: 1, padding: spacing.md, justifyContent: 'center' }}
+          >
+            <Text
+              variant="body"
+              style={{ color: colors.text_secondary, textAlign: 'center' }}
+            >
+              Web runtime not available on this build. Please rebuild native
+              binaries.
             </Text>
           </View>
         )}
@@ -238,8 +436,13 @@ const BrowserScreen = ({ route, navigation }: any) => {
             onSubmitEditing={() => handleNavigate()}
             containerStyle={{ marginBottom: 0 }}
           />
-          <Button onPress={() => handleNavigate()}>{t.browser.navigateButton}</Button>
-          <Text variant="caption" style={{ color: colors.success, textAlign: 'center' }}>
+          <Button onPress={() => handleNavigate()}>
+            {t.browser.navigateButton}
+          </Button>
+          <Text
+            variant="caption"
+            style={{ color: colors.success, textAlign: 'center' }}
+          >
             {t.browser.connectionStatus}
           </Text>
         </Column>
@@ -247,10 +450,16 @@ const BrowserScreen = ({ route, navigation }: any) => {
 
       {!loading && browserContent && (
         <Card>
-          <Text variant="h2" style={{ color: colors.primary, marginBottom: spacing.sm }}>
+          <Text
+            variant="h2"
+            style={{ color: colors.primary, marginBottom: spacing.sm }}
+          >
             {browserContent.title}
           </Text>
-          <Text variant="caption" style={{ color: colors.text_secondary, marginBottom: spacing.md }}>
+          <Text
+            variant="caption"
+            style={{ color: colors.text_secondary, marginBottom: spacing.md }}
+          >
             {browserContent.description}
           </Text>
           <Text variant="body">{browserContent.content}</Text>
@@ -289,10 +498,11 @@ const BrowserScreen = ({ route, navigation }: any) => {
 
   if (isZhtp) {
     return (
-      <SafeAreaView style={{ flex: 1, backgroundColor: colors.bg_darkest }} edges={['top']}>
-        <View style={{ flex: 1 }}>
-          {renderZhtp()}
-        </View>
+      <SafeAreaView
+        style={{ flex: 1, backgroundColor: colors.bg_darkest }}
+        edges={['top']}
+      >
+        <View style={{ flex: 1 }}>{renderZhtp()}</View>
       </SafeAreaView>
     );
   }

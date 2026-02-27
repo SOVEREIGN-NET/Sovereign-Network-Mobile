@@ -64,6 +64,26 @@ export interface PoUWSubmitResponse {
   };
 }
 
+export interface WalletTransaction {
+  tx_hash: string;
+  tx_type: string;
+  amount: number;
+  fee: number;
+  from_wallet: string | null;
+  to_address: string | null;
+  timestamp: number;
+  block_height: number | null;
+  status: 'confirmed' | 'pending';
+  memo: string | null;
+}
+
+export interface WalletTransactionsResponse {
+  identity_id: string;
+  total_transactions: number;
+  transactions: WalletTransaction[];
+  status?: string;
+}
+
 class AppService {
   /**
    * Get wallet list for an identity
@@ -248,6 +268,31 @@ class AppService {
     } catch (error: unknown) {
       console.error(
         '[AppService] submitReceipts failed:',
+        error instanceof Error ? error.message : error,
+      );
+      throw error;
+    }
+  }
+
+  /**
+   * Get wallet transaction history for an identity (64-char hex identity ID).
+   */
+  async getWalletTransactions(
+    identityIdHex: string,
+  ): Promise<WalletTransactionsResponse> {
+    try {
+      const data = await quicRequest<WalletTransactionsResponse>(
+        `/api/v1/wallet/transactions/${identityIdHex}`,
+        { timeout: 15 },
+      );
+      console.log('[AppService] getWalletTransactions:', {
+        identityId: maskIdentifier(identityIdHex),
+        total: data.total_transactions ?? data.transactions?.length ?? 0,
+      });
+      return data;
+    } catch (error: unknown) {
+      console.error(
+        '[AppService] getWalletTransactions failed:',
         error instanceof Error ? error.message : error,
       );
       throw error;

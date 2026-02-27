@@ -377,33 +377,35 @@ const DashboardScreen: React.FC<any> = ({ navigation }) => {
                     >
                       {formatTokenPrice(token.price)}
                     </Text>
-                    <Row gap="xs" align="center">
-                      <Animated.View
-                        style={{
-                          transform: [{ scale: token.arrowScale }],
-                        }}
-                      >
+                    {token.showVariation && (
+                      <Row gap="xs" align="center">
+                        <Animated.View
+                          style={{
+                            transform: [{ scale: token.arrowScale }],
+                          }}
+                        >
+                          <Text
+                            variant="caption"
+                            style={{
+                              fontSize: 12,
+                              color: trendColor,
+                              fontWeight: '700',
+                            }}
+                          >
+                            {getTrendArrow(token.trend)}
+                          </Text>
+                        </Animated.View>
                         <Text
                           variant="caption"
                           style={{
-                            fontSize: 12,
                             color: trendColor,
-                            fontWeight: '700',
+                            fontWeight: '500',
                           }}
                         >
-                          {getTrendArrow(token.trend)}
+                          {formatChange(token.change)}
                         </Text>
-                      </Animated.View>
-                      <Text
-                        variant="caption"
-                        style={{
-                          color: trendColor,
-                          fontWeight: '500',
-                        }}
-                      >
-                        {formatChange(token.change)}
-                      </Text>
-                    </Row>
+                      </Row>
+                    )}
                   </Animated.View>
                 </View>
               );

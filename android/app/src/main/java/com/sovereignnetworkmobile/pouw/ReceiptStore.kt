@@ -12,20 +12,9 @@ import kotlinx.coroutines.flow.Flow
  * Room database for storing PoUW receipts.
  */
 @Database(entities = [ReceiptEntity::class], version = 2, exportSchema = false)
-@TypeConverters(ReceiptStateConverter::class, ByteArrayConverter::class)
+@TypeConverters(ReceiptStateConverter::class)
 abstract class ReceiptDatabase : RoomDatabase() {
     abstract fun receiptDao(): ReceiptDao
-}
-
-/**
- * Type converter for ByteArray (stored as BLOB).
- */
-class ByteArrayConverter {
-    @TypeConverter
-    fun fromByteArray(bytes: ByteArray): ByteArray = bytes
-    
-    @TypeConverter
-    fun toByteArray(bytes: ByteArray): ByteArray = bytes
 }
 
 /**

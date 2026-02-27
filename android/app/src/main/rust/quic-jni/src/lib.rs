@@ -616,6 +616,7 @@ pub extern "system" fn Java_com_sovereignnetworkmobile_NativeIdentityProvisionin
     symbol: JString<'local>,
     initial_supply: jni::sys::jlong,
     decimals: jni::sys::jint,
+    treasury_recipient: JByteArray<'local>,
     chain_id: jni::sys::jint,
 ) -> JString<'local> {
     let identity_json_str: String = match env.get_string(&identity_json) {
@@ -631,12 +632,19 @@ pub extern "system" fn Java_com_sovereignnetworkmobile_NativeIdentityProvisionin
         Err(_) => return env.new_string("").unwrap_or_default(),
     };
 
+    let treasury_arr: Vec<u8> = env.convert_byte_array(treasury_recipient).unwrap_or_default();
+    let mut treasury_recipient_arr = [0u8; 32];
+    if treasury_arr.len() >= 32 {
+        treasury_recipient_arr.copy_from_slice(&treasury_arr[..32]);
+    }
+
     match identity_bridge::build_token_create_transaction(
         &identity_json_str,
         &name_str,
         &symbol_str,
         initial_supply as u64,
         decimals as u8,
+        treasury_recipient_arr,
         chain_id as u8,
     ) {
         Ok(hex_tx) => env.new_string(&hex_tx).unwrap_or_default(),
@@ -696,6 +704,7 @@ pub extern "system" fn Java_com_sovereignnetworkmobile_NativeIdentityProvisionin
     to_pubkey: JByteArray<'local>,
     amount: jni::sys::jlong,
     chain_id: jni::sys::jint,
+    nonce: jni::sys::jlong,
 ) -> JString<'local> {
     let identity_json_str: String = match env.get_string(&identity_json) {
         Ok(s) => s.into(),
@@ -716,6 +725,7 @@ pub extern "system" fn Java_com_sovereignnetworkmobile_NativeIdentityProvisionin
         &to_pubkey_bytes,
         amount as u64,
         chain_id as u8,
+        nonce as u64,
     ) {
         Ok(hex_tx) => env.new_string(&hex_tx).unwrap_or_default(),
         Err(e) => {

@@ -8,6 +8,7 @@ export interface TokenData {
   previousPrice: number;
   change: number;
   trend: 'up' | 'down' | 'neutral';
+  showVariation: boolean;
   arrowScale: Animated.Value;
   priceFlash: Animated.Value;
 }
@@ -18,13 +19,12 @@ interface TokenConfig {
   basePrice: number;
   volatility: number;
   trendBias: number;
+  showVariation: boolean;
 }
 
 const TOKEN_CONFIGS: TokenConfig[] = [
-  { symbol: 'SOV', name: 'Sovereign Network Token', basePrice: 2.34, volatility: 0.03, trendBias: 0.6 },
-  { symbol: 'CBE', name: 'Central Blockchain Entertainment', basePrice: 5.67, volatility: 0.025, trendBias: 0.4 },
-  { symbol: 'ZDEFI', name: 'DeFi Protocol Token', basePrice: 1.89, volatility: 0.04, trendBias: -0.2 },
-  { symbol: 'ZNFT', name: 'NFT Marketplace Token', basePrice: 3.12, volatility: 0.035, trendBias: 0.3 },
+  { symbol: 'SOV', name: 'Sovereign Network Token', basePrice: 0.0218, volatility: 0, trendBias: 0, showVariation: false },
+  { symbol: 'CBE', name: 'Central Blockchain Entertainment', basePrice: 5.67, volatility: 0.025, trendBias: 0.4, showVariation: true },
 ];
 
 const UPDATE_INTERVAL = 2500;
@@ -48,6 +48,7 @@ export const useTrendingTokens = (): TokenData[] => {
       previousPrice: config.basePrice,
       change: 0,
       trend: 'neutral' as const,
+      showVariation: config.showVariation,
       arrowScale: animatedRefs.current[index].arrowScale,
       priceFlash: animatedRefs.current[index].priceFlash,
     }))
@@ -62,6 +63,19 @@ export const useTrendingTokens = (): TokenData[] => {
           const config = TOKEN_CONFIGS[index];
           const currentMomentum = momentumRef.current[index];
           const animRefs = animatedRefs.current[index];
+
+          if (!config.showVariation) {
+            return {
+              ...token,
+              previousPrice: config.basePrice,
+              price: config.basePrice,
+              change: 0,
+              trend: 'neutral',
+              showVariation: false,
+              arrowScale: animRefs.arrowScale,
+              priceFlash: animRefs.priceFlash,
+            };
+          }
 
           const randomFactor = (Math.random() - 0.5) * 2;
           const biasedRandom = randomFactor + config.trendBias * 0.3;
@@ -103,6 +117,7 @@ export const useTrendingTokens = (): TokenData[] => {
             price: newPrice,
             change,
             trend,
+            showVariation: config.showVariation,
             arrowScale: animRefs.arrowScale,
             priceFlash: animRefs.priceFlash,
           };
@@ -117,7 +132,7 @@ export const useTrendingTokens = (): TokenData[] => {
 };
 
 export const formatTokenPrice = (price: number): string => {
-  return `$${price.toFixed(2)}`;
+  return price < 1 ? `$${price.toFixed(4)}` : `$${price.toFixed(2)}`;
 };
 
 export const formatChange = (change: number): string => {
