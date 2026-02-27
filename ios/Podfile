@@ -5,9 +5,6 @@ require Pod::Executable.execute_command('node', ['-p',
     {paths: [process.argv[1]]},
   )', __dir__]).strip
 
-# Firebase static frameworks cause modular header conflicts with RN 0.82; keep as dynamic frameworks
-$RNFirebaseAsStaticFramework = false
-
 platform :ios, min_ios_version_supported
 prepare_react_native_project!
 
@@ -19,18 +16,6 @@ end
 
 target 'SovereignNetworkMobile' do
   rn_config = use_native_modules!
-
-  # Firebase Swift pods need modular headers on their C deps when linked statically with RN
-  pod 'FirebaseCore', :modular_headers => true
-  pod 'FirebaseCoreInternal', :modular_headers => true
-  pod 'FirebaseInstallations', :modular_headers => true
-  pod 'FirebaseCrashlytics', :modular_headers => true
-  pod 'FirebaseSessions', :modular_headers => true
-  pod 'FirebaseCoreExtension', :modular_headers => true
-  pod 'FirebaseRemoteConfigInterop', :modular_headers => true
-  pod 'GoogleDataTransport', :modular_headers => true
-  pod 'GoogleUtilities', :modular_headers => true
-  pod 'nanopb', :modular_headers => true
 
   # CBOR serialization for ZHTP protocol
   pod 'SwiftCBOR', '~> 0.6.0'
@@ -57,17 +42,12 @@ target 'SovereignNetworkMobile' do
       # :ccache_enabled => true
     )
 
-    # Firebase build settings
     react_native_abs_path = File.expand_path(rn_config[:reactNativePath], Pod::Config.instance.installation_root)
 
     installer.pods_project.targets.each do |target|
       target.build_configurations.each do |build_config|
         # Ensure REACT_NATIVE_PATH is available to Xcode script phases (Hermes, etc.)
         build_config.build_settings['REACT_NATIVE_PATH'] = react_native_abs_path
-        build_config.build_settings['GCC_PREPROCESSOR_DEFINITIONS'] ||= [
-          '$(inherited)',
-          'FIREBASE_ANALYTICS_COLLECTION_ENABLED=1',
-        ]
       end
     end
 

@@ -2,7 +2,6 @@ import UIKit
 import React
 import React_RCTAppDelegate
 import ReactAppDependencyProvider
-import FirebaseCore
 import SafariServices
 
 @main
@@ -19,9 +18,6 @@ class AppDelegate: UIResponder, UIApplicationDelegate {
     // Prevent SafariServices from auto-loading password manager
     // Load SafariServices early and disable it to prevent _SFPasswordViewController crash
     _ = Bundle(identifier: "com.apple.SafariServices")
-
-    // Configure Firebase
-    FirebaseApp.configure()
 
     let delegate = ReactNativeDelegate()
     let factory = RCTReactNativeFactory(delegate: delegate)
