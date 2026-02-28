@@ -1,5 +1,5 @@
 import { identityProvisioning } from '../services/NativeIdentityProvisioning';
-import { publicQuicRequest } from '../services/quic';
+import { publicQuicRequest, quicRequest } from '../services/quic';
 
 const POUW_VERSION = 1;
 const DEFAULT_BATCH_INTERVAL_MS = 30_000;
@@ -184,10 +184,7 @@ function normalizeIdentifier(value: string): string | null {
   return decodedB64 && decodedB64.length > 0 ? bytesToHex(decodedB64) : null;
 }
 
-function findStringValue(
-  value: unknown,
-  keys: Set<string>,
-): string | null {
+function findStringValue(value: unknown, keys: Set<string>): string | null {
   if (Array.isArray(value)) {
     for (const item of value) {
       const found = findStringValue(item, keys);
@@ -284,7 +281,10 @@ function parseDecodedTokenPayload(
   requestedProofs: ProofType[],
 ): ChallengeToken | null {
   try {
-    const parsedJson = JSON.parse(decodeUtf8(payload)) as Record<string, unknown>;
+    const parsedJson = JSON.parse(decodeUtf8(payload)) as Record<
+      string,
+      unknown
+    >;
     const parsedObj = parseChallengeObject(parsedJson, requestedProofs);
     if (parsedObj) return parsedObj;
   } catch {}
@@ -393,7 +393,9 @@ function parseChallengeObject(
     expires_at: expiresAt,
     policy: {
       max_receipts:
-        typeof rawPolicy.max_receipts === 'number' ? rawPolicy.max_receipts : 64,
+        typeof rawPolicy.max_receipts === 'number'
+          ? rawPolicy.max_receipts
+          : 64,
       max_bytes_total:
         typeof rawPolicy.max_bytes_total === 'number'
           ? rawPolicy.max_bytes_total
@@ -408,7 +410,9 @@ function parseChallengeObject(
           : Array.from(new Set<ProofType>(['hash', ...requestedProofs])),
     },
     node_signature:
-      typeof candidate.node_signature === 'string' ? candidate.node_signature : '',
+      typeof candidate.node_signature === 'string'
+        ? candidate.node_signature
+        : '',
   };
 }
 
@@ -611,15 +615,34 @@ export class PoUWController {
     await this.ensureChallenge([proofType]);
     if (!this.activeChallenge || !this.clientDid || !this.clientNodeId) return;
     const allowed = this.activeChallenge.policy.allowed_proof_types;
+    let effectiveProofType = proofType;
     if (!allowed.includes(proofType)) {
-      if (__DEV__) {
-        console.warn('[PoUWController] receipt blocked: proof_type not allowed by challenge policy', {
-          challenge_nonce: this.activeChallenge.challenge_nonce,
-          requested: proofType,
-          allowed,
-        });
+      const fallbackToHash = allowed.includes('hash');
+      if (fallbackToHash) {
+        effectiveProofType = 'hash';
+        if (__DEV__) {
+          console.warn(
+            '[PoUWController] proof_type not in challenge policy, falling back to hash',
+            {
+              challenge_nonce: this.activeChallenge.challenge_nonce,
+              requested: proofType,
+              allowed,
+            },
+          );
+        }
+      } else {
+        if (__DEV__) {
+          console.warn(
+            '[PoUWController] receipt blocked: proof_type not allowed by challenge policy',
+            {
+              challenge_nonce: this.activeChallenge.challenge_nonce,
+              requested: proofType,
+              allowed,
+            },
+          );
+        }
+        throw new Error('Challenge policy does not allow requested proof_type');
       }
-      throw new Error('Challenge policy does not allow requested proof_type');
     }
 
     const now = nowSecs();
@@ -630,7 +653,7 @@ export class PoUWController {
       client_node_id: this.clientNodeId,
       provider_id: '',
       content_id: randomHex(32),
-      proof_type: proofType,
+      proof_type: effectiveProofType,
       bytes_verified: bytesVerified,
       result_ok: true,
       started_at: now - 1,
@@ -678,7 +701,7 @@ export class PoUWController {
     };
 
     try {
-      const response = await publicQuicRequest<SubmitResponse>(
+      const response = await quicRequest<SubmitResponse>(
         '/api/v1/pouw/submit',
         {
           method: 'POST',
@@ -698,17 +721,26 @@ export class PoUWController {
 
   private async ensureChallenge(proofTypes: ProofType[]): Promise<void> {
     if (!this.isChallengeValidForProofs(this.activeChallenge, proofTypes)) {
-      await this.refreshChallenge(proofTypes);
+      try {
+        await this.refreshChallenge(proofTypes);
+      } catch {
+        // Ignore refresh failure - will check validity below
+      }
       if (!this.isChallengeValidForProofs(this.activeChallenge, proofTypes)) {
-        if (__DEV__) {
-          console.warn('[PoUWController] challenge invalid after refresh', {
-            requested: proofTypes,
-            challenge_nonce: this.activeChallenge?.challenge_nonce ?? null,
-            returned:
-              this.activeChallenge?.policy.allowed_proof_types ?? [],
-          });
+        const hashFallback =
+          this.activeChallenge?.policy.allowed_proof_types.includes('hash');
+        if (!hashFallback) {
+          if (__DEV__) {
+            console.warn('[PoUWController] challenge invalid after refresh', {
+              requested: proofTypes,
+              challenge_nonce: this.activeChallenge?.challenge_nonce ?? null,
+              returned: this.activeChallenge?.policy.allowed_proof_types ?? [],
+            });
+          }
+          throw new Error(
+            'No compatible PoUW challenge for requested proof types',
+          );
         }
-        throw new Error('No compatible PoUW challenge for requested proof types');
       }
     }
   }
@@ -741,14 +773,19 @@ export class PoUWController {
         failureReason = 'parse';
         throw new Error('unparseable challenge response');
       }
-      if (!proofTypes.every(pt => parsed.policy.allowed_proof_types.includes(pt))) {
+      if (
+        !proofTypes.every(pt => parsed.policy.allowed_proof_types.includes(pt))
+      ) {
         failureReason = 'policy';
         if (__DEV__) {
-          console.warn('[PoUWController] challenge rejected: missing requested proof types', {
-            challenge_nonce: parsed.challenge_nonce,
-            requested: proofTypes,
-            returned: parsed.policy.allowed_proof_types,
-          });
+          console.warn(
+            '[PoUWController] challenge rejected: missing requested proof types',
+            {
+              challenge_nonce: parsed.challenge_nonce,
+              requested: proofTypes,
+              returned: parsed.policy.allowed_proof_types,
+            },
+          );
         }
         throw new Error('challenge policy missing requested proof types');
       }
@@ -770,17 +807,26 @@ export class PoUWController {
           },
         );
         const parsed = parseChallengeAny(response, proofTypes);
-        if (parsed && proofTypes.every(pt => parsed.policy.allowed_proof_types.includes(pt))) {
+        // Accept fallback if it has ANY matching proof type (like hash)
+        const hasMatchingProof =
+          parsed &&
+          parsed.policy.allowed_proof_types.some(pt =>
+            proofTypes.includes(pt as ProofType),
+          );
+        if (hasMatchingProof) {
           this.activeChallenge = parsed;
         } else {
           this.activeChallenge = null;
           failureReason = parsed ? 'policy' : 'parse';
           if (__DEV__ && parsed) {
-            console.warn('[PoUWController] fallback challenge rejected: missing requested proof types', {
-              challenge_nonce: parsed.challenge_nonce,
-              requested: proofTypes,
-              returned: parsed.policy.allowed_proof_types,
-            });
+            console.warn(
+              '[PoUWController] fallback challenge rejected: missing requested proof types',
+              {
+                challenge_nonce: parsed.challenge_nonce,
+                requested: proofTypes,
+                returned: parsed.policy.allowed_proof_types,
+              },
+            );
           }
         }
         if (this.activeChallenge && __DEV__) {
@@ -796,7 +842,9 @@ export class PoUWController {
     }
     if (!this.activeChallenge && __DEV__) {
       if (failureReason === 'policy') {
-        console.warn('[PoUWController] challenge incompatible with requested proof types');
+        console.warn(
+          '[PoUWController] challenge incompatible with requested proof types',
+        );
       } else if (failureReason === 'parse') {
         console.warn('[PoUWController] challenge parse failed');
       } else {

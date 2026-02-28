@@ -1,4 +1,10 @@
-import React, { useState, useMemo, useEffect, useCallback, useRef } from 'react';
+import React, {
+  useState,
+  useMemo,
+  useEffect,
+  useCallback,
+  useRef,
+} from 'react';
 import { View, ActivityIndicator, TextInput } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import {
@@ -289,8 +295,7 @@ const BrowserScreen = ({ route, navigation }: any) => {
                     console.log('[🌐 PoUW] Controller available, recording...');
                   }
                   const loadedUrl =
-                    event?.nativeEvent?.url ||
-                    `zhtp://${web4Domain}/`;
+                    event?.nativeEvent?.url || `zhtp://${web4Domain}/`;
                   let loadedPath = '/';
                   try {
                     const parsed = new URL(
@@ -327,23 +332,30 @@ const BrowserScreen = ({ route, navigation }: any) => {
 
                   getCurrentAuthSessionIdPrefix({ forceRefresh: true })
                     .then(async sidPrefix => {
-                      if (!sidPrefix) {
-                        throw new Error('Missing authenticated session id prefix');
-                      }
-                      const quicSessionId = new Uint8Array(8);
-                      for (let i = 0; i < 8; i++) {
-                        quicSessionId[i] = parseInt(
-                          sidPrefix.slice(i * 2, i * 2 + 2),
-                          16,
-                        );
+                      let quicSessionId: Uint8Array;
+                      if (sidPrefix) {
+                        quicSessionId = new Uint8Array(8);
+                        for (let i = 0; i < 8; i++) {
+                          quicSessionId[i] = parseInt(
+                            sidPrefix.slice(i * 2, i * 2 + 2),
+                            16,
+                          );
+                        }
+                      } else {
+                        quicSessionId = new Uint8Array(8);
                       }
                       const resolveResult = await web4Client.resolveDomain(
                         web4Domain,
                       );
                       const manifestCid =
-                        resolveResult.manifest_cid ||
-                        `unknown:${web4Domain}`;
+                        resolveResult.manifest_cid || `unknown:${web4Domain}`;
 
+                      console.log(
+                        '[PoUW] RECORDING with quicSessionId:',
+                        Array.from(quicSessionId)
+                          .map(b => b.toString(16).padStart(2, '0'))
+                          .join(''),
+                      );
                       await pouwControllerRef.current?.recordWeb4ManifestRoute({
                         manifestCid,
                         domain: web4Domain,

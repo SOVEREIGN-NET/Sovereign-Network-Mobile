@@ -168,10 +168,11 @@ class SubmissionClient(
                 method = "POST",
                 headersJson = JSONObject().apply {
                     put("content-type", "application/json")
+                    put("X-Zhtp-Identity", identitySigner.getDid().removePrefix("did:zhtp:"))
                 }.toString(),
                 body = body,
                 timeoutSecs = DEFAULT_TIMEOUT_SECS,
-                alpn = "public"
+                alpn = "authenticated"
             )
             
             recordRequest()

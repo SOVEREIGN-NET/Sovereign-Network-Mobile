@@ -53,8 +53,16 @@ const PUBLIC_ENDPOINTS: EndpointRule[] = [
  * The server derives sender/creator from the authenticated session.
  */
 const MUTATING_IDENTITY_ENDPOINTS = [
-  { method: 'POST', path: '/api/v1/token/create', identityField: 'creator_identity' },
-  { method: 'POST', path: '/api/v1/token/mint', identityField: 'creator_identity' },
+  {
+    method: 'POST',
+    path: '/api/v1/token/create',
+    identityField: 'creator_identity',
+  },
+  {
+    method: 'POST',
+    path: '/api/v1/token/mint',
+    identityField: 'creator_identity',
+  },
   { method: 'POST', path: '/api/v1/token/transfer', identityField: 'from' },
 ] as const;
 
@@ -71,7 +79,9 @@ function matchPath(pattern: string, actual: string): boolean {
   const pSegs = normalizePath(pattern).split('/').filter(Boolean);
   const aSegs = normalizePath(actual).split('/').filter(Boolean);
   if (pSegs.length !== aSegs.length) return false;
-  return pSegs.every((p, i) => p.startsWith(':') ? !!aSegs[i] : p === aSegs[i]);
+  return pSegs.every((p, i) =>
+    p.startsWith(':') ? !!aSegs[i] : p === aSegs[i],
+  );
 }
 
 function isPublicEndpoint(method: string, path: string): boolean {
@@ -87,15 +97,21 @@ function isPublicEndpoint(method: string, path: string): boolean {
 // ---------------------------------------------------------------------------
 
 function isIdentityRegisterPath(method: string, path: string): boolean {
-  return method === 'POST' && normalizePath(path) === '/api/v1/identity/register';
+  return (
+    method === 'POST' && normalizePath(path) === '/api/v1/identity/register'
+  );
 }
 
-function deriveIdentityIdFromBody(body: string | undefined): string | undefined {
+function deriveIdentityIdFromBody(
+  body: string | undefined,
+): string | undefined {
   if (!body) return undefined;
   try {
     const did: string | undefined = JSON.parse(body)?.did;
     if (!did || typeof did !== 'string') return undefined;
-    return did.startsWith('did:zhtp:') ? did.substring('did:zhtp:'.length) : did;
+    return did.startsWith('did:zhtp:')
+      ? did.substring('did:zhtp:'.length)
+      : did;
   } catch {
     return undefined;
   }
@@ -162,8 +178,9 @@ async function rawRequest(
   const headers: Record<string, string> = { ...options.headers };
   let body = options.body;
 
-  const alpn = options.alpnOverride
-    ?? (isPublicEndpoint(method, path) ? 'public' : 'authenticated');
+  const alpn =
+    options.alpnOverride ??
+    (isPublicEndpoint(method, path) ? 'public' : 'authenticated');
 
   // Inject identity for authenticated requests
   if (alpn === 'authenticated') {
@@ -192,7 +209,10 @@ async function rawRequest(
     console.log('[quic] request:', method, redactDidInPath(path), `(${alpn})`);
   }
 
-  const response: QuicRawResponse = await NativeQuic.request(url, requestOptions);
+  const response: QuicRawResponse = await NativeQuic.request(
+    url,
+    requestOptions,
+  );
 
   if (alpn === 'authenticated') {
     const sid = (response as any)?.sessionIdPrefix;
@@ -202,8 +222,12 @@ async function rawRequest(
   }
 
   if (__DEV__) {
-    console.log('[quic] response:', response.status, response.statusText,
-      `(${response.body?.length ?? 0} bytes)`);
+    console.log(
+      '[quic] response:',
+      response.status,
+      response.statusText,
+      `(${response.body?.length ?? 0} bytes)`,
+    );
   }
 
   return response;
@@ -213,7 +237,8 @@ export async function getCurrentAuthSessionIdPrefix(options?: {
   forceRefresh?: boolean;
 }): Promise<string | null> {
   const forceRefresh = options?.forceRefresh === true;
-  if (!forceRefresh && latestAuthSessionIdPrefix) return latestAuthSessionIdPrefix;
+  if (!forceRefresh && latestAuthSessionIdPrefix)
+    return latestAuthSessionIdPrefix;
   if (!NativeQuic?.getCurrentSessionIdPrefix) return null;
 
   const identityId = await SecureIdentityStorage.getIdentityId();
@@ -221,12 +246,14 @@ export async function getCurrentAuthSessionIdPrefix(options?: {
 
   // Force a fresh authenticated request so native captures the newest session ID.
   if (forceRefresh) {
+    latestAuthSessionIdPrefix = null;
     try {
       const did = toDid(normalizeIdentityId(identityId));
       await rawRequest(`/api/v1/pouw/rewards/${encodeURIComponent(did)}`, {
         method: 'GET',
         alpnOverride: 'authenticated',
       });
+      await new Promise(resolve => setTimeout(resolve, 500));
     } catch {
       // Best-effort refresh; fallback to native getter below.
     }
@@ -282,7 +309,10 @@ export async function publicQuicRequest<T>(
   path: string,
   options?: RequestOptions,
 ): Promise<T> {
-  const response = await rawRequest(path, { ...options, alpnOverride: 'public' });
+  const response = await rawRequest(path, {
+    ...options,
+    alpnOverride: 'public',
+  });
 
   if (!response.ok) {
     let code: string | undefined;
@@ -351,10 +381,18 @@ export async function testQuicHealthCheck(
     const latencyMs = Date.now() - startTime;
     if (response.ok) {
       let data: unknown;
-      try { data = JSON.parse(response.body); } catch { data = response.body; }
+      try {
+        data = JSON.parse(response.body);
+      } catch {
+        data = response.body;
+      }
       return { success: true, data, latencyMs };
     }
-    return { success: false, error: `HTTP ${response.status}: ${response.statusText}`, latencyMs };
+    return {
+      success: false,
+      error: `HTTP ${response.status}: ${response.statusText}`,
+      latencyMs,
+    };
   } catch (error: unknown) {
     return {
       success: false,
@@ -377,7 +415,9 @@ export function toQuicUrl(url: string): string {
   return url.replace(/^https?:\/\//, 'quic://');
 }
 
-export function parseQuicUrl(url: string): { host: string; port: number; path: string } | null {
+export function parseQuicUrl(
+  url: string,
+): { host: string; port: number; path: string } | null {
   try {
     const normalized = url.replace(/^quic:\/\//, 'https://');
     const parsed = new URL(normalized);
