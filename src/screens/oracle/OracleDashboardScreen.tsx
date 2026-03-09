@@ -23,6 +23,7 @@ import {
   OraclePair,
   VariationPeriod,
 } from '../../services/OracleService';
+import SimulatorTab from './SimulatorTab';
 
 const MONO_FONT = Platform.OS === 'ios' ? 'Menlo' : 'monospace';
 
@@ -47,13 +48,14 @@ const fmtPct = (v: unknown): string => {
   return `${sign}${n.toFixed(2)}%`;
 };
 
-type Tab = 'price' | 'variation' | 'status' | 'config';
+type Tab = 'price' | 'variation' | 'status' | 'config' | 'simulator';
 
 const TABS: { key: Tab; label: string }[] = [
   { key: 'price', label: 'Price' },
-  { key: 'variation', label: 'Variation' },
+  { key: 'variation', label: 'Var' },
   { key: 'status', label: 'Status' },
   { key: 'config', label: 'Config' },
+  { key: 'simulator', label: 'Sim' },
 ];
 
 const PAIRS: OraclePair[] = ['SOV/USD', 'CBE/USD'];
@@ -675,7 +677,12 @@ const OracleDashboardScreen: React.FC<any> = ({ navigation }) => {
         <View style={{ width: 48 }} />
       </View>
 
-      <View style={styles.tabBar}>
+      <ScrollView
+        horizontal
+        showsHorizontalScrollIndicator={false}
+        style={styles.tabBar}
+        contentContainerStyle={styles.tabBarContent}
+      >
         {TABS.map(({ key, label }) => (
           <Pressable
             key={key}
@@ -693,17 +700,21 @@ const OracleDashboardScreen: React.FC<any> = ({ navigation }) => {
             </Text>
           </Pressable>
         ))}
-      </View>
-
-      <ScrollView
-        contentContainerStyle={styles.content}
-        showsVerticalScrollIndicator={false}
-      >
-        {activeTab === 'price' && <PriceTab />}
-        {activeTab === 'variation' && <VariationTab />}
-        {activeTab === 'status' && <StatusTab data={status} />}
-        {activeTab === 'config' && <ConfigTab data={config} />}
       </ScrollView>
+
+      {activeTab === 'simulator' ? (
+        <SimulatorTab />
+      ) : (
+        <ScrollView
+          contentContainerStyle={styles.content}
+          showsVerticalScrollIndicator={false}
+        >
+          {activeTab === 'price' && <PriceTab />}
+          {activeTab === 'variation' && <VariationTab />}
+          {activeTab === 'status' && <StatusTab data={status} />}
+          {activeTab === 'config' && <ConfigTab data={config} />}
+        </ScrollView>
+      )}
     </SafeAreaView>
   );
 };
@@ -723,18 +734,21 @@ const styles = StyleSheet.create({
     borderBottomColor: colors.border,
   },
   tabBar: {
-    flexDirection: 'row',
     backgroundColor: colors.bg_darker,
     marginHorizontal: spacing.lg,
     marginVertical: spacing.sm,
     borderRadius: borderRadius.full,
-    padding: 3,
     borderWidth: 1,
     borderColor: colors.border,
+    flexGrow: 0,
+  },
+  tabBarContent: {
+    padding: 3,
+    flexDirection: 'row',
   },
   tab: {
-    flex: 1,
     paddingVertical: spacing.xs + 2,
+    paddingHorizontal: spacing.md,
     alignItems: 'center',
     borderRadius: borderRadius.full,
   },
