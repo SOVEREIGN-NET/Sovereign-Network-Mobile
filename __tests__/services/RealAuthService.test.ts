@@ -2,7 +2,7 @@ import { RealAuthService } from 'src/services/RealAuthService';
 
 describe('RealAuthService', () => {
   let authService: RealAuthService;
-  const TEST_NODE_URL = 'http://77.42.37.161:9334';
+  const TEST_NODE_URL = process.env.TEST_NODE_URL ?? 'http://g1.thesovereignnetwork.org:9334';
 
   beforeEach(() => {
     authService = new RealAuthService(TEST_NODE_URL);

@@ -18,11 +18,18 @@ if ! command -v gh &> /dev/null; then
 fi
 
 # Variables
-SERVICE_ACCOUNT_JSON="/Users/supertramp/Downloads/sovereign-network-mobile-906a1-7093f108fa6c.json"
+# Credentials are read from android/vault/release-keystore-credentials.txt (gitignored)
+# or from environment variables.
+VAULT_FILE="android/vault/release-keystore-credentials.txt"
+if [[ -f "$VAULT_FILE" ]]; then
+  source "$VAULT_FILE"
+fi
+
+SERVICE_ACCOUNT_JSON="${GOOGLE_PLAY_SERVICE_ACCOUNT_JSON_PATH:-/Users/supertramp/Downloads/sovereign-network-mobile-906a1-a6a74897ca20.json}"
 RELEASE_KEYSTORE="android/app/release.keystore"
-KEYSTORE_PASSWORD="Tachipirina500!"
-RELEASE_KEY_ALIAS="release-key"
-RELEASE_KEY_PASSWORD="Tachipirina500!"
+KEYSTORE_PASSWORD="${RELEASE_KEYSTORE_PASSWORD:?RELEASE_KEYSTORE_PASSWORD is not set. See android/vault/release-keystore-credentials.txt}"
+RELEASE_KEY_ALIAS="${RELEASE_KEY_ALIAS:-release-key}"
+RELEASE_KEY_PASSWORD="${RELEASE_KEY_PASSWORD:?RELEASE_KEY_PASSWORD is not set. See android/vault/release-keystore-credentials.txt}"
 
 echo "📝 Preparing GitHub Secrets..."
 echo ""
