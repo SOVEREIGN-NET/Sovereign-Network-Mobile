@@ -1,6 +1,0 @@
-  1. /Users/supertramp/Dev/SovereignNetworkMobile/an
-  droid.sh - Main Android runner (just calls npm run
-   android)                                         
-  2. /Users/supertramp/Dev/SovereignNetworkMobile/an
-  droid/app/src/main/rust/quic-jni/build-android.sh 
-  - Rust QUIC native library builder  
