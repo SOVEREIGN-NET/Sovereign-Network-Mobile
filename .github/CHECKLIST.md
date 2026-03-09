@@ -71,7 +71,7 @@ Once secrets are added:
 **Keystore Details:**
 - File: `android/app/release.keystore`
 - Alias: `release-key`
-- Password: `Tachipirina500!`
+- Password: see `android/vault/release-keystore-credentials.txt` (gitignored)
 - Validity: 10,000 days
 
 **Build Config:**

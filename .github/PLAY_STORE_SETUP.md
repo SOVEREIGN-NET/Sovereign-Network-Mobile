@@ -28,7 +28,7 @@ android/app/release.keystore
 
 Details:
 - **Alias**: `release-key`
-- **Password**: `Tachipirina500!`
+- **Password**: see `android/vault/release-keystore-credentials.txt` (gitignored)
 - **Validity**: 10,000 days
 
 ## Step 2: Verify Service Account
@@ -58,9 +58,9 @@ This will add these secrets to your GitHub repository:
 |-------------|-------|
 | `RELEASE_KEYSTORE_FILE` | Base64-encoded keystore file |
 | `GOOGLE_PLAY_SERVICE_ACCOUNT_JSON` | Service account JSON content |
-| `RELEASE_KEYSTORE_PASSWORD` | `Tachipirina500!` |
+| `RELEASE_KEYSTORE_PASSWORD` | From `android/vault/release-keystore-credentials.txt` |
 | `RELEASE_KEY_ALIAS` | `release-key` |
-| `RELEASE_KEY_PASSWORD` | `Tachipirina500!` |
+| `RELEASE_KEY_PASSWORD` | From `android/vault/release-keystore-credentials.txt` |
 
 ### Manual Setup (if script doesn't work)
 
@@ -82,7 +82,7 @@ Copy the entire JSON and paste it.
 
 **3. RELEASE_KEYSTORE_PASSWORD**
 ```
-Tachipirina500!
+<see android/vault/release-keystore-credentials.txt>
 ```
 
 **4. RELEASE_KEY_ALIAS**
@@ -92,7 +92,7 @@ release-key
 
 **5. RELEASE_KEY_PASSWORD**
 ```
-Tachipirina500!
+<see android/vault/release-keystore-credentials.txt>
 ```
 
 ## Step 4: Test the Workflow
