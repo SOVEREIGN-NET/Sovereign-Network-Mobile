@@ -149,3 +149,10 @@ ios/vendor/liboqs.xcframework/liboqs.xcframework
 wallet.txt
 android/vault/
 docs/RELEASE_DEPLOYMENT.md
+
+# Local toolchain / cache dirs
+.bundle/
+.cargo/
+.expo/
+.qoder/
+.vscode/
