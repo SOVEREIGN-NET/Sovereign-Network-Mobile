@@ -5,6 +5,17 @@
 
 import { BottomTabScreenProps } from '@react-navigation/bottom-tabs';
 import { NativeStackScreenProps } from '@react-navigation/native-stack';
+import type { Identity } from './identity';
+
+// Root stack — all top-level screens including auth modals
+export type RootStackParamList = {
+  MainTabs: undefined;
+  SignIn: undefined;
+  CreateIdentity: undefined;
+  RecoverIdentity: undefined;
+  MigrationSeed: { seedWords: string[] };
+  SeedPhrase: { seedPhrases: string[]; identity?: Identity };
+};
 
 // Define the tab navigator param list
 export type TabParamList = {
@@ -23,6 +34,7 @@ export type DashboardStackParamList = {
   IdentityDetail: { did: string };
   WalletDetail: { ownerId: string };
   ExplorerSearch: { query?: string };
+  OracleDashboard: undefined;
 };
 
 export type IdentityStackParamList = {

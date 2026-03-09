@@ -26,6 +26,24 @@ class NativeIdentityProvisioning(reactContext: ReactApplicationContext) :
 
     companion object {
         private const val TAG = "NativeIdentityProvisioning"
+
+        // Protocol treasury recipient key-id (32 bytes)
+        private val TREASURY_RECIPIENT: ByteArray = byteArrayOf(
+            0x6a.toByte(), 0xdb.toByte(), 0x02.toByte(), 0x79.toByte(),
+            0xd2.toByte(), 0xaf.toByte(), 0x62.toByte(), 0x5f.toByte(),
+            0x4d.toByte(), 0x29.toByte(), 0x2b.toByte(), 0xaf.toByte(),
+            0xe0.toByte(), 0xfc.toByte(), 0xfe.toByte(), 0x3e.toByte(),
+            0x20.toByte(), 0x20.toByte(), 0x43.toByte(), 0x64.toByte(),
+            0x78.toByte(), 0xb0.toByte(), 0xf9.toByte(), 0x0d.toByte(),
+            0x98.toByte(), 0xad.toByte(), 0xaf.toByte(), 0x82.toByte(),
+            0x0c.toByte(), 0xac.toByte(), 0x15.toByte(), 0x47.toByte()
+        )
+
+        @JvmStatic private external fun nativeBuildTokenCreate(
+            identityJson: String, name: String, symbol: String,
+            initialSupply: Long, decimals: Int,
+            treasuryRecipient: ByteArray, chainId: Int
+        ): String
     }
 
     private val executor: Executor = Executors.newCachedThreadPool()
@@ -346,8 +364,16 @@ class NativeIdentityProvisioning(reactContext: ReactApplicationContext) :
 
                 Log.d(TAG, "Building token create transaction: $name/$symbol with supply=$initialSupply")
 
-                val hexSignedTx = identity.buildTokenCreate(name, symbol, initialSupply, decimals)
-                if (hexSignedTx == null) {
+                val identityJson = identity.serialize()
+                if (identityJson == null) {
+                    promise.reject("SIGNING_ERROR", "Failed to serialize identity for signing")
+                    return@execute
+                }
+                val hexSignedTx = nativeBuildTokenCreate(
+                    identityJson, name, symbol, initialSupply, decimals,
+                    TREASURY_RECIPIENT, 0x02
+                )
+                if (hexSignedTx.isEmpty()) {
                     promise.reject("SIGNING_ERROR", "Failed to build token creation transaction")
                     return@execute
                 }

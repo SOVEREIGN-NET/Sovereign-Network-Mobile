@@ -52,19 +52,9 @@ const PUBLIC_ENDPOINTS: EndpointRule[] = [
  * Mutating endpoints that require identity auto-population.
  * The server derives sender/creator from the authenticated session.
  */
-const MUTATING_IDENTITY_ENDPOINTS = [
-  {
-    method: 'POST',
-    path: '/api/v1/token/create',
-    identityField: 'creator_identity',
-  },
-  {
-    method: 'POST',
-    path: '/api/v1/token/mint',
-    identityField: 'creator_identity',
-  },
-  { method: 'POST', path: '/api/v1/token/transfer', identityField: 'from' },
-] as const;
+// Token endpoints use signed_tx — identity is embedded in the transaction,
+// not injected as a separate body field.
+const MUTATING_IDENTITY_ENDPOINTS: { method: string; path: string; identityField: string }[] = [];
 
 // ---------------------------------------------------------------------------
 // Path matching helpers
@@ -295,6 +285,14 @@ export async function quicRequest<T>(
     } catch {
       body = response.body;
     }
+    if (__DEV__) {
+      // Log 5xx as errors; 4xx are expected client errors (auth, not found, etc.)
+      if (response.status >= 500) {
+        console.error('[quic] error body:', response.body);
+      } else {
+        console.log('[quic] error body:', response.body);
+      }
+    }
     throw new QuicError(response.status, response.statusText, code, body);
   }
 
@@ -322,6 +320,13 @@ export async function publicQuicRequest<T>(
       code = (body as Record<string, unknown>)?.code as string | undefined;
     } catch {
       body = response.body;
+    }
+    if (__DEV__) {
+      if (response.status >= 500) {
+        console.error('[quic] error body:', response.body);
+      } else {
+        console.log('[quic] error body:', response.body);
+      }
     }
     throw new QuicError(response.status, response.statusText, code, body);
   }

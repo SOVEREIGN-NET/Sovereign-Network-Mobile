@@ -139,6 +139,7 @@ private func cBuildTokenCreate(
     _ symbol: UnsafePointer<CChar>?,
     _ initialSupply: UInt64,
     _ decimals: UInt8,
+    _ treasuryRecipient: UnsafePointer<UInt8>?,
     _ chainId: UInt8
 ) -> UnsafeMutablePointer<CChar>?
 
@@ -714,6 +715,18 @@ public class ZhtpClient {
         return String(cString: hexPtr)
     }
 
+    // Protocol treasury recipient key-id (32 bytes)
+    private static let treasuryRecipientBytes: [UInt8] = {
+        let hex = "6adb0279d2af625f4d292bafe0fcfe3e2020436478b0f90d98adaf820cac1547"
+        var result = [UInt8](repeating: 0, count: 32)
+        for i in 0..<32 {
+            let start = hex.index(hex.startIndex, offsetBy: i * 2)
+            let end = hex.index(start, offsetBy: 2)
+            result[i] = UInt8(hex[start..<end], radix: 16) ?? 0
+        }
+        return result
+    }()
+
     /// Build signed token create transaction (returns hex-encoded string ready for API)
     public static func buildTokenCreate(
         name: String,
@@ -723,16 +736,20 @@ public class ZhtpClient {
         using identity: Identity,
         chainId: UInt8 = 0x02  // testnet
     ) throws -> String {
+        var treasury = treasuryRecipientBytes
         guard let hexPtr = name.withCString({ namePtr in
             symbol.withCString { symbolPtr in
-                cBuildTokenCreate(
-                    identity.getHandle(),
-                    namePtr,
-                    symbolPtr,
-                    initialSupply,
-                    decimals,
-                    chainId
-                )
+                treasury.withUnsafeBufferPointer { treasuryPtr in
+                    cBuildTokenCreate(
+                        identity.getHandle(),
+                        namePtr,
+                        symbolPtr,
+                        initialSupply,
+                        decimals,
+                        treasuryPtr.baseAddress,
+                        chainId
+                    )
+                }
             }
         }) else {
             throw ClientError.signingError("Failed to build token create transaction")

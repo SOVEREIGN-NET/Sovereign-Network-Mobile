@@ -5,6 +5,7 @@
 
 import React, { useState, useEffect } from 'react';
 import { View, ScrollView, Pressable } from 'react-native';
+import { StackActions } from '@react-navigation/native';
 import { NativeStackScreenProps } from '@react-navigation/native-stack';
 import {
   Card,
@@ -22,9 +23,9 @@ import { useTranslation } from '../i18n';
 import { useAuth } from '../hooks';
 import SeedVaultService from '../services/SeedVaultService';
 import { colors, spacing, typography, borderRadius } from '../theme';
-import { AuthStackParamList } from '../navigation/AuthNavigator';
+import { RootStackParamList } from '../types/navigation';
 
-type SeedPhraseScreenProps = NativeStackScreenProps<AuthStackParamList, 'SeedPhrase'>;
+type SeedPhraseScreenProps = NativeStackScreenProps<RootStackParamList, 'SeedPhrase'>;
 
 const SeedPhraseScreen = ({ navigation, route }: SeedPhraseScreenProps) => {
   const { t } = useTranslation();
@@ -90,7 +91,9 @@ const SeedPhraseScreen = ({ navigation, route }: SeedPhraseScreenProps) => {
     try {
       if (identity) {
         await setCurrentIdentity(identity);
-        navigation.goBack();
+        // Pop all auth screens back to MainTabs — goBack() would only go back
+        // one level to CreateIdentity/MigrationSeed, leaving user stuck on auth screens.
+        navigation.dispatch(StackActions.popToTop());
       }
     } finally {
       setIsSaving(false);

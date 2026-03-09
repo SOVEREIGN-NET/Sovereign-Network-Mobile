@@ -19,11 +19,11 @@ import {
 } from '../components';
 import { useAuth } from '../hooks';
 import { colors, spacing, typography, borderRadius } from '../theme';
-import { AuthStackParamList } from '../navigation/AuthNavigator';
+import { RootStackParamList } from '../types/navigation';
 import SeedVaultService from '../services/SeedVaultService';
 import SecureIdentityStorage from '../services/SecureIdentityStorage';
 
-type MigrationSeedScreenProps = NativeStackScreenProps<AuthStackParamList, 'MigrationSeed'>;
+type MigrationSeedScreenProps = NativeStackScreenProps<RootStackParamList, 'MigrationSeed'>;
 
 const MigrationSeedScreen = ({ navigation, route }: MigrationSeedScreenProps) => {
   const { migrateIdentityFromSeed, isLoading, error } = useAuth();

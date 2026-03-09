@@ -323,9 +323,9 @@ class NativeIdentityProvisioningBridge {
   async signTokenCreateTransaction(params: {
     name: string;
     symbol: string;
-    initialSupply: number;
+    initialSupply: string;
     decimals: number;
-    maxSupply: number | null;
+    maxSupply: string | null;
   }): Promise<{ signed_tx: string }> {
     if (!this.nativeModule) {
       throw new Error(

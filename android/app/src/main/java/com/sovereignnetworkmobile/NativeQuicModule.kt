@@ -28,7 +28,10 @@ class NativeQuicModule(reactContext: ReactApplicationContext) :
         // GeneratedConfig.kt is the single source of truth - updated at build time
         private const val QUINN_CONTROL_PLANE_HOST = com.sovereignnetworkmobile.config.GeneratedConfig.QUINN_CONTROL_PLANE_HOST
         private const val QUINN_CONTROL_PLANE_PORT = com.sovereignnetworkmobile.config.GeneratedConfig.QUINN_CONTROL_PLANE_PORT
-        private const val QUINN_CONTROL_PLANE_SERVER_NAME = com.sovereignnetworkmobile.config.GeneratedConfig.QUINN_CONTROL_PLANE_SERVER_NAME
+        // Empty serverName → use host as SNI (Rust rejects empty string)
+        private val QUINN_CONTROL_PLANE_SERVER_NAME: String =
+            com.sovereignnetworkmobile.config.GeneratedConfig.QUINN_CONTROL_PLANE_SERVER_NAME
+                .ifEmpty { QUINN_CONTROL_PLANE_HOST }
     }
 
     private val executor: Executor = Executors.newCachedThreadPool()
@@ -286,7 +289,7 @@ class NativeQuicModule(reactContext: ReactApplicationContext) :
             }
 
             NativeQuicBridge.initUhpQuinn()
-            val spkiPin = com.sovereignnetworkmobile.config.GeneratedConfig.QUINN_SPKI_PIN_HEX
+            val spkiPin = com.sovereignnetworkmobile.config.GeneratedConfig.spkiPinFor(QUINN_CONTROL_PLANE_HOST)
 
             val handshake: Map<String, Any?>? = if (NativeQuicBridge.useLibClientHandshake) {
                 // New path: 3-leg UHP via lib-client HandshakeState (keys stay in Rust)

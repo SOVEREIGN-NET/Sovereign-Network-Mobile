@@ -148,4 +148,27 @@ class NativeSettingsModule(reactContext: ReactApplicationContext) :
       promise.reject("CLEAR_SETTINGS_ERROR", e.message)
     }
   }
+
+  /**
+   * Delete the Rust TOFU trust database so the next connection re-pins the node cert.
+   * Path mirrors lib-network's default_trustdb_path(): $HOME/.zhtp/trustdb.json
+   */
+  @ReactMethod
+  fun clearNodeTrust(promise: Promise) {
+    try {
+      val homeDir = reactApplicationContext.filesDir.parent
+        ?: System.getenv("HOME")
+        ?: run {
+          promise.reject("CLEAR_TRUST_ERROR", "Could not determine home directory")
+          return
+        }
+      val trustDbFile = java.io.File(homeDir, ".zhtp/trustdb.json")
+      if (trustDbFile.exists()) {
+        trustDbFile.delete()
+      }
+      promise.resolve(true)
+    } catch (e: Exception) {
+      promise.reject("CLEAR_TRUST_ERROR", e.message)
+    }
+  }
 }

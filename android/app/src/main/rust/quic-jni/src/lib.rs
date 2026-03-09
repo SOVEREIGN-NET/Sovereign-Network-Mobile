@@ -214,10 +214,9 @@ pub extern "system" fn Java_com_sovereignnetworkmobile_NativeQuicBridge_nativeRe
         if let Some(ref rt) = RUNTIME {
             rt.block_on(async {
                 // Parse URL to get host and port
-                use std::net::SocketAddr;
-                use crate::quic_client::parse_quic_url;
+                use crate::quic_client::{parse_quic_url, resolve_addr};
                 let (host, port, path) = parse_quic_url(&url_str)?;
-                let addr: SocketAddr = format!("{}:{}", host, port).parse()?;
+                let addr = resolve_addr(&host, port)?;
 
                 let client_config = if insecure_bool {
                     crate::quic_client::create_insecure_client_config()?
@@ -260,11 +259,12 @@ pub extern "system" fn Java_com_sovereignnetworkmobile_NativeQuicBridge_nativeRe
     // Convert result to response map
     let response_result: Result<(i32, &str, String, bool), anyhow::Error> = result
         .map(|(status, body)| {
+            let ok = status >= 200 && status < 300;
             (
                 status as i32,
                 "",
                 String::from_utf8_lossy(&body).to_string(),
-                true,
+                ok,
             )
         });
 
@@ -413,11 +413,12 @@ pub extern "system" fn Java_com_sovereignnetworkmobile_NativeQuicBridge_nativeUh
     );
 
     let response_result = result.map(|(status, body)| {
+        let ok = status >= 200 && status < 300;
         (
             status as i32,
             "",
             String::from_utf8_lossy(&body).to_string(),
-            true,
+            ok,
         )
     });
     create_zhtp_response_map(&mut env, response_result)
@@ -798,9 +799,9 @@ pub extern "system" fn Java_com_sovereignnetworkmobile_NativeQuicBridge_nativeRe
         if let Some(ref rt) = RUNTIME {
             rt.block_on(async {
                 // Create QUIC connection and send ZHTP request
-                use crate::quic_client::parse_quic_url;
+                use crate::quic_client::{parse_quic_url, resolve_addr};
                 let (host, port, path) = parse_quic_url(&url_str)?;
-                let addr: std::net::SocketAddr = format!("{}:{}", host, port).parse()?;
+                let addr = resolve_addr(&host, port)?;
 
                 let client_config = if insecure_bool {
                     crate::quic_client::create_insecure_client_config()?

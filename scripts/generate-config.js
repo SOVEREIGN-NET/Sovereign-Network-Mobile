@@ -58,26 +58,42 @@ function parseNodeUrl(url) {
     if (match) {
       return { host: match[1], port: parseInt(match[2], 10) || 9334 };
     }
-    return { host: '77.42.37.161', port: 9334 };
+    return { host: 'g1.thesovereignnetwork.org', port: 9334 };
   }
+}
+
+// Parse node registry: "host:port:pin_hex,host:port:pin_hex,..."
+// Returns array of { host, port, pin } objects
+function parseNodeRegistry(registryStr) {
+  if (!registryStr) return [];
+  return registryStr.split(',').map(entry => {
+    const parts = entry.trim().split(':');
+    if (parts.length < 2) return null;
+    // parts: [host, port, pin_hex (optional)]
+    return { host: parts[0], port: parseInt(parts[1], 10), pin: parts[2] || '' };
+  }).filter(Boolean);
 }
 
 // Generate config
 const envConfig = parseEnv(envPath);
-const nodeUrl = envConfig.ZHTP_NODE_URL || 'http://77.42.37.161:9334';
+const nodeUrl = envConfig.ZHTP_NODE_URL || 'http://g1.thesovereignnetwork.org:9334';
 const { host: nodeHost, port: nodePort } = parseNodeUrl(nodeUrl);
-const certificatePin = envConfig.CERTIFICATE_PIN || 'd21aa1f13cea799f96588a274c210c6de46786f098dc321477d8e04b7d87e058'; // Default testnet pin
 const sovTokenId = envConfig.SOV_TOKEN_ID || null;
 const chainId = envConfig.CHAIN_ID || '2';
+const nodeRegistry = parseNodeRegistry(envConfig.ZHTP_NODE_REGISTRY);
+// Control plane pin = pin for the primary node host
+const controlNodeEntry = nodeRegistry.find(n => n.host === nodeHost) || nodeRegistry[0];
+const certificatePin = controlNodeEntry?.pin || '';
 
 // 1. Generate JSON config for React Native
 const generatedConfig = {
   ZHTP_NODE_URL: nodeUrl,
   ZHTP_NODE_HOST: nodeHost,
   ZHTP_NODE_PORT: nodePort,
-  CERTIFICATE_PIN: certificatePin,
+  CERTIFICATE_PIN: certificatePin, // empty = system CA trust
   SOV_TOKEN_ID: sovTokenId,
   CHAIN_ID: chainId,
+  NODE_REGISTRY: nodeRegistry,
 };
 
 fs.writeFileSync(
@@ -90,11 +106,12 @@ console.log(`✓ Generated React Native config at ${generatedJsonPath}`);
 console.log(`  ZHTP_NODE_URL: ${generatedConfig.ZHTP_NODE_URL}`);
 console.log(`  ZHTP_NODE_HOST: ${generatedConfig.ZHTP_NODE_HOST}`);
 console.log(`  ZHTP_NODE_PORT: ${generatedConfig.ZHTP_NODE_PORT}`);
-console.log(`  CERTIFICATE_PIN: ${certificatePin}`);
+console.log(`  CERTIFICATE_PIN: ${certificatePin || '(none — system CA trust)'}`);
 console.log(`  SOV_TOKEN_ID: ${sovTokenId || '(not set)'}`);
 console.log(`  CHAIN_ID: ${chainId}`);
 
 // 2. Generate iOS Swift config
+const iosSpkiEntries = nodeRegistry.map(n => `        "${n.host}": "${n.pin}",`).join('\n');
 const iosConfig = `import Foundation
 
 /**
@@ -112,11 +129,20 @@ struct GeneratedConfig {
     // QUIC Control Plane (used by NativeQuicModule for authenticated requests)
     static let quinnControlPlaneHost = "${nodeHost}"
     static let quinnControlPlanePort: UInt16 = ${nodePort}
-    static let quinnControlPlaneServerName = "zhtp-mesh"
+    // Empty = use hostname as SNI
+    static let quinnControlPlaneServerName = ""
 
-    // SPKI Pin (this should match your server certificate)
-    // This is used for certificate pinning in QUIC connections
+    // SPKI pin for the control plane node (SHA-256 of SubjectPublicKeyInfo, hex-encoded)
     static let quinnSpkiPinHex = "${certificatePin}"
+
+    // Per-host SPKI pins — generated from ZHTP_NODE_REGISTRY in .env
+    private static let spkiPins: [String: String] = [
+${iosSpkiEntries}
+    ]
+
+    static func spkiPin(for host: String) -> String {
+        return spkiPins[host] ?? quinnSpkiPinHex
+    }
 }
 `;
 
@@ -130,6 +156,7 @@ fs.writeFileSync(iosConfigPath, iosConfig, 'utf8');
 console.log(`✓ Generated iOS config at ${iosConfigPath}`);
 
 // 3. Generate Android Kotlin config
+const androidSpkiEntries = nodeRegistry.map(n => `        "${n.host}" to "${n.pin}",`).join('\n');
 const androidConfig = `package com.sovereignnetworkmobile.config
 
 /**
@@ -147,11 +174,18 @@ object GeneratedConfig {
     // QUIC Control Plane (used by NativeQuicModule for authenticated requests)
     const val QUINN_CONTROL_PLANE_HOST = "${nodeHost}"
     const val QUINN_CONTROL_PLANE_PORT = ${nodePort}
-    const val QUINN_CONTROL_PLANE_SERVER_NAME = "zhtp-mesh"
+    // Empty = use hostname as SNI
+    const val QUINN_CONTROL_PLANE_SERVER_NAME = ""
 
-    // SPKI Pin (this should match your server certificate)
-    // This is used for certificate pinning in QUIC connections
+    // SPKI pin for the control plane node (SHA-256 of SubjectPublicKeyInfo, hex-encoded)
     const val QUINN_SPKI_PIN_HEX = "${certificatePin}"
+
+    // Per-host SPKI pins — generated from ZHTP_NODE_REGISTRY in .env
+    private val SPKI_PINS: Map<String, String> = mapOf(
+${androidSpkiEntries}
+    )
+
+    fun spkiPinFor(host: String): String = SPKI_PINS[host] ?: QUINN_SPKI_PIN_HEX
 }
 `;
 

@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useCallback } from 'react';
-import { View, ScrollView, TouchableOpacity, Alert } from 'react-native';
+import { View, ScrollView, TouchableOpacity } from 'react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useFocusEffect } from '@react-navigation/native';
 import {
@@ -404,20 +404,14 @@ const SendTokensScreen = ({ navigation }: any) => {
 
       setTransferStatus({
         type: 'success',
-        message: `Transfer successful!`,
+        message: `Transfer submitted — check Activity for confirmation.`,
       });
 
-      // Reset form
-      setTimeout(() => {
-        setTransferForm({
-          recipient: '',
-          amount: '',
-          memo: '',
-        });
-        setTransferStatus({ type: null, message: '' });
-        refreshWallets(); // Re-fetch wallet balances from server
+      refreshWallets();
 
-        Alert.alert('Success', 'Transfer completed');
+      // Navigate back after a brief moment so user sees the pending tx
+      setTimeout(() => {
+        navigation.goBack();
       }, 1500);
     } catch (error: any) {
       console.error('[SendTokensScreen] Transfer failed:', error);

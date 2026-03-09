@@ -12,7 +12,37 @@ export interface RewardCounterData {
   rewards: PoUWRewardsResponse | null;
   loading: boolean;
   error: string | null;
+  /** Unix timestamp (seconds) when this identity becomes eligible for PoUW rewards. */
+  maturesAt: number | null;
   refetch: () => void;
+}
+
+const ZERO_REWARDS = (did: string): PoUWRewardsResponse => ({
+  client_did: did,
+  total_rewards: 0,
+  total_earned: 0,
+  total_paid: 0,
+  pending: 0,
+  rewards: [],
+});
+
+/** Extract maturation timing from a QuicError — handles both JSON and plain-text bodies. */
+function extractMaturationSecs(error: unknown): { ageSecs: number; requiredSecs: number } | null {
+  const body = (error as any)?.body;
+  // JSON body: { age_secs, required_secs }
+  if (body && typeof body === 'object') {
+    const obj = body as Record<string, unknown>;
+    if (typeof obj.age_secs === 'number' && typeof obj.required_secs === 'number') {
+      return { ageSecs: obj.age_secs, requiredSecs: obj.required_secs };
+    }
+  }
+  // Plain-text body: "...31164 seconds old, minimum 86400 seconds required"
+  const text = typeof body === 'string' ? body : (error instanceof Error ? error.message : '');
+  const match = text.match(/(\d+)\s+seconds\s+old.*?minimum\s+(\d+)\s+seconds/i);
+  if (match) {
+    return { ageSecs: parseInt(match[1], 10), requiredSecs: parseInt(match[2], 10) };
+  }
+  return null;
 }
 
 const toSOV = (rawAmount: number): number => atomicToHuman(rawAmount, SOV_DECIMALS);
@@ -33,9 +63,15 @@ export const useRewardCounter = (): RewardCounterData => {
   const [rewards, setRewards] = useState<PoUWRewardsResponse | null>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [maturesAt, setMaturesAt] = useState<number | null>(null);
 
   const fetchRewards = useCallback(async () => {
     if (!currentIdentity?.did) {
+      return;
+    }
+
+    // Don't hammer the server while we know we're in maturation
+    if (maturesAt && Math.floor(Date.now() / 1000) < maturesAt) {
       return;
     }
 
@@ -45,19 +81,30 @@ export const useRewardCounter = (): RewardCounterData => {
     try {
       const data = await appService.getRewards(currentIdentity.did);
       setRewards(data);
+      setMaturesAt(null); // eligible — clear any prior maturation state
     } catch (err) {
-      const msg =
-        err instanceof Error ? err.message : 'Failed to fetch rewards';
+      const status = (err as any)?.status as number | undefined;
+      const msg = err instanceof Error ? err.message : 'Failed to fetch rewards';
+
       if (msg.includes('404') || msg.includes('NotFound')) {
-        setRewards({
-          client_did: currentIdentity.did,
-          total_rewards: 0,
-          total_earned: 0,
-          total_paid: 0,
-          pending: 0,
-          rewards: [],
-        });
+        // Identity exists but has no rewards yet — treat as zero
+        setRewards(ZERO_REWARDS(currentIdentity.did));
         setError(null);
+      } else if (status === 401 || status === 403) {
+        // Check whether this is a maturation response (identity too new)
+        const info = extractMaturationSecs(err);
+        if (__DEV__) {
+          console.log('[useRewardCounter] 401 body:', JSON.stringify((err as any)?.body));
+        }
+        if (info) {
+          const remainingSecs = info.requiredSecs - info.ageSecs;
+          setMaturesAt(Math.floor(Date.now() / 1000) + remainingSecs);
+          setRewards(ZERO_REWARDS(currentIdentity.did));
+          setError(null); // not an error — expected during maturation
+        } else {
+          setError(msg);
+          console.warn('[useRewardCounter] Error fetching rewards:', msg);
+        }
       } else {
         setError(msg);
         console.warn('[useRewardCounter] Error fetching rewards:', msg);
@@ -65,7 +112,7 @@ export const useRewardCounter = (): RewardCounterData => {
     } finally {
       setLoading(false);
     }
-  }, [currentIdentity?.did]);
+  }, [currentIdentity?.did, maturesAt]);
 
   useEffect(() => {
     fetchRewards();
@@ -81,6 +128,7 @@ export const useRewardCounter = (): RewardCounterData => {
     rewards,
     loading,
     error,
+    maturesAt,
     refetch: fetchRewards,
   };
 };

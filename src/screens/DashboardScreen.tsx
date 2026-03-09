@@ -322,6 +322,43 @@ const DashboardScreen: React.FC<any> = ({ navigation }) => {
             align="center"
             style={{ marginBottom: spacing.sm }}
           >
+            <Text variant="h3">Oracle</Text>
+            <Badge label="Public" variant="default" size="sm" />
+          </Row>
+          <Pressable
+            onPress={() => navigation.navigate('OracleDashboard')}
+            style={{
+              flexDirection: 'row',
+              alignItems: 'center',
+              justifyContent: 'space-between',
+              paddingVertical: spacing.sm,
+              paddingHorizontal: spacing.md,
+              borderRadius: borderRadius.lg,
+              backgroundColor: colors.bg_darker,
+              borderWidth: 1,
+              borderColor: colors.border,
+            }}
+          >
+            <Column gap="xs" style={{ flex: 1 }}>
+              <Text variant="body" style={{ fontWeight: '600' }}>
+                SOV/USD Price Oracle
+              </Text>
+              <Text variant="caption" style={{ color: colors.text_secondary }}>
+                Live price feed, committee status, and oracle config
+              </Text>
+            </Column>
+            <Text variant="body" style={{ color: colors.text_secondary }}>
+              →
+            </Text>
+          </Pressable>
+        </Card>
+
+        <Card>
+          <Row
+            justify="space-between"
+            align="center"
+            style={{ marginBottom: spacing.sm }}
+          >
             <Text variant="h3">{trendingTokens.title}</Text>
             <Badge label="Live" variant="success" size="sm" />
           </Row>

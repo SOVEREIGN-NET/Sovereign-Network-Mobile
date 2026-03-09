@@ -30,4 +30,7 @@ RCT_EXTERN_METHOD(updateSettings:(NSDictionary *)settings
 RCT_EXTERN_METHOD(clearSettings:(RCTPromiseResolveBlock)resolve
                   reject:(RCTPromiseRejectBlock)reject)
 
+RCT_EXTERN_METHOD(clearNodeTrust:(RCTPromiseResolveBlock)resolve
+                  reject:(RCTPromiseRejectBlock)reject)
+
 @end

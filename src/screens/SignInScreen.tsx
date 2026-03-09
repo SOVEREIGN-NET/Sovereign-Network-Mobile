@@ -31,9 +31,9 @@ import { useAuth, useNodeConnection } from '../hooks';
 import { useTranslation } from '../i18n';
 import { colors, spacing, typography } from '../theme';
 import SecureIdentityStorage from '../services/SecureIdentityStorage';
-import { AuthStackParamList } from '../navigation/AuthNavigator';
+import { RootStackParamList } from '../types/navigation';
 
-type SignInScreenProps = NativeStackScreenProps<AuthStackParamList, 'SignIn'>;
+type SignInScreenProps = NativeStackScreenProps<RootStackParamList, 'SignIn'>;
 
 /** Validate DID format: "did:zhtp:" followed by exactly 64 lowercase hex chars. */
 function isValidDid(did: string): boolean {

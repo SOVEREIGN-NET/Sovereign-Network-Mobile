@@ -40,13 +40,17 @@ export function useNodeConnectionStatus(
 
     try {
       const supported = await isQuicSupported();
+      if (__DEV__) console.log('[NodeStatus] QUIC supported:', supported);
       if (!supported) {
         setConnectionStatus('disconnected');
+        console.warn('[NodeStatus] QUIC not supported on this device');
         return;
       }
 
       setConnectionStatus('checking');
+      if (__DEV__) console.log('[NodeStatus] Testing connection to', DEFAULT_NODE_HOST, DEFAULT_NODE_PORT);
       const result = await testQuicConnection(DEFAULT_NODE_HOST, DEFAULT_NODE_PORT);
+      if (__DEV__) console.log('[NodeStatus] testQuicConnection result:', JSON.stringify(result));
 
       if (result.success) {
         setConnectionStatus('connected');
@@ -60,10 +64,12 @@ export function useNodeConnectionStatus(
       } else {
         setConnectionStatus('disconnected');
         setLatencyMs(null);
+        if (__DEV__) console.warn('[NodeStatus] Connection failed:', (result as any)?.error);
       }
-    } catch {
+    } catch (err) {
       setConnectionStatus('disconnected');
       setLatencyMs(null);
+      if (__DEV__) console.warn('[NodeStatus] Connection check threw:', err instanceof Error ? err.message : err);
     } finally {
       checkInFlightRef.current = false;
     }

@@ -44,11 +44,6 @@ export const useUserTokenBalances = () => {
 
   const { data, loading, error, retry } = useAsyncData(
     async () => {
-      if (!identityId) {
-        console.log('[useUserTokenBalances] ⚠️ Cannot fetch balances: No identity ID');
-        return null;
-      }
-
       try {
         console.log('[useUserTokenBalances] 📡 Fetching token balances for identity:', identityId);
         const balances = await tokenService.getUserTokenBalances(identityId);
@@ -61,6 +56,7 @@ export const useUserTokenBalances = () => {
     },
     [identityId],
     null,
+    !identityId,
   );
 
   const tokenData = useMemo<UserTokenBalancesData>(() => {

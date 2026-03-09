@@ -19,9 +19,9 @@ import { useAuth, useNodeConnection } from '../hooks';
 import { useTranslation } from '../i18n';
 import { colors, spacing, typography } from '../theme';
 import { validatePassword, getStrengthDescription, getStrengthColor } from '../utils/passwordValidator';
-import { AuthStackParamList } from '../navigation/AuthNavigator';
+import { RootStackParamList } from '../types/navigation';
 
-type CreateIdentityScreenProps = NativeStackScreenProps<AuthStackParamList, 'CreateIdentity'>;
+type CreateIdentityScreenProps = NativeStackScreenProps<RootStackParamList, 'CreateIdentity'>;
 
 const CreateIdentityScreen = ({ navigation }: CreateIdentityScreenProps) => {
   const { t } = useTranslation();

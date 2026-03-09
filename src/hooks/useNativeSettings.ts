@@ -74,6 +74,24 @@ export function useNativeSettings() {
   }, []);
 
   /**
+   * Delete the Rust TOFU trust database ($HOME/.zhtp/trustdb.json).
+   * Forces re-pinning on next connection.
+   */
+  const clearNodeTrust = useCallback(async () => {
+    try {
+      if (!NativeSettings) {
+        console.warn('NativeSettings module not available');
+        return false;
+      }
+      await NativeSettings.clearNodeTrust();
+      return true;
+    } catch (err: any) {
+      console.error('Failed to clear node trust:', err);
+      return false;
+    }
+  }, []);
+
+  /**
    * Clear all settings
    */
   const clearSettings = useCallback(async () => {
@@ -107,6 +125,7 @@ export function useNativeSettings() {
     loadSettings,
     saveSettings,
     clearSettings,
+    clearNodeTrust,
   };
 }
 

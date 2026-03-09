@@ -419,7 +419,6 @@ const SIDScreen = ({ navigation }: any) => {
                   </Text>
                 </View>
                 <Row style={{ gap: spacing.sm }}>
-                  {/* Token create hidden for now */}
                   <TouchableOpacity
                     style={{
                       width: 36,
@@ -894,6 +893,8 @@ const SIDScreen = ({ navigation }: any) => {
                                 borderBottomWidth:
                                   index === activityData.transactions.length - 1 ? 0 : 1,
                                 borderBottomColor: colors.border,
+                                borderLeftWidth: isPending ? 3 : 0,
+                                borderLeftColor: colors.warning,
                               }}
                             >
                               <View

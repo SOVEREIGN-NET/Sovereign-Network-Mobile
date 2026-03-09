@@ -5,10 +5,20 @@ use std::future::IntoFuture;
 use quinn::{ClientConfig, Endpoint, TransportConfig};
 use rustls::pki_types::{CertificateDer, ServerName};
 use std::collections::HashMap;
-use std::net::SocketAddr;
+use std::net::{SocketAddr, ToSocketAddrs};
 use std::sync::Arc;
 use std::time::{Duration, Instant};
 use tokio::net::UdpSocket;
+
+/// Resolve a hostname + port to a `SocketAddr` via DNS.
+/// Single source of truth — prevents `"host:port".parse()` failures for hostnames.
+pub fn resolve_addr(host: &str, port: u16) -> Result<SocketAddr> {
+    format!("{}:{}", host, port)
+        .to_socket_addrs()
+        .with_context(|| format!("DNS resolution failed for {}:{}", host, port))?
+        .next()
+        .ok_or_else(|| anyhow::anyhow!("No address found for {}:{}", host, port))
+}
 
 /// Response from a QUIC HTTP request (UTF-8 body)
 #[derive(Debug)]
@@ -47,7 +57,7 @@ impl QuicClient {
         port: u16,
     ) -> Result<(bool, f64, String)> {
         let start = Instant::now();
-        let addr: SocketAddr = format!("{}:{}", host, port).parse()?;
+        let addr = resolve_addr(&host, port)?;
 
         log::info!("[🌐 Web4] Testing QUIC connection to {}", addr);
 
@@ -80,7 +90,7 @@ impl QuicClient {
         insecure: bool,
     ) -> Result<QuicResponse, Box<dyn std::error::Error + Send + Sync>> {
         let (host, port, path) = parse_quic_url(url)?;
-        let addr: SocketAddr = format!("{}:{}", host, port).parse()?;
+        let addr = resolve_addr(&host, port)?;
 
         log::info!("[🌐 Web4] QUIC request: {} {} to {}", method, path, addr);
 
@@ -158,7 +168,7 @@ impl QuicClient {
         insecure: bool,
     ) -> Result<QuicBytesResponse, Box<dyn std::error::Error + Send + Sync>> {
         let (host, port, path) = parse_quic_url(url)?;
-        let addr: SocketAddr = format!("{}:{}", host, port).parse()?;
+        let addr = resolve_addr(&host, port)?;
 
         log::info!("[🌐 Web4] QUIC request (bytes): {} {} to {}", method, path, addr);
 
@@ -237,7 +247,7 @@ pub async fn check_udp_reachability(
     port: u16,
 ) -> Result<(bool, f64)> {
     let start = Instant::now();
-    let addr: SocketAddr = format!("{}:{}", host, port).parse()?;
+    let addr = resolve_addr(host, port)?;
 
     log::info!("[🌐 Web4] Checking UDP reachability to {}", addr);
 

@@ -135,25 +135,11 @@ class AppService {
    * Get PoUW rewards for a client
    */
   async getRewards(clientDid: string): Promise<PoUWRewardsResponse> {
-    try {
-      const encodedDid = encodeURIComponent(clientDid);
-      const data = await quicRequest<PoUWRewardsResponse>(
-        `/api/v1/pouw/rewards/${encodedDid}`,
-        { timeout: 15 },
-      );
-      console.log('[AppService] getRewards:', {
-        clientDid: maskIdentifier(clientDid),
-        totalEarned: data.total_earned,
-        totalPaid: data.total_paid,
-      });
-      return data;
-    } catch (error: unknown) {
-      console.error(
-        '[AppService] getRewards failed:',
-        error instanceof Error ? error.message : error,
-      );
-      throw error;
-    }
+    const encodedDid = encodeURIComponent(clientDid);
+    return quicRequest<PoUWRewardsResponse>(
+      `/api/v1/pouw/rewards/${encodedDid}`,
+      { timeout: 15 },
+    );
   }
 
   /**

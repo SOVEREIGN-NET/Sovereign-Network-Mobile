@@ -105,6 +105,24 @@ class NativeSettings: NSObject {
     resolve(true)
   }
 
+  /**
+   * Delete the Rust TOFU trust database so the next connection re-pins the node cert.
+   * Path mirrors lib-network's default_trustdb_path(): $HOME/.zhtp/trustdb.json
+   */
+  @objc
+  func clearNodeTrust(_ resolve: @escaping RCTPromiseResolveBlock, reject: @escaping RCTPromiseRejectBlock) {
+    let trustDbPath = (NSHomeDirectory() as NSString).appendingPathComponent(".zhtp/trustdb.json")
+    let fileManager = FileManager.default
+    do {
+      if fileManager.fileExists(atPath: trustDbPath) {
+        try fileManager.removeItem(atPath: trustDbPath)
+      }
+      resolve(true)
+    } catch {
+      reject("CLEAR_TRUST_ERROR", error.localizedDescription, error)
+    }
+  }
+
   @objc
   static func requiresMainQueueSetup() -> Bool {
     return false
