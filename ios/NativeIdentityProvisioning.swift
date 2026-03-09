@@ -194,9 +194,16 @@ class NativeIdentityProvisioning: NSObject, UIDocumentPickerDelegate {
 
                 print("[NativeIdentityProvisioning] ✅ Registration proof signed")
                 print("[NativeIdentityProvisioning]    Signature length: \(signature.count) bytes")
-                print("[NativeIdentityProvisioning]    Signature (hex): \(signature.map { String(format: "%02x", $0) }.joined())")
                 print("[NativeIdentityProvisioning]    DID: \(identity.did)")
                 print("[NativeIdentityProvisioning]    Timestamp: \(timestamp)")
+
+                // DIAGNOSTIC: log the pk bytes sent to server so we can cross-reference
+                // against [TokenCreate:signer] walletPk[0..8] later
+                let regPkHex = identity.publicKey.prefix(8)
+                    .map { String(format: "%02x", $0) }.joined()
+                let regKeyId = identity.did.hasPrefix("did:zhtp:")
+                    ? String(identity.did.dropFirst("did:zhtp:".count)) : identity.did
+                print("[Registration:pk] pk[0..8]=\(regPkHex) key_id[0..16]=\(String(regKeyId.prefix(16)))")
 
                 // Return proof data for TypeScript to send via QUIC
                 resolve([
@@ -261,6 +268,11 @@ class NativeIdentityProvisioning: NSObject, UIDocumentPickerDelegate {
                 guard let libIdentity = identity.libClientIdentity else {
                     throw NSError(domain: "IdentityProvisioning", code: -4, userInfo: [NSLocalizedDescriptionKey: "lib-client Identity not available"])
                 }
+
+                // DIAGNOSTIC: confirm pk being stored matches the identityId from server
+                let storedPkHex = identity.publicKey.prefix(8)
+                    .map { String(format: "%02x", $0) }.joined()
+                print("[Store:pk] identityId=\(identityId.prefix(16)) pk[0..8]=\(storedPkHex)")
 
                 try IdentityHandleStore.shared.store(identity: libIdentity, identityId: identityId)
                 print("[NativeIdentityProvisioning]    ✅ Identity stored in handle store")
@@ -924,12 +936,33 @@ class NativeIdentityProvisioning: NSObject, UIDocumentPickerDelegate {
                 print("[NativeIdentityProvisioning]   Symbol: \(symbol)")
                 print("[NativeIdentityProvisioning]   Supply: \(initialSupplyValue) (parsed from string)")
 
-                // Get the current identity from handle store
-                guard let identityAny = IdentityHandleStore.shared.getLatestIdentity(),
-                      let identity = identityAny as? Identity else {
-                    reject("NO_IDENTITY", "No active identity for signing", nil)
+                // Resolve the *registered* identity (same one used by UHP auth),
+                // not just whatever was last stored — which may be an unregistered key.
+                guard let registeredId = UserDefaults.standard.string(
+                    forKey: "com.sovereign.zhtp.current_identity_id"
+                ) else {
+                    reject("NO_IDENTITY", "No registered identity found for signing", nil)
                     return
                 }
+                guard let identity = self?.resolveIdentity(identityIdOrDid: registeredId) else {
+                    reject("NO_IDENTITY", "Cannot resolve registered identity (id: \(registeredId))", nil)
+                    return
+                }
+
+                // --- DIAGNOSTIC: verify signer key matches auth identity ---
+                // DID suffix (after "did:zhtp:") = key_id. Must match UHP auth key_id.
+                let signerDid = identity.did
+                let signerKeyId = signerDid.hasPrefix("did:zhtp:")
+                    ? String(signerDid.dropFirst("did:zhtp:".count))
+                    : signerDid
+                let signerKeyIdPrefix = String(signerKeyId.prefix(16))  // first 8 bytes as hex
+                let walletPkHex = identity.publicKey.prefix(8)
+                    .map { String(format: "%02x", $0) }.joined()
+                print("[TokenCreate:signer] registeredId=\(registeredId)")
+                print("[TokenCreate:signer] DID=\(signerDid)")
+                print("[TokenCreate:signer] key_id[0..8]=\(signerKeyIdPrefix)")
+                print("[TokenCreate:signer] walletPk[0..8]=\(walletPkHex)")
+                // -----------------------------------------------------------
 
                 // Use lib-client FFI to build and sign the full transaction
                 // FFI handles: bincode serialization, signing, Transaction wrapping, hex encoding
@@ -942,6 +975,7 @@ class NativeIdentityProvisioning: NSObject, UIDocumentPickerDelegate {
                     chainId: 0x02  // testnet
                 )
 
+                print("[TokenCreate:signer] tx hex_len=\(hexSignedTx.count) tx[0..8]=\(String(hexSignedTx.prefix(16)))")
                 print("[NativeIdentityProvisioning] Token create transaction built and signed")
                 print("[NativeIdentityProvisioning] Hex tx length: \(hexSignedTx.count)")
                 print("[NativeIdentityProvisioning] DID: \(identity.did)")

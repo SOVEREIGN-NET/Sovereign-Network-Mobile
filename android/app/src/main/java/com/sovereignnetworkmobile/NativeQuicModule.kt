@@ -28,7 +28,10 @@ class NativeQuicModule(reactContext: ReactApplicationContext) :
         // GeneratedConfig.kt is the single source of truth - updated at build time
         private const val QUINN_CONTROL_PLANE_HOST = com.sovereignnetworkmobile.config.GeneratedConfig.QUINN_CONTROL_PLANE_HOST
         private const val QUINN_CONTROL_PLANE_PORT = com.sovereignnetworkmobile.config.GeneratedConfig.QUINN_CONTROL_PLANE_PORT
-        private const val QUINN_CONTROL_PLANE_SERVER_NAME = com.sovereignnetworkmobile.config.GeneratedConfig.QUINN_CONTROL_PLANE_SERVER_NAME
+        // Empty serverName → use host as SNI (Rust rejects empty string)
+        private val QUINN_CONTROL_PLANE_SERVER_NAME: String =
+            com.sovereignnetworkmobile.config.GeneratedConfig.QUINN_CONTROL_PLANE_SERVER_NAME
+                .ifEmpty { QUINN_CONTROL_PLANE_HOST }
     }
 
     private val executor: Executor = Executors.newCachedThreadPool()
@@ -178,7 +181,6 @@ class NativeQuicModule(reactContext: ReactApplicationContext) :
                 }
 
                 val alpnMode = alpn ?: "authenticated"
-                Log.d(TAG, "[🌐 Web4] QUIC request: $method $url (ALPN: $alpnMode)")
 
                 if (alpnMode == "public") {
                     val result = NativeQuicBridge.request(
@@ -207,6 +209,7 @@ class NativeQuicModule(reactContext: ReactApplicationContext) :
                 }
 
                 Log.d(TAG, "[🌐 Web4] Auth request identity_id=${maskIdentifier(identityId)} path=${parsedUrl.path}")
+                Log.d(TAG, "[PoUW] Enqueueing authenticated request for identity=${maskIdentifier(identityId)}")
                 enqueueAuthenticatedRequest(
                     identityId = identityId,
                     parsedUrl = parsedUrl,
@@ -228,7 +231,7 @@ class NativeQuicModule(reactContext: ReactApplicationContext) :
     fun getCurrentSessionIdPrefix(identityId: String, promise: Promise) {
         val normalized = normalizeIdentityId(identityId) ?: identityId
         val value = synchronized(connectionLock) {
-            quinnSessionIdPrefixByIdentity[normalized]
+            quinnSessionIdPrefixByIdentity[normalized] ?: quinnSessionIdPrefixByIdentity[identityId]
         }
         promise.resolve(value)
     }
@@ -286,7 +289,7 @@ class NativeQuicModule(reactContext: ReactApplicationContext) :
             }
 
             NativeQuicBridge.initUhpQuinn()
-            val spkiPin = com.sovereignnetworkmobile.config.GeneratedConfig.QUINN_SPKI_PIN_HEX
+            val spkiPin = com.sovereignnetworkmobile.config.GeneratedConfig.spkiPinFor(QUINN_CONTROL_PLANE_HOST)
 
             val handshake: Map<String, Any?>? = if (NativeQuicBridge.useLibClientHandshake) {
                 // New path: 3-leg UHP via lib-client HandshakeState (keys stay in Rust)
@@ -333,7 +336,7 @@ class NativeQuicModule(reactContext: ReactApplicationContext) :
 
             val handle = (handshake?.get("handle") as? Number)?.toLong() ?: 0L
             val sessionIdPrefix = run {
-                val bytes = handshake?.get("session_id") as? ByteArray
+                val bytes = handshake?.get("sessionId") as? ByteArray
                 if (bytes != null && bytes.size >= 8) {
                     bytes.take(8).joinToString("") { b -> "%02x".format(b) }
                 } else {
@@ -341,8 +344,12 @@ class NativeQuicModule(reactContext: ReactApplicationContext) :
                 }
             }
             if (!sessionIdPrefix.isNullOrEmpty()) {
+                val normalized = normalizeIdentityId(identityId)
                 synchronized(connectionLock) {
                     quinnSessionIdPrefixByIdentity[identityId] = sessionIdPrefix
+                    if (normalized != identityId) {
+                        quinnSessionIdPrefixByIdentity[normalized] = sessionIdPrefix
+                    }
                 }
             }
             Log.d(TAG, "[🌐 Web4] Handshake ok handle=$handle identity_id=${maskIdentifier(identityId)}")

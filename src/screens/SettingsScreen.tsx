@@ -14,6 +14,7 @@ import {
   ScreenLayout,
 } from '../components';
 import { useAuth } from '../hooks';
+import { useNativeSettings } from '../hooks/useNativeSettings';
 import { useTranslation } from '../i18n';
 import { colors, spacing, typography, borderRadius } from '../theme';
 import { setUseMockService } from '../context/AuthContext';
@@ -24,6 +25,7 @@ type Language = 'en' | 'es' | 'fr' | 'de';
 const SettingsScreen = ({ navigation }: any) => {
   const { t } = useTranslation();
   const { currentIdentity, signOut, isLoading } = useAuth();
+  const { clearNodeTrust } = useNativeSettings();
 
   // Local state for settings (would be persisted in real app)
   const [language, setLanguage] = useState<Language>('en');
@@ -87,6 +89,40 @@ const SettingsScreen = ({ navigation }: any) => {
               t.settings.reset.successTitle,
               t.settings.reset.success,
             );
+          },
+          style: 'destructive',
+        },
+      ],
+    );
+  };
+
+  const handleResetNodeTrust = () => {
+    Alert.alert(
+      t.settings.nodeTrust.confirmTitle,
+      t.settings.nodeTrust.confirmMessage,
+      [
+        {
+          text: t.settings.nodeTrust.cancel,
+          onPress: () => {},
+          style: 'cancel',
+        },
+        {
+          text: t.settings.nodeTrust.confirm,
+          onPress: () => {
+            (async () => {
+              const ok = await clearNodeTrust();
+              if (ok) {
+                Alert.alert(
+                  t.settings.nodeTrust.successTitle,
+                  t.settings.nodeTrust.success,
+                );
+              } else {
+                Alert.alert(
+                  t.settings.nodeTrust.errorTitle,
+                  t.settings.nodeTrust.error,
+                );
+              }
+            })();
           },
           style: 'destructive',
         },
@@ -475,6 +511,20 @@ const SettingsScreen = ({ navigation }: any) => {
                 >
                   {t.settings.data.clearCache}
                 </Button>
+
+                <Button variant="secondary" onPress={handleResetNodeTrust}>
+                  {t.settings.data.resetNodeTrust}
+                </Button>
+
+                <Text
+                  style={{
+                    fontSize: typography.size.xs,
+                    color: colors.text_secondary,
+                    marginTop: spacing.xs,
+                  }}
+                >
+                  {t.settings.data.resetNodeTrustDescription}
+                </Text>
               </Column>
             </Card>
 

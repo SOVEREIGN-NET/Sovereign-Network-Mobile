@@ -23,7 +23,7 @@
  * ⚠️  SINGLE POINT TO CHANGE NODE URL:
  *     Edit .env file only:
  *     - Local testing:  ZHTP_NODE_URL=http://192.168.1.30:9334
- *     - Remote server:  ZHTP_NODE_URL=http://77.42.37.161:9334
+ *     - Remote server:  ZHTP_NODE_URL=http://g1.thesovereignnetwork.org:9334
  *
  * This value is injected at build time via scripts/generate-config.js
  */
@@ -66,7 +66,7 @@ export const DEFAULT_NETWORK_TYPE: 'testnet' | 'mainnet' = 'testnet';
 
 /**
  * Determine if testnet uses self-signed certificates
- * Testnet (77.42.37.161) uses self-signed rcgen certificates with certificate pinning
+ * Network nodes use system CA trust (no certificate pinning)
  * Mainnet would use proper SSL certificates
  */
 function isTestnetWithSelfSignedCerts(): boolean {

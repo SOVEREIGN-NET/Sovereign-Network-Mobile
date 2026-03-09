@@ -34,10 +34,11 @@ export function useAsyncData<T>(
   asyncFunction: () => Promise<T>,
   dependencies: any[] = [],
   initialData: T | null = null,
+  skip = false,
 ): UseAsyncDataReturn<T> {
   const [state, setState] = useState<UseAsyncDataState<T>>({
     data: initialData,
-    loading: true,
+    loading: !skip,
     error: null,
   });
 
@@ -52,6 +53,11 @@ export function useAsyncData<T>(
   }, [asyncFunction]);
 
   useEffect(() => {
+    if (skip) {
+      setState({ data: initialData, loading: false, error: null });
+      return;
+    }
+
     let mounted = true;
 
     const fetchData = async () => {
@@ -82,7 +88,7 @@ export function useAsyncData<T>(
       mounted = false;
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [...dependencies, retryCount]);
+  }, [...dependencies, retryCount, skip]);
 
   const retry = useCallback(() => {
     setRetryCount(prev => prev + 1);

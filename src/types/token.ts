@@ -20,9 +20,13 @@ export interface TokenCreateResponse {
   token_id: string;
   name: string;
   symbol: string;
-  total_supply: number;
-  creator: string; // DID format
-  tx_hash: string;
+  initial_supply: number;
+  decimals: number;
+  treasury_allocation_bps: number;
+  treasury_recipient: string;
+  creator_allocation: number;
+  treasury_allocation: number;
+  tx_status: string;
 }
 
 // ============ MINT TOKEN ============

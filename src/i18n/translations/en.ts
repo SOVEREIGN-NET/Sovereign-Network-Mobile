@@ -834,6 +834,18 @@ export const en = {
     data: {
       title: 'Data & Cache',
       clearCache: 'Clear Cache',
+      resetNodeTrust: 'Reset Node Trust',
+      resetNodeTrustDescription: 'Re-verify node certificates on next connection',
+    },
+    nodeTrust: {
+      confirmTitle: 'Reset Node Trust?',
+      confirmMessage: 'This clears the locally cached certificate trust store. The app will re-verify node certificates on next connection.',
+      confirm: 'Reset',
+      cancel: 'Cancel',
+      successTitle: 'Trust Reset',
+      success: 'Node trust cleared. Reconnect to re-verify certificates.',
+      errorTitle: 'Reset Failed',
+      error: 'Could not clear node trust. Please try again.',
     },
     danger: {
       title: 'Danger Zone',

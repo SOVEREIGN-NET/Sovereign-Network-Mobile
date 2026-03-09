@@ -1,460 +1,223 @@
 /**
  * Token Management Screen
+<<<<<<< HEAD
+ * Full token info for each tracked token. Delete is a secondary action.
+=======
  * Manage tracked tokens - view status and remove token IDs that no longer exist
+>>>>>>> origin/main
  */
 
 import React, { useState, useEffect, useCallback } from 'react';
 import {
   View,
   ScrollView,
-  StyleSheet,
   Text,
   TouchableOpacity,
   Alert,
   ActivityIndicator,
+  RefreshControl,
+  Clipboard,
 } from 'react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import { colors } from '../theme/tokens';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { colors, spacing, typography, borderRadius } from '../theme';
 import tokenService from '../services/TokenService';
+import type { TokenInfoResponse } from '../types/token';
 
 const TRACKED_TOKENS_KEY = 'sov:tracked_tokens';
 const LEGACY_CREATED_TOKENS_KEY = 'sov:created_tokens';
 
-interface TokenStatus {
+interface TrackedToken {
   tokenId: string;
-  name?: string;
-  symbol?: string;
-  exists: boolean;
+  info: TokenInfoResponse | null;
   error?: string;
 }
 
+const copy = (value: string, label: string) => {
+  Clipboard.setString(value);
+  Alert.alert('Copied', `${label} copied to clipboard`);
+};
+
+const Row = ({ label, value, mono, copyable }: { label: string; value: string; mono?: boolean; copyable?: boolean }) => (
+  <TouchableOpacity
+    activeOpacity={copyable ? 0.5 : 1}
+    onPress={copyable ? () => copy(value, label) : undefined}
+    style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-start', paddingVertical: 6, borderBottomWidth: 1, borderBottomColor: `${colors.text_secondary}15` }}
+  >
+    <Text style={{ fontSize: typography.size.xs, color: colors.text_secondary, textTransform: 'uppercase', letterSpacing: 0.5, flex: 1 }}>
+      {label}{copyable ? ' ⎘' : ''}
+    </Text>
+    <Text style={{ fontSize: typography.size.xs, color: copyable ? colors.primary : colors.text_primary, flex: 2, textAlign: 'right', fontFamily: mono ? 'Courier' : undefined }} numberOfLines={mono ? 1 : 2} ellipsizeMode="middle">
+      {value}
+    </Text>
+  </TouchableOpacity>
+);
+
 const TokenManagementScreen = ({ navigation }: any) => {
-  const [tokens, setTokens] = useState<TokenStatus[]>([]);
+  const insets = useSafeAreaInsets();
+  const [tokens, setTokens] = useState<TrackedToken[]>([]);
   const [loading, setLoading] = useState(true);
+  const [refreshing, setRefreshing] = useState(false);
 
-  const loadTrackedTokenIds = useCallback(async (): Promise<string[]> => {
-    const trackedTokensJson = await AsyncStorage.getItem(TRACKED_TOKENS_KEY);
-    if (trackedTokensJson) {
-      return JSON.parse(trackedTokensJson);
-    }
-
-    const legacyCreatedTokensJson = await AsyncStorage.getItem(
-      LEGACY_CREATED_TOKENS_KEY,
-    );
-    if (legacyCreatedTokensJson) {
-      const trackedTokenIds: string[] = JSON.parse(legacyCreatedTokensJson);
-      await AsyncStorage.setItem(
-        TRACKED_TOKENS_KEY,
-        JSON.stringify(trackedTokenIds),
-      );
+  const loadTrackedIds = useCallback(async (): Promise<string[]> => {
+    const json = await AsyncStorage.getItem(TRACKED_TOKENS_KEY);
+    if (json) return JSON.parse(json);
+    const legacy = await AsyncStorage.getItem(LEGACY_CREATED_TOKENS_KEY);
+    if (legacy) {
+      const ids: string[] = JSON.parse(legacy);
+      await AsyncStorage.setItem(TRACKED_TOKENS_KEY, JSON.stringify(ids));
       await AsyncStorage.removeItem(LEGACY_CREATED_TOKENS_KEY);
-      return trackedTokenIds;
+      return ids;
     }
-
     return [];
   }, []);
 
-  const saveTrackedTokenIds = useCallback(async (tokenIds: string[]) => {
-    if (tokenIds.length > 0) {
-      await AsyncStorage.setItem(TRACKED_TOKENS_KEY, JSON.stringify(tokenIds));
+  const saveTrackedIds = useCallback(async (ids: string[]) => {
+    if (ids.length > 0) {
+      await AsyncStorage.setItem(TRACKED_TOKENS_KEY, JSON.stringify(ids));
     } else {
       await AsyncStorage.removeItem(TRACKED_TOKENS_KEY);
     }
     await AsyncStorage.removeItem(LEGACY_CREATED_TOKENS_KEY);
   }, []);
 
-  const loadTokens = useCallback(async () => {
-    setLoading(true);
+  const loadTokens = useCallback(async (isRefresh = false) => {
+    if (isRefresh) setRefreshing(true);
+    else setLoading(true);
+
     try {
-      const tokenIds = await loadTrackedTokenIds();
-      if (tokenIds.length === 0) {
-        setTokens([]);
-        setLoading(false);
-        return;
-      }
-      const tokenStatuses: TokenStatus[] = [];
-
-      for (const tokenId of tokenIds) {
-        try {
-          const tokenInfo = await tokenService.getTokenInfo(tokenId);
-          tokenStatuses.push({
-            tokenId,
-            name: tokenInfo.name,
-            symbol: tokenInfo.symbol,
-            exists: true,
-          });
-        } catch (error: any) {
-          tokenStatuses.push({
-            tokenId,
-            exists: false,
-            error: error.message || 'Token not found',
-          });
-        }
-      }
-
-      setTokens(tokenStatuses);
-    } catch (error: any) {
-      console.error('[TokenManagement] Failed to load tokens:', error);
-      Alert.alert('Error', 'Failed to load tokens: ' + error.message);
+      const ids = await loadTrackedIds();
+      const results: TrackedToken[] = await Promise.all(
+        ids.map(async (tokenId) => {
+          try {
+            const info = await tokenService.getTokenInfo(tokenId);
+            return { tokenId, info };
+          } catch (e: any) {
+            return { tokenId, info: null, error: e?.message || 'Not found' };
+          }
+        })
+      );
+      setTokens(results);
+    } catch (e: any) {
+      Alert.alert('Error', e.message);
     } finally {
       setLoading(false);
+      setRefreshing(false);
     }
-  }, [loadTrackedTokenIds]);
+  }, [loadTrackedIds]);
 
-  useEffect(() => {
-    loadTokens();
-  }, [loadTokens]);
+  useEffect(() => { loadTokens(); }, [loadTokens]);
 
-  const deleteToken = useCallback(async (tokenId: string) => {
-    Alert.alert(
-      'Delete Token',
-      `Remove this token ID from your tracked list?`,
-      [
-        { text: 'Cancel', onPress: () => {} },
-        {
-          text: 'Delete',
-          onPress: async () => {
-            try {
-              const tokenIds = await loadTrackedTokenIds();
-              const filtered = tokenIds.filter(id => id !== tokenId);
-              await saveTrackedTokenIds(filtered);
-
-              // Reload the list
-              await loadTokens();
-              Alert.alert('Deleted', 'Token ID removed from your tracked list');
-            } catch (error: any) {
-              Alert.alert('Error', 'Failed to delete token: ' + error.message);
-            }
-          },
-          style: 'destructive',
+  const removeToken = useCallback((tokenId: string) => {
+    Alert.alert('Remove from tracked list?', tokenId.slice(0, 16) + '...', [
+      { text: 'Cancel', style: 'cancel' },
+      {
+        text: 'Remove',
+        style: 'destructive',
+        onPress: async () => {
+          const ids = await loadTrackedIds();
+          await saveTrackedIds(ids.filter(id => id !== tokenId));
+          setTokens(prev => prev.filter(t => t.tokenId !== tokenId));
         },
-      ]
-    );
-  }, [loadTokens, loadTrackedTokenIds, saveTrackedTokenIds]);
+      },
+    ]);
+  }, [loadTrackedIds, saveTrackedIds]);
 
-  const deleteAllInvalid = useCallback(async () => {
-    const invalidTokens = tokens.filter(t => !t.exists);
-    if (invalidTokens.length === 0) {
-      Alert.alert('Info', 'No invalid tokens to delete');
-      return;
-    }
-
-    Alert.alert(
-      'Delete Invalid Tokens',
-      `Remove ${invalidTokens.length} invalid token ID(s) from your tracked list?`,
-      [
-        { text: 'Cancel', onPress: () => {} },
-        {
-          text: 'Delete All',
-          onPress: async () => {
-            try {
-              const validTokenIds = tokens.filter(t => t.exists).map(t => t.tokenId);
-              await saveTrackedTokenIds(validTokenIds);
-
-              await loadTokens();
-              Alert.alert('Deleted', `${invalidTokens.length} invalid token(s) removed`);
-            } catch (error: any) {
-              Alert.alert('Error', 'Failed to delete tokens: ' + error.message);
-            }
-          },
-          style: 'destructive',
-        },
-      ]
-    );
-  }, [tokens, loadTokens, saveTrackedTokenIds]);
+  const formatSupply = (supply: number, decimals: number) => {
+    const human = supply / Math.pow(10, decimals);
+    if (human >= 1e9) return `${(human / 1e9).toFixed(2)}B`;
+    if (human >= 1e6) return `${(human / 1e6).toFixed(2)}M`;
+    if (human >= 1e3) return `${(human / 1e3).toFixed(2)}K`;
+    return human.toLocaleString();
+  };
 
   if (loading) {
     return (
-      <View style={styles.container}>
+      <View style={{ flex: 1, backgroundColor: colors.bg_darkest, justifyContent: 'center', alignItems: 'center' }}>
         <ActivityIndicator size="large" color={colors.primary} />
       </View>
     );
   }
 
-  const validTokens = tokens.filter(t => t.exists);
-  const invalidTokens = tokens.filter(t => !t.exists);
-
   return (
-    <View style={styles.container}>
-      <ScrollView contentContainerStyle={styles.scrollContent}>
-        {/* Header */}
-        <View style={styles.header}>
-          <Text style={styles.title}>Token Management</Text>
-          <Text style={styles.subtitle}>
-            {tokens.length} token{tokens.length !== 1 ? 's' : ''} tracked
+    <View style={{ flex: 1, backgroundColor: colors.bg_darkest }}>
+      {/* Header */}
+      <View style={{ paddingTop: insets.top + spacing.md, paddingHorizontal: spacing.md, paddingBottom: spacing.md, flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}>
+        <View>
+          <Text style={{ fontSize: typography.size.xl, fontWeight: typography.weight.bold, color: colors.text_primary }}>
+            My Tokens
+          </Text>
+          <Text style={{ fontSize: typography.size.sm, color: colors.text_secondary, marginTop: 2 }}>
+            {tokens.length} tracked
           </Text>
         </View>
-
-        {tokens.length === 0 ? (
-          <View style={styles.emptyState}>
-            <Text style={styles.emptyText}>No tracked tokens yet</Text>
-          </View>
-        ) : (
-          <>
-            {/* Valid Tokens Section */}
-            {validTokens.length > 0 && (
-              <View style={styles.section}>
-                <Text style={styles.sectionTitle}>Available Tokens ({validTokens.length})</Text>
-                {validTokens.map(token => (
-                  <View key={token.tokenId} style={styles.tokenCard}>
-                    <View style={styles.tokenInfo}>
-                      <Text style={styles.tokenName}>{token.name}</Text>
-                      <Text style={styles.tokenSymbol}>{token.symbol}</Text>
-                      <Text style={styles.tokenId} numberOfLines={1}>
-                        {token.tokenId}
-                      </Text>
-                    </View>
-                    <View style={styles.statusBadge}>
-                      <Text style={styles.statusBadgeText}>✓ Valid</Text>
-                    </View>
-                    <TouchableOpacity
-                      style={styles.deleteButton}
-                      onPress={() => deleteToken(token.tokenId)}
-                    >
-                      <Text style={styles.deleteButtonText}>Delete</Text>
-                    </TouchableOpacity>
-                  </View>
-                ))}
-              </View>
-            )}
-
-            {/* Invalid Tokens Section */}
-            {invalidTokens.length > 0 && (
-              <View style={styles.section}>
-                <Text style={[styles.sectionTitle, styles.invalidTitle]}>
-                  Unavailable Tokens ({invalidTokens.length})
-                </Text>
-                <Text style={styles.invalidHint}>
-                  These token IDs no longer exist on the network
-                </Text>
-                {invalidTokens.map(token => (
-                  <View key={token.tokenId} style={[styles.tokenCard, styles.invalidCard]}>
-                    <View style={styles.tokenInfo}>
-                      <Text style={styles.tokenName}>Unknown Token</Text>
-                      <Text style={styles.tokenSymbol}>--</Text>
-                      <Text style={styles.tokenId} numberOfLines={1}>
-                        {token.tokenId}
-                      </Text>
-                      <Text style={styles.errorMessage}>{token.error}</Text>
-                    </View>
-                    <View style={[styles.statusBadge, styles.invalidBadge]}>
-                      <Text style={styles.invalidBadgeText}>✗ Invalid</Text>
-                    </View>
-                    <TouchableOpacity
-                      style={[styles.deleteButton, styles.deleteButtonInvalid]}
-                      onPress={() => deleteToken(token.tokenId)}
-                    >
-                      <Text style={styles.deleteButtonText}>Delete</Text>
-                    </TouchableOpacity>
-                  </View>
-                ))}
-
-                {/* Delete All Invalid Button */}
-                <TouchableOpacity
-                  style={styles.deleteAllButton}
-                  onPress={deleteAllInvalid}
-                >
-                  <Text style={styles.deleteAllButtonText}>
-                    Delete All Invalid Tokens
-                  </Text>
-                </TouchableOpacity>
-              </View>
-            )}
-          </>
-        )}
-      </ScrollView>
-
-      {/* Footer Actions */}
-      <View style={styles.footer}>
-        <TouchableOpacity
-          style={styles.refreshButton}
-          onPress={loadTokens}
-        >
-          <Text style={styles.refreshButtonText}>Refresh</Text>
-        </TouchableOpacity>
-        <TouchableOpacity
-          style={styles.closeButton}
-          onPress={() => navigation.goBack()}
-        >
-          <Text style={styles.closeButtonText}>Close</Text>
+        <TouchableOpacity onPress={() => navigation.goBack()} hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}>
+          <Text style={{ fontSize: typography.size.lg, color: colors.text_secondary }}>✕</Text>
         </TouchableOpacity>
       </View>
+
+      <ScrollView
+        showsVerticalScrollIndicator={false}
+        contentContainerStyle={{ padding: spacing.md, paddingBottom: insets.bottom + spacing.xl }}
+        refreshControl={<RefreshControl refreshing={refreshing} onRefresh={() => loadTokens(true)} tintColor={colors.primary} />}
+      >
+        {tokens.length === 0 ? (
+          <View style={{ alignItems: 'center', paddingVertical: spacing.xl * 2 }}>
+            <Text style={{ fontSize: typography.size.md, color: colors.text_secondary }}>No tokens tracked yet</Text>
+          </View>
+        ) : (
+          tokens.map(({ tokenId, info, error }) => (
+            <View key={tokenId} style={{ backgroundColor: colors.bg_lighter, borderRadius: borderRadius.lg, padding: spacing.md, marginBottom: spacing.md, borderLeftWidth: 3, borderLeftColor: info ? colors.primary : colors.error }}>
+
+              {/* Token header */}
+              <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: spacing.md }}>
+                <View style={{ flexDirection: 'row', alignItems: 'center', gap: spacing.sm }}>
+                  <View style={{ backgroundColor: `${colors.primary}20`, paddingHorizontal: spacing.sm, paddingVertical: 3, borderRadius: borderRadius.sm }}>
+                    <Text style={{ fontSize: typography.size.sm, fontWeight: typography.weight.bold, color: colors.primary, fontFamily: 'Courier' }}>
+                      {info?.symbol ?? '???'}
+                    </Text>
+                  </View>
+                  <Text style={{ fontSize: typography.size.md, fontWeight: typography.weight.semibold, color: colors.text_primary }}>
+                    {info?.name ?? 'Unknown Token'}
+                  </Text>
+                </View>
+                <TouchableOpacity
+                  onPress={() => removeToken(tokenId)}
+                  hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
+                  style={{ padding: 4 }}
+                >
+                  <Text style={{ fontSize: typography.size.xs, color: colors.error, opacity: 0.7 }}>Remove</Text>
+                </TouchableOpacity>
+              </View>
+
+              {info ? (
+                <>
+                  <Row label="Token ID"     value={tokenId}           mono copyable />
+                  <Row label="Creator"      value={info.creator}      mono copyable />
+                  <Row label="Decimals"     value={String(info.decimals)} />
+                  <Row label="Total Supply"
+                    value={`${formatSupply(info.total_supply, info.decimals)} (${info.total_supply.toLocaleString()} raw)`}
+                  />
+                  <Row label="Max Supply"
+                    value={info.max_supply != null
+                      ? `${formatSupply(info.max_supply, info.decimals)} (${info.max_supply.toLocaleString()} raw)`
+                      : 'Unlimited'}
+                  />
+                  <Row label="Deflationary"     value={info.is_deflationary ? 'Yes' : 'No'} />
+                  <Row label="Created at Block" value={info.created_at_block != null ? String(info.created_at_block) : 'Pending'} />
+                </>
+              ) : (
+                <View style={{ paddingVertical: spacing.sm }}>
+                  <Text style={{ fontSize: typography.size.xs, color: colors.error }}>{error}</Text>
+                  <Text style={{ fontSize: typography.size.xs, color: colors.text_secondary, marginTop: 4, fontFamily: 'Courier' }}>{tokenId}</Text>
+                </View>
+              )}
+            </View>
+          ))
+        )}
+      </ScrollView>
     </View>
   );
 };
-
-const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    backgroundColor: colors.bg_dark,
-  },
-  scrollContent: {
-    padding: 16,
-    paddingBottom: 100,
-  },
-  header: {
-    marginBottom: 24,
-  },
-  title: {
-    fontSize: 28,
-    fontWeight: 'bold',
-    color: colors.text_primary,
-    marginBottom: 4,
-  },
-  subtitle: {
-    fontSize: 14,
-    color: colors.text_secondary,
-  },
-  emptyState: {
-    alignItems: 'center',
-    justifyContent: 'center',
-    paddingVertical: 48,
-  },
-  emptyText: {
-    fontSize: 16,
-    color: colors.text_secondary,
-  },
-  section: {
-    marginBottom: 24,
-  },
-  sectionTitle: {
-    fontSize: 16,
-    fontWeight: '600',
-    color: colors.text_primary,
-    marginBottom: 12,
-  },
-  invalidTitle: {
-    color: '#ff6b6b',
-  },
-  invalidHint: {
-    fontSize: 12,
-    color: colors.text_secondary,
-    marginBottom: 12,
-    fontStyle: 'italic',
-  },
-  tokenCard: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    backgroundColor: colors.bg_lighter,
-    borderRadius: 12,
-    padding: 12,
-    marginBottom: 8,
-    borderLeftWidth: 4,
-    borderLeftColor: colors.primary,
-  },
-  invalidCard: {
-    borderLeftColor: '#ff6b6b',
-    opacity: 0.7,
-  },
-  tokenInfo: {
-    flex: 1,
-    marginRight: 8,
-  },
-  tokenName: {
-    fontSize: 14,
-    fontWeight: '600',
-    color: colors.text_primary,
-  },
-  tokenSymbol: {
-    fontSize: 12,
-    color: colors.text_secondary,
-    marginBottom: 4,
-  },
-  tokenId: {
-    fontSize: 10,
-    color: colors.text_secondary,
-    fontFamily: 'Courier New',
-    marginBottom: 4,
-  },
-  errorMessage: {
-    fontSize: 10,
-    color: '#ff6b6b',
-  },
-  statusBadge: {
-    paddingHorizontal: 8,
-    paddingVertical: 4,
-    borderRadius: 6,
-    backgroundColor: 'rgba(76, 175, 80, 0.2)',
-    marginRight: 8,
-  },
-  invalidBadge: {
-    backgroundColor: 'rgba(255, 107, 107, 0.2)',
-  },
-  statusBadgeText: {
-    fontSize: 11,
-    fontWeight: '600',
-    color: '#4caf50',
-  },
-  invalidBadgeText: {
-    fontSize: 11,
-    fontWeight: '600',
-    color: '#ff6b6b',
-  },
-  deleteButton: {
-    paddingHorizontal: 10,
-    paddingVertical: 6,
-    borderRadius: 6,
-    backgroundColor: colors.bg_dark,
-    borderWidth: 1,
-    borderColor: colors.primary,
-  },
-  deleteButtonInvalid: {
-    borderColor: '#ff6b6b',
-  },
-  deleteButtonText: {
-    fontSize: 11,
-    fontWeight: '600',
-    color: colors.primary,
-  },
-  deleteAllButton: {
-    marginTop: 12,
-    paddingVertical: 12,
-    borderRadius: 8,
-    backgroundColor: 'rgba(255, 107, 107, 0.15)',
-    borderWidth: 1,
-    borderColor: '#ff6b6b',
-  },
-  deleteAllButtonText: {
-    fontSize: 14,
-    fontWeight: '600',
-    color: '#ff6b6b',
-    textAlign: 'center',
-  },
-  footer: {
-    flexDirection: 'row',
-    gap: 8,
-    paddingHorizontal: 16,
-    paddingVertical: 12,
-    backgroundColor: colors.bg_lighter,
-    borderTopWidth: 1,
-    borderTopColor: colors.bg_lighter,
-  },
-  refreshButton: {
-    flex: 1,
-    paddingVertical: 12,
-    borderRadius: 8,
-    backgroundColor: colors.bg_dark,
-    borderWidth: 1,
-    borderColor: colors.primary,
-  },
-  refreshButtonText: {
-    fontSize: 14,
-    fontWeight: '600',
-    color: colors.primary,
-    textAlign: 'center',
-  },
-  closeButton: {
-    flex: 1,
-    paddingVertical: 12,
-    borderRadius: 8,
-    backgroundColor: colors.primary,
-  },
-  closeButtonText: {
-    fontSize: 14,
-    fontWeight: '600',
-    color: colors.bg_dark,
-    textAlign: 'center',
-  },
-});
 
 export default TokenManagementScreen;

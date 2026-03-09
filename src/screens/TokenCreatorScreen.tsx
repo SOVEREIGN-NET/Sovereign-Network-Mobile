@@ -5,8 +5,9 @@
  */
 
 import React, { useState } from 'react';
-import { View, ScrollView, TouchableOpacity, Alert, KeyboardAvoidingView, Platform } from 'react-native';
+import { View, ScrollView, TouchableOpacity, KeyboardAvoidingView, Platform } from 'react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import { useNavigation } from '@react-navigation/native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import {
   Button,
@@ -16,6 +17,7 @@ import {
 } from '../components';
 import { colors, spacing, typography, borderRadius } from '../theme';
 import tokenService from '../services/TokenService';
+import { publicQuicRequest } from '../services/quic';
 import { useAuth } from '../hooks/useAuth';
 import { TokenCreateRequest } from '../types/token';
 
@@ -42,7 +44,16 @@ interface TokenCreatorScreenProps {
 
 const TokenCreatorScreen: React.FC<TokenCreatorScreenProps> = ({ onClose }) => {
   const insets = useSafeAreaInsets();
+  const navigation = useNavigation();
   const { currentIdentity } = useAuth();
+
+  const handleClose = () => {
+    if (onClose) {
+      onClose();
+    } else {
+      navigation.goBack();
+    }
+  };
 
   // FORM STATE
   const [name, setName] = useState('');
@@ -116,17 +127,17 @@ const TokenCreatorScreen: React.FC<TokenCreatorScreenProps> = ({ onClose }) => {
     setSymbolStatus({ available: null, checking: true });
 
     try {
-      const response = await tokenService.listTokens();
-      const tokens = response.tokens || [];
       const symbolUpper = sym.trim().toUpperCase();
-      const exists = tokens.some(token => token.symbol.toUpperCase() === symbolUpper);
+      const response = await publicQuicRequest<{ symbol: string; available: boolean }>(
+        `/api/v1/token/symbol/available/${symbolUpper}`,
+      );
 
       setSymbolStatus({
-        available: !exists,
+        available: response.available,
         checking: false,
       });
 
-      console.log(`[TokenCreatorScreen] Symbol "${symbolUpper}" is ${exists ? 'taken' : 'available'}`);
+      console.log(`[TokenCreatorScreen] Symbol "${symbolUpper}" is ${response.available ? 'available' : 'taken'}`);
     } catch (error) {
       console.warn('[TokenCreatorScreen] Failed to check symbol availability:', error);
       setSymbolStatus({ available: null, checking: false });
@@ -194,10 +205,38 @@ const TokenCreatorScreen: React.FC<TokenCreatorScreenProps> = ({ onClose }) => {
 
       setStatus({
         type: 'success',
-        message: `Token created. Token ID: ${response.token_id}`,
+        message: `Submitted to mempool. Confirming...`,
       });
 
-      // Reset form
+      // Step 5: Poll until token is confirmed on chain
+      const tokenId = response.token_id;
+      const MAX_POLLS = 30;
+      const POLL_INTERVAL_MS = 2000;
+      let confirmed = false;
+
+      for (let i = 0; i < MAX_POLLS; i++) {
+        await new Promise(resolve => setTimeout(resolve, POLL_INTERVAL_MS));
+        try {
+          const info = await publicQuicRequest<{ created_at_block?: number | null }>(
+            `/api/v1/token/${tokenId}`,
+          );
+          if (info && info.created_at_block != null) {
+            confirmed = true;
+            console.log('[TokenCreatorScreen] Token confirmed at block:', info.created_at_block);
+            break;
+          }
+        } catch {
+          // token not yet on chain — keep polling
+        }
+      }
+
+      setStatus({
+        type: 'success',
+        message: confirmed
+          ? `Token confirmed on chain. ID: ${tokenId}`
+          : `Token submitted. ID: ${tokenId}`,
+      });
+
       setTimeout(() => {
         setName('');
         setSymbol('');
@@ -252,7 +291,7 @@ const TokenCreatorScreen: React.FC<TokenCreatorScreenProps> = ({ onClose }) => {
             Create Token
           </Text>
           <TouchableOpacity
-            onPress={onClose}
+            onPress={handleClose}
             hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
           >
             <Text
@@ -406,22 +445,6 @@ const TokenCreatorScreen: React.FC<TokenCreatorScreenProps> = ({ onClose }) => {
             editable={!loading}
           />
 
-          {/* Max Supply */}
-          <FormField
-            label="Max Supply (Optional)"
-            placeholder="Leave empty for unlimited"
-            value={maxSupply}
-            onChangeText={(text) => {
-              setMaxSupply(text);
-              if (errors.max_supply) {
-                setErrors((prev) => ({ ...prev, max_supply: undefined }));
-              }
-            }}
-            keyboardType="decimal-pad"
-            error={errors.max_supply}
-            editable={!loading}
-          />
-
           {/* Decimals Preview */}
           {decimals && !errors.decimals && initialSupply && !errors.initial_supply && (() => {
             const rawSupply = Number(initialSupply);
@@ -539,6 +562,22 @@ const TokenCreatorScreen: React.FC<TokenCreatorScreenProps> = ({ onClose }) => {
               </View>
             );
           })()}
+
+          {/* Max Supply */}
+          <FormField
+            label="Max Supply (Optional)"
+            placeholder="Leave empty for unlimited"
+            value={maxSupply}
+            onChangeText={(text) => {
+              setMaxSupply(text);
+              if (errors.max_supply) {
+                setErrors((prev) => ({ ...prev, max_supply: undefined }));
+              }
+            }}
+            keyboardType="decimal-pad"
+            error={errors.max_supply}
+            editable={!loading}
+          />
 
           {/* Create Button */}
           <Button

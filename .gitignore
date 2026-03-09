@@ -147,3 +147,4 @@ ios/vendor/liboqs.xcframework/liboqs.xcframework
 # Sensitive files
 wallet.txt
 android/vault/
+docs/RELEASE_DEPLOYMENT.md

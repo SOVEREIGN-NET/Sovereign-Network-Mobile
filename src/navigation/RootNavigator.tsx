@@ -8,6 +8,7 @@ import { createNativeStackNavigator } from '@react-navigation/native-stack';
 import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
 import { useColorScheme, View } from 'react-native';
 import { colors } from '../theme/tokens';
+import { RootStackParamList } from '../types/navigation';
 
 // Screens
 import DashboardScreen from '../screens/DashboardScreen';
@@ -39,6 +40,7 @@ import TokenDetailScreen from '../screens/TokenDetailScreen';
 import MyDomainsScreen from '../screens/MyDomainsScreen';
 import DomainDetailScreen from '../screens/DomainDetailScreen';
 import ExplorerDashboardScreen from '../screens/explorer/ExplorerDashboardScreen';
+import OracleDashboardScreen from '../screens/oracle/OracleDashboardScreen';
 import BlockDetailScreen from '../screens/explorer/BlockDetailScreen';
 import TransactionDetailScreen from '../screens/explorer/TransactionDetailScreen';
 import IdentityDetailScreen from '../screens/explorer/IdentityDetailScreen';
@@ -47,8 +49,11 @@ import SearchScreen from '../screens/explorer/SearchScreen';
 import PoUWScreen from '../screens/PoUWScreen';
 import SignInScreen from '../screens/SignInScreen';
 import CreateIdentityScreen from '../screens/CreateIdentityScreen';
+import SeedPhraseScreen from '../screens/SeedPhraseScreen';
+import RecoverIdentityScreen from '../screens/RecoverIdentityScreen';
+import MigrationSeedScreen from '../screens/MigrationSeedScreen';
 
-const Stack = createNativeStackNavigator();
+const Stack = createNativeStackNavigator<RootStackParamList>();
 const Tab = createBottomTabNavigator();
 
 const DashboardStack = () => {
@@ -112,6 +117,11 @@ const DashboardStack = () => {
       <Stack.Screen
         name="ExplorerSearch"
         component={SearchScreen}
+        options={{ headerShown: false }}
+      />
+      <Stack.Screen
+        name="OracleDashboard"
+        component={OracleDashboardScreen}
         options={{ headerShown: false }}
       />
     </Stack.Navigator>
@@ -505,6 +515,36 @@ const RootNavigator = () => {
           name="CreateIdentity"
           component={CreateIdentityScreen as any}
           options={{ presentation: 'modal' }}
+        />
+        <Stack.Screen
+          name="RecoverIdentity"
+          component={RecoverIdentityScreen as any}
+          options={{
+            title: 'Recover Identity',
+            headerStyle: { backgroundColor: colors.bg_dark },
+            headerTintColor: colors.primary,
+            headerTitleStyle: { color: colors.text_primary },
+          }}
+        />
+        <Stack.Screen
+          name="MigrationSeed"
+          component={MigrationSeedScreen as any}
+          options={{
+            title: 'Migration Seed',
+            headerStyle: { backgroundColor: colors.bg_dark },
+            headerTintColor: colors.primary,
+            headerTitleStyle: { color: colors.text_primary },
+          }}
+        />
+        <Stack.Screen
+          name="SeedPhrase"
+          component={SeedPhraseScreen as any}
+          options={{
+            title: 'Your Seed Phrase',
+            headerStyle: { backgroundColor: colors.bg_dark },
+            headerTintColor: colors.primary,
+            headerTitleStyle: { color: colors.text_primary },
+          }}
         />
       </Stack.Navigator>
     </NavigationContainer>

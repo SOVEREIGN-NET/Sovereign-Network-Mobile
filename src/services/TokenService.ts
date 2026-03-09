@@ -3,7 +3,7 @@
  * Direct QUIC-based token operations (create, mint, transfer, etc.)
  */
 
-import { quicRequest } from './quic';
+import { quicRequest, publicQuicRequest } from './quic';
 import { nativeIdentityProvisioning } from './NativeIdentityProvisioning';
 import type {
   TokenCreateRequest,
@@ -47,10 +47,24 @@ class TokenService {
   /** POST /api/v1/token/create — Dilithium-signed */
   async createToken(request: TokenCreateRequest): Promise<TokenCreateResponse> {
     console.log('[TokenService] Creating token:', request.name);
+
+    // Step 1: fetch fee config and push to Rust before signing (spec requirement).
+    // token_creation_fee must be current so the builder uses the right atomic.
+    // Default is 1000 if the call fails.
+    try {
+      const feeConfig = await publicQuicRequest<Record<string, unknown>>('/api/v1/blockchain/fee-config');
+      const configStr = JSON.stringify(feeConfig);
+      await nativeIdentityProvisioning.setFeeConfig(configStr);
+      console.log('[TokenService] Fee config updated, token_creation_fee:', feeConfig.token_creation_fee);
+    } catch (err) {
+      console.warn('[TokenService] Fee config refresh failed, using cached/default:', err);
+    }
+
     const signingResult =
       await nativeIdentityProvisioning.signTokenCreateTransaction({
         name: request.name,
         symbol: request.symbol,
+<<<<<<< HEAD
         initialSupply: Number(request.initial_supply),
         decimals: request.decimals,
         maxSupply:

@@ -65,8 +65,11 @@ class NativeQuic: NSObject {
   private let defaultTimeout: TimeInterval = 30.0
   private let quinnControlPlaneHost = GeneratedConfig.quinnControlPlaneHost
   private let quinnControlPlanePort = GeneratedConfig.quinnControlPlanePort
-  private let quinnControlPlaneServerName = GeneratedConfig.quinnControlPlaneServerName
-  private let quinnSpkiPinHex = GeneratedConfig.quinnSpkiPinHex
+  // Empty serverName → use host as SNI (Rust rejects empty string)
+  private let quinnControlPlaneServerName: String = {
+    let s = GeneratedConfig.quinnControlPlaneServerName
+    return s.isEmpty ? GeneratedConfig.quinnControlPlaneHost : s
+  }()
   private let alpnPublic = "zhtp-public/1"
   private let alpnAuthenticated = "zhtp-uhp/2"
 
@@ -112,21 +115,29 @@ class NativeQuic: NSObject {
 
     uhp_quinn_init()
 
-    guard let spkiPin = dataFromHex(quinnSpkiPinHex), spkiPin.count == 32 else {
-      reject("QUIC_ERROR", "Invalid SPKI pin configuration", nil)
-      return
-    }
-
     let serverName = quinnControlPlaneServerName.isEmpty ? host : quinnControlPlaneServerName
     var handle: UInt64 = 0
+    let pinHex = GeneratedConfig.quinnSpkiPinHex
 
-    let rc = host.withCString { hostPtr in
-      serverName.withCString { serverNamePtr in
-        spkiPin.withUnsafeBytes { spkiBuf -> Int32 in
-          guard let spkiPtr = spkiBuf.baseAddress?.assumingMemoryBound(to: UInt8.self) else {
-            return -1
+    let rc: Int32
+    if pinHex.isEmpty {
+      // System CA trust — no SPKI pin
+      rc = host.withCString { hostPtr in
+        serverName.withCString { serverNamePtr in
+          uhp_quic_connect_public(hostPtr, UInt16(port), serverNamePtr, nil, &handle)
+        }
+      }
+    } else {
+      guard let spkiPin = dataFromHex(pinHex), spkiPin.count == 32 else {
+        reject("QUIC_ERROR", "Invalid SPKI pin configuration", nil)
+        return
+      }
+      rc = host.withCString { hostPtr in
+        serverName.withCString { serverNamePtr in
+          spkiPin.withUnsafeBytes { spkiBuf -> Int32 in
+            guard let spkiPtr = spkiBuf.baseAddress?.assumingMemoryBound(to: UInt8.self) else { return -1 }
+            return uhp_quic_connect_public(hostPtr, UInt16(port), serverNamePtr, spkiPtr, &handle)
           }
-          return uhp_quic_connect_public(hostPtr, UInt16(port), serverNamePtr, spkiPtr, &handle)
         }
       }
     }
@@ -229,9 +240,16 @@ class NativeQuic: NSObject {
       return
     }
 
-    guard let spkiPin = dataFromHex(quinnSpkiPinHex), spkiPin.count == 32 else {
-      reject("QUIC_ERROR", "Invalid SPKI pin configuration", nil)
-      return
+    let spkiPin: Data
+    let pinHex = GeneratedConfig.quinnSpkiPinHex
+    if pinHex.isEmpty {
+      spkiPin = Data() // system CA trust — empty means no pinning
+    } else {
+      guard let pin = dataFromHex(pinHex), pin.count == 32 else {
+        reject("QUIC_ERROR", "Invalid SPKI pin configuration", nil)
+        return
+      }
+      spkiPin = pin
     }
 
     enqueueQuinnRequest(
@@ -600,7 +618,8 @@ class NativeQuic: NSObject {
     identityId: String,
     chainId: UInt8
   ) -> Result<QuinnHandshakeResult, Error> {
-    guard spkiPin.count == 32 else {
+    // spkiPin may be empty (system CA trust) or 32 bytes (SPKI pinned)
+    guard spkiPin.isEmpty || spkiPin.count == 32 else {
       return .failure(NSError(domain: "NativeQuic", code: -1, userInfo: [NSLocalizedDescriptionKey: "Invalid SPKI pin length"]))
     }
 
@@ -647,53 +666,66 @@ class NativeQuic: NSObject {
     var session = UhpSession()
     var handle: UInt64 = 0
 
-    let rc = host.withCString { hostPtr in
-      serverName.withCString { serverNamePtr in
-        spkiPin.withUnsafeBytes { spkiBuf -> Int32 in
-          guard let spkiPtr = spkiBuf.baseAddress?.assumingMemoryBound(to: UInt8.self) else {
+    func callHandshake(hostPtr: UnsafePointer<CChar>, serverNamePtr: UnsafePointer<CChar>, spkiPtr: UnsafePointer<UInt8>?) -> Int32 {
+      return materials.identityJson.withUnsafeBytes { identityBuf -> Int32 in
+        guard let identityPtr = identityBuf.baseAddress?.assumingMemoryBound(to: UInt8.self) else {
+          return -1
+        }
+        return materials.dilithiumSk.withUnsafeBytes { dilBuf -> Int32 in
+          guard let dilPtr = dilBuf.baseAddress?.assumingMemoryBound(to: UInt8.self) else {
             return -1
           }
-          return materials.identityJson.withUnsafeBytes { identityBuf -> Int32 in
-            guard let identityPtr = identityBuf.baseAddress?.assumingMemoryBound(to: UInt8.self) else {
+          return materials.kyberSk.withUnsafeBytes { kybBuf -> Int32 in
+            guard let kybPtr = kybBuf.baseAddress?.assumingMemoryBound(to: UInt8.self) else {
               return -1
             }
-            return materials.dilithiumSk.withUnsafeBytes { dilBuf -> Int32 in
-              guard let dilPtr = dilBuf.baseAddress?.assumingMemoryBound(to: UInt8.self) else {
+            return materials.masterSeed.withUnsafeBytes { seedBuf -> Int32 in
+              guard let seedPtr = seedBuf.baseAddress?.assumingMemoryBound(to: UInt8.self) else {
                 return -1
               }
-              return materials.kyberSk.withUnsafeBytes { kybBuf -> Int32 in
-                guard let kybPtr = kybBuf.baseAddress?.assumingMemoryBound(to: UInt8.self) else {
-                  return -1
-                }
-                return materials.masterSeed.withUnsafeBytes { seedBuf -> Int32 in
-                  guard let seedPtr = seedBuf.baseAddress?.assumingMemoryBound(to: UInt8.self) else {
-                    return -1
-                  }
 
-                  let keyBytes = UhpPrivateKeyBytes(
-                    dilithium_sk_ptr: dilPtr,
-                    dilithium_sk_len: materials.dilithiumSk.count,
-                    kyber_sk_ptr: kybPtr,
-                    kyber_sk_len: materials.kyberSk.count,
-                    master_seed_ptr: seedPtr,
-                    master_seed_len: materials.masterSeed.count
-                  )
+              let keyBytes = UhpPrivateKeyBytes(
+                dilithium_sk_ptr: dilPtr,
+                dilithium_sk_len: materials.dilithiumSk.count,
+                kyber_sk_ptr: kybPtr,
+                kyber_sk_len: materials.kyberSk.count,
+                master_seed_ptr: seedPtr,
+                master_seed_len: materials.masterSeed.count
+              )
 
-                  return uhp_quic_connect_and_handshake(
-                    hostPtr,
-                    UInt16(port),
-                    serverNamePtr,
-                    spkiPtr,
-                    identityPtr,
-                    materials.identityJson.count,
-                    keyBytes,
-                    chainId,
-                    &handle,
-                    &session
-                  )
-                }
-              }
+              return uhp_quic_connect_and_handshake(
+                hostPtr,
+                UInt16(port),
+                serverNamePtr,
+                spkiPtr,
+                identityPtr,
+                materials.identityJson.count,
+                keyBytes,
+                chainId,
+                &handle,
+                &session
+              )
             }
+          }
+        }
+      }
+    }
+
+    let rc: Int32
+    if spkiPin.isEmpty {
+      rc = host.withCString { hostPtr in
+        serverName.withCString { serverNamePtr in
+          callHandshake(hostPtr: hostPtr, serverNamePtr: serverNamePtr, spkiPtr: nil)
+        }
+      }
+    } else {
+      rc = host.withCString { hostPtr in
+        serverName.withCString { serverNamePtr in
+          spkiPin.withUnsafeBytes { spkiBuf -> Int32 in
+            guard let spkiPtr = spkiBuf.baseAddress?.assumingMemoryBound(to: UInt8.self) else {
+              return -1
+            }
+            return callHandshake(hostPtr: hostPtr, serverNamePtr: serverNamePtr, spkiPtr: spkiPtr)
           }
         }
       }
@@ -785,20 +817,28 @@ class NativeQuic: NSObject {
   ) throws -> (status: Int, headers: [String: String], body: Data, statusText: String) {
     uhp_quinn_init()
 
-    guard let spkiPin = dataFromHex(quinnSpkiPinHex), spkiPin.count == 32 else {
-      throw NSError(domain: "NativeQuic", code: -1, userInfo: [NSLocalizedDescriptionKey: "Invalid SPKI pin configuration"])
-    }
-
     let serverName = resolveServerName(host: parsedUrl.host, headers: headers)
     var handle: UInt64 = 0
+    let pinHex = GeneratedConfig.quinnSpkiPinHex
 
-    let connectRc = parsedUrl.host.withCString { hostPtr in
-      serverName.withCString { serverNamePtr in
-        spkiPin.withUnsafeBytes { spkiBuf -> Int32 in
-          guard let spkiPtr = spkiBuf.baseAddress?.assumingMemoryBound(to: UInt8.self) else {
-            return -1
+    let connectRc: Int32
+    if pinHex.isEmpty {
+      // System CA trust — no SPKI pin
+      connectRc = parsedUrl.host.withCString { hostPtr in
+        serverName.withCString { serverNamePtr in
+          uhp_quic_connect_public(hostPtr, UInt16(parsedUrl.port), serverNamePtr, nil, &handle)
+        }
+      }
+    } else {
+      guard let spkiPin = dataFromHex(pinHex), spkiPin.count == 32 else {
+        throw NSError(domain: "NativeQuic", code: -1, userInfo: [NSLocalizedDescriptionKey: "Invalid SPKI pin configuration"])
+      }
+      connectRc = parsedUrl.host.withCString { hostPtr in
+        serverName.withCString { serverNamePtr in
+          spkiPin.withUnsafeBytes { spkiBuf -> Int32 in
+            guard let spkiPtr = spkiBuf.baseAddress?.assumingMemoryBound(to: UInt8.self) else { return -1 }
+            return uhp_quic_connect_public(hostPtr, UInt16(parsedUrl.port), serverNamePtr, spkiPtr, &handle)
           }
-          return uhp_quic_connect_public(hostPtr, UInt16(parsedUrl.port), serverNamePtr, spkiPtr, &handle)
         }
       }
     }

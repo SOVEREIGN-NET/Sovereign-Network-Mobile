@@ -4,7 +4,7 @@
  * Used in Dashboard/Browser screens
  */
 
-import React, { useEffect } from 'react';
+import React, { useEffect, useState, useRef } from 'react';
 import { View, Pressable, StyleSheet } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Text, Row } from '../../atoms';
@@ -33,8 +33,31 @@ const HeaderBar: React.FC<HeaderBarProps> = ({
   const insets = useSafeAreaInsets();
   const { t } = useTranslation();
 
-  // SOV reward counter - slow drip
-  const { displayBalance } = useRewardCounter();
+  // SOV reward counter
+  const { displayBalance, maturesAt } = useRewardCounter();
+
+  // Maturation banner — dismiss on tap or after 10s; reappears if maturesAt changes
+  const [bannerDismissed, setBannerDismissed] = useState(false);
+  const bannerTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  useEffect(() => {
+    setBannerDismissed(false);
+    if (maturesAt) {
+      bannerTimerRef.current = setTimeout(() => setBannerDismissed(true), 10_000);
+    }
+    return () => {
+      if (bannerTimerRef.current) clearTimeout(bannerTimerRef.current);
+    };
+  }, [maturesAt]);
+
+  const sovLabel = (() => {
+    if (!maturesAt) return `SOV ${displayBalance}`;
+    const remaining = maturesAt - Math.floor(Date.now() / 1000);
+    if (remaining <= 0) return `SOV ${displayBalance}`;
+    const hours = Math.floor(remaining / 3600);
+    const minutes = Math.floor((remaining % 3600) / 60);
+    const countdown = hours > 0 ? `${hours}h ${minutes}m` : `${minutes}m`;
+    return `Eligible in ${countdown}`;
+  })();
 
   // Connection status from hook - auto-check on startup
   const { connectionStatus, latencyMs } = useNodeConnectionStatus(true);
@@ -149,6 +172,27 @@ const HeaderBar: React.FC<HeaderBarProps> = ({
       padding: spacing.sm,
       marginRight: 0,
     },
+    maturationBanner: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      justifyContent: 'space-between',
+      backgroundColor: colors.warning + '22',
+      borderRadius: 6,
+      paddingVertical: 4,
+      paddingHorizontal: spacing.sm,
+      marginTop: spacing.xs,
+    },
+    maturationBannerText: {
+      fontSize: typography.size.sm,
+      color: colors.warning,
+      flex: 1,
+    },
+    maturationBannerDismiss: {
+      fontSize: typography.size.sm,
+      color: colors.warning,
+      paddingLeft: spacing.sm,
+      opacity: 0.7,
+    },
   });
 
   return (
@@ -178,7 +222,7 @@ const HeaderBar: React.FC<HeaderBarProps> = ({
           pointerEvents="box-only"
           hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
         >
-          <Text style={styles.sovLabel}>SOV {displayBalance}</Text>
+          <Text style={styles.sovLabel}>{sovLabel}</Text>
         </Pressable>
 
         {/* Right: Connection Status */}
@@ -202,6 +246,21 @@ const HeaderBar: React.FC<HeaderBarProps> = ({
           </Row>
         </View>
       </Row>
+
+      {/* Maturation banner — shown when identity is too new for rewards */}
+      {maturesAt && !bannerDismissed && (() => {
+        const remaining = maturesAt - Math.floor(Date.now() / 1000);
+        if (remaining <= 0) return null;
+        const hours = Math.ceil(remaining / 3600);
+        return (
+          <Pressable style={styles.maturationBanner} onPress={() => setBannerDismissed(true)}>
+            <Text style={styles.maturationBannerText}>
+              {'⏳ Rewards available in ~' + hours + (hours === 1 ? ' hour' : ' hours')}
+            </Text>
+            <Text style={styles.maturationBannerDismiss}>✕</Text>
+          </Pressable>
+        );
+      })()}
     </View>
   );
 };

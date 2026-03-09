@@ -473,10 +473,10 @@ object NativeQuicBridge {
             return mapOf(
                 "ok" to true,
                 "handle" to quicHandle,
-                "session_key" to sessionResult?.get("session_key"),
-                "session_id" to sessionResult?.get("session_id"),
-                "peer_did" to sessionResult?.get("peer_did"),
-                "peer_public_key" to sessionResult?.get("peer_public_key")
+                "session_key" to sessionResult?.get("sessionKey"),
+                "session_id" to sessionResult?.get("sessionId"),
+                "peer_did" to sessionResult?.get("peerDid"),
+                "peer_public_key" to sessionResult?.get("peerPublicKey")
             )
         } catch (t: Throwable) {
             Log.e(TAG, "lib-client handshake failed", t)

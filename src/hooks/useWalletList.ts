@@ -83,11 +83,6 @@ export const useWalletList = () => {
         };
       }
 
-      if (!identityId) {
-        console.log('[useWalletList] ⚠️ Cannot fetch wallet list: no identity ID');
-        return null;
-      }
-
       try {
         console.log('[useWalletList] 📡 Fetching wallet list for identity:', identityId);
         const response = await appService.getWalletList(identityId);
@@ -109,6 +104,7 @@ export const useWalletList = () => {
     },
     [identityId, useMock, currentIdentity?.wallets, forceCleanupAndSignOut],
     null,
+    !identityId && !useMock,
   );
 
   const walletData = useMemo<WalletListData>(() => {

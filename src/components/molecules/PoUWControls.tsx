@@ -8,7 +8,32 @@ import {
   ActivityIndicator,
 } from 'react-native';
 import { usePoUW } from '../../hooks/usePoUW';
+import { useRewardCounter } from '../../hooks/useRewardCounter';
 import { colors, spacing, typography, borderRadius } from '../../theme';
+
+function formatCountdown(maturesAt: number): string {
+  const remaining = maturesAt - Math.floor(Date.now() / 1000);
+  if (remaining <= 0) return 'Eligible now';
+  const hours = Math.floor(remaining / 3600);
+  const minutes = Math.floor((remaining % 3600) / 60);
+  if (hours > 0) return `${hours}h ${minutes}m`;
+  return `${minutes}m`;
+}
+
+function isMaturingError(e: unknown): boolean {
+  const body = (e as any)?.body;
+  if (!body || typeof body !== 'object') return false;
+  const obj = body as Record<string, unknown>;
+  if (typeof obj.age_secs === 'number' && typeof obj.required_secs === 'number') return true;
+  if (Array.isArray(obj.rejected)) {
+    return obj.rejected.some(
+      r => r && typeof r === 'object' &&
+        typeof (r as any).age_secs === 'number' &&
+        typeof (r as any).required_secs === 'number',
+    );
+  }
+  return false;
+}
 
 export interface PoUWControlsProps {
   onPendingCountChange?: (count: number) => void;
@@ -25,9 +50,30 @@ export function PoUWControls({
     isAvailable,
     error,
     isLoading,
+    maturesAt: flushMaturesAt,
   } = usePoUW();
+
+  // Also check rewards endpoint — gives us maturation state on screen open,
+  // before the user ever attempts a flush.
+  const { maturesAt: rewardsMaturesAt } = useRewardCounter();
+  const maturesAt = rewardsMaturesAt ?? flushMaturesAt;
   const [pending, setPending] = useState(0);
   const [lastError, setLastError] = useState<string | null>(null);
+  const [countdown, setCountdown] = useState<string | null>(null);
+
+  // Update countdown string every minute while maturing
+  useEffect(() => {
+    if (!maturesAt) {
+      setCountdown(null);
+      return;
+    }
+    setCountdown(formatCountdown(maturesAt));
+    const timer = setInterval(() => {
+      const label = formatCountdown(maturesAt);
+      setCountdown(label);
+    }, 60_000);
+    return () => clearInterval(timer);
+  }, [maturesAt]);
 
   const updatePending = useCallback(async () => {
     try {
@@ -47,6 +93,8 @@ export function PoUWControls({
       Alert.alert('Success', 'Receipts submitted to network!');
       await updatePending();
     } catch (e) {
+      // Maturation errors are shown via the countdown banner — skip the alert
+      if (isMaturingError(e)) return;
       const message = e instanceof Error ? e.message : 'Unknown error';
       setLastError(message);
       Alert.alert('Flush Failed', message);
@@ -65,6 +113,8 @@ export function PoUWControls({
     updatePending();
   }, []);
 
+  const isMaturing = countdown !== null && countdown !== 'Eligible now';
+
   if (error) {
     return (
       <View style={styles.container}>
@@ -77,16 +127,28 @@ export function PoUWControls({
 
   return (
     <View style={styles.container}>
+      {isMaturing && (
+        <View style={styles.maturationCard}>
+          <Text style={styles.maturationTitle}>Identity Maturing</Text>
+          <Text style={styles.maturationSubtitle}>
+            New identities earn PoUW rewards after a 24-hour maturation period.
+          </Text>
+          <Text style={styles.maturationCountdown}>
+            Eligible in {countdown}
+          </Text>
+        </View>
+      )}
+
       <View style={styles.statusCard}>
         <View style={styles.statusHeader}>
           <View
             style={[
               styles.statusDot,
-              { backgroundColor: isAvailable ? colors.success : colors.error },
+              { backgroundColor: isMaturing ? colors.text_secondary : isAvailable ? colors.success : colors.error },
             ]}
           />
           <Text style={styles.statusText}>
-            {isAvailable ? 'PoUW Active' : 'PoUW Unavailable'}
+            {isMaturing ? 'PoUW Maturing' : isAvailable ? 'PoUW Active' : 'PoUW Unavailable'}
           </Text>
         </View>
 
@@ -105,15 +167,19 @@ export function PoUWControls({
         <View style={styles.buttonContainer}>
           <Pressable
             onPress={handleFlush}
-            disabled={isLoading || !isAvailable || pending === 0}
+            disabled={isLoading || !isAvailable || pending === 0 || isMaturing}
             style={({ pressed }) => [
               styles.flushButton,
-              (isLoading || !isAvailable || pending === 0) && styles.flushButtonDisabled,
+              (isLoading || !isAvailable || pending === 0 || isMaturing) && styles.flushButtonDisabled,
               pressed && styles.flushButtonPressed,
             ]}
           >
             <Text style={styles.flushButtonText}>
-              {pending > 0 ? `Submit Receipts (${pending})` : 'No Receipts'}
+              {isMaturing
+                ? `Eligible in ${countdown}`
+                : pending > 0
+                  ? `Submit Receipts (${pending})`
+                  : 'No Receipts'}
             </Text>
           </Pressable>
         </View>
@@ -134,6 +200,29 @@ const styles = StyleSheet.create({
   container: {
     flex: 1,
     gap: spacing.md,
+  },
+  maturationCard: {
+    backgroundColor: colors.bg_dark,
+    borderRadius: borderRadius.lg,
+    padding: spacing.lg,
+    borderWidth: 1,
+    borderColor: colors.text_secondary,
+    gap: spacing.xs,
+  },
+  maturationTitle: {
+    color: colors.text_primary,
+    fontSize: typography.size.md,
+    fontWeight: typography.weight.semibold,
+  },
+  maturationSubtitle: {
+    color: colors.text_secondary,
+    fontSize: typography.size.sm,
+  },
+  maturationCountdown: {
+    color: colors.primary,
+    fontSize: typography.size.lg,
+    fontWeight: typography.weight.bold,
+    marginTop: spacing.xs,
   },
   statusCard: {
     backgroundColor: colors.bg_dark,

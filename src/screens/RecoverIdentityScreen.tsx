@@ -22,12 +22,12 @@ import {
 import { useAuth } from '../hooks';
 import { useTranslation } from '../i18n';
 import { colors, spacing, typography, borderRadius } from '../theme';
-import { AuthStackParamList } from '../navigation/AuthNavigator';
+import { RootStackParamList } from '../types/navigation';
 import SeedVaultService from '../services/SeedVaultService';
 import RealAuthService from '../services/RealAuthService';
 import SecureIdentityStorage from '../services/SecureIdentityStorage';
 
-type RecoverIdentityScreenProps = NativeStackScreenProps<AuthStackParamList, 'RecoverIdentity'>;
+type RecoverIdentityScreenProps = NativeStackScreenProps<RootStackParamList, 'RecoverIdentity'>;
 
 type RecoveryMethod = 'seed';
 
