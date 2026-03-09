@@ -13,7 +13,8 @@ import {
   Row,
   ScreenLayout,
 } from '../components';
-import { useAuth, useNativeSettings } from '../hooks';
+import { useAuth } from '../hooks';
+import { useNativeSettings } from '../hooks/useNativeSettings';
 import { useTranslation } from '../i18n';
 import { colors, spacing, typography, borderRadius } from '../theme';
 import { setUseMockService } from '../context/AuthContext';

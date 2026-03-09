@@ -356,6 +356,7 @@ const BrowserScreen = ({ route, navigation }: any) => {
                           .map(b => b.toString(16).padStart(2, '0'))
                           .join(''),
                       );
+
                       await pouwControllerRef.current?.recordWeb4ManifestRoute({
                         manifestCid,
                         domain: web4Domain,

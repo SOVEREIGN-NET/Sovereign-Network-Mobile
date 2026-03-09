@@ -211,6 +211,13 @@ async function rawRequest(
     }
   }
 
+  if (alpn === 'authenticated') {
+    const sid = (response as any)?.sessionIdPrefix;
+    if (typeof sid === 'string' && /^[0-9a-fA-F]{16}$/.test(sid)) {
+      latestAuthSessionIdPrefix = sid.toLowerCase();
+    }
+  }
+
   if (__DEV__) {
     console.log(
       '[quic] response:',
