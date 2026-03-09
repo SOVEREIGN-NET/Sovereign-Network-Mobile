@@ -1,311 +1,171 @@
-# 📱 ZHTP Web4 Mobile App
+# Sovereign Network Mobile
 
-A complete Web4 mobile application built with React Native, featuring built-in ZK-DID identity management, quantum-resistant cryptography, and real ZHTP blockchain integration.
+React Native mobile app for The Sovereign Network — a post-quantum, decentralized identity and token platform built on the ZHTP protocol.
 
-## 🚀 Features
+## Overview
 
-### Zero-Knowledge Identity (ZK-DID)
-- **Quantum-Resistant Security**: Post-quantum cryptographic operations
-- **Privacy-First**: Zero-knowledge proofs for identity operations
-- **One Identity Per Human**: Soulbound identity with citizen onboarding
-- **Biometric Support**: Native biometric verification integration
-- **Credential Management**: Verifiable credentials with ZK proofs
+This app provides a full native interface to the Sovereign Network, including identity provisioning, token operations, DAO governance, PoUW mining, and a Web4 browser. All cryptographic operations run inside a Rust FFI core (`lib-client`) via platform-native bridges (Swift on iOS, JNI on Android).
 
-### 💰 Quantum Wallet System
-- **Post-Quantum Cryptography**: Quantum-resistant key generation
-- **Multi-Wallet Support**: Multiple wallets per identity with different purposes
-- **Real-time Balance**: Live ZHTP token balance and transaction history
-- **UBI Integration**: Automatic Universal Basic Income claiming
-- **Staking Support**: Participate in network consensus and earn rewards
+## Architecture
 
-### 🏛️ DAO Governance
-- **Zero-Knowledge Voting**: Private voting with verifiable results
-- **One Citizen One Vote**: Equal representation for all verified citizens
-- **Proposal System**: Create and vote on network governance proposals
-- **Treasury Management**: Community-controlled fund allocation
-- **Live Statistics**: Real-time DAO metrics and governance data
+### Transport Layer
+- **QUIC** via Quinn v0.11 with Rustls 0.23 — compiled as `quinn-ffi` (iOS XCFramework) and `quic-jni` (Android `.so`)
+- **ZHTP protocol** over QUIC, CBOR-encoded
+- Two ALPNs: `zhtp-public/1` (unauthenticated) and `zhtp-uhp/2` (authenticated session)
+- **UHP v2 handshake** — Dilithium5 signatures + Kyber1024 key encapsulation, keys stay in Rust
 
-### 🌐 Web4 Browser
-- **ZHTP Protocol**: Native support for zhtp://, zk://, mesh://, dao:// protocols
-- **Decentralized DNS**: ZDNS resolution for .zhtp domains
-- **dApp Integration**: Seamless dApp discovery and launching
-- **Real-time Updates**: WebSocket integration for live network data
+### Identity
+- Post-quantum ZK-DID: one soulbound identity per human
+- Opaque handle pattern on both platforms — Rust owns all key material
+- iOS: `UnsafeMutableRawPointer` via `@_silgen_name` C FFI
+- Android: `Long` handle via JNI
+- Storage: iOS Keychain / Android EncryptedSharedPreferences (serialized JSON only, no raw keys)
 
-## Technology Stack
+### Node Registry
+Multi-node QUIC with per-host SPKI certificate pinning. Nodes configured via `.env` `ZHTP_NODE_REGISTRY` (`host:port:pin`). Run `node scripts/generate-config.js` after changes.
 
-### Mobile Framework
-- **React Native**: Cross-platform mobile framework for iOS and Android
-- **React Navigation 7**: Bottom-tab and stack-based navigation
-- **TypeScript**: Full type safety for production reliability
-- **Expo Ready**: Compatible with Expo for rapid deployment
+| Node | Host | Port |
+|------|------|------|
+| g1 | g1.thesovereignnetwork.org | 9334 |
+| g2 | g2.thesovereignnetwork.org | 9334 |
+| g3 | g3.thesovereignnetwork.org | 9334 |
+| g4 | g4.thesovereignnetwork.org | 9334 |
 
-### Frontend Architecture
-- **Atomic Design System**: Atoms → Molecules → Organisms component structure
-- **Custom Hooks**: useAsyncData, useDebounce, usePersistedState
-- **React Context**: State management and provider pattern
-- **Responsive Layout**: Column/Row layout components with flexible spacing
+## Features
 
-### Design System
-- **Design Tokens**: Centralized colors, spacing, typography, shadows
-- **Modern Aesthetics**: Generous spacing, rounded corners, subtle borders
-- **Theme System**: Dark theme with cyan primary color (#00d4ff)
-- **Component Library**: 24+ reusable UI components
+- **Identity** — Create, recover, backup ZK-DID identities with seed phrase support and biometric lock
+- **Wallet** — Multi-wallet token management, send/receive, staking, UBI claims
+- **Tokens** — Token creation with bonding curves, token management and trading
+- **PoUW** — Proof of Useful Work mining with reward tracking
+- **DAO** — Governance proposals, zero-knowledge voting, treasury status
+- **Oracle** — On-chain oracle data dashboard
+- **Web4 Browser** — Native ZHTP/zhtp:// protocol support with domain management
+- **SID** — Sovereign Identity Document screen
+- **Settings** — Node trust management, native settings bridge
 
-### Cryptography
-- **Quantum-Resistant**: Post-quantum cryptographic operations
-- **Zero-Knowledge Proofs**: Identity verification without revealing data
-- **Secure Storage**: Encrypted local storage for sensitive data
-- **Web Crypto API**: Browser-native cryptographic operations
+## Tech Stack
 
-### Integration
-- **ZHTP Blockchain**: Real API integration with ZHTP node
-- **Mock Data Service**: Demo mode with realistic mock data
-- **Async Data Hooks**: Efficient data fetching with loading states
-- **Navigation System**: Type-safe navigation with parameters
+| Layer | Technology |
+|-------|-----------|
+| Framework | React Native 0.82, React 19 |
+| Language | TypeScript |
+| Navigation | React Navigation 7 (stack + bottom tabs) |
+| Crypto core | Rust (lib-client, lib-identity, lib-crypto, lib-network) |
+| iOS FFI | Swift + `@_silgen_name` C FFI |
+| Android FFI | Kotlin + JNI |
+| Storage | Keychain (iOS) / EncryptedSharedPreferences (Android) |
+| QR codes | react-native-qrcode-svg |
+| Secure storage | react-native-keychain |
 
-## 🚀 Quick Start
-
-### Prerequisites
-1. **Node.js**: Version 16 or higher
-2. **npm** or **yarn**: Package manager
-3. **Xcode** (macOS) or **Android Studio**: For native builds
-
-### Installation & Running
-
-1. **Install Dependencies**
-   ```bash
-   npm install
-   ```
-
-2. **Start Development Server**
-   ```bash
-   npm start
-   ```
-
-3. **Run Tests**
-   ```bash
-   npm test
-   ```
-
-### Building for Devices
-
-1. **Build for Android**
-   ```bash
-   npm run android
-   ```
-
-2. **Build for iOS**
-   ```bash
-   npm run ios
-   ```
-
-## 📁 Project Structure
+## Project Structure
 
 ```
 SovereignNetworkMobile/
 ├── src/
-│   ├── components/          # UI component library
-│   │   ├── atoms/          # Base components (Button, Card, Text, Input)
-│   │   ├── molecules/      # Composite components (DetailRow, StatBox, ProgressBar)
-│   │   └── organisms/      # Complex components (LoadingView, ErrorView)
-│   ├── screens/            # Navigation screens (11 total)
-│   │   ├── DashboardScreen.tsx
-│   │   ├── WalletScreen.tsx
-│   │   ├── DAOScreen.tsx
-│   │   ├── IdentityScreen.tsx
-│   │   ├── BrowserScreen.tsx
-│   │   └── [Detail screens]
-│   ├── navigation/         # React Navigation setup
-│   │   └── RootNavigator.tsx
-│   ├── hooks/              # Custom React hooks
-│   │   ├── useAsyncData.ts
-│   │   ├── useDebounce.ts
-│   │   └── usePersistedState.ts
-│   ├── services/           # Business logic
-│   │   └── MockDataService.ts
-│   ├── utils/              # Utility functions
-│   │   ├── colors.ts
-│   │   ├── dates.ts
-│   │   └── numbers.ts
-│   ├── theme/              # Design tokens
-│   │   └── tokens.ts
-│   └── App.tsx             # Root component
-├── __tests__/              # Test files (102 passing tests)
-├── package.json
-└── jest.config.js
+│   ├── screens/            # 40+ screens
+│   │   ├── oracle/         # Oracle dashboard
+│   │   └── explorer/       # Network explorer
+│   ├── services/           # Business logic & native bridges
+│   │   ├── quic.ts         # QUIC session management
+│   │   ├── NativeIdentityProvisioning.ts
+│   │   ├── TokenService.ts
+│   │   ├── OracleService.ts
+│   │   ├── BondingCurveService.ts
+│   │   └── AppService.ts
+│   ├── hooks/              # React hooks
+│   ├── native/             # Native module type declarations
+│   ├── navigation/         # RootNavigator
+│   ├── types/              # Shared TypeScript types
+│   ├── config.ts           # GeneratedConfig (from .env)
+│   └── i18n/              # Translations
+├── ios/                    # iOS native (Swift + Objective-C)
+│   ├── ZhtpClient.swift    # All lib-client C FFI declarations
+│   ├── NativeQuicModule.swift
+│   ├── NativeIdentityProvisioning.swift
+│   ├── RCTPoUW.swift
+│   └── PoUWTests/
+├── android/                # Android native (Kotlin + Rust)
+│   └── app/src/main/java/com/sovereignnetworkmobile/
+│       ├── pouw/           # PoUW controller, verifier, receipt store
+│       └── [Native modules]
+├── scripts/
+│   ├── generate-config.js  # Generates src/config.ts from .env
+│   └── bump-version.sh
+├── protos/pouw/v1/         # PoUW protobuf definitions
+└── docs/
+    ├── RELEASE_DEPLOYMENT.md
+    └── pouw/               # PoUW implementation docs
 ```
 
-## 🎨 Design System
+## Setup
 
-### Color Palette
-- **Primary**: `#00d4ff` (Cyan) - Actions, highlights
-- **Success**: `#51cf66` (Green) - Positive states
-- **Error**: `#ff6b6b` (Red) - Error states
-- **Warning**: `#ffd43b` (Yellow) - Warning states
-- **Background**: `#1a1a2e` (Dark) - Main background
+### Prerequisites
+- Node.js 18+
+- Yarn or npm
+- Xcode 15+ (iOS)
+- Android Studio + NDK r26+ (Android)
+- Rust toolchain with cross-compilation targets
 
-### Spacing Scale
-- `xs`: 6px - Minimal spacing
-- `sm`: 10px - Small gaps
-- `md`: 14px - Medium gaps
-- `lg`: 18px - Large gaps (default card padding)
-- `xl`: 24px - Extra large spacing
-- `2xl`: 32px - Large sections
-- `3xl`: 48px - Major sections
-
-### Border Radius
-- `sm`: 6px - Small elements
-- `base`: 10px - Buttons, inputs
-- `md`: 12px - Input fields
-- `lg`: 14px - Cards
-- `xl`: 16px - Large cards
-- `2xl`: 20px - Extra-large cards
-
-## 📱 Navigation Map
-
-### Bottom Tab Navigation (5 Tabs)
-1. **Dashboard** - Network status, quick actions, app info
-   - Nested: ClaimUBIScreen
-
-2. **Wallet** - Multi-wallet management, balances, transactions
-   - Nested: SendTokensScreen, ReceiveTokensScreen, StakeTokensScreen
-
-3. **DAO** - Governance, proposals, voting
-   - Nested: ProposalDetailScreen
-
-4. **Identity** - ZK-DID management, verification
-   - Standalone interface
-
-5. **Browser** - Web4 navigation, ZHTP protocol support
-   - Standalone interface
-
-## 🧪 Testing
-
-### Test Suite (102 Tests)
-- **Hook Tests**: useAsyncData, useDebounce
-- **Component Tests**: Card, Button, Badge, ProgressBar
-- **Utility Tests**: colors, dates, numbers
-- **Integration Tests**: App component
-
-### Running Tests
+### Install
 ```bash
-# Run all tests
-npm test
-
-# Run in watch mode
-npm test -- --watch
-
-# Update snapshots
-npm test -- --updateSnapshot
-
-# Coverage report
-npm test -- --coverage
+yarn install
 ```
 
-## 🏗️ Component Architecture
-
-### Atomic Design Pattern
-1. **Atoms**: Basic building blocks (Button, Text, Card, Input)
-2. **Molecules**: Simple component combinations (DetailRow, StatBox, ListItem)
-3. **Organisms**: Complex UI groups (LoadingView, ErrorView)
-4. **Templates**: Screen layouts (Dashboard, Wallet, DAO)
-5. **Screens**: Full page components with navigation
-
-### Key Components
-- **Card**: Container component with padding and rounded corners
-- **Text**: Typography component with variants (h1, h2, h3, body, caption)
-- **Button**: Action component with primary/secondary/outline variants
-- **Column/Row**: Layout helpers for Flexbox structure
-- **Input**: Text input field with validation
-- **Badge**: Status indicator component
-- **ProgressBar**: Progress visualization
-- **StatBox**: Statistics display component
-
-## 🔧 Development
-
-### Available Scripts
+### Configure nodes
+Copy `.env.example` to `.env` and set `ZHTP_NODE_REGISTRY`, then:
 ```bash
-npm start          # Start Metro development server
-npm test           # Run Jest test suite
-npm run android    # Build and run on Android
-npm run ios        # Build and run on iOS
-npm run lint       # Run ESLint
-npm run format     # Format code with Prettier
+node scripts/generate-config.js
 ```
 
-### Code Quality
-- **TypeScript**: Full type safety
-- **ESLint**: Code linting rules
-- **Prettier**: Code formatting
-- **Jest**: Comprehensive test coverage
-- **React Test Renderer**: Component testing
+### iOS
+```bash
+cd ios && pod install
+yarn ios
+```
 
-## 📊 Performance Metrics
+### Android
+Android JNI libs are pre-built in `android/app/jniLibs/`. To run:
+```bash
+yarn android
+```
 
-### Screen Sizes
-- Main Screens: Average 133 lines
-- Detail Screens: Average 73 lines
-- Total App: 1,033 lines across 11 screens
+To rebuild Rust JNI (requires NDK):
+```bash
+cd android/app/src/main/rust/quic-jni
+./build-android.sh
+```
 
-### Code Quality
-- **Zero Runtime Errors**: All tests passing
-- **Type Safe**: Full TypeScript coverage
-- **Accessibility Ready**: Semantic components
-- **Responsive**: Mobile-first design
+### Release build (Android)
+Credentials are stored in `android/vault/release-keystore-credentials.txt` (gitignored).
+```bash
+cd android
+RELEASE_KEYSTORE_PASSWORD='...' \
+RELEASE_KEY_ALIAS='release-key' \
+RELEASE_KEY_PASSWORD='...' \
+./gradlew bundleRelease -x buildQuicJni
+```
 
-## 🔐 Security Features
+## Testing
+```bash
+# JS/TS tests
+yarn test
 
-- **Post-Quantum Cryptography**: Quantum-resistant algorithms
-- **Zero-Knowledge Proofs**: Privacy-preserving identity
-- **Encrypted Storage**: Secure local data persistence
-- **Biometric Integration**: Native device security
-- **Type Safety**: TypeScript prevents runtime errors
+# Android unit tests (PoUW suite)
+cd android && ./gradlew test
 
-## 📈 Roadmap
+# iOS tests
+xcodebuild test -workspace ios/SovereignNetworkMobile.xcworkspace \
+  -scheme SovereignNetworkMobile -destination 'platform=iOS Simulator,...'
+```
 
-### Phase 1: Foundation ✅
-- Core component library
-- Navigation system
-- Design system tokens
-- Mock data service
+## Security
 
-### Phase 2: Features (In Progress)
-- Real API integration
-- Biometric authentication
-- Offline mode support
-- State persistence
+- All private key material stays inside Rust — never crosses the FFI boundary as plaintext
+- Secrets loaded from gitignored vault files and environment variables only
+- SPKI certificate pinning on all QUIC connections
+- Release logging redacted; console silenced in production builds
+- Jailbreak/root detection, device binding, and runtime protection services
 
-### Phase 3: Enhancement
-- Advanced search and filtering
-- Bulk operations
-- Custom themes
-- Animation library
+## Version
 
-### Phase 4: Optimization
-- Code splitting
-- Bundle optimization
-- Image optimization
-- Performance monitoring
-
-## 📝 Contributing
-
-1. Follow atomic design patterns
-2. Use TypeScript for type safety
-3. Write tests for new features
-4. Follow ESLint rules
-5. Use meaningful commit messages
-
-## 📄 License
-
-MIT License - See LICENSE file for details
-
-## 🤝 Support
-
-For issues, feature requests, or questions:
-- Open an issue on GitHub
-- Check existing documentation
-- Review component storybook
-
----
-
-**Built with ❤️ using React Native, TypeScript, and Zero-Knowledge Proofs**
+Current: `1.1.0-beta.1` (versionCode 11)
