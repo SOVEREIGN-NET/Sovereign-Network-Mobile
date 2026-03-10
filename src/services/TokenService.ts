@@ -64,7 +64,6 @@ class TokenService {
       await nativeIdentityProvisioning.signTokenCreateTransaction({
         name: request.name,
         symbol: request.symbol,
-<<<<<<< HEAD
         initialSupply: Number(request.initial_supply),
         decimals: request.decimals,
         maxSupply:
