@@ -55,7 +55,6 @@ const TABS: { key: Tab; label: string }[] = [
   { key: 'variation', label: 'Var' },
   { key: 'status', label: 'Status' },
   { key: 'config', label: 'Config' },
-  { key: 'simulator', label: 'Sim' },
 ];
 
 const PAIRS: OraclePair[] = ['SOV/USD', 'CBE/USD'];
