@@ -52,7 +52,6 @@
 		A1001F1712B4D5A500A1F001 /* Web4View.swift in Sources */ = {isa = PBXBuildFile; fileRef = A1001F0712B4D5A500A1F001 /* Web4View.swift */; };
 		A1001F1912B4D5A500A1F001 /* Web4ViewManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = A1001F0912B4D5A500A1F001 /* Web4ViewManager.swift */; };
 		A1001F1A12B4D5A500A1F001 /* Web4ViewManager.m in Sources */ = {isa = PBXBuildFile; fileRef = A1001F0A12B4D5A500A1F001 /* Web4ViewManager.m */; };
-		D587A3F2F3D0FE221BA89560 /* libPods-SovereignNetworkMobile.a in Frameworks */ = {isa = PBXBuildFile; fileRef = 913B2D12B92125132EBB4582 /* libPods-SovereignNetworkMobile.a */; };
 		E7A1B0B02F9A1B2C3D4E5F60 /* web4apps in Resources */ = {isa = PBXBuildFile; fileRef = E7A1B0A02F9A1B2C3D4E5F60 /* web4apps */; };
 /* End PBXBuildFile section */
 
@@ -113,7 +112,6 @@
 		C535CF3660E964372412D213 /* Pods-SovereignNetworkMobile.release.xcconfig */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = text.xcconfig; name = "Pods-SovereignNetworkMobile.release.xcconfig"; path = "Target Support Files/Pods-SovereignNetworkMobile/Pods-SovereignNetworkMobile.release.xcconfig"; sourceTree = "<group>"; };
 		CE81F714342A4E49CE7F819E /* libPods-SovereignNetworkMobile.a */ = {isa = PBXFileReference; explicitFileType = archive.ar; includeInIndex = 0; path = "libPods-SovereignNetworkMobile.a"; sourceTree = BUILT_PRODUCTS_DIR; };
 		E7A1B0A02F9A1B2C3D4E5F60 /* web4apps */ = {isa = PBXFileReference; lastKnownFileType = folder; name = web4apps; path = SovereignNetworkMobile/web4apps; sourceTree = "<group>"; };
-		E8797297A65D70022D4466FB /* Pods-SovereignNetworkMobile.release.xcconfig */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = text.xcconfig; name = "Pods-SovereignNetworkMobile.release.xcconfig"; path = "Target Support Files/Pods-SovereignNetworkMobile/Pods-SovereignNetworkMobile.release.xcconfig"; sourceTree = "<group>"; };
 		ED297162215061F000B7C4FE /* JavaScriptCore.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = JavaScriptCore.framework; path = System/Library/Frameworks/JavaScriptCore.framework; sourceTree = SDKROOT; };
 /* End PBXFileReference section */
 
@@ -449,22 +447,14 @@
 /* Begin XCBuildConfiguration section */
 		13B07F941A680F5B00A75B9A /* Debug */ = {
 			isa = XCBuildConfiguration;
-<<<<<<< HEAD
 			baseConfigurationReference = 22AFB4F9795D9863684B0F71 /* Pods-SovereignNetworkMobile.debug.xcconfig */;
-=======
-			baseConfigurationReference = B35D47897B43E86905062E45 /* Pods-SovereignNetworkMobile.debug.xcconfig */;
->>>>>>> origin/main
 			buildSettings = {
 				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
 				ASSETCATALOG_COMPILER_INCLUDE_ALL_APPICON_ASSETS = YES;
 				CLANG_ENABLE_MODULES = YES;
 				CODE_SIGN_IDENTITY = "Apple Development";
 				CODE_SIGN_STYLE = Automatic;
-<<<<<<< HEAD
 				CURRENT_PROJECT_VERSION = 11;
-=======
-				CURRENT_PROJECT_VERSION = 10;
->>>>>>> origin/main
 				DEVELOPMENT_TEAM = P7QAGNGM38;
 				ENABLE_BITCODE = NO;
 				HEADER_SEARCH_PATHS = (
@@ -586,22 +576,14 @@
 		};
 		13B07F951A680F5B00A75B9A /* Release */ = {
 			isa = XCBuildConfiguration;
-<<<<<<< HEAD
 			baseConfigurationReference = C535CF3660E964372412D213 /* Pods-SovereignNetworkMobile.release.xcconfig */;
-=======
-			baseConfigurationReference = E8797297A65D70022D4466FB /* Pods-SovereignNetworkMobile.release.xcconfig */;
->>>>>>> origin/main
 			buildSettings = {
 				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
 				ASSETCATALOG_COMPILER_INCLUDE_ALL_APPICON_ASSETS = YES;
 				CLANG_ENABLE_MODULES = YES;
 				CODE_SIGN_IDENTITY = "Apple Development";
 				CODE_SIGN_STYLE = Automatic;
-<<<<<<< HEAD
 				CURRENT_PROJECT_VERSION = 11;
-=======
-				CURRENT_PROJECT_VERSION = 10;
->>>>>>> origin/main
 				DEVELOPMENT_TEAM = P7QAGNGM38;
 				HEADER_SEARCH_PATHS = (
 					"$(inherited)",
