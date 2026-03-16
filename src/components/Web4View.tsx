@@ -1,7 +1,6 @@
 import React, { useEffect, useRef } from 'react';
 import {
   requireNativeComponent,
-  UIManager,
   Platform,
   ViewProps,
   NativeSyntheticEvent,
@@ -37,12 +36,20 @@ export interface Web4ViewProps extends ViewProps {
 
 const ComponentName = 'Web4View';
 
-const viewManagerConfig = UIManager.getViewManagerConfig(ComponentName);
-const NativeWeb4View = viewManagerConfig
-  ? requireNativeComponent<Web4ViewProps>(ComponentName)
-  : null;
+// UIManager.getViewManagerConfig() always returns null on React Native New
+// Architecture (0.74+). Use requireNativeComponent directly and catch the
+// error thrown when the native module is genuinely absent instead.
+let NativeWeb4View: ReturnType<typeof requireNativeComponent<Web4ViewProps>> | null =
+  null;
+let isWeb4ViewAvailable = false;
+try {
+  NativeWeb4View = requireNativeComponent<Web4ViewProps>(ComponentName);
+  isWeb4ViewAvailable = true;
+} catch (_e) {
+  // Native module not linked — component renders nothing (see fallback below).
+}
 
-export const isWeb4ViewAvailable = !!viewManagerConfig;
+export { isWeb4ViewAvailable };
 
 export const Web4View: React.FC<Web4ViewProps> = props => {
   const warnedRef = useRef(false);
