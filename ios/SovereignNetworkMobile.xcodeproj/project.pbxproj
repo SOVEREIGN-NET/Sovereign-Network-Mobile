@@ -42,6 +42,7 @@
 		761780ED2CA45674006654EE /* AppDelegate.swift in Sources */ = {isa = PBXBuildFile; fileRef = 761780EC2CA45674006654EE /* AppDelegate.swift */; };
 		7B9CBBBC6C3C0DDFC7CD0808 /* PrivacyInfo.xcprivacy in Resources */ = {isa = PBXBuildFile; fileRef = 13B07FB81A68108700A75B9A /* PrivacyInfo.xcprivacy */; };
 		81AB9BB82411601600AC10FF /* LaunchScreen.storyboard in Resources */ = {isa = PBXBuildFile; fileRef = 81AB9BB72411601600AC10FF /* LaunchScreen.storyboard */; };
+		938BD6A42413FD5E8224B71D /* libPods-SovereignNetworkMobile.a in Frameworks */ = {isa = PBXBuildFile; fileRef = 5E1568FF23C7AF1A97F93DDD /* libPods-SovereignNetworkMobile.a */; };
 		A1001F1012B4D5A500A1F001 /* Web4BlobCache.swift in Sources */ = {isa = PBXBuildFile; fileRef = A1001F0012B4D5A500A1F001 /* Web4BlobCache.swift */; };
 		A1001F1212B4D5A500A1F001 /* Web4ManifestCache.swift in Sources */ = {isa = PBXBuildFile; fileRef = A1001F0212B4D5A500A1F001 /* Web4ManifestCache.swift */; };
 		A1001F1312B4D5A500A1F001 /* Web4Types.swift in Sources */ = {isa = PBXBuildFile; fileRef = A1001F0312B4D5A500A1F001 /* Web4Types.swift */; };
@@ -62,6 +63,7 @@
 		13B07FB51A68108700A75B9A /* Images.xcassets */ = {isa = PBXFileReference; lastKnownFileType = folder.assetcatalog; name = Images.xcassets; path = SovereignNetworkMobile/Images.xcassets; sourceTree = "<group>"; };
 		13B07FB61A68108700A75B9A /* Info.plist */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = text.plist.xml; name = Info.plist; path = SovereignNetworkMobile/Info.plist; sourceTree = "<group>"; };
 		13B07FB81A68108700A75B9A /* PrivacyInfo.xcprivacy */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = text.plist.xml; name = PrivacyInfo.xcprivacy; path = SovereignNetworkMobile/PrivacyInfo.xcprivacy; sourceTree = "<group>"; };
+		2F5E78FB29059C15B821DDE8 /* Pods-SovereignNetworkMobile.release.xcconfig */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = text.xcconfig; name = "Pods-SovereignNetworkMobile.release.xcconfig"; path = "Target Support Files/Pods-SovereignNetworkMobile/Pods-SovereignNetworkMobile.release.xcconfig"; sourceTree = "<group>"; };
 		302F8C642F48BB13005F30AF /* RCTPoUW.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RCTPoUW.swift; sourceTree = "<group>"; };
 		302F8C662F48BB28005F30AF /* NativePoUW.m */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.objc; path = NativePoUW.m; sourceTree = "<group>"; };
 		303D4B5B2F31637F00647354 /* NativeIdentityProvisioningModule+Domain.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "NativeIdentityProvisioningModule+Domain.swift"; sourceTree = "<group>"; };
@@ -96,6 +98,8 @@
 		30F1A1A12F1A0001 /* ZhtpAuth.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ZhtpAuth.swift; sourceTree = "<group>"; };
 		30F1A1A22F1A0001 /* ZhtpAuthRequest.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ZhtpAuthRequest.swift; sourceTree = "<group>"; };
 		30F1A1A32F1A0001 /* UhpHandshake.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = UhpHandshake.swift; sourceTree = "<group>"; };
+		59A035D3286C430164400898 /* Pods-SovereignNetworkMobile.debug.xcconfig */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = text.xcconfig; name = "Pods-SovereignNetworkMobile.debug.xcconfig"; path = "Target Support Files/Pods-SovereignNetworkMobile/Pods-SovereignNetworkMobile.debug.xcconfig"; sourceTree = "<group>"; };
+		5E1568FF23C7AF1A97F93DDD /* libPods-SovereignNetworkMobile.a */ = {isa = PBXFileReference; explicitFileType = archive.ar; includeInIndex = 0; path = "libPods-SovereignNetworkMobile.a"; sourceTree = BUILT_PRODUCTS_DIR; };
 		761780EC2CA45674006654EE /* AppDelegate.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; name = AppDelegate.swift; path = SovereignNetworkMobile/AppDelegate.swift; sourceTree = "<group>"; };
 		81AB9BB72411601600AC10FF /* LaunchScreen.storyboard */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = file.storyboard; name = LaunchScreen.storyboard; path = SovereignNetworkMobile/LaunchScreen.storyboard; sourceTree = "<group>"; };
 		A1001F0012B4D5A500A1F001 /* Web4BlobCache.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Web4BlobCache.swift; sourceTree = "<group>"; };
@@ -117,6 +121,7 @@
 			buildActionMask = 2147483647;
 			files = (
 				30E39C4A2F073687004BA6A5 /* liboqs.xcframework in Frameworks */,
+				938BD6A42413FD5E8224B71D /* libPods-SovereignNetworkMobile.a in Frameworks */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -178,6 +183,7 @@
 			children = (
 				30E39C492F073687004BA6A5 /* liboqs.xcframework */,
 				ED297162215061F000B7C4FE /* JavaScriptCore.framework */,
+				5E1568FF23C7AF1A97F93DDD /* libPods-SovereignNetworkMobile.a */,
 			);
 			name = Frameworks;
 			sourceTree = "<group>";
@@ -238,6 +244,8 @@
 		BBD78D7AC51CEA395F1C20DB /* Pods */ = {
 			isa = PBXGroup;
 			children = (
+				59A035D3286C430164400898 /* Pods-SovereignNetworkMobile.debug.xcconfig */,
+				2F5E78FB29059C15B821DDE8 /* Pods-SovereignNetworkMobile.release.xcconfig */,
 			);
 			path = Pods;
 			sourceTree = "<group>";
@@ -249,10 +257,13 @@
 			isa = PBXNativeTarget;
 			buildConfigurationList = 13B07F931A680F5B00A75B9A /* Build configuration list for PBXNativeTarget "SovereignNetworkMobile" */;
 			buildPhases = (
+				51C43EA3092BAC21C7F150EC /* [CP] Check Pods Manifest.lock */,
 				13B07F871A680F5B00A75B9A /* Sources */,
 				13B07F8C1A680F5B00A75B9A /* Frameworks */,
 				13B07F8E1A680F5B00A75B9A /* Resources */,
 				00DD1BFF1BD5951E006B06BC /* Bundle React Native code and images */,
+				A8E9327ED126873F0571DAAD /* [CP] Embed Pods Frameworks */,
+				5F7B6B9E321BD725F610A8EF /* [CP] Copy Pods Resources */,
 			);
 			buildRules = (
 			);
@@ -326,6 +337,62 @@
 			shellPath = /bin/sh;
 			shellScript = "set -e\n\nWITH_ENVIRONMENT=\"$REACT_NATIVE_PATH/scripts/xcode/with-environment.sh\"\nREACT_NATIVE_XCODE=\"$REACT_NATIVE_PATH/scripts/react-native-xcode.sh\"\n\n/bin/sh -c \"$WITH_ENVIRONMENT $REACT_NATIVE_XCODE\"\n";
 		};
+		51C43EA3092BAC21C7F150EC /* [CP] Check Pods Manifest.lock */ = {
+			isa = PBXShellScriptBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			inputFileListPaths = (
+			);
+			inputPaths = (
+				"${PODS_PODFILE_DIR_PATH}/Podfile.lock",
+				"${PODS_ROOT}/Manifest.lock",
+			);
+			name = "[CP] Check Pods Manifest.lock";
+			outputFileListPaths = (
+			);
+			outputPaths = (
+				"$(DERIVED_FILE_DIR)/Pods-SovereignNetworkMobile-checkManifestLockResult.txt",
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+			shellPath = /bin/sh;
+			shellScript = "diff \"${PODS_PODFILE_DIR_PATH}/Podfile.lock\" \"${PODS_ROOT}/Manifest.lock\" > /dev/null\nif [ $? != 0 ] ; then\n    # print error to STDERR\n    echo \"error: The sandbox is not in sync with the Podfile.lock. Run 'pod install' or update your CocoaPods installation.\" >&2\n    exit 1\nfi\n# This output is used by Xcode 'outputs' to avoid re-running this script phase.\necho \"SUCCESS\" > \"${SCRIPT_OUTPUT_FILE_0}\"\n";
+			showEnvVarsInLog = 0;
+		};
+		5F7B6B9E321BD725F610A8EF /* [CP] Copy Pods Resources */ = {
+			isa = PBXShellScriptBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			inputFileListPaths = (
+				"${PODS_ROOT}/Target Support Files/Pods-SovereignNetworkMobile/Pods-SovereignNetworkMobile-resources-${CONFIGURATION}-input-files.xcfilelist",
+			);
+			name = "[CP] Copy Pods Resources";
+			outputFileListPaths = (
+				"${PODS_ROOT}/Target Support Files/Pods-SovereignNetworkMobile/Pods-SovereignNetworkMobile-resources-${CONFIGURATION}-output-files.xcfilelist",
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+			shellPath = /bin/sh;
+			shellScript = "\"${PODS_ROOT}/Target Support Files/Pods-SovereignNetworkMobile/Pods-SovereignNetworkMobile-resources.sh\"\n";
+			showEnvVarsInLog = 0;
+		};
+		A8E9327ED126873F0571DAAD /* [CP] Embed Pods Frameworks */ = {
+			isa = PBXShellScriptBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			inputFileListPaths = (
+				"${PODS_ROOT}/Target Support Files/Pods-SovereignNetworkMobile/Pods-SovereignNetworkMobile-frameworks-${CONFIGURATION}-input-files.xcfilelist",
+			);
+			name = "[CP] Embed Pods Frameworks";
+			outputFileListPaths = (
+				"${PODS_ROOT}/Target Support Files/Pods-SovereignNetworkMobile/Pods-SovereignNetworkMobile-frameworks-${CONFIGURATION}-output-files.xcfilelist",
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+			shellPath = /bin/sh;
+			shellScript = "\"${PODS_ROOT}/Target Support Files/Pods-SovereignNetworkMobile/Pods-SovereignNetworkMobile-frameworks.sh\"\n";
+			showEnvVarsInLog = 0;
+		};
 /* End PBXShellScriptBuildPhase section */
 
 /* Begin PBXSourcesBuildPhase section */
@@ -380,6 +447,7 @@
 /* Begin XCBuildConfiguration section */
 		13B07F941A680F5B00A75B9A /* Debug */ = {
 			isa = XCBuildConfiguration;
+			baseConfigurationReference = 59A035D3286C430164400898 /* Pods-SovereignNetworkMobile.debug.xcconfig */;
 			buildSettings = {
 				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
 				ASSETCATALOG_COMPILER_INCLUDE_ALL_APPICON_ASSETS = YES;
@@ -508,6 +576,7 @@
 		};
 		13B07F951A680F5B00A75B9A /* Release */ = {
 			isa = XCBuildConfiguration;
+			baseConfigurationReference = 2F5E78FB29059C15B821DDE8 /* Pods-SovereignNetworkMobile.release.xcconfig */;
 			buildSettings = {
 				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
 				ASSETCATALOG_COMPILER_INCLUDE_ALL_APPICON_ASSETS = YES;
