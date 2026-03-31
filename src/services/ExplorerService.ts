@@ -59,10 +59,13 @@ export interface TransactionInfo {
   from: string;
   to: string;
   amount: number;
+  amount_human?: number | string;
   fee: number;
   transaction_type: string;
   timestamp: number;
   size: number;
+  status?: 'confirmed' | 'pending';
+  memo?: string | null;
 }
 
 export interface TransactionDetailResponse {

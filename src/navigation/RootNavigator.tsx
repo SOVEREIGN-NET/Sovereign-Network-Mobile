@@ -348,6 +348,11 @@ const SIDStack = () => {
           title: 'PoUW Rewards',
         }}
       />
+      <Stack.Screen
+        name="TransactionDetail"
+        component={TransactionDetailScreen}
+        options={{ headerShown: false }}
+      />
     </Stack.Navigator>
   );
 };

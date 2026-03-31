@@ -1,5 +1,6 @@
 import React, { useMemo, useState } from 'react';
 import { View, TextInput, Animated, Pressable } from 'react-native';
+import { useNetworkNotices } from '../hooks/useNetworkNotices';
 import {
   useTrendingTokens,
   formatTokenPrice,
@@ -40,9 +41,19 @@ const getTrendArrow = (trend: TokenData['trend']) => {
   return '•';
 };
 
+const NOTICE_STYLE: Record<
+  'info' | 'warning' | 'error',
+  { bg: string; border: string; text: string; icon: string }
+> = {
+  error:   { bg: '#3D1515', border: '#7B2020', text: '#FF6B6B', icon: '⚠' },
+  warning: { bg: '#3D2E00', border: '#7B5C00', text: '#FFB800', icon: '⚡' },
+  info:    { bg: '#0D2D45', border: '#0E4B7A', text: '#4FC3F7', icon: 'ℹ' },
+};
+
 const DashboardScreen: React.FC<any> = ({ navigation }) => {
   const { t } = useTranslation();
   const [drawerVisible, setDrawerVisible] = useState(false);
+  const { activeNotice, dismiss } = useNetworkNotices();
   const [urlInput, setUrlInput] = useState('zhtp://central.sov');
   const trendingTokensData = useTrendingTokens();
   const trendingDappsData = useTrendingDapps();
@@ -117,6 +128,30 @@ const DashboardScreen: React.FC<any> = ({ navigation }) => {
         onBalancePress={() => navigation.navigate('SIDTab', { screen: 'PoUW' })}
         showHamburger={false}
       />
+      {activeNotice && (() => {
+        const s = NOTICE_STYLE[activeNotice.level];
+        return (
+          <Pressable
+            onPress={() => dismiss(activeNotice.id)}
+            style={{
+              flexDirection: 'row',
+              alignItems: 'center',
+              backgroundColor: s.bg,
+              borderBottomWidth: 1,
+              borderBottomColor: s.border,
+              paddingVertical: spacing.sm,
+              paddingHorizontal: spacing.lg,
+              gap: spacing.sm,
+            }}
+          >
+            <Text style={{ fontSize: typography.size.sm, color: s.text }}>{s.icon}</Text>
+            <Text style={{ flex: 1, fontSize: typography.size.xs, color: s.text, lineHeight: 18 }}>
+              {activeNotice.message}
+            </Text>
+            <Text style={{ fontSize: typography.size.md, color: s.text, opacity: 0.7 }}>×</Text>
+          </Pressable>
+        );
+      })()}
       <ScreenLayout
         paddingTop={spacing.lg}
         paddingBottom={spacing.xl}

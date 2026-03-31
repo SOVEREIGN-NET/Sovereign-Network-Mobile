@@ -37,3 +37,9 @@ export type { UseTokenOperationsReturn, TokenOperationState } from './useTokenOp
 
 export { useUserTokenBalances } from './useUserTokenBalances';
 export type { UserTokenBalancesData, TokenDisplay } from './useUserTokenBalances';
+
+export { useNetworkNotices } from './useNetworkNotices';
+export type { UseNetworkNoticesReturn } from './useNetworkNotices';
+
+export { useAddressBook } from './useAddressBook';
+export type { AddressBookEntry, UseAddressBookReturn } from './useAddressBook';

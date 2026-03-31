@@ -4,7 +4,7 @@
  */
 
 import React, { useRef, useState, useEffect } from 'react';
-import { View, TextInput, Pressable } from 'react-native';
+import { View, TextInput } from 'react-native';
 import { NativeStackScreenProps } from '@react-navigation/native-stack';
 import {
   Card,
@@ -16,14 +16,12 @@ import {
   ErrorAlert,
   SelectableOptionCard,
   ActionFooter,
-  Switch,
   PasswordField,
 } from '../components';
 import { useAuth } from '../hooks';
 import { useTranslation } from '../i18n';
 import { colors, spacing, typography, borderRadius } from '../theme';
 import { RootStackParamList } from '../types/navigation';
-import SeedVaultService from '../services/SeedVaultService';
 import RealAuthService from '../services/RealAuthService';
 import SecureIdentityStorage from '../services/SecureIdentityStorage';
 
@@ -40,7 +38,6 @@ const RecoverIdentityScreen = (_props: RecoverIdentityScreenProps) => {
   const [localError, setLocalError] = useState<string | null>(null);
   const inputRefs = useRef<Array<TextInput | null>>([]);
   const [isFillingFromKeychain, setIsFillingFromKeychain] = useState(false);
-  const [persistSeed, setPersistSeed] = useState(true);
   const [showMigration, setShowMigration] = useState(false);
   const [showMigrationBanner, setShowMigrationBanner] = useState(false);
 
@@ -137,25 +134,33 @@ const RecoverIdentityScreen = (_props: RecoverIdentityScreenProps) => {
         await SecureIdentityStorage.saveLoginCredentials(identity.did, newPassword);
       }
 
-      if (recoveryMethod === 'seed' && persistSeed) {
-        try {
-          await SeedVaultService.saveSeedPhrase(validatedSeedData.split(/\s+/));
-        } catch (saveError: any) {
-          console.warn('[RecoverIdentity] Failed to persist seed phrase:', saveError);
-          setLocalError(saveError?.message || 'Recovered, but failed to persist seed phrase.');
-        }
-      }
+      // Note: SeedVaultService.saveSeedPhrase() is intentionally NOT called here.
+      // The seed is already stored without biometric via walletKeychainService
+      // inside RealAuthService.storeIdentity(), which getMasterSeedPhrase()
+      // checks first. Calling saveSeedPhrase() would trigger a biometric prompt
+      // on Android even on write, which is unexpected UX during recovery.
 
-      // Reset form
-      setSeedWords(Array(24).fill(''));
-      setNewPassword('');
-      setConfirmNewPassword('');
-      setRecoveryPhase('seed');
-      setValidatedSeedData(null);
-      setShowMigration(false);
-      setShowMigrationBanner(false);
-
-      // App.tsx will detect authenticated state and switch to RootNavigator
+      // Navigate to SIDTab (wallet) and show welcome banner with display name.
+      _props.navigation.reset({
+        index: 0,
+        routes: [{
+          name: 'MainTabs',
+          state: {
+            index: 2,
+            routes: [
+              { name: 'DashboardTab' },
+              { name: 'DAOTab' },
+              {
+                name: 'SIDTab',
+                state: {
+                  index: 0,
+                  routes: [{ name: 'SIDMain', params: { showWelcome: identity.displayName || 'back' } }],
+                },
+              },
+            ],
+          },
+        }],
+      });
     } catch (err: any) {
       const message = err.message || t.auth.recoverIdentity.errors.recoveryFailed;
       if (message === 'MIGRATION_REQUIRED') {
@@ -266,41 +271,6 @@ const RecoverIdentityScreen = (_props: RecoverIdentityScreenProps) => {
                 {t.auth.recoverIdentity.seed.hint}
               </Text>
 
-              <Card
-                style={{
-                  marginTop: spacing.sm,
-                  backgroundColor: colors.bg_dark,
-                  borderColor: colors.border,
-                  borderWidth: 1,
-                }}
-              >
-                <Pressable
-                  disabled={isLoading}
-                  onPress={() => setPersistSeed((prev) => !prev)}
-                  style={{ padding: spacing.md }}
-                >
-                  <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}>
-                    <View style={{ flex: 1 }}>
-                      <Text
-                        variant="body"
-                        weight="semibold"
-                        color={colors.text_primary}
-                        style={{ marginBottom: spacing.xs }}
-                      >
-                        Save seed on this device
-                      </Text>
-                      <Text variant="caption" color={colors.text_secondary}>
-                        Store in device Keychain/Keystore after successful recovery.
-                      </Text>
-                    </View>
-                    <Switch
-                      value={persistSeed}
-                      onValueChange={setPersistSeed}
-                      disabled={isLoading}
-                    />
-                  </View>
-                </Pressable>
-              </Card>
               <View
                 style={{
                   flexDirection: 'row',

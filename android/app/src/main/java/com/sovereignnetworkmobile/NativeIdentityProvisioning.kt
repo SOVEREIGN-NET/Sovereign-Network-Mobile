@@ -371,7 +371,7 @@ class NativeIdentityProvisioning(reactContext: ReactApplicationContext) :
                 }
                 val hexSignedTx = nativeBuildTokenCreate(
                     identityJson, name, symbol, initialSupply, decimals,
-                    TREASURY_RECIPIENT, 0x02
+                    TREASURY_RECIPIENT, 0x03
                 )
                 if (hexSignedTx.isEmpty()) {
                     promise.reject("SIGNING_ERROR", "Failed to build token creation transaction")
@@ -523,7 +523,7 @@ class NativeIdentityProvisioning(reactContext: ReactApplicationContext) :
                 val chainId = if (params.hasKey("chainId") && !params.isNull("chainId")) {
                     params.getInt("chainId")
                 } else {
-                    0x02
+                    0x03
                 }
 
                 // Validate wallet IDs are 64 hex chars (32 bytes each)

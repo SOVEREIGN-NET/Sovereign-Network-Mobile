@@ -676,12 +676,7 @@ const OracleDashboardScreen: React.FC<any> = ({ navigation }) => {
         <View style={{ width: 48 }} />
       </View>
 
-      <ScrollView
-        horizontal
-        showsHorizontalScrollIndicator={false}
-        style={styles.tabBar}
-        contentContainerStyle={styles.tabBarContent}
-      >
+      <View style={styles.tabBar}>
         {TABS.map(({ key, label }) => (
           <Pressable
             key={key}
@@ -699,7 +694,7 @@ const OracleDashboardScreen: React.FC<any> = ({ navigation }) => {
             </Text>
           </Pressable>
         ))}
-      </ScrollView>
+      </View>
 
       {activeTab === 'simulator' ? (
         <SimulatorTab />
@@ -733,22 +728,22 @@ const styles = StyleSheet.create({
     borderBottomColor: colors.border,
   },
   tabBar: {
+    flexDirection: 'row',
+    alignItems: 'center',
     backgroundColor: colors.bg_darker,
     marginHorizontal: spacing.lg,
     marginVertical: spacing.sm,
     borderRadius: borderRadius.full,
     borderWidth: 1,
     borderColor: colors.border,
-    flexGrow: 0,
-  },
-  tabBarContent: {
     padding: 3,
-    flexDirection: 'row',
   },
   tab: {
+    flex: 1,
     paddingVertical: spacing.xs + 2,
     paddingHorizontal: spacing.md,
     alignItems: 'center',
+    justifyContent: 'center',
     borderRadius: borderRadius.full,
   },
   tabActive: {
