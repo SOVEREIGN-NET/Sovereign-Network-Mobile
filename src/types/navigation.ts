@@ -15,6 +15,7 @@ export type RootStackParamList = {
   RecoverIdentity: undefined;
   MigrationSeed: { seedWords: string[] };
   SeedPhrase: { seedPhrases: string[]; identity?: Identity };
+  BuyCrypto: { walletAddress?: string } | undefined;
 };
 
 // Define the tab navigator param list
@@ -54,6 +55,7 @@ export type SIDStackParamList = {
   StakeTokens: undefined;
   ConfirmTransaction: undefined;
   TokenCreator: undefined;
+  BuyCrypto: { walletAddress?: string } | undefined;
 };
 
 export type DAOStackParamList = {
