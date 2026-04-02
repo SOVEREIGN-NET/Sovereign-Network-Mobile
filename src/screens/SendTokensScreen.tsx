@@ -840,17 +840,17 @@ const SendTokensScreen = ({ navigation }: any) => {
 
               {/* Recipient Input - Changes based on token type */}
               <View>
-                <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 4 }}>
-                  <Text style={{ fontSize: typography.size.xs, color: colors.text_secondary }}>
-                    {selectedToken.type === 'sov' ? 'Recipient Wallet ID' : 'Recipient DID or Key ID'}
-                  </Text>
-                  {addressBookEntries.length > 0 && (
-                    <TouchableOpacity onPress={() => setShowAddressBook(true)}>
-                      <Text style={{ fontSize: typography.size.xs, color: colors.primary }}>From contacts</Text>
-                    </TouchableOpacity>
-                  )}
-                </View>
+                <Text
+                  style={{
+                    fontSize: typography.size.xs,
+                    color: colors.text_secondary,
+                    marginBottom: spacing.xs,
+                  }}
+                >
+                  {selectedToken.type === 'sov' ? 'Recipient Wallet ID' : 'Recipient DID or Key ID'}
+                </Text>
                 <FormField
+                  label=""
                   placeholder={
                     selectedToken.type === 'sov'
                       ? '64 hex characters'
@@ -869,11 +869,36 @@ const SendTokensScreen = ({ navigation }: any) => {
                 {transferForm.recipient.trim().length > 0 && (() => {
                   const saved = findByAddress(transferForm.recipient.trim());
                   return saved ? (
-                    <Text style={{ fontSize: typography.size.xs, color: colors.primary, marginTop: 2 }}>
+                    <Text style={{ fontSize: typography.size.sm, color: colors.primary, marginTop: spacing.xs }}>
                       {saved.name}
                     </Text>
                   ) : null;
                 })()}
+                {addressBookEntries.length > 0 && (
+                  <TouchableOpacity
+                    onPress={() => setShowAddressBook(true)}
+                    style={{
+                      marginTop: spacing.sm,
+                      paddingVertical: spacing.md,
+                      paddingHorizontal: spacing.lg,
+                      borderRadius: borderRadius.base,
+                      borderWidth: 1.5,
+                      borderColor: colors.primary + '60',
+                      backgroundColor: colors.primary + '10',
+                      alignItems: 'center',
+                    }}
+                  >
+                    <Text
+                      style={{
+                        fontSize: typography.size.md,
+                        fontWeight: typography.weight.semibold,
+                        color: colors.primary,
+                      }}
+                    >
+                      Choose from Contacts
+                    </Text>
+                  </TouchableOpacity>
+                )}
               </View>
 
               {/* Amount */}
@@ -932,26 +957,104 @@ const SendTokensScreen = ({ navigation }: any) => {
 
       {/* Address book picker */}
       <Modal visible={showAddressBook} transparent animationType="slide" onRequestClose={() => setShowAddressBook(false)}>
-        <View style={{ flex: 1, backgroundColor: 'rgba(0,0,0,0.5)', justifyContent: 'flex-end' }}>
-          <View style={{ backgroundColor: colors.bg_dark, borderTopLeftRadius: borderRadius.lg, borderTopRightRadius: borderRadius.lg, padding: spacing.lg, maxHeight: '70%' }}>
-            <Row style={{ justifyContent: 'space-between', alignItems: 'center', marginBottom: spacing.md }}>
-              <Text style={{ fontSize: typography.size.lg, fontWeight: '700', color: colors.text_primary }}>Contacts</Text>
-              <TouchableOpacity onPress={() => setShowAddressBook(false)}>
-                <Text style={{ color: colors.text_secondary, fontSize: typography.size.lg }}>×</Text>
+        <View style={{ flex: 1, backgroundColor: 'rgba(0,0,0,0.6)', justifyContent: 'flex-end' }}>
+          <View
+            style={{
+              backgroundColor: colors.bg_dark,
+              borderTopLeftRadius: borderRadius.xl,
+              borderTopRightRadius: borderRadius.xl,
+              paddingTop: spacing.md,
+              paddingBottom: spacing['2xl'],
+              maxHeight: '80%',
+            }}
+          >
+            {/* Drag handle */}
+            <View style={{ alignItems: 'center', marginBottom: spacing.md }}>
+              <View
+                style={{
+                  width: 40,
+                  height: 4,
+                  borderRadius: 2,
+                  backgroundColor: colors.bg_lighter,
+                }}
+              />
+            </View>
+
+            {/* Header */}
+            <View
+              style={{
+                flexDirection: 'row',
+                justifyContent: 'space-between',
+                alignItems: 'center',
+                paddingHorizontal: spacing.lg,
+                marginBottom: spacing.lg,
+              }}
+            >
+              <Text
+                style={{
+                  fontSize: typography.size.xl,
+                  fontWeight: typography.weight.bold,
+                  color: colors.text_primary,
+                }}
+              >
+                Contacts
+              </Text>
+              <TouchableOpacity
+                onPress={() => setShowAddressBook(false)}
+                style={{
+                  width: 36,
+                  height: 36,
+                  borderRadius: 18,
+                  backgroundColor: colors.bg_lighter,
+                  justifyContent: 'center',
+                  alignItems: 'center',
+                }}
+              >
+                <Text style={{ color: colors.text_primary, fontSize: 16, fontWeight: '600' }}>X</Text>
               </TouchableOpacity>
-            </Row>
-            <ScrollView showsVerticalScrollIndicator={false}>
-              {addressBookEntries.map(entry => (
+            </View>
+
+            {/* Contact list */}
+            <ScrollView
+              showsVerticalScrollIndicator={false}
+              contentContainerStyle={{ paddingHorizontal: spacing.lg }}
+            >
+              {addressBookEntries.map((entry, index) => (
                 <TouchableOpacity
                   key={entry.id}
                   onPress={() => {
                     setTransferForm(prev => ({ ...prev, recipient: entry.address }));
                     setShowAddressBook(false);
                   }}
-                  style={{ paddingVertical: spacing.sm, borderBottomWidth: 1, borderBottomColor: colors.border }}
+                  activeOpacity={0.6}
+                  style={{
+                    paddingVertical: spacing.lg,
+                    paddingHorizontal: spacing.md,
+                    borderRadius: borderRadius.base,
+                    backgroundColor: index % 2 === 0 ? colors.bg_darker : 'transparent',
+                    marginBottom: spacing.xs,
+                  }}
                 >
-                  <Text style={{ fontSize: typography.size.sm, fontWeight: '600', color: colors.text_primary }}>{entry.name}</Text>
-                  <Text style={{ fontSize: typography.size.xs, color: colors.text_secondary, marginTop: 2 }} numberOfLines={1}>{entry.address}</Text>
+                  <Text
+                    style={{
+                      fontSize: typography.size.md,
+                      fontWeight: typography.weight.semibold,
+                      color: colors.text_primary,
+                      marginBottom: spacing.xs,
+                    }}
+                  >
+                    {entry.name}
+                  </Text>
+                  <Text
+                    style={{
+                      fontSize: typography.size.sm,
+                      color: colors.text_secondary,
+                      fontFamily: 'Courier',
+                    }}
+                    numberOfLines={1}
+                  >
+                    {entry.address}
+                  </Text>
                 </TouchableOpacity>
               ))}
             </ScrollView>
@@ -962,39 +1065,105 @@ const SendTokensScreen = ({ navigation }: any) => {
       {/* Save contact prompt (shown after successful transfer) */}
       <Modal visible={!!savingContact} transparent animationType="fade" onRequestClose={() => { setSavingContact(null); navigation.goBack(); }}>
         <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : 'height'} style={{ flex: 1 }}>
-        <View style={{ flex: 1, backgroundColor: 'rgba(0,0,0,0.5)', justifyContent: 'center', padding: spacing.lg }}>
-          <View style={{ backgroundColor: colors.bg_dark, borderRadius: borderRadius.lg, borderWidth: 1, borderColor: colors.border, padding: spacing.lg, gap: spacing.md }}>
-            <Text style={{ fontSize: typography.size.lg, fontWeight: '700', color: colors.text_primary }}>Save contact?</Text>
-            <Text style={{ fontSize: typography.size.xs, color: colors.text_secondary }} numberOfLines={2}>{savingContact?.address}</Text>
-            <TextInput
-              value={newContactName}
-              onChangeText={setNewContactName}
-              placeholder="Contact name"
-              placeholderTextColor={colors.text_secondary}
-              style={{ backgroundColor: colors.bg_darker, borderRadius: borderRadius.base, borderWidth: 1, borderColor: colors.border, paddingHorizontal: spacing.md, paddingVertical: spacing.sm, color: colors.text_primary, fontSize: typography.size.sm }}
-              autoFocus
-            />
-            <Row style={{ gap: spacing.sm }}>
-              <TouchableOpacity
-                onPress={() => { setSavingContact(null); navigation.goBack(); }}
-                style={{ flex: 1, paddingVertical: spacing.sm, borderRadius: borderRadius.base, borderWidth: 1, borderColor: colors.border, alignItems: 'center' }}
-              >
-                <Text style={{ color: colors.text_secondary }}>Skip</Text>
-              </TouchableOpacity>
-              <TouchableOpacity
-                onPress={async () => {
-                  if (!newContactName.trim()) return;
-                  await addToBook(newContactName.trim(), savingContact!.address);
-                  setSavingContact(null);
-                  navigation.goBack();
+          <View style={{ flex: 1, backgroundColor: 'rgba(0,0,0,0.6)', justifyContent: 'center', paddingHorizontal: spacing.lg }}>
+            <View
+              style={{
+                backgroundColor: colors.bg_dark,
+                borderRadius: borderRadius.xl,
+                borderWidth: 1,
+                borderColor: colors.border,
+                padding: spacing.xl,
+              }}
+            >
+              <Text
+                style={{
+                  fontSize: typography.size.xl,
+                  fontWeight: typography.weight.bold,
+                  color: colors.text_primary,
+                  marginBottom: spacing.md,
                 }}
-                style={{ flex: 1, paddingVertical: spacing.sm, borderRadius: borderRadius.base, backgroundColor: colors.primary, alignItems: 'center' }}
               >
-                <Text style={{ color: colors.bg_darkest, fontWeight: '600' }}>Save</Text>
-              </TouchableOpacity>
-            </Row>
+                Save contact?
+              </Text>
+              <Text
+                style={{
+                  fontSize: typography.size.sm,
+                  color: colors.text_secondary,
+                  fontFamily: 'Courier',
+                  marginBottom: spacing.lg,
+                }}
+                numberOfLines={2}
+              >
+                {savingContact?.address}
+              </Text>
+              <TextInput
+                value={newContactName}
+                onChangeText={setNewContactName}
+                placeholder="Contact name"
+                placeholderTextColor={colors.text_placeholder}
+                style={{
+                  backgroundColor: colors.bg_darker,
+                  borderRadius: borderRadius.base,
+                  borderWidth: 1,
+                  borderColor: colors.border,
+                  paddingHorizontal: spacing.md,
+                  paddingVertical: spacing.lg,
+                  color: colors.text_primary,
+                  fontSize: typography.size.md,
+                  marginBottom: spacing.lg,
+                }}
+                autoFocus
+              />
+              <Row style={{ gap: spacing.md }}>
+                <TouchableOpacity
+                  onPress={() => { setSavingContact(null); navigation.goBack(); }}
+                  style={{
+                    flex: 1,
+                    paddingVertical: spacing.lg,
+                    borderRadius: borderRadius.base,
+                    borderWidth: 1.5,
+                    borderColor: colors.border,
+                    alignItems: 'center',
+                  }}
+                >
+                  <Text
+                    style={{
+                      color: colors.text_secondary,
+                      fontSize: typography.size.md,
+                      fontWeight: typography.weight.semibold,
+                    }}
+                  >
+                    Skip
+                  </Text>
+                </TouchableOpacity>
+                <TouchableOpacity
+                  onPress={async () => {
+                    if (!newContactName.trim()) return;
+                    await addToBook(newContactName.trim(), savingContact!.address);
+                    setSavingContact(null);
+                    navigation.goBack();
+                  }}
+                  style={{
+                    flex: 1,
+                    paddingVertical: spacing.lg,
+                    borderRadius: borderRadius.base,
+                    backgroundColor: colors.primary,
+                    alignItems: 'center',
+                  }}
+                >
+                  <Text
+                    style={{
+                      color: colors.bg_darkest,
+                      fontSize: typography.size.md,
+                      fontWeight: typography.weight.bold,
+                    }}
+                  >
+                    Save
+                  </Text>
+                </TouchableOpacity>
+              </Row>
+            </View>
           </View>
-        </View>
         </KeyboardAvoidingView>
       </Modal>
 

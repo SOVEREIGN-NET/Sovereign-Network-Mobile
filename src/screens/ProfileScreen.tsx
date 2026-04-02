@@ -256,21 +256,6 @@ const ProfileScreen = ({ navigation }: any) => {
                     @{currentIdentity.username}
                   </Text>
                 )}
-                <TouchableOpacity
-                  onPress={() =>
-                    currentIdentity.did && copyToClipboard(currentIdentity.did)
-                  }
-                >
-                  <Text
-                    variant="caption"
-                    style={{
-                      color: colors.text_secondary,
-                      marginBottom: spacing.md,
-                    }}
-                  >
-                    {truncateId(currentIdentity.did)}
-                  </Text>
-                </TouchableOpacity>
                 <Button
                   variant="secondary"
                   onPress={() => navigation?.navigate('ProfileEdit')}

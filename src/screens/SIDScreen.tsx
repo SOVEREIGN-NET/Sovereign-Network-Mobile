@@ -606,12 +606,12 @@ const SIDScreen = ({ navigation, route }: any) => {
               </Card>
             </View>
 
-            {/* Send, Receive & Buy Buttons */}
+            {/* Send & Receive Buttons */}
             <View
               style={{
                 paddingHorizontal: spacing.md,
                 flexDirection: 'row',
-                gap: spacing.sm,
+                gap: spacing.md,
                 marginBottom: spacing.md,
               }}
             >
@@ -660,34 +660,6 @@ const SIDScreen = ({ navigation, route }: any) => {
                   }}
                 >
                   ↓ {t.wallet.actions.receive}
-                </Text>
-              </TouchableOpacity>
-
-              <TouchableOpacity
-                style={{
-                  flex: 1,
-                  paddingVertical: spacing.lg,
-                  borderRadius: borderRadius.base,
-                  borderWidth: 2,
-                  borderColor: colors.success_dark,
-                  justifyContent: 'center',
-                  alignItems: 'center',
-                }}
-                onPress={() =>
-                  navigation?.navigate('BuyCrypto', {
-                    walletAddress: selectedWallet?.id,
-                  })
-                }
-                disabled={isLoading}
-              >
-                <Text
-                  style={{
-                    fontSize: typography.size.md,
-                    fontWeight: typography.weight.semibold,
-                    color: colors.success,
-                  }}
-                >
-                  $ Buy
                 </Text>
               </TouchableOpacity>
             </View>
