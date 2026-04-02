@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useCallback } from 'react';
-import { View, ScrollView, TouchableOpacity } from 'react-native';
+import { View, ScrollView, TouchableOpacity, Modal, TextInput, Alert, KeyboardAvoidingView, Platform } from 'react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useFocusEffect } from '@react-navigation/native';
 import {
@@ -13,6 +13,7 @@ import {
   LoadingView,
 } from '../components';
 import { useAuth, useWalletList } from '../hooks';
+import { useAddressBook } from '../hooks/useAddressBook';
 import { useTranslation } from '../i18n';
 import { colors, spacing, typography, borderRadius } from '../theme';
 import tokenService from '../services/TokenService';
@@ -75,6 +76,12 @@ const SendTokensScreen = ({ navigation }: any) => {
     type: null,
     message: '',
   });
+
+  // Address book
+  const { entries: addressBookEntries, add: addToBook, findByAddress } = useAddressBook();
+  const [showAddressBook, setShowAddressBook] = useState(false);
+  const [savingContact, setSavingContact] = useState<{ address: string } | null>(null);
+  const [newContactName, setNewContactName] = useState('');
 
   const getDefaultSovWalletId = useCallback((): string | null => {
     if (!wallets || wallets.length === 0) {
@@ -409,10 +416,17 @@ const SendTokensScreen = ({ navigation }: any) => {
 
       refreshWallets();
 
-      // Navigate back after a brief moment so user sees the pending tx
-      setTimeout(() => {
-        navigation.goBack();
-      }, 1500);
+      // Offer to save recipient to address book if not already saved
+      const recipient = transferForm.recipient.trim();
+      const alreadySaved = findByAddress(recipient);
+      if (!alreadySaved) {
+        setTimeout(() => {
+          setNewContactName('');
+          setSavingContact({ address: recipient });
+        }, 800);
+      } else {
+        setTimeout(() => navigation.goBack(), 1500);
+      }
     } catch (error: any) {
       console.error('[SendTokensScreen] Transfer failed:', error);
       setTransferStatus({
@@ -825,27 +839,67 @@ const SendTokensScreen = ({ navigation }: any) => {
               </View>
 
               {/* Recipient Input - Changes based on token type */}
-              <FormField
-                label={
-                  selectedToken.type === 'sov'
-                    ? 'Recipient Wallet ID'
-                    : 'Recipient DID or Key ID'
-                }
-                placeholder={
-                  selectedToken.type === 'sov'
-                    ? '64 hex characters'
-                    : 'did:zhtp:... or 64/5184 hex'
-                }
-                value={transferForm.recipient}
-                onChangeText={text => {
-                  setTransferForm(prev => ({ ...prev, recipient: text }));
-                  if (errors.recipient) {
-                    setErrors(prev => ({ ...prev, recipient: undefined }));
+              <View>
+                <Text
+                  style={{
+                    fontSize: typography.size.xs,
+                    color: colors.text_secondary,
+                    marginBottom: spacing.xs,
+                  }}
+                >
+                  {selectedToken.type === 'sov' ? 'Recipient Wallet ID' : 'Recipient DID or Key ID'}
+                </Text>
+                <FormField
+                  label=""
+                  placeholder={
+                    selectedToken.type === 'sov'
+                      ? '64 hex characters'
+                      : 'did:zhtp:... or 64/5184 hex'
                   }
-                }}
-                error={errors.recipient}
-                editable={!isTransferring}
-              />
+                  value={transferForm.recipient}
+                  onChangeText={text => {
+                    setTransferForm(prev => ({ ...prev, recipient: text }));
+                    if (errors.recipient) {
+                      setErrors(prev => ({ ...prev, recipient: undefined }));
+                    }
+                  }}
+                  error={errors.recipient}
+                  editable={!isTransferring}
+                />
+                {transferForm.recipient.trim().length > 0 && (() => {
+                  const saved = findByAddress(transferForm.recipient.trim());
+                  return saved ? (
+                    <Text style={{ fontSize: typography.size.sm, color: colors.primary, marginTop: spacing.xs }}>
+                      {saved.name}
+                    </Text>
+                  ) : null;
+                })()}
+                {addressBookEntries.length > 0 && (
+                  <TouchableOpacity
+                    onPress={() => setShowAddressBook(true)}
+                    style={{
+                      marginTop: spacing.sm,
+                      paddingVertical: spacing.md,
+                      paddingHorizontal: spacing.lg,
+                      borderRadius: borderRadius.base,
+                      borderWidth: 1.5,
+                      borderColor: colors.primary + '60',
+                      backgroundColor: colors.primary + '10',
+                      alignItems: 'center',
+                    }}
+                  >
+                    <Text
+                      style={{
+                        fontSize: typography.size.md,
+                        fontWeight: typography.weight.semibold,
+                        color: colors.primary,
+                      }}
+                    >
+                      Choose from Contacts
+                    </Text>
+                  </TouchableOpacity>
+                )}
+              </View>
 
               {/* Amount */}
               <FormField
@@ -900,6 +954,219 @@ const SendTokensScreen = ({ navigation }: any) => {
           )}
         </Column>
       </ScrollView>
+
+      {/* Address book picker */}
+      <Modal visible={showAddressBook} transparent animationType="slide" onRequestClose={() => setShowAddressBook(false)}>
+        <View style={{ flex: 1, backgroundColor: 'rgba(0,0,0,0.6)', justifyContent: 'flex-end' }}>
+          <View
+            style={{
+              backgroundColor: colors.bg_dark,
+              borderTopLeftRadius: borderRadius.xl,
+              borderTopRightRadius: borderRadius.xl,
+              paddingTop: spacing.md,
+              paddingBottom: spacing['2xl'],
+              maxHeight: '80%',
+            }}
+          >
+            {/* Drag handle */}
+            <View style={{ alignItems: 'center', marginBottom: spacing.md }}>
+              <View
+                style={{
+                  width: 40,
+                  height: 4,
+                  borderRadius: 2,
+                  backgroundColor: colors.bg_lighter,
+                }}
+              />
+            </View>
+
+            {/* Header */}
+            <View
+              style={{
+                flexDirection: 'row',
+                justifyContent: 'space-between',
+                alignItems: 'center',
+                paddingHorizontal: spacing.lg,
+                marginBottom: spacing.lg,
+              }}
+            >
+              <Text
+                style={{
+                  fontSize: typography.size.xl,
+                  fontWeight: typography.weight.bold,
+                  color: colors.text_primary,
+                }}
+              >
+                Contacts
+              </Text>
+              <TouchableOpacity
+                onPress={() => setShowAddressBook(false)}
+                style={{
+                  width: 36,
+                  height: 36,
+                  borderRadius: 18,
+                  backgroundColor: colors.bg_lighter,
+                  justifyContent: 'center',
+                  alignItems: 'center',
+                }}
+              >
+                <Text style={{ color: colors.text_primary, fontSize: 16, fontWeight: '600' }}>X</Text>
+              </TouchableOpacity>
+            </View>
+
+            {/* Contact list */}
+            <ScrollView
+              showsVerticalScrollIndicator={false}
+              contentContainerStyle={{ paddingHorizontal: spacing.lg }}
+            >
+              {addressBookEntries.map((entry, index) => (
+                <TouchableOpacity
+                  key={entry.id}
+                  onPress={() => {
+                    setTransferForm(prev => ({ ...prev, recipient: entry.address }));
+                    setShowAddressBook(false);
+                  }}
+                  activeOpacity={0.6}
+                  style={{
+                    paddingVertical: spacing.lg,
+                    paddingHorizontal: spacing.md,
+                    borderRadius: borderRadius.base,
+                    backgroundColor: index % 2 === 0 ? colors.bg_darker : 'transparent',
+                    marginBottom: spacing.xs,
+                  }}
+                >
+                  <Text
+                    style={{
+                      fontSize: typography.size.md,
+                      fontWeight: typography.weight.semibold,
+                      color: colors.text_primary,
+                      marginBottom: spacing.xs,
+                    }}
+                  >
+                    {entry.name}
+                  </Text>
+                  <Text
+                    style={{
+                      fontSize: typography.size.sm,
+                      color: colors.text_secondary,
+                      fontFamily: 'Courier',
+                    }}
+                    numberOfLines={1}
+                  >
+                    {entry.address}
+                  </Text>
+                </TouchableOpacity>
+              ))}
+            </ScrollView>
+          </View>
+        </View>
+      </Modal>
+
+      {/* Save contact prompt (shown after successful transfer) */}
+      <Modal visible={!!savingContact} transparent animationType="fade" onRequestClose={() => { setSavingContact(null); navigation.goBack(); }}>
+        <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : 'height'} style={{ flex: 1 }}>
+          <View style={{ flex: 1, backgroundColor: 'rgba(0,0,0,0.6)', justifyContent: 'center', paddingHorizontal: spacing.lg }}>
+            <View
+              style={{
+                backgroundColor: colors.bg_dark,
+                borderRadius: borderRadius.xl,
+                borderWidth: 1,
+                borderColor: colors.border,
+                padding: spacing.xl,
+              }}
+            >
+              <Text
+                style={{
+                  fontSize: typography.size.xl,
+                  fontWeight: typography.weight.bold,
+                  color: colors.text_primary,
+                  marginBottom: spacing.md,
+                }}
+              >
+                Save contact?
+              </Text>
+              <Text
+                style={{
+                  fontSize: typography.size.sm,
+                  color: colors.text_secondary,
+                  fontFamily: 'Courier',
+                  marginBottom: spacing.lg,
+                }}
+                numberOfLines={2}
+              >
+                {savingContact?.address}
+              </Text>
+              <TextInput
+                value={newContactName}
+                onChangeText={setNewContactName}
+                placeholder="Contact name"
+                placeholderTextColor={colors.text_placeholder}
+                style={{
+                  backgroundColor: colors.bg_darker,
+                  borderRadius: borderRadius.base,
+                  borderWidth: 1,
+                  borderColor: colors.border,
+                  paddingHorizontal: spacing.md,
+                  paddingVertical: spacing.lg,
+                  color: colors.text_primary,
+                  fontSize: typography.size.md,
+                  marginBottom: spacing.lg,
+                }}
+                autoFocus
+              />
+              <Row style={{ gap: spacing.md }}>
+                <TouchableOpacity
+                  onPress={() => { setSavingContact(null); navigation.goBack(); }}
+                  style={{
+                    flex: 1,
+                    paddingVertical: spacing.lg,
+                    borderRadius: borderRadius.base,
+                    borderWidth: 1.5,
+                    borderColor: colors.border,
+                    alignItems: 'center',
+                  }}
+                >
+                  <Text
+                    style={{
+                      color: colors.text_secondary,
+                      fontSize: typography.size.md,
+                      fontWeight: typography.weight.semibold,
+                    }}
+                  >
+                    Skip
+                  </Text>
+                </TouchableOpacity>
+                <TouchableOpacity
+                  onPress={async () => {
+                    if (!newContactName.trim()) return;
+                    await addToBook(newContactName.trim(), savingContact!.address);
+                    setSavingContact(null);
+                    navigation.goBack();
+                  }}
+                  style={{
+                    flex: 1,
+                    paddingVertical: spacing.lg,
+                    borderRadius: borderRadius.base,
+                    backgroundColor: colors.primary,
+                    alignItems: 'center',
+                  }}
+                >
+                  <Text
+                    style={{
+                      color: colors.bg_darkest,
+                      fontSize: typography.size.md,
+                      fontWeight: typography.weight.bold,
+                    }}
+                  >
+                    Save
+                  </Text>
+                </TouchableOpacity>
+              </Row>
+            </View>
+          </View>
+        </KeyboardAvoidingView>
+      </Modal>
+
     </ScreenLayout>
   );
 };

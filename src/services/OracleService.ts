@@ -23,6 +23,9 @@ export interface SovPriceResponse {
   epochs_since_finalization: number;
   is_fresh: boolean;
   max_price_staleness_epochs: number;
+  pricing_mode?: string;
+  cbe_usd_price_atomic?: string;
+  cbe_usd_price?: number;
 }
 
 export interface CbePriceResponse {
@@ -84,6 +87,8 @@ export interface LatestFinalizedPrice {
   epoch_id: number;
   sov_usd_price_atomic: string;
   sov_usd_price: number;
+  cbe_usd_price_atomic?: string;
+  cbe_usd_price?: number;
 }
 
 export interface OracleStatusResponse {
@@ -95,6 +100,13 @@ export interface OracleStatusResponse {
   finalized_prices_count: number;
   latest_finalized_price: LatestFinalizedPrice | null;
   oracle_price_scale: string;
+  pricing_mode?: string;
+  onramp_vwap_cbe_usd_atomic?: string | null;
+  onramp_vwap_cbe_usd?: number | null;
+  onramp_window_trade_count?: number;
+  onramp_window_usdc_volume_atomic?: string;
+  onramp_min_trades_required?: number;
+  onramp_min_volume_usdc_atomic?: string;
 }
 
 export interface PendingCommitteeUpdate {

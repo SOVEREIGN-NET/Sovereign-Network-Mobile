@@ -668,7 +668,7 @@ public class ZhtpClient {
         amount: UInt64,
         nonce: UInt64,
         using identity: Identity,
-        chainId: UInt8 = 0x02  // testnet
+        chainId: UInt8 = 0x03  // development
     ) throws -> String {
         guard let hexPtr = tokenId.withUnsafeBytes({ tokenIdPtr in
             toPublicKey.withUnsafeBytes { toPubkeyPtr in
@@ -695,7 +695,7 @@ public class ZhtpClient {
         toPublicKey: Data,
         amount: UInt64,
         using identity: Identity,
-        chainId: UInt8 = 0x02  // testnet
+        chainId: UInt8 = 0x03  // development
     ) throws -> String {
         guard let hexPtr = tokenId.withUnsafeBytes({ tokenIdPtr in
             toPublicKey.withUnsafeBytes { toPubkeyPtr in
@@ -734,7 +734,7 @@ public class ZhtpClient {
         initialSupply: UInt64,
         decimals: UInt8,
         using identity: Identity,
-        chainId: UInt8 = 0x02  // testnet
+        chainId: UInt8 = 0x03  // development
     ) throws -> String {
         var treasury = treasuryRecipientBytes
         guard let hexPtr = name.withCString({ namePtr in
@@ -763,7 +763,7 @@ public class ZhtpClient {
         tokenId: Data,
         amount: UInt64,
         using identity: Identity,
-        chainId: UInt8 = 0x02  // testnet
+        chainId: UInt8 = 0x03  // development
     ) throws -> String {
         guard let hexPtr = tokenId.withUnsafeBytes({ tokenIdPtr in
             cBuildTokenBurn(
@@ -787,7 +787,7 @@ public class ZhtpClient {
         amount: UInt64,
         nonce: UInt64,
         using identity: Identity,
-        chainId: UInt8 = 0x02  // testnet
+        chainId: UInt8 = 0x03  // development
     ) throws -> String {
         print("[ZhtpClient] buildSovWalletTransfer called with nonce = \(nonce), amount = \(amount)")
         
@@ -831,7 +831,7 @@ public class ZhtpClient {
                 identity.getHandle(),
                 domainPtr,
                 nil,
-                0x02
+                0x03
             )
         }
 
@@ -855,7 +855,7 @@ public class ZhtpClient {
                     identity.getHandle(),
                     domainPtr,
                     cidPtr,
-                    0x02
+                    0x03
                 )
             }
         }) else {
@@ -890,7 +890,7 @@ public class ZhtpClient {
                 identity.getHandle(),
                 domainPtr,
                 pubkeyBytes,
-                0x02
+                0x03
             )
         }) else {
             throw ClientError.signingError("Failed to build domain transfer request")

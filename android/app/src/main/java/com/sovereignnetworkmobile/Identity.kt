@@ -196,21 +196,21 @@ class Identity private constructor(
 
     // ─── Token transactions ───
 
-    fun buildTokenCreate(name: String, symbol: String, supply: Long, decimals: Int, chainId: Int = 0x02): String? =
+    fun buildTokenCreate(name: String, symbol: String, supply: Long, decimals: Int, chainId: Int = 0x03): String? =
         nativeBuildTokenCreate(handle, name, symbol, supply, decimals, chainId)
 
-    fun buildTokenMint(tokenId: ByteArray, toPubkey: ByteArray, amount: Long, chainId: Int = 0x02): String? =
+    fun buildTokenMint(tokenId: ByteArray, toPubkey: ByteArray, amount: Long, chainId: Int = 0x03): String? =
         nativeBuildTokenMint(handle, tokenId, toPubkey, amount, chainId)
 
     fun buildTokenTransfer(
         tokenId: ByteArray,
         toPubkey: ByteArray,
         amount: Long,
-        chainId: Int = 0x02,
+        chainId: Int = 0x03,
         nonce: Long = 0L
     ): String? = nativeBuildTokenTransfer(handle, tokenId, toPubkey, amount, chainId, nonce)
 
-    fun buildTokenBurn(tokenId: ByteArray, amount: Long, chainId: Int = 0x02): String? =
+    fun buildTokenBurn(tokenId: ByteArray, amount: Long, chainId: Int = 0x03): String? =
         nativeBuildTokenBurn(handle, tokenId, amount, chainId)
 
     /** Build signed SOV wallet-to-wallet transfer. fromWalletId and toWalletId must each be 32 bytes. */
@@ -218,7 +218,7 @@ class Identity private constructor(
         fromWalletId: ByteArray,
         toWalletId: ByteArray,
         amount: Long,
-        chainId: Int = 0x02,
+        chainId: Int = 0x03,
         nonce: Long = 0L
     ): String? = nativeBuildSovWalletTransfer(handle, fromWalletId, toWalletId, amount, chainId, nonce)
 

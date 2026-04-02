@@ -68,6 +68,7 @@ export interface WalletTransaction {
   tx_hash: string;
   tx_type: string;
   amount: number;
+  amount_human?: number | string;
   fee: number;
   from_wallet: string | null;
   to_address: string | null;

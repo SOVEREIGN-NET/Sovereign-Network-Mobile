@@ -56,9 +56,20 @@ const formatTxValue = (value: number): string => {
 const FIXED_TAB_PANEL_HEIGHT = 320;
 const CORE_SYMBOLS = new Set(['SOV', 'UBI', 'SAVINGS']);
 
-const SIDScreen = ({ navigation }: any) => {
+const SIDScreen = ({ navigation, route }: any) => {
   const { t } = useTranslation();
   const { currentIdentity, isLoading } = useAuth();
+  const [welcomeName, setWelcomeName] = React.useState<string | null>(null);
+
+  React.useEffect(() => {
+    const name = route?.params?.showWelcome;
+    if (!name) return;
+    setWelcomeName(name);
+    const timer = setTimeout(() => setWelcomeName(null), 4000);
+    return () => clearTimeout(timer);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
   const {
     wallets,
     walletByType,
@@ -75,8 +86,6 @@ const SIDScreen = ({ navigation }: any) => {
   const [activeWalletTab, setActiveWalletTab] = useState('Activity');
   const [domainRegistrationModalVisible, setDomainRegistrationModalVisible] =
     useState(false);
-  const [selectedActivityTx, setSelectedActivityTx] =
-    useState<WalletTransaction | null>(null);
 
   const identityHex = useMemo(() => {
     const did = currentIdentity?.did;
@@ -377,6 +386,27 @@ const SIDScreen = ({ navigation }: any) => {
         title="Menu"
       />
 
+      {welcomeName !== null && (
+        <View
+          style={{
+            backgroundColor: colors.success_dark,
+            paddingVertical: spacing.sm,
+            paddingHorizontal: spacing.lg,
+          }}
+        >
+          <Text
+            style={{
+              color: '#fff',
+              fontSize: typography.size.sm,
+              fontWeight: typography.weight.semibold,
+              textAlign: 'center',
+            }}
+          >
+            Welcome back, {welcomeName}!
+          </Text>
+        </View>
+      )}
+
       <ScreenLayout paddingTop={spacing.md}>
         <ScrollView
           showsVerticalScrollIndicator={false}
@@ -532,50 +562,6 @@ const SIDScreen = ({ navigation }: any) => {
                     )}
                   </View>
 
-                  <Text
-                    style={{
-                      fontSize: typography.size.xs,
-                      color: colors.text_secondary,
-                      marginBottom: spacing.md,
-                    }}
-                  >
-                    YOUR DID (for token transfers & sharing)
-                  </Text>
-                  <View style={{ flexDirection: 'row', alignItems: 'center' }}>
-                    <ScrollView
-                      horizontal
-                      showsHorizontalScrollIndicator={false}
-                      contentContainerStyle={{ paddingRight: spacing.sm }}
-                      style={{ flex: 1 }}
-                    >
-                      <Text
-                        style={{
-                          fontSize: typography.size.sm,
-                          fontWeight: typography.weight.semibold,
-                          color: colors.text_primary,
-                          letterSpacing: 0.5,
-                          fontFamily: 'Courier',
-                        }}
-                      >
-                        {currentIdentity?.did || 'Loading...'}
-                      </Text>
-                    </ScrollView>
-                    {currentIdentity?.did && (
-                      <TouchableOpacity
-                        onPress={() => copyToClipboard(currentIdentity.did)}
-                        style={{ marginLeft: spacing.sm }}
-                      >
-                        <Text
-                          style={{
-                            fontSize: typography.size.xs,
-                            color: colors.primary,
-                          }}
-                        >
-                          {t.wallet.actions.copy}
-                        </Text>
-                      </TouchableOpacity>
-                    )}
-                  </View>
                 </View>
 
                 {/* Balance Section */}
@@ -886,7 +872,7 @@ const SIDScreen = ({ navigation }: any) => {
                             <TouchableOpacity
                               key={tx.tx_hash}
                               activeOpacity={0.75}
-                              onPress={() => setSelectedActivityTx(tx)}
+                              onPress={() => navigation.navigate('TransactionDetail', { hash: tx.tx_hash })}
                               style={{
                                 backgroundColor:
                                   index % 2 === 0 ? colors.bg_darker : colors.bg_dark,
@@ -959,7 +945,7 @@ const SIDScreen = ({ navigation }: any) => {
                                       color: colors.text_primary,
                                     }}
                                   >
-                                    {formatTxValue(Number(tx.amount || 0))}
+                                    {formatTxValue(tx.amount_human != null ? Number(tx.amount_human) : Number(tx.amount || 0))}
                                   </Text>
                                 </Row>
                                 <Text
@@ -968,7 +954,7 @@ const SIDScreen = ({ navigation }: any) => {
                                     color: colors.text_secondary,
                                   }}
                                 >
-                                  Fee {formatTxValue(Number(tx.fee || 0))}
+                                  Fee {formatTxValue(Number(tx.fee || 0) / 1e8)}
                                   {'  '}
                                   From {shortMiddle(tx.from_wallet)}
                                 </Text>
@@ -1069,108 +1055,6 @@ const SIDScreen = ({ navigation }: any) => {
         </View>
       </Modal>
 
-      <Modal
-        visible={!!selectedActivityTx}
-        animationType="slide"
-        transparent
-        onRequestClose={() => setSelectedActivityTx(null)}
-      >
-        <View
-          style={{
-            flex: 1,
-            backgroundColor: 'rgba(0,0,0,0.45)',
-            justifyContent: 'center',
-            padding: spacing.md,
-          }}
-        >
-          <View
-            style={{
-              backgroundColor: colors.bg_dark,
-              borderRadius: borderRadius.lg,
-              borderWidth: 1,
-              borderColor: colors.border,
-              padding: spacing.md,
-              gap: spacing.sm,
-            }}
-          >
-            <Text
-              style={{
-                fontSize: typography.size.lg,
-                fontWeight: typography.weight.semibold,
-                color: colors.text_primary,
-              }}
-            >
-              Transaction Details
-            </Text>
-            <Text style={{ color: colors.text_secondary, fontSize: typography.size.xs }}>
-              Type: {selectedActivityTx?.tx_type || '-'}
-            </Text>
-            <Text style={{ color: colors.text_secondary, fontSize: typography.size.xs }}>
-              Status: {selectedActivityTx?.status || '-'}
-            </Text>
-            <Text style={{ color: colors.text_secondary, fontSize: typography.size.xs }}>
-              Amount: {formatTxValue(Number(selectedActivityTx?.amount || 0))}
-            </Text>
-            <Text style={{ color: colors.text_secondary, fontSize: typography.size.xs }}>
-              Fee: {formatTxValue(Number(selectedActivityTx?.fee || 0))}
-            </Text>
-            <Text style={{ color: colors.text_secondary, fontSize: typography.size.xs }}>
-              From: {selectedActivityTx?.from_wallet || '-'}
-            </Text>
-            <Text style={{ color: colors.text_secondary, fontSize: typography.size.xs }}>
-              To: {selectedActivityTx?.to_address || '-'}
-            </Text>
-            <Text
-              selectable
-              style={{
-                color: colors.text_primary,
-                fontSize: typography.size.xs,
-                fontFamily: 'Courier',
-              }}
-            >
-              Hash: {selectedActivityTx?.tx_hash || '-'}
-            </Text>
-
-            <Row style={{ gap: spacing.sm, marginTop: spacing.sm }}>
-              <TouchableOpacity
-                style={{
-                  flex: 1,
-                  paddingVertical: spacing.sm,
-                  borderRadius: borderRadius.base,
-                  borderWidth: 1,
-                  borderColor: colors.border,
-                  alignItems: 'center',
-                }}
-                onPress={() => setSelectedActivityTx(null)}
-              >
-                <Text style={{ color: colors.text_secondary }}>Close</Text>
-              </TouchableOpacity>
-              <TouchableOpacity
-                style={{
-                  flex: 1,
-                  paddingVertical: spacing.sm,
-                  borderRadius: borderRadius.base,
-                  backgroundColor: colors.primary,
-                  alignItems: 'center',
-                }}
-                onPress={() => {
-                  const hash = selectedActivityTx?.tx_hash;
-                  setSelectedActivityTx(null);
-                  if (!hash) return;
-                  navigation.navigate('DashboardTab', {
-                    screen: 'ExplorerSearch',
-                    params: { query: hash },
-                  });
-                }}
-              >
-                <Text style={{ color: colors.bg_darkest, fontWeight: typography.weight.semibold }}>
-                  Open in Explorer
-                </Text>
-              </TouchableOpacity>
-            </Row>
-          </View>
-        </View>
-      </Modal>
     </View>
   );
 };

@@ -114,7 +114,11 @@ export const useTrendingTokens = (): TokenData[] => {
 
 export const formatTokenPrice = (price: number): string => {
   if (typeof price !== 'number' || price <= 0) return '—';
-  return price < 1 ? `$${price.toFixed(4)}` : `$${price.toFixed(2)}`;
+  if (price >= 1) return `$${price.toFixed(2)}`;
+  // Show enough decimal places to reveal 4 significant digits.
+  // e.g. $0.000012 → toFixed(9), $0.0012 → toFixed(6), $0.12 → toFixed(4)
+  const leadingZeros = Math.floor(-Math.log10(price));
+  return `$${price.toFixed(Math.min(leadingZeros + 4, 10))}`;
 };
 
 export const formatChange = (change: number): string => {

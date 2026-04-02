@@ -52,6 +52,7 @@ import CreateIdentityScreen from '../screens/CreateIdentityScreen';
 import SeedPhraseScreen from '../screens/SeedPhraseScreen';
 import RecoverIdentityScreen from '../screens/RecoverIdentityScreen';
 import MigrationSeedScreen from '../screens/MigrationSeedScreen';
+import BuyCryptoScreen from '../screens/BuyCryptoScreen';
 
 const Stack = createNativeStackNavigator<RootStackParamList>();
 const Tab = createBottomTabNavigator();
@@ -347,6 +348,20 @@ const SIDStack = () => {
           headerShown: false,
           title: 'PoUW Rewards',
         }}
+      />
+      <Stack.Screen
+        name="BuyCrypto"
+        component={BuyCryptoScreen}
+        options={{
+          headerShown: false,
+          presentation: 'modal',
+          animation: 'slide_from_bottom',
+        }}
+      />
+      <Stack.Screen
+        name="TransactionDetail"
+        component={TransactionDetailScreen}
+        options={{ headerShown: false }}
       />
     </Stack.Navigator>
   );

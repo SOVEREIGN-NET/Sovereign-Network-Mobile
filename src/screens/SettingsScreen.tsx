@@ -528,6 +528,58 @@ const SettingsScreen = ({ navigation }: any) => {
               </Column>
             </Card>
 
+            {/* On-Ramp (Demo) */}
+            <Card>
+              <Row style={{ alignItems: 'center', gap: spacing.sm, marginBottom: spacing.md }}>
+                <Text
+                  style={{
+                    fontSize: typography.size.sm,
+                    fontWeight: typography.weight.semibold,
+                    color: colors.text_primary,
+                  }}
+                >
+                  Buy Crypto
+                </Text>
+                <View
+                  style={{
+                    backgroundColor: colors.warning + '30',
+                    paddingHorizontal: spacing.sm,
+                    paddingVertical: 2,
+                    borderRadius: borderRadius.sm,
+                  }}
+                >
+                  <Text
+                    style={{
+                      fontSize: typography.size.xs,
+                      fontWeight: typography.weight.bold,
+                      color: colors.warning,
+                    }}
+                  >
+                    DEMO
+                  </Text>
+                </View>
+              </Row>
+
+              <Text
+                style={{
+                  fontSize: typography.size.xs,
+                  color: colors.text_secondary,
+                  marginBottom: spacing.md,
+                  lineHeight: 18,
+                }}
+              >
+                Coinme on-ramp integration (dev widget).{'\n'}
+                Buy crypto with cash at 10,000+ US retail locations or with card.
+              </Text>
+
+              <Button
+                variant="outline"
+                onPress={() => navigation.navigate('BuyCrypto')}
+              >
+                Open Coinme Widget (Demo)
+              </Button>
+            </Card>
+
             {/* Danger Zone */}
             <Card>
               <Text

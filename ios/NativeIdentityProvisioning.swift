@@ -972,7 +972,7 @@ class NativeIdentityProvisioning: NSObject, UIDocumentPickerDelegate {
                     initialSupply: initialSupplyValue,
                     decimals: decimals.uint8Value,
                     using: identity,
-                    chainId: 0x02  // testnet
+                    chainId: 0x03  // development
                 )
 
                 print("[TokenCreate:signer] tx hex_len=\(hexSignedTx.count) tx[0..8]=\(String(hexSignedTx.prefix(16)))")
@@ -1055,7 +1055,7 @@ class NativeIdentityProvisioning: NSObject, UIDocumentPickerDelegate {
                     toPublicKey: recipientPubkey,
                     amount: amountValue,
                     using: identity,
-                    chainId: 0x02  // testnet
+                    chainId: 0x03  // development
                 )
 
                 print("[NativeIdentityProvisioning] Token mint transaction built and signed")
@@ -1153,7 +1153,7 @@ class NativeIdentityProvisioning: NSObject, UIDocumentPickerDelegate {
                     amount: amountValue,
                     nonce: nonceValue,
                     using: identity,
-                    chainId: 0x02  // testnet
+                    chainId: 0x03  // development
                 )
 
                 print("[NativeIdentityProvisioning] Token transfer transaction built and signed")
@@ -1227,7 +1227,7 @@ class NativeIdentityProvisioning: NSObject, UIDocumentPickerDelegate {
                     tokenId: tokenIdData,
                     amount: amountValue,
                     using: identity,
-                    chainId: 0x02
+                    chainId: 0x03
                 )
 
                 resolve(["signed_tx": hexSignedTx])
@@ -1287,7 +1287,7 @@ class NativeIdentityProvisioning: NSObject, UIDocumentPickerDelegate {
                     return
                 }
 
-                var chainId: UInt8 = 0x02
+                var chainId: UInt8 = 0x03
                 if let chainIdNum = params["chainId"] as? NSNumber {
                     chainId = UInt8(truncating: chainIdNum)
                 } else if let chainIdStr = params["chainId"] as? String,
