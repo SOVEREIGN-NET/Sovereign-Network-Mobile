@@ -167,10 +167,33 @@ fn load_identity(identity_json: &str, key_bytes: &UhpPrivateKeyBytes) -> Result<
 
     // Extract dilithium_pk from the identity JSON
     let dilithium_pk = extract_dilithium_pk_from_identity(identity_json)
-        .unwrap_or_else(|_| {
-            // If we can't extract from JSON, use empty vector (will fail in from_serialized)
-            Vec::new()
-        });
+        .unwrap_or_else(|_| Vec::new());
+
+    let dilithium_sk: [u8; 4896] = match dilithium_sk.len() {
+        4896 => dilithium_sk.try_into().unwrap(),
+        4864 => {
+            let mut arr = [0u8; 4896];
+            arr[..4864].copy_from_slice(&dilithium_sk);
+            arr
+        }
+        n => return Err(anyhow::anyhow!("dilithium_sk: expected 4864 or 4896 bytes, got {n}")),
+    };
+    let dilithium_pk: [u8; 2592] = dilithium_pk
+        .try_into()
+        .map_err(|v: Vec<u8>| anyhow::anyhow!("dilithium_pk: expected 2592 bytes, got {}", v.len()))?;
+    let kyber_sk: [u8; 3168] = kyber_sk
+        .try_into()
+        .map_err(|v: Vec<u8>| anyhow::anyhow!("kyber_sk: expected 3168 bytes, got {}", v.len()))?;
+    let master_seed: [u8; 64] = match master_seed.len() {
+        64 => master_seed.try_into().unwrap(),
+        32 => {
+            // Legacy 32-byte seed → zero-pad to 64 bytes
+            let mut arr = [0u8; 64];
+            arr[..32].copy_from_slice(&master_seed);
+            arr
+        }
+        n => return Err(anyhow::anyhow!("master_seed: expected 32 or 64 bytes, got {n}")),
+    };
 
     let private_key = PrivateKey {
         dilithium_sk,
@@ -186,14 +209,29 @@ fn extract_dilithium_pk_from_identity(identity_json: &str) -> Result<Vec<u8>> {
     let raw: serde_json::Value = serde_json::from_str(identity_json)
         .map_err(|e| anyhow::anyhow!("Failed to parse identity JSON: {}", e))?;
 
-    // Extract the public key from the JSON
-    let pk_hex = raw.get("public_key")
-        .and_then(|v| v.as_str())
-        .or_else(|| raw.get("dilithium_pk").and_then(|v| v.as_str()))
-        .ok_or_else(|| anyhow::anyhow!("No public key found in identity JSON"))?;
+    // Handshake JSON format: { "public_key": { "dilithium_pk": [...] } }
+    let pk_value = raw
+        .get("public_key")
+        .and_then(|v| v.get("dilithium_pk"))
+        .ok_or_else(|| anyhow::anyhow!("Missing public_key.dilithium_pk in identity JSON"))?;
 
-    hex::decode(pk_hex)
-        .map_err(|e| anyhow::anyhow!("Failed to decode public key: {}", e))
+    match pk_value {
+        serde_json::Value::Array(arr) => {
+            let mut bytes = Vec::with_capacity(arr.len());
+            for v in arr {
+                let byte = v.as_u64().ok_or_else(|| {
+                    anyhow::anyhow!("Invalid dilithium_pk byte value in identity JSON")
+                })?;
+                bytes.push(byte as u8);
+            }
+            Ok(bytes)
+        }
+        serde_json::Value::String(s) => {
+            hex::decode(s)
+                .map_err(|e| anyhow::anyhow!("Invalid hex dilithium_pk in identity JSON: {}", e))
+        }
+        _ => Err(anyhow::anyhow!("Unsupported dilithium_pk format in identity JSON")),
+    }
 }
 
 fn build_capabilities() -> HandshakeCapabilities {

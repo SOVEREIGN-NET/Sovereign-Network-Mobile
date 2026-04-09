@@ -64,6 +64,36 @@ export const DEFAULT_NODE_PORT = parseInt(
  */
 export const DEFAULT_NETWORK_TYPE: 'testnet' | 'mainnet' = 'testnet';
 
+// =============================================================================
+// BUILD INFO (injected at build time by scripts/generate-config.js)
+// =============================================================================
+
+export interface PlatformBuildInfo {
+  version: string;
+  build: string;
+}
+
+export interface BuildInfo {
+  ios: PlatformBuildInfo;
+  android: PlatformBuildInfo;
+  gitCommit: string;
+  gitBranch: string;
+  gitDirty: boolean;
+  generatedAt: string;
+}
+
+const FALLBACK_BUILD_INFO: BuildInfo = {
+  ios: { version: 'unknown', build: 'unknown' },
+  android: { version: 'unknown', build: 'unknown' },
+  gitCommit: 'unknown',
+  gitBranch: 'unknown',
+  gitDirty: false,
+  generatedAt: 'unknown',
+};
+
+export const BUILD_INFO: BuildInfo =
+  (generatedConfig.BUILD_INFO as BuildInfo | undefined) ?? FALLBACK_BUILD_INFO;
+
 /**
  * Determine if testnet uses self-signed certificates
  * Network nodes use system CA trust (no certificate pinning)

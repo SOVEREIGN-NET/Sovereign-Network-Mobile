@@ -544,11 +544,39 @@ class NativeIdentityProvisioning(reactContext: ReactApplicationContext) :
 
                 val fromWalletId = hexToBytes(fromWalletIdHex)
                 val toWalletId = hexToBytes(toWalletIdHex)
-                
+
                 // Parse nonce from JS params (required)
                 val nonceParam = params.getDouble("nonce")
                 val nonce = nonceParam.toLong()
-                
+
+                // Trust the JS-provided fromWalletId. The caller has already
+                // selected the wallet from /api/v1/wallet/list for this identity.
+                //
+                // Historically this code overrode fromWalletId with
+                // blake3(current_dilithium_pk || current_kyber_pk) from the live
+                // identity handle. That worked before key rotation existed, but
+                // breaks after a chain re-registration / recovery: the balance
+                // lives under the OLD wallet_id (pre-rotation), while the live
+                // handle hashes to the NEW wallet_id. The override made the tx
+                // carry data.from = new_wallet_id (balance = 0) and fail.
+                //
+                // The server's legacy validation path already handles this case:
+                // Dilithium keys are seed-deterministic (unchanged by recovery),
+                // so wallet_registry[old_wallet_id].dilithium_pk still matches
+                // the signature's dilithium_pk, and the balance check uses the
+                // funded wallet. See MEMORY.md "iOS ↔ Android Convergence".
+                val liveWalletId = identity.getWalletId()
+                if (liveWalletId != null) {
+                    val liveWalletIdHex = liveWalletId.joinToString("") { "%02x".format(it) }
+                    if (liveWalletIdHex != fromWalletIdHex) {
+                        Log.i(
+                            TAG,
+                            "fromWalletId differs from live handle (likely post-rotation): " +
+                                "js=$fromWalletIdHex, live=$liveWalletIdHex",
+                        )
+                    }
+                }
+
                 Log.d(TAG, "Building SOV wallet transfer: $fromWalletIdHex -> $toWalletIdHex (nonce=$nonce)")
 
                 val hexSignedTx = identity.buildSovWalletTransfer(

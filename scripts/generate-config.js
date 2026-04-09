@@ -12,10 +12,13 @@
 
 const fs = require('fs');
 const path = require('path');
+const { execFileSync } = require('child_process');
 
 const rootDir = path.join(__dirname, '..');
 const envPath = path.join(rootDir, '.env');
 const generatedJsonPath = path.join(rootDir, '.env.generated.json');
+const androidGradlePath = path.join(rootDir, 'android', 'app', 'build.gradle');
+const iosPbxprojPath = path.join(rootDir, 'ios', 'SovereignNetworkMobile.xcodeproj', 'project.pbxproj');
 const iosConfigPath = path.join(rootDir, 'ios', 'GeneratedConfig.swift');
 const androidConfigPath = path.join(rootDir, 'android', 'app', 'src', 'main', 'java', 'com', 'sovereignnetworkmobile', 'config', 'GeneratedConfig.kt');
 
@@ -74,6 +77,69 @@ function parseNodeRegistry(registryStr) {
   }).filter(Boolean);
 }
 
+// Extract Android version info from build.gradle
+function readAndroidBuildInfo() {
+  try {
+    const gradle = fs.readFileSync(androidGradlePath, 'utf8');
+    const codeMatch = gradle.match(/versionCode\s+(\d+)/);
+    const nameMatch = gradle.match(/versionName\s+"([^"]+)"/);
+    return {
+      version: nameMatch ? nameMatch[1] : 'unknown',
+      build: codeMatch ? codeMatch[1] : 'unknown',
+    };
+  } catch {
+    return { version: 'unknown', build: 'unknown' };
+  }
+}
+
+// Extract iOS version info from project.pbxproj (first occurrence — all targets paired)
+function readIosBuildInfo() {
+  try {
+    const pbx = fs.readFileSync(iosPbxprojPath, 'utf8');
+    const versionMatch = pbx.match(/MARKETING_VERSION\s*=\s*([^;]+);/);
+    const buildMatch = pbx.match(/CURRENT_PROJECT_VERSION\s*=\s*([^;]+);/);
+    return {
+      version: versionMatch ? versionMatch[1].trim() : 'unknown',
+      build: buildMatch ? buildMatch[1].trim() : 'unknown',
+    };
+  } catch {
+    return { version: 'unknown', build: 'unknown' };
+  }
+}
+
+// Git info (short commit + branch). Safe fallback if git missing or not a repo.
+function readGitInfo() {
+  const safe = args => {
+    try {
+      return execFileSync('git', args, {
+        cwd: rootDir,
+        stdio: ['ignore', 'pipe', 'ignore'],
+      })
+        .toString()
+        .trim();
+    } catch {
+      return '';
+    }
+  };
+  return {
+    commit: safe(['rev-parse', '--short', 'HEAD']) || 'unknown',
+    branch: safe(['rev-parse', '--abbrev-ref', 'HEAD']) || 'unknown',
+    dirty: safe(['status', '--porcelain']) !== '',
+  };
+}
+
+const androidBuild = readAndroidBuildInfo();
+const iosBuild = readIosBuildInfo();
+const gitInfo = readGitInfo();
+const buildInfo = {
+  ios: iosBuild,
+  android: androidBuild,
+  gitCommit: gitInfo.commit,
+  gitBranch: gitInfo.branch,
+  gitDirty: gitInfo.dirty,
+  generatedAt: new Date().toISOString(),
+};
+
 // Generate config
 const envConfig = parseEnv(envPath);
 const nodeUrl = envConfig.ZHTP_NODE_URL || 'http://g1.thesovereignnetwork.org:9334';
@@ -94,6 +160,7 @@ const generatedConfig = {
   SOV_TOKEN_ID: sovTokenId,
   CHAIN_ID: chainId,
   NODE_REGISTRY: nodeRegistry,
+  BUILD_INFO: buildInfo,
 };
 
 fs.writeFileSync(
@@ -109,6 +176,9 @@ console.log(`  ZHTP_NODE_PORT: ${generatedConfig.ZHTP_NODE_PORT}`);
 console.log(`  CERTIFICATE_PIN: ${certificatePin || '(none — system CA trust)'}`);
 console.log(`  SOV_TOKEN_ID: ${sovTokenId || '(not set)'}`);
 console.log(`  CHAIN_ID: ${chainId}`);
+console.log(
+  `  BUILD_INFO: ios=${iosBuild.version} (${iosBuild.build}), android=${androidBuild.version} (${androidBuild.build}), git=${gitInfo.commit}${gitInfo.dirty ? '-dirty' : ''} @ ${gitInfo.branch}`,
+);
 
 // 2. Generate iOS Swift config
 const iosSpkiEntries = nodeRegistry.map(n => `        "${n.host}": "${n.pin}",`).join('\n');

@@ -243,13 +243,29 @@ fn ensure_identity_id_field(identity_json: &str) -> Result<String> {
         .map_err(|e| anyhow::anyhow!("Failed to serialize identity JSON: {e}"))
 }
 
+fn vec_to_array<const N: usize>(v: Vec<u8>, name: &str) -> Result<[u8; N]> {
+    if v.len() == N {
+        return v.try_into()
+            .map_err(|v: Vec<u8>| anyhow::anyhow!("{name}: expected {N} bytes, got {}", v.len()));
+    }
+    // Support legacy sizes with zero-padding:
+    // - dilithium_sk: crystals-dilithium 4864 → 4896
+    // - master_seed: legacy 32 → 64
+    if (N == 4896 && v.len() == 4864) || (N == 64 && v.len() == 32) {
+        let mut arr = [0u8; N];
+        arr[..v.len()].copy_from_slice(&v);
+        return Ok(arr);
+    }
+    Err(anyhow::anyhow!("{name}: expected {N} bytes, got {}", v.len()))
+}
+
 fn load_identity(identity_json: &str, key_bytes: &UhpPrivateKeyBytes) -> Result<ZhtpIdentity> {
     let dilithium_pk = extract_dilithium_pk(identity_json)?;
     let private_key = PrivateKey {
-        dilithium_sk: key_bytes.dilithium_sk.clone(),
-        dilithium_pk,
-        kyber_sk: key_bytes.kyber_sk.clone(),
-        master_seed: key_bytes.master_seed.clone(),
+        dilithium_sk: vec_to_array(key_bytes.dilithium_sk.clone(), "dilithium_sk")?,
+        dilithium_pk: vec_to_array(dilithium_pk, "dilithium_pk")?,
+        kyber_sk: vec_to_array(key_bytes.kyber_sk.clone(), "kyber_sk")?,
+        master_seed: vec_to_array(key_bytes.master_seed.clone(), "master_seed")?,
     };
 
     let normalized_json = ensure_identity_id_field(identity_json)?;
@@ -394,7 +410,6 @@ fn log_signature(label: &str, signature: &lib_crypto::types::Signature) {
     let sig_len = signature.signature.len();
     let pk_len = signature.public_key.dilithium_pk.len();
     let algo = match signature.algorithm {
-        SignatureAlgorithm::Dilithium2 => "Dilithium2",
         SignatureAlgorithm::Dilithium5 => "Dilithium5",
         SignatureAlgorithm::RingSignature => "RingSignature",
     };
