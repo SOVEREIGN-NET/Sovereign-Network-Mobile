@@ -34,6 +34,10 @@ private func cIdentityGetNodeId(_ handle: UnsafeMutableRawPointer) -> ByteBuffer
 @_silgen_name("zhtp_client_identity_get_created_at")
 private func cIdentityGetCreatedAt(_ handle: UnsafeMutableRawPointer) -> UInt64
 
+// Get primary wallet ID = blake3(dilithium_pk || kyber_pk) — 32 bytes
+@_silgen_name("zhtp_client_identity_get_wallet_id")
+private func cIdentityGetWalletId(_ handle: UnsafeRawPointer) -> ByteBuffer
+
 // Get master seed phrase (BIP39) from identity handle
 @_silgen_name("zhtp_client_identity_get_seed_phrase")
 private func cIdentityGetSeedPhrase(_ handle: UnsafeMutableRawPointer) -> UnsafeMutablePointer<CChar>?
@@ -548,6 +552,18 @@ public class ZhtpClient {
         }
         let ptr = buf.data!.assumingMemoryBound(to: UInt8.self)
         return Array(UnsafeBufferPointer(start: ptr, count: buf.len))
+    }
+
+    /// Get primary wallet ID = blake3(dilithium_pk || kyber_pk) — 32 bytes
+    /// Use this as from_wallet_id in SOV transfers.
+    public static func getWalletId(_ identity: Identity) throws -> Data {
+        let buf = cIdentityGetWalletId(identity.getHandle())
+        defer { cBufferFree(buf) }
+        if buf.data == nil || buf.len == 0 {
+            throw ClientError.identityError("Failed to get wallet ID")
+        }
+        let ptr = buf.data!.assumingMemoryBound(to: UInt8.self)
+        return Data(UnsafeBufferPointer(start: ptr, count: buf.len))
     }
 
     /// Get 24-word seed phrase (BIP39) derived from the identity master seed

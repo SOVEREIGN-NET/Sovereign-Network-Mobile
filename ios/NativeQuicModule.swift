@@ -324,7 +324,9 @@ class NativeQuic: NSObject {
 
     guard shouldStart else { return }
 
-    DispatchQueue.global(qos: .userInitiated).async {
+    // Dilithium5 signing requires ~1MB+ stack space; GCD threads only get 512KB.
+    // Use a dedicated Thread with 2MB stack to avoid EXC_BAD_ACCESS stack overflow.
+    let handshakeThread = Thread {
       let handshakeResult: Result<QuinnHandshakeResult, Error>
 
       if self.useLibClientHandshake {
@@ -373,6 +375,9 @@ class NativeQuic: NSObject {
         }
       }
     }
+    handshakeThread.stackSize = 2 * 1024 * 1024  // 2MB for Dilithium5
+    handshakeThread.qualityOfService = .userInitiated
+    handshakeThread.start()
   }
 
   private func drainQuinnQueue(identityId: String, quinnHandle: UInt64, sessionBox: AuthSessionBox) {

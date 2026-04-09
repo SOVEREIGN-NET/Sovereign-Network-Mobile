@@ -19,6 +19,8 @@ import { Text } from './src/components'; // NavigationContainer is handled by ea
 import { useTranslation } from './src/i18n';
 import { config } from './src/config';
 import { installLogGuard } from './src/utils/logging';
+import { useNodeConnectionStatus } from './src/hooks/useNodeConnectionStatus';
+import { useChainReregistration } from './src/hooks/useChainReregistration';
 
 installLogGuard();
 
@@ -38,7 +40,17 @@ function AppContent() {
     );
   }
 
-  const { isBootstrapping } = authContext;
+  const { isBootstrapping, currentIdentity, setCurrentIdentity } = authContext;
+
+  // Connection status for chain detection
+  const { isConnected } = useNodeConnectionStatus(true);
+
+  // Transparent chain re-registration
+  const { status: chainStatus } = useChainReregistration(
+    isConnected,
+    currentIdentity,
+    setCurrentIdentity,
+  );
 
   // Show loading indicator while checking auth state
   if (isBootstrapping) {
@@ -62,6 +74,33 @@ function AppContent() {
           }}
         >
           {t.app.loading}
+        </Text>
+      </View>
+    );
+  }
+
+  // Show syncing state during chain re-registration (spec: section 4)
+  if (chainStatus === 'syncing') {
+    return (
+      <View
+        style={{
+          flex: 1,
+          backgroundColor: colors.bg_darkest,
+          justifyContent: 'center',
+          alignItems: 'center',
+        }}
+      >
+        <Text variant="h2" style={{ color: colors.primary }}>
+          {t.app.title}
+        </Text>
+        <Text
+          variant="body"
+          style={{
+            color: colors.text_secondary,
+            marginTop: 16,
+          }}
+        >
+          Syncing your account...
         </Text>
       </View>
     );

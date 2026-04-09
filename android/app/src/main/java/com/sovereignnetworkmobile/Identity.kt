@@ -93,6 +93,7 @@ class Identity private constructor(
         @JvmStatic private external fun nativeIdentityGetPublicKey(handle: Long): ByteArray?
         @JvmStatic private external fun nativeIdentityGetKyberPublicKey(handle: Long): ByteArray?
         @JvmStatic private external fun nativeIdentityGetNodeId(handle: Long): ByteArray?
+        @JvmStatic private external fun nativeIdentityGetWalletId(handle: Long): ByteArray?
         @JvmStatic private external fun nativeIdentityGetCreatedAt(handle: Long): Long
 
         // ─── JNI: Serialization ───
@@ -176,6 +177,9 @@ class Identity private constructor(
 
     /** Serialize to handshake-compatible JSON format for UHP. */
     fun toHandshakeJson(): String? = nativeIdentityToHandshakeJson(handle)
+
+    /** Get primary wallet ID = blake3(dilithium_pk || kyber_pk) — 32 bytes. Use as from_wallet_id in SOV transfers. */
+    fun getWalletId(): ByteArray? = nativeIdentityGetWalletId(handle)
 
     /** Get 24-word BIP39 seed phrase. Show to user once during onboarding. */
     fun getSeedPhrase(): String? = nativeIdentityGetSeedPhrase(handle)

@@ -43,3 +43,5 @@ export type { UseNetworkNoticesReturn } from './useNetworkNotices';
 
 export { useAddressBook } from './useAddressBook';
 export type { AddressBookEntry, UseAddressBookReturn } from './useAddressBook';
+export { useChainReregistration } from './useChainReregistration';
+export type { ChainReregStatus, UseChainReregistrationReturn } from './useChainReregistration';

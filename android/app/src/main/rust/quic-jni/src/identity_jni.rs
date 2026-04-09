@@ -253,6 +253,25 @@ pub extern "system" fn Java_com_sovereignnetworkmobile_Identity_nativeIdentityGe
     identity.created_at as jlong
 }
 
+/// Get wallet ID = blake3(dilithium_pk || kyber_pk) — 32 bytes
+#[no_mangle]
+pub extern "system" fn Java_com_sovereignnetworkmobile_Identity_nativeIdentityGetWalletId<'local>(
+    mut env: JNIEnv<'local>,
+    _class: JClass<'local>,
+    handle: jlong,
+) -> JByteArray<'local> {
+    if handle == 0 {
+        return JByteArray::default();
+    }
+    let identity = unsafe { handle_ref(handle) };
+    let mut combined = Vec::with_capacity(identity.public_key.len() + identity.kyber_public_key.len());
+    combined.extend_from_slice(&identity.public_key);
+    combined.extend_from_slice(&identity.kyber_public_key);
+    let wallet_id = zhtp_client::crypto::Blake3::hash(&combined);
+    env.byte_array_from_slice(&wallet_id)
+        .unwrap_or_else(|_| JByteArray::default())
+}
+
 // ─── Serialization ─────────────────────────────────────────────────────────────
 
 #[no_mangle]

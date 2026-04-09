@@ -1327,6 +1327,28 @@ class NativeIdentityProvisioning: NSObject, UIDocumentPickerDelegate {
                     return
                 }
 
+                // Trust the JS-provided fromWalletId. The caller has already
+                // selected the wallet from /api/v1/wallet/list for this identity.
+                //
+                // Historically this code overrode fromWalletId with
+                // blake3(current_dilithium_pk || current_kyber_pk) from the live
+                // identity handle. That worked before key rotation existed, but
+                // breaks after a chain re-registration / recovery: the balance
+                // lives under the OLD wallet_id (pre-rotation), while the live
+                // handle hashes to the NEW wallet_id. The override made the tx
+                // carry data.from = new_wallet_id (balance = 0) and fail.
+                //
+                // The server's legacy validation path already handles this case:
+                // Dilithium keys are seed-deterministic (unchanged by recovery),
+                // so wallet_registry[old_wallet_id].dilithium_pk still matches
+                // the signature's dilithium_pk, and the balance check uses the
+                // funded wallet. See MEMORY.md "iOS ↔ Android Convergence".
+                let liveWalletId = try ZhtpClient.getWalletId(identity)
+                let liveWalletIdHex = liveWalletId.map { String(format: "%02x", $0) }.joined()
+                if liveWalletIdHex != fromWalletIdHex {
+                    print("[NativeIdentityProvisioning] ℹ️ fromWalletId differs from live handle (likely post-rotation): js=\(fromWalletIdHex), live=\(liveWalletIdHex)")
+                }
+
                 let hexSignedTx = try ZhtpClient.buildSovWalletTransfer(
                     fromWalletId: fromWalletId,
                     toWalletId: toWalletId,

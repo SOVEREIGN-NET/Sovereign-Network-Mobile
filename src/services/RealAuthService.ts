@@ -19,6 +19,8 @@ import { isQuicSupported, testQuicConnection, quicRequestRaw, publicQuicRequest 
 import IdentityCleanup from './IdentityCleanup';
 import SeedVaultService from './SeedVaultService';
 import { maskIdentifier } from '../utils/maskIdentifier';
+import { ChainBindingStorage } from './ChainBindingStorage';
+import type { LocalChainBinding } from './ChainBindingStorage';
 
 const { NativeZhtpApi } = NativeModules;
 
@@ -226,6 +228,23 @@ class RealAuthService {
           console.log('[RealAuthService]    Identity ID: ' + identityId);
           if (serverDid) {
             generatedIdentity.did = serverDid;
+          }
+
+          // Save initial chain binding so future launches can detect chain changes
+          try {
+            const { fetchChainInfo } = require('./ChainInfoService');
+            const chainInfo = await fetchChainInfo();
+            await ChainBindingStorage.set({
+              chainId: chainInfo.chain_id,
+              registeredHeight: chainInfo.height,
+              identityId,
+              primaryWalletId: registrationResponse.primary_wallet_id || '',
+              ubiWalletId: registrationResponse.ubi_wallet_id || '',
+              savingsWalletId: registrationResponse.savings_wallet_id || '',
+            });
+            console.log('[RealAuthService] Initial chain binding saved for chain', chainInfo.chain_id);
+          } catch (chainErr) {
+            console.warn('[RealAuthService] Failed to save initial chain binding (non-fatal):', chainErr);
           }
         }
       } catch (serverError: unknown) {
@@ -605,6 +624,116 @@ class RealAuthService {
 
   getNodeUrl(): string {
     return DEFAULT_SOV_NODE_URL;
+  }
+
+  /**
+   * Re-register an existing on-device identity against a new chain.
+   *
+   * CRITICAL: This method NEVER generates new keys. It loads the existing
+   * Rust identity handle from secure storage, signs a fresh registration
+   * proof, and submits it to the node. The keypair is unchanged.
+   *
+   * Returns the updated LocalChainBinding on success.
+   */
+  async reRegisterExistingIdentity(
+    currentIdentity: Identity,
+    newChainId: number,
+    newHeight: number,
+  ): Promise<LocalChainBinding> {
+    const identityId = currentIdentity.identityId;
+    if (!identityId) {
+      throw new Error('Cannot re-register: identity has no identityId');
+    }
+
+    console.log('[RealAuthService] Re-registering existing identity on chain', newChainId);
+
+    // 1. Ensure the Rust handle is loaded from Keychain/ESP
+    try {
+      const restoreResult = await nativeIdentityProvisioning.restoreIdentityToHandleStore(identityId);
+      if (restoreResult?.status !== 'restored' && restoreResult?.status !== 'already_loaded') {
+        console.warn('[RealAuthService] Handle restore status:', restoreResult?.status);
+      }
+    } catch (err) {
+      throw new Error('Failed to restore identity handle for re-registration: ' + (err instanceof Error ? err.message : String(err)));
+    }
+
+    // 2. Get registration proof (signs with existing Dilithium5 key)
+    const displayName = currentIdentity.displayName || 'Recovered Identity';
+    const registrationProof = await nativeIdentityProvisioning.createRegistrationProof(
+      displayName,
+      { did: currentIdentity.did },
+    );
+
+    // 3. POST to /api/v1/identity/register — same endpoint, existing key
+    const registerRequest = {
+      public_key: registrationProof.public_key,
+      kyber_public_key: registrationProof.kyber_public_key,
+      device_id: registrationProof.device_id,
+      display_name: displayName,
+      identity_type: currentIdentity.identityType || 'human',
+      registration_proof: registrationProof.registration_proof,
+      timestamp: registrationProof.timestamp,
+    };
+
+    const response = await quicRequestRaw(
+      '/api/v1/identity/register',
+      {
+        method: 'POST',
+        body: JSON.stringify(registerRequest),
+        headers: { 'Content-Type': 'application/json' },
+      },
+    );
+
+    let newIdentityId = identityId;
+    let primaryWalletId = '';
+    let ubiWalletId = '';
+    let savingsWalletId = '';
+
+    if (response.ok) {
+      const body = JSON.parse(response.body);
+      newIdentityId = body.identity_id || identityId;
+      primaryWalletId = body.primary_wallet_id || '';
+      ubiWalletId = body.ubi_wallet_id || '';
+      savingsWalletId = body.savings_wallet_id || '';
+      console.log('[RealAuthService] Re-registration succeeded, new identityId:', newIdentityId);
+    } else if (response.status === 409) {
+      // Already registered on this chain — treat as success
+      console.warn('[RealAuthService] Identity already registered on new chain, continuing');
+    } else {
+      throw new Error(`Re-registration failed: HTTP ${response.status}: ${response.body}`);
+    }
+
+    // 4. If the server assigned a different identityId, update native storage
+    if (newIdentityId !== identityId) {
+      try {
+        await nativeIdentityProvisioning.storeProvisionedIdentity(
+          newIdentityId,
+          { did: currentIdentity.did },
+        );
+      } catch (err) {
+        console.warn('[RealAuthService] Failed to update native store with new identityId:', err);
+      }
+
+      try {
+        await nativeIdentityProvisioning.restoreIdentityToHandleStore(newIdentityId);
+      } catch (err) {
+        console.warn('[RealAuthService] Failed to restore new identityId to handle store:', err);
+      }
+    }
+
+    // 5. Persist chain binding
+    const binding: LocalChainBinding = {
+      chainId: newChainId,
+      registeredHeight: newHeight,
+      identityId: newIdentityId,
+      primaryWalletId,
+      ubiWalletId,
+      savingsWalletId,
+    };
+    await ChainBindingStorage.set(binding);
+
+    console.log('[RealAuthService] Chain binding saved for chain', newChainId);
+    return binding;
   }
 
   private async storeIdentity(identity: Identity): Promise<void> {

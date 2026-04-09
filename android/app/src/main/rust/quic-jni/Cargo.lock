@@ -1910,6 +1910,7 @@ dependencies = [
  "primitive-types",
  "rand 0.8.5",
  "serde",
+ "serde_arrays",
  "serde_json",
  "sled",
  "thiserror 1.0.69",
@@ -1940,7 +1941,6 @@ dependencies = [
  "lib-crypto",
  "lib-identity-core",
  "pqc_kyber",
- "pqcrypto-dilithium",
  "pqcrypto-kyber",
  "pqcrypto-traits",
  "rand 0.8.5",
@@ -1993,8 +1993,6 @@ dependencies = [
  "hex",
  "hkdf",
  "pqc_kyber",
- "pqcrypto-dilithium",
- "pqcrypto-traits",
  "rand 0.8.5",
  "serde",
  "sha3",
@@ -2225,6 +2223,7 @@ dependencies = [
  "blake3",
  "getrandom 0.2.17",
  "hex",
+ "lib-crypto",
  "serde",
 ]
 
@@ -2904,19 +2903,6 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "1b23e1823e8a78ad67990c5cb843d5eba75ab3b8a44d041f3814fde89463dc6f"
 dependencies = [
  "rand_core 0.6.4",
-]
-
-[[package]]
-name = "pqcrypto-dilithium"
-version = "0.5.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "685de0fa68c6786559d5fcdaa414f0cd68ef3f5d162f61823bd7424cd276726f"
-dependencies = [
- "cc",
- "glob",
- "libc",
- "pqcrypto-internals",
- "pqcrypto-traits",
 ]
 
 [[package]]
@@ -3662,6 +3648,15 @@ checksum = "9a8e94ea7f378bd32cbbd37198a4a91436180c5bb472411e48b5ec2e2124ae9e"
 dependencies = [
  "serde_core",
  "serde_derive",
+]
+
+[[package]]
+name = "serde_arrays"
+version = "0.1.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "38636132857f68ec3d5f3eb121166d2af33cb55174c4d5ff645db6165cbef0fd"
+dependencies = [
+ "serde",
 ]
 
 [[package]]
