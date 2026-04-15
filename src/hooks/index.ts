@@ -38,6 +38,9 @@ export type { UseTokenOperationsReturn, TokenOperationState } from './useTokenOp
 export { useUserTokenBalances } from './useUserTokenBalances';
 export type { UserTokenBalancesData, TokenDisplay } from './useUserTokenBalances';
 
+export { useTokenRegistry, getTokenRegistry, resolveTokenBySymbol } from './useTokenRegistry';
+export type { TokenRegistry } from './useTokenRegistry';
+
 export { useNetworkNotices } from './useNetworkNotices';
 export type { UseNetworkNoticesReturn } from './useNetworkNotices';
 
@@ -45,3 +48,6 @@ export { useAddressBook } from './useAddressBook';
 export type { AddressBookEntry, UseAddressBookReturn } from './useAddressBook';
 export { useChainReregistration } from './useChainReregistration';
 export type { ChainReregStatus, UseChainReregistrationReturn } from './useChainReregistration';
+
+export { useDaoStakes } from './useDaoStakes';
+export type { DaoStake, DaoStakesResponse } from './useDaoStakes';

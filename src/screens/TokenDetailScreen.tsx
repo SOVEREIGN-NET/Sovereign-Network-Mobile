@@ -21,7 +21,7 @@ import {
 import { colors, spacing, typography, borderRadius } from '../theme';
 import { useAuth } from '../hooks/useAuth';
 import tokenService from '../services/TokenService';
-import { atomicToHuman } from '../utils/tokenUnits';
+import { atomsToDisplayLocale } from '../utils/tokenUnits';
 
 const TokenDetailScreen = ({ route, navigation }: any) => {
   const insets = useSafeAreaInsets();
@@ -144,10 +144,6 @@ const TokenDetailScreen = ({ route, navigation }: any) => {
     return <LoadingView />;
   }
 
-  const formatBalance = (balance: number): string => {
-    return balance.toLocaleString('en-US', { maximumFractionDigits: 2 });
-  };
-
   return (
     <KeyboardAvoidingView
       behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
@@ -202,10 +198,10 @@ const TokenDetailScreen = ({ route, navigation }: any) => {
                   {/* Info Section */}
                   <SectionLabel style={{ paddingHorizontal: spacing.md }}>Information</SectionLabel>
                   <Column gap="sm" style={{ paddingHorizontal: spacing.md, paddingBottom: spacing.md }}>
-                    <DetailRow label="Total Supply" value={formatBalance(atomicToHuman(token.total_supply, token.decimals))} />
+                    <DetailRow label="Total Supply" value={atomsToDisplayLocale(String(token.total_supply ?? '0'), token.decimals)} />
                     <DetailRow label="Decimals" value={token.decimals.toString()} />
                     {token.max_supply && (
-                      <DetailRow label="Max Supply" value={formatBalance(atomicToHuman(token.max_supply, token.decimals))} />
+                      <DetailRow label="Max Supply" value={atomsToDisplayLocale(String(token.max_supply), token.decimals)} />
                     )}
                     <DetailRow label="Deflationary" value={token.is_deflationary ? 'Yes' : 'No'} />
                     <DetailRow label="Created at Block" value={token.created_at_block.toString()} />

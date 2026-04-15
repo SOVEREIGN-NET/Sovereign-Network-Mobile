@@ -1,9 +1,20 @@
 import { useState, useEffect, useCallback } from 'react';
 import { useAuth } from './useAuth';
 import appService, { PoUWRewardsResponse } from '../services/AppService';
-import { atomicToHuman } from '../utils/tokenUnits';
 
-const SOV_DECIMALS = 8;
+const SOV_DECIMALS = 18;
+const SOV_ATOMS_PER_UNIT = 10n ** BigInt(SOV_DECIMALS);
+
+/** Parse raw atoms (string from node, or legacy number) into whole-SOV float. */
+const atomsToSov = (v: unknown): number => {
+  if (v == null) return 0;
+  const s = typeof v === 'number' ? String(Math.trunc(v)) : String(v).trim();
+  if (!/^\d+$/.test(s)) return 0;
+  const atoms = BigInt(s);
+  const whole = atoms / SOV_ATOMS_PER_UNIT;
+  const frac = atoms % SOV_ATOMS_PER_UNIT;
+  return Number(whole) + Number(frac) / Number(SOV_ATOMS_PER_UNIT);
+};
 
 export interface RewardCounterData {
   balance: number;
@@ -45,7 +56,7 @@ function extractMaturationSecs(error: unknown): { ageSecs: number; requiredSecs:
   return null;
 }
 
-const toSOV = (rawAmount: number): number => atomicToHuman(rawAmount, SOV_DECIMALS);
+const toSOV = (rawAmount: unknown): number => atomsToSov(rawAmount);
 
 const formatSovBalance = (amount: number): string => {
   if (amount <= 0) return '0';

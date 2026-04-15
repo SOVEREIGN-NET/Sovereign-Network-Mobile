@@ -412,6 +412,48 @@ class NativeIdentityProvisioningBridge {
   }
 
   /**
+   * Sign a token transfer where the sender is identified by an explicit
+   * wallet_id (as opposed to the identity key). Used for CBE and any future
+   * token whose balance lives at wallet_id. Nonce must be fetched by the
+   * caller against (tokenId, fromWalletId) — NOT against the recipient.
+   */
+  async signTokenWalletTransferTransaction(params: {
+    tokenId: string;
+    fromWalletId: string;
+    toWalletId: string;
+    amount: number;
+    nonce: number;
+    chainId?: number;
+  }): Promise<{ signed_tx: string }> {
+    if (!this.nativeModule) {
+      throw new Error(
+        'NativeIdentityProvisioning not available on this platform',
+      );
+    }
+
+    return await this.nativeModule.signTokenWalletTransferTransaction(params);
+  }
+
+  /**
+   * Sign a DAO stake transaction — locks SOV into a sector welfare DAO wallet.
+   * Amount is in nSOV (atoms). Nonce must be fetched against (SOV token_id, staker wallet).
+   */
+  async signDaoStakeTransaction(params: {
+    sectorDaoKeyId: string;
+    amount: number;
+    nonce: number;
+    lockBlocks: number;
+    chainId?: number;
+  }): Promise<{ signed_tx: string }> {
+    if (!this.nativeModule) {
+      throw new Error(
+        'NativeIdentityProvisioning not available on this platform',
+      );
+    }
+    return await this.nativeModule.signDaoStakeTransaction(params);
+  }
+
+  /**
    * Pass fee config JSON (from server) to Rust for cached fee computation.
    * Returns updatedAt height and current chain height.
    */

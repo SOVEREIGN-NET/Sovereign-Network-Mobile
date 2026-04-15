@@ -41,8 +41,9 @@ if (!generatedConfig.ZHTP_NODE_URL) {
 
 export const DEFAULT_SOV_NODE_URL = generatedConfig.ZHTP_NODE_URL;
 export const CERTIFICATE_PIN = generatedConfig.CERTIFICATE_PIN;
-export const SOV_TOKEN_ID: string =
-  '0b82ce3b103b0557d7224a16fa3c1c4311ed66d019bc512094b5229d7c838768';
+// Token IDs are resolved at runtime from the chain registry
+// (GET /api/v1/token/list). Do NOT hardcode token IDs here — see
+// src/hooks/useTokenRegistry.ts.
 export const CHAIN_ID: number = Number.isFinite(
   Number(generatedConfig.CHAIN_ID),
 )
@@ -260,7 +261,6 @@ export const config = {
   NODE_HOST: DEFAULT_NODE_HOST,
   NODE_PORT: DEFAULT_NODE_PORT,
   CERTIFICATE_PIN,
-  SOV_TOKEN_ID,
   CHAIN_ID,
   NETWORK_TYPE: DEFAULT_NETWORK_TYPE,
   API_ENDPOINTS,

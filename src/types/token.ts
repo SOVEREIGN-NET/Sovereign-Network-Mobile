@@ -20,12 +20,12 @@ export interface TokenCreateResponse {
   token_id: string;
   name: string;
   symbol: string;
-  initial_supply: number;
+  initial_supply: string;
   decimals: number;
   treasury_allocation_bps: number;
   treasury_recipient: string;
-  creator_allocation: number;
-  treasury_allocation: number;
+  creator_allocation: string;
+  treasury_allocation: string;
   tx_status: string;
 }
 
@@ -40,9 +40,9 @@ export interface TokenMintRequest {
 
 export interface TokenMintResponse {
   success: boolean;
-  amount_minted: number;
+  amount_minted: string;
   to: string;
-  new_total_supply: number;
+  new_total_supply: string;
 }
 
 // ============ TRANSFER TOKEN ============
@@ -57,11 +57,11 @@ export interface TokenTransferRequest {
 
 export interface TokenTransferResponse {
   success: boolean;
-  amount: number;
+  amount: string;
   from: string;
   to: string;
-  from_balance: number;
-  to_balance: number;
+  from_balance: string;
+  to_balance: string;
 }
 
 // ============ SOV WALLET TRANSFER ============
@@ -76,11 +76,11 @@ export interface SovTransferRequest {
 
 export interface SovTransferResponse {
   success: boolean;
-  amount: number;
+  amount: string;
   from_wallet_id: string;
   to_wallet_id: string;
-  from_balance: number;
-  to_balance: number;
+  from_balance: string;
+  to_balance: string;
   tx_hash?: string;
   tx_status?: string;
 }
@@ -92,8 +92,8 @@ export interface TokenInfoResponse {
   name: string;
   symbol: string;
   decimals: number;
-  total_supply: number;
-  max_supply: number | null;
+  total_supply: string;
+  max_supply: string | null;
   creator: string;
   is_deflationary: boolean;
   created_at_block: number;
@@ -103,7 +103,7 @@ export interface TokenInfoResponse {
 
 export interface TokenBalanceResponse {
   token_id: string;
-  balance: number;
+  balance: string;
   decimals: number;
   symbol: string;
   name: string;
@@ -114,13 +114,13 @@ export interface TokenBalanceResponse {
 
 export interface TokenBurnRequest {
   token_id: string;
-  amount: number;
+  amount: string;
 }
 
 export interface TokenBurnResponse {
   success: boolean;
-  amount_burned: number;
-  remaining_balance: number;
+  amount_burned: string;
+  remaining_balance: string;
 }
 
 // ============ LIST TOKENS ============
@@ -129,7 +129,8 @@ export interface TokenListItem {
   token_id: string;
   name: string;
   symbol: string;
-  total_supply: number;
+  decimals: number;
+  total_supply: string;
 }
 
 export interface TokenListResponse {

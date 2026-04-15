@@ -167,6 +167,31 @@ private func cBuildSovWalletTransfer(
     _ nonce: UInt64
 ) -> UnsafeMutablePointer<CChar>?
 
+/// Build signed token transfer where the sender is an explicit wallet_id.
+/// Used for CBE and any token whose sender lives at wallet_id (not identity key).
+@_silgen_name("zhtp_client_build_token_wallet_transfer")
+private func cBuildTokenWalletTransfer(
+    _ handle: UnsafeMutableRawPointer,
+    _ tokenId: UnsafePointer<UInt8>?,       // 32 bytes
+    _ fromWalletId: UnsafePointer<UInt8>?,  // 32 bytes
+    _ toWalletId: UnsafePointer<UInt8>?,    // 32 bytes
+    _ amount: UInt64,
+    _ chainId: UInt8,
+    _ nonce: UInt64
+) -> UnsafeMutablePointer<CChar>?
+
+/// Build signed DAO stake transaction. Moves SOV from the caller's key_id-derived
+/// wallet into `sector_dao_key_id` (a welfare DAO wallet), locking for `lockBlocks`.
+@_silgen_name("zhtp_client_build_dao_stake")
+private func cBuildDaoStake(
+    _ handle: UnsafeMutableRawPointer,
+    _ sectorDaoKeyId: UnsafePointer<UInt8>?,  // exactly 32 bytes
+    _ amount: UInt64,                          // nSOV (1 SOV = 1e9 nSOV)
+    _ nonce: UInt64,
+    _ lockBlocks: UInt64,
+    _ chainId: UInt8
+) -> UnsafeMutablePointer<CChar>?
+
 // MARK: - C FFI Declarations: Domain transactions (handle is opaque IdentityHandle*)
 
 /// Build signed domain registration transaction
@@ -827,6 +852,84 @@ public class ZhtpClient {
             }
         }) else {
             throw ClientError.signingError("Failed to build SOV wallet transfer transaction")
+        }
+        defer { cStringFree(hexPtr) }
+        return String(cString: hexPtr)
+    }
+
+    /// Build signed token transfer where the sender is an explicit wallet_id.
+    /// Used for CBE and any token held at wallet_id rather than the identity key.
+    /// All three 32-byte buffers (tokenId, fromWalletId, toWalletId) are required.
+    public static func buildTokenWalletTransfer(
+        tokenId: Data,
+        fromWalletId: Data,
+        toWalletId: Data,
+        amount: UInt64,
+        nonce: UInt64,
+        using identity: Identity,
+        chainId: UInt8 = 0x03  // development
+    ) throws -> String {
+        print("[ZhtpClient] buildTokenWalletTransfer called nonce=\(nonce) amount=\(amount)")
+
+        guard tokenId.count == 32 else {
+            throw ClientError.signingError("tokenId must be exactly 32 bytes, got \(tokenId.count)")
+        }
+        guard fromWalletId.count == 32 else {
+            throw ClientError.signingError("fromWalletId must be exactly 32 bytes, got \(fromWalletId.count)")
+        }
+        guard toWalletId.count == 32 else {
+            throw ClientError.signingError("toWalletId must be exactly 32 bytes, got \(toWalletId.count)")
+        }
+
+        guard let hexPtr = tokenId.withUnsafeBytes({ tokPtr in
+            fromWalletId.withUnsafeBytes { fromPtr in
+                toWalletId.withUnsafeBytes { toPtr in
+                    cBuildTokenWalletTransfer(
+                        identity.getHandle(),
+                        tokPtr.baseAddress?.assumingMemoryBound(to: UInt8.self),
+                        fromPtr.baseAddress?.assumingMemoryBound(to: UInt8.self),
+                        toPtr.baseAddress?.assumingMemoryBound(to: UInt8.self),
+                        amount,
+                        chainId,
+                        nonce
+                    )
+                }
+            }
+        }) else {
+            throw ClientError.signingError("Failed to build token wallet transfer transaction")
+        }
+        defer { cStringFree(hexPtr) }
+        return String(cString: hexPtr)
+    }
+
+    /// Build signed DAO stake transaction — moves SOV from the identity's key_id
+    /// wallet into a sector welfare DAO wallet, locking for `lockBlocks`.
+    /// `sectorDaoKeyId` must be exactly 32 bytes. Amount is in nSOV.
+    public static func buildDaoStake(
+        sectorDaoKeyId: Data,
+        amount: UInt64,
+        nonce: UInt64,
+        lockBlocks: UInt64,
+        using identity: Identity,
+        chainId: UInt8 = 0x03
+    ) throws -> String {
+        print("[ZhtpClient] buildDaoStake amount=\(amount) nonce=\(nonce) lockBlocks=\(lockBlocks) chainId=\(chainId)")
+
+        guard sectorDaoKeyId.count == 32 else {
+            throw ClientError.signingError("sectorDaoKeyId must be exactly 32 bytes, got \(sectorDaoKeyId.count)")
+        }
+
+        guard let hexPtr = sectorDaoKeyId.withUnsafeBytes({ daoPtr in
+            cBuildDaoStake(
+                identity.getHandle(),
+                daoPtr.baseAddress?.assumingMemoryBound(to: UInt8.self),
+                amount,
+                nonce,
+                lockBlocks,
+                chainId
+            )
+        }) else {
+            throw ClientError.signingError("Failed to build DAO stake transaction")
         }
         defer { cStringFree(hexPtr) }
         return String(cString: hexPtr)

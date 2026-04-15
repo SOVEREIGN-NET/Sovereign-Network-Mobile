@@ -1370,6 +1370,212 @@ class NativeIdentityProvisioning: NSObject, UIDocumentPickerDelegate {
         }
     }
 
+    /// Sign a token transfer where the sender is an explicit wallet_id (e.g.
+    /// CBE). Mirrors signSovWalletTransferTransaction but carries a token_id.
+    /// Nonce MUST be fetched against (token_id, fromWalletId) by the caller.
+    @objc
+    func signTokenWalletTransferTransaction(
+        _ params: NSDictionary,
+        resolve: @escaping RCTPromiseResolveBlock,
+        reject: @escaping RCTPromiseRejectBlock
+    ) {
+        queue.async { [weak self] in
+            guard self != nil else {
+                reject("IDENTITY_ERROR", "Module deallocated", nil)
+                return
+            }
+            do {
+                guard let tokenIdHex = params["tokenId"] as? String,
+                      let fromWalletIdHex = params["fromWalletId"] as? String,
+                      let toWalletIdHex = params["toWalletId"] as? String else {
+                    reject("INVALID_PARAMS", "Missing required token wallet transfer parameters (tokenId, fromWalletId, toWalletId)", nil)
+                    return
+                }
+
+                var amountValue: UInt64 = 0
+                if let amountStr = params["amount"] as? String {
+                    guard let parsed = UInt64(amountStr) else {
+                        reject("INVALID_PARAMS", "amount must be a valid integer string", nil)
+                        return
+                    }
+                    amountValue = parsed
+                } else if let amountNum = params["amount"] as? NSNumber {
+                    amountValue = amountNum.uint64Value
+                } else {
+                    reject("INVALID_PARAMS", "amount must be a string or number", nil)
+                    return
+                }
+
+                var nonceValue: UInt64 = 0
+                if let nonceStr = params["nonce"] as? String {
+                    guard let parsed = UInt64(nonceStr) else {
+                        reject("INVALID_PARAMS", "nonce must be a valid integer string", nil)
+                        return
+                    }
+                    nonceValue = parsed
+                } else if let nonceNum = params["nonce"] as? NSNumber {
+                    nonceValue = nonceNum.uint64Value
+                } else {
+                    reject("INVALID_PARAMS", "nonce is required (string or number)", nil)
+                    return
+                }
+
+                var chainId: UInt8 = 0x03
+                if let chainIdNum = params["chainId"] as? NSNumber {
+                    chainId = UInt8(truncating: chainIdNum)
+                } else if let chainIdStr = params["chainId"] as? String,
+                          let parsedChainId = UInt8(chainIdStr) {
+                    chainId = parsedChainId
+                }
+
+                guard let tokenIdData = Data(fromHexString: tokenIdHex), tokenIdData.count == 32 else {
+                    reject("INVALID_PARAMS", "tokenId must be 64 hex characters (32 bytes)", nil)
+                    return
+                }
+                guard let fromWalletIdData = Data(fromHexString: fromWalletIdHex), fromWalletIdData.count == 32 else {
+                    reject("INVALID_PARAMS", "fromWalletId must be 64 hex characters (32 bytes)", nil)
+                    return
+                }
+                guard let toWalletIdData = Data(fromHexString: toWalletIdHex), toWalletIdData.count == 32 else {
+                    reject("INVALID_PARAMS", "toWalletId must be 64 hex characters (32 bytes)", nil)
+                    return
+                }
+
+                guard let identityAny = IdentityHandleStore.shared.getLatestIdentity(),
+                      let identity = identityAny as? Identity else {
+                    reject("NO_IDENTITY", "No active identity for signing", nil)
+                    return
+                }
+
+                print("[NativeIdentityProvisioning] Building token wallet transfer")
+                print("[NativeIdentityProvisioning]   Token ID: \(tokenIdHex)")
+                print("[NativeIdentityProvisioning]   From: \(fromWalletIdHex)")
+                print("[NativeIdentityProvisioning]   To: \(toWalletIdHex)")
+                print("[NativeIdentityProvisioning]   Amount: \(amountValue)")
+                print("[NativeIdentityProvisioning]   Nonce: \(nonceValue)")
+
+                let hexSignedTx = try ZhtpClient.buildTokenWalletTransfer(
+                    tokenId: tokenIdData,
+                    fromWalletId: fromWalletIdData,
+                    toWalletId: toWalletIdData,
+                    amount: amountValue,
+                    nonce: nonceValue,
+                    using: identity,
+                    chainId: chainId
+                )
+
+                resolve(["signed_tx": hexSignedTx])
+
+            } catch {
+                print("[NativeIdentityProvisioning] ❌ Token wallet transfer signing failed: \(error)")
+                reject("SIGNING_ERROR", "Failed to sign token wallet transfer: \(error)", nil)
+            }
+        }
+    }
+
+    /// Sign a DAO stake transaction. Moves SOV from the caller's identity wallet
+    /// into a sector welfare DAO wallet, locked for `lockBlocks`.
+    /// Params: { sectorDaoKeyId (64 hex), amount (nSOV str|num), nonce (str|num),
+    ///           lockBlocks (str|num), chainId (optional num) }
+    @objc
+    func signDaoStakeTransaction(
+        _ params: NSDictionary,
+        resolve: @escaping RCTPromiseResolveBlock,
+        reject: @escaping RCTPromiseRejectBlock
+    ) {
+        queue.async { [weak self] in
+            guard self != nil else {
+                reject("IDENTITY_ERROR", "Module deallocated", nil)
+                return
+            }
+            do {
+                guard let sectorDaoKeyIdHex = params["sectorDaoKeyId"] as? String else {
+                    reject("INVALID_PARAMS", "Missing sectorDaoKeyId", nil)
+                    return
+                }
+
+                var amountValue: UInt64 = 0
+                if let s = params["amount"] as? String {
+                    guard let v = UInt64(s) else {
+                        reject("INVALID_PARAMS", "amount must be a valid integer string", nil)
+                        return
+                    }
+                    amountValue = v
+                } else if let n = params["amount"] as? NSNumber {
+                    amountValue = n.uint64Value
+                } else {
+                    reject("INVALID_PARAMS", "amount is required (string or number)", nil)
+                    return
+                }
+
+                var nonceValue: UInt64 = 0
+                if let s = params["nonce"] as? String {
+                    guard let v = UInt64(s) else {
+                        reject("INVALID_PARAMS", "nonce must be a valid integer string", nil)
+                        return
+                    }
+                    nonceValue = v
+                } else if let n = params["nonce"] as? NSNumber {
+                    nonceValue = n.uint64Value
+                } else {
+                    reject("INVALID_PARAMS", "nonce is required (string or number)", nil)
+                    return
+                }
+
+                var lockBlocksValue: UInt64 = 0
+                if let s = params["lockBlocks"] as? String {
+                    guard let v = UInt64(s) else {
+                        reject("INVALID_PARAMS", "lockBlocks must be a valid integer string", nil)
+                        return
+                    }
+                    lockBlocksValue = v
+                } else if let n = params["lockBlocks"] as? NSNumber {
+                    lockBlocksValue = n.uint64Value
+                } else {
+                    reject("INVALID_PARAMS", "lockBlocks is required (string or number)", nil)
+                    return
+                }
+
+                var chainId: UInt8 = 0x03
+                if let n = params["chainId"] as? NSNumber {
+                    chainId = UInt8(truncating: n)
+                } else if let s = params["chainId"] as? String, let v = UInt8(s) {
+                    chainId = v
+                }
+
+                guard let sectorDaoKeyId = Data(fromHexString: sectorDaoKeyIdHex),
+                      sectorDaoKeyId.count == 32 else {
+                    reject("INVALID_PARAMS", "sectorDaoKeyId must be 64 hex characters (32 bytes)", nil)
+                    return
+                }
+
+                guard let identityAny = IdentityHandleStore.shared.getLatestIdentity(),
+                      let identity = identityAny as? Identity else {
+                    reject("NO_IDENTITY", "No active identity for signing", nil)
+                    return
+                }
+
+                print("[NativeIdentityProvisioning] Building DAO stake tx dao=\(sectorDaoKeyIdHex) amount=\(amountValue) nonce=\(nonceValue) lockBlocks=\(lockBlocksValue) chainId=\(chainId)")
+
+                let hexSignedTx = try ZhtpClient.buildDaoStake(
+                    sectorDaoKeyId: sectorDaoKeyId,
+                    amount: amountValue,
+                    nonce: nonceValue,
+                    lockBlocks: lockBlocksValue,
+                    using: identity,
+                    chainId: chainId
+                )
+
+                print("[NativeIdentityProvisioning] DAO stake tx signed, hex length: \(hexSignedTx.count)")
+                resolve(["signed_tx": hexSignedTx])
+
+            } catch {
+                print("[NativeIdentityProvisioning] ❌ DAO stake signing failed: \(error)")
+                reject("SIGNING_ERROR", "Failed to sign DAO stake transaction: \(error)", nil)
+            }
+        }
+    }
+
     // MARK: - Fee Config
 
     @objc

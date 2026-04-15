@@ -3,7 +3,26 @@ import { useAuth } from './useAuth';
 import { useAsyncData } from './useAsyncData';
 import { getUseMockService } from '../context/AuthContext';
 import appService from '../services/AppService';
-import { atomicToHuman } from '../utils/tokenUnits';
+
+const SOV_DECIMALS = 18;
+const SOV_ATOMS_PER_UNIT = 10n ** BigInt(SOV_DECIMALS);
+
+/**
+ * Parse a raw atoms value (string from node, or legacy number) into a display
+ * number expressed in whole SOV. Uses bigint internally so string u128 atoms
+ * survive; the final Number() cast is only for UI display of whole-SOV amounts
+ * and is safe up to ~9e15 SOV (well beyond the total supply).
+ */
+const atomsToSov = (v: unknown): number => {
+  if (v == null) return 0;
+  const s = typeof v === 'number' ? String(Math.trunc(v)) : String(v).trim();
+  if (!/^\d+$/.test(s)) return 0;
+  const atoms = BigInt(s);
+  const whole = atoms / SOV_ATOMS_PER_UNIT;
+  const frac = atoms % SOV_ATOMS_PER_UNIT;
+  // Combine with float fraction; precision loss only matters below ~1e-15 SOV.
+  return Number(whole) + Number(frac) / Number(SOV_ATOMS_PER_UNIT);
+};
 
 export interface WalletPermissions {
   can_transfer_external: boolean;
@@ -56,10 +75,10 @@ const toWalletDisplay = (wallet: any): WalletDisplay => ({
   id: resolveWalletId(wallet),
   name: wallet.name ?? `${wallet.wallet_type} Wallet`,
   wallet_type: wallet.wallet_type ?? 'Unknown',
-  available_balance: atomicToHuman(wallet.available_balance ?? 0),
-  staked_balance: atomicToHuman(wallet.staked_balance ?? 0),
-  pending_rewards: atomicToHuman(wallet.pending_rewards ?? 0),
-  total_balance: atomicToHuman(wallet.total_balance ?? wallet.balance ?? 0),
+  available_balance: atomsToSov(wallet.available_balance),
+  staked_balance: atomsToSov(wallet.staked_balance),
+  pending_rewards: atomsToSov(wallet.pending_rewards),
+  total_balance: atomsToSov(wallet.total_balance ?? wallet.balance),
   permissions: wallet.permissions,
   created_at: wallet.created_at,
   description: wallet.description,
@@ -114,10 +133,8 @@ export const useWalletList = () => {
       return acc;
     }, {});
     const totalFromWallets = wallets.reduce((sum, wallet) => sum + (wallet.total_balance ?? 0), 0);
-    const totalBalance =
-      data?.total_balance && data.total_balance > 0
-        ? atomicToHuman(data.total_balance)
-        : totalFromWallets;
+    const totalFromServer = atomsToSov(data?.total_balance);
+    const totalBalance = totalFromServer > 0 ? totalFromServer : totalFromWallets;
 
     return {
       identityId: data?.identity_id ?? identityId ?? null,

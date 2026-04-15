@@ -586,6 +586,7 @@ export const en = {
     tabs: {
       tokens: 'Tokens',
       nfts: 'NFTs',
+      staking: 'Staking',
       activity: 'Activity',
     },
     empty: {

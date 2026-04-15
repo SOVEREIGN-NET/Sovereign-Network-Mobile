@@ -601,6 +601,151 @@ class NativeIdentityProvisioning(reactContext: ReactApplicationContext) :
         }
     }
 
+    /**
+     * Sign a token transfer where the sender is an explicit wallet_id (e.g.
+     * CBE). Mirrors signSovWalletTransferTransaction but carries a token_id.
+     * The nonce MUST be fetched against (token_id, fromWalletId).
+     */
+    @ReactMethod
+    fun signTokenWalletTransferTransaction(params: ReadableMap, promise: Promise) {
+        executor.execute {
+            try {
+                val tokenIdHex = params.getString("tokenId") ?: ""
+                val fromWalletIdHex = params.getString("fromWalletId") ?: ""
+                val toWalletIdHex = params.getString("toWalletId") ?: ""
+                val amount = parseAmount(params, "amount")
+                    ?: run {
+                        promise.reject("INVALID_PARAMS", "amount must be a valid integer string or number")
+                        return@execute
+                    }
+                val chainId = if (params.hasKey("chainId") && !params.isNull("chainId")) {
+                    params.getInt("chainId")
+                } else {
+                    0x03
+                }
+
+                if (tokenIdHex.length != 64 || !tokenIdHex.matches(Regex("[0-9a-fA-F]+"))) {
+                    promise.reject("INVALID_PARAMS", "tokenId must be 64 hex characters (32 bytes)")
+                    return@execute
+                }
+                if (fromWalletIdHex.length != 64 || !fromWalletIdHex.matches(Regex("[0-9a-fA-F]+"))) {
+                    promise.reject("INVALID_PARAMS", "fromWalletId must be 64 hex characters (32 bytes)")
+                    return@execute
+                }
+                if (toWalletIdHex.length != 64 || !toWalletIdHex.matches(Regex("[0-9a-fA-F]+"))) {
+                    promise.reject("INVALID_PARAMS", "toWalletId must be 64 hex characters (32 bytes)")
+                    return@execute
+                }
+
+                val identity = getLatestIdentity()
+                if (identity == null) {
+                    promise.reject("IDENTITY_ERROR", "No identity available for signing")
+                    return@execute
+                }
+
+                val nonceParam = params.getDouble("nonce")
+                val nonce = nonceParam.toLong()
+
+                val tokenIdBytes = hexToBytes(tokenIdHex)
+                val fromWalletIdBytes = hexToBytes(fromWalletIdHex)
+                val toWalletIdBytes = hexToBytes(toWalletIdHex)
+
+                Log.d(TAG, "Building token wallet transfer: token=$tokenIdHex from=$fromWalletIdHex to=$toWalletIdHex nonce=$nonce")
+
+                val hexSignedTx = identity.buildTokenWalletTransfer(
+                    tokenIdBytes,
+                    fromWalletIdBytes,
+                    toWalletIdBytes,
+                    amount,
+                    chainId = chainId,
+                    nonce = nonce,
+                )
+                if (hexSignedTx == null) {
+                    promise.reject("SIGNING_ERROR", "Failed to build token wallet transfer transaction")
+                    return@execute
+                }
+
+                promise.resolve(WritableNativeMap().apply {
+                    putString("signed_tx", hexSignedTx)
+                })
+            } catch (e: Exception) {
+                Log.e(TAG, "Token wallet transfer signing failed", e)
+                promise.reject("IDENTITY_ERROR", "Failed to sign token wallet transfer: ${e.message}", e)
+            }
+        }
+    }
+
+    /**
+     * Sign a DAO stake transaction. Moves SOV from the caller's identity wallet
+     * into a sector welfare DAO wallet, locked for lockBlocks.
+     * Params: { sectorDaoKeyId (64 hex), amount, nonce, lockBlocks, chainId? }
+     */
+    @ReactMethod
+    fun signDaoStakeTransaction(params: ReadableMap, promise: Promise) {
+        executor.execute {
+            try {
+                val sectorDaoKeyIdHex = params.getString("sectorDaoKeyId") ?: ""
+                val amount = parseAmount(params, "amount")
+                    ?: run {
+                        promise.reject("INVALID_PARAMS", "amount must be a valid integer string or number")
+                        return@execute
+                    }
+                val lockBlocks = parseAmount(params, "lockBlocks")
+                    ?: run {
+                        promise.reject("INVALID_PARAMS", "lockBlocks must be a valid integer string or number")
+                        return@execute
+                    }
+                val nonce = parseAmount(params, "nonce")
+                    ?: run {
+                        promise.reject("INVALID_PARAMS", "nonce must be a valid integer string or number")
+                        return@execute
+                    }
+                val chainId = if (params.hasKey("chainId") && !params.isNull("chainId")) {
+                    params.getInt("chainId")
+                } else {
+                    0x03
+                }
+
+                if (sectorDaoKeyIdHex.length != 64 || !sectorDaoKeyIdHex.matches(Regex("[0-9a-fA-F]+"))) {
+                    promise.reject("INVALID_PARAMS", "sectorDaoKeyId must be 64 hex characters (32 bytes)")
+                    return@execute
+                }
+
+                val identity = getLatestIdentity()
+                if (identity == null) {
+                    promise.reject("IDENTITY_ERROR", "No identity available for signing")
+                    return@execute
+                }
+
+                val daoKeyIdBytes = hexToBytes(sectorDaoKeyIdHex)
+
+                Log.d(
+                    TAG,
+                    "Building DAO stake: dao=$sectorDaoKeyIdHex amount=$amount nonce=$nonce lockBlocks=$lockBlocks chainId=$chainId",
+                )
+
+                val hexSignedTx = identity.buildDaoStake(
+                    sectorDaoKeyId = daoKeyIdBytes,
+                    amount = amount,
+                    nonce = nonce,
+                    lockBlocks = lockBlocks,
+                    chainId = chainId,
+                )
+                if (hexSignedTx == null) {
+                    promise.reject("SIGNING_ERROR", "Failed to build DAO stake transaction")
+                    return@execute
+                }
+
+                promise.resolve(WritableNativeMap().apply {
+                    putString("signed_tx", hexSignedTx)
+                })
+            } catch (e: Exception) {
+                Log.e(TAG, "DAO stake signing failed", e)
+                promise.reject("IDENTITY_ERROR", "Failed to sign DAO stake: ${e.message}", e)
+            }
+        }
+    }
+
     // ─── Fee config ───
 
     @ReactMethod

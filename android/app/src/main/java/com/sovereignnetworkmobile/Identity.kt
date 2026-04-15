@@ -132,6 +132,16 @@ class Identity private constructor(
             amount: Long, chainId: Int, nonce: Long
         ): String?
 
+        @JvmStatic private external fun nativeBuildTokenWalletTransfer(
+            handle: Long, tokenId: ByteArray, fromWalletId: ByteArray,
+            toWalletId: ByteArray, amount: Long, chainId: Int, nonce: Long
+        ): String?
+
+        @JvmStatic private external fun nativeBuildDaoStake(
+            handle: Long, sectorDaoKeyId: ByteArray,
+            amount: Long, nonce: Long, lockBlocks: Long, chainId: Int
+        ): String?
+
         // ─── JNI: Domain requests (returns JSON for REST API) ───
         @JvmStatic private external fun nativeBuildDomainRegisterRequest(
             handle: Long, domain: String, contentMappingsJson: String?
@@ -225,6 +235,29 @@ class Identity private constructor(
         chainId: Int = 0x03,
         nonce: Long = 0L
     ): String? = nativeBuildSovWalletTransfer(handle, fromWalletId, toWalletId, amount, chainId, nonce)
+
+    /**
+     * Build signed token transfer where the sender is identified by an explicit
+     * wallet_id. Use this for CBE and any token whose sender lives at wallet_id
+     * rather than the identity key. All three byte arrays must be 32 bytes.
+     */
+    fun buildTokenWalletTransfer(
+        tokenId: ByteArray,
+        fromWalletId: ByteArray,
+        toWalletId: ByteArray,
+        amount: Long,
+        chainId: Int = 0x03,
+        nonce: Long = 0L
+    ): String? = nativeBuildTokenWalletTransfer(handle, tokenId, fromWalletId, toWalletId, amount, chainId, nonce)
+
+    /** Build signed DAO stake. sectorDaoKeyId must be 32 bytes. amount in nSOV. */
+    fun buildDaoStake(
+        sectorDaoKeyId: ByteArray,
+        amount: Long,
+        nonce: Long,
+        lockBlocks: Long,
+        chainId: Int = 0x03,
+    ): String? = nativeBuildDaoStake(handle, sectorDaoKeyId, amount, nonce, lockBlocks, chainId)
 
     // ─── Domain requests (returns JSON for REST API) ───
 

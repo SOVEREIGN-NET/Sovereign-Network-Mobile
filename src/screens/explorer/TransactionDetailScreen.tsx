@@ -5,6 +5,25 @@ import { Text, Card, Column, Row, Badge } from '../../components';
 import { colors, spacing, borderRadius, typography } from '../../theme';
 import { useAsyncData } from '../../hooks';
 import { fetchTransaction, TransactionDetailResponse } from '../../services/ExplorerService';
+import type { WalletTransaction } from '../../services/AppService';
+import { atomsToDisplayLocale } from '../../utils/tokenUnits';
+
+const SOV_DECIMALS = 18;
+
+/** Normalize a raw atoms value (string or legacy number) to a canonical decimal string. */
+const atomsString = (v: unknown): string => {
+  if (v == null) return '0';
+  const s = typeof v === 'number' ? String(Math.trunc(v)) : String(v).trim();
+  return /^\d+$/.test(s) ? s : '0';
+};
+
+const atomsIsPositive = (v: unknown): boolean => {
+  const s = atomsString(v);
+  return s !== '0';
+};
+
+const formatSov = (atoms: unknown, fractionDigits = 8): string =>
+  atomsToDisplayLocale(atomsString(atoms), SOV_DECIMALS, fractionDigits);
 
 const MONO_FONT = Platform.OS === 'ios' ? 'Menlo' : 'monospace';
 
@@ -25,12 +44,12 @@ function formatTimeAgo(ts: number): string {
 
 function formatAmount(info: TransactionDetailResponse['transaction']): string {
   if (!info) return '—';
-  if (info.amount_human != null) return String(Number(info.amount_human));
-  return String(Number(info.amount) / 1e8);
+  if (info.amount_human != null) return String(info.amount_human);
+  return formatSov(info.amount);
 }
 
-function formatFee(fee: number): string {
-  return String(Number(fee) / 1e8);
+function formatFee(fee: unknown): string {
+  return formatSov(fee);
 }
 
 function formatAddress(addr: string | null | undefined): string | null {
@@ -70,25 +89,67 @@ const DetailText: React.FC<{ value: string; dim?: boolean }> = ({ value, dim }) 
 );
 
 const TransactionDetailScreen: React.FC<any> = ({ navigation, route }) => {
-  const { hash } = route.params;
+  const { hash, activityTx } = route.params as {
+    hash: string;
+    activityTx?: WalletTransaction;
+  };
 
+  // Primary data source: the activity tx passed from the SID screen. It has
+  // all the fields we need (amount, fee, from_wallet, to_address, memo,
+  // block_height, status). The explorer fetch is secondary — used when no
+  // activity tx was passed (deep link) or to fill gaps.
   const { data, loading, error, retry } = useAsyncData<TransactionDetailResponse>(
     () => fetchTransaction(hash),
     [hash],
   );
 
-  const info = data?.transaction;
+  const explorerInfo = data?.transaction;
 
-  const statusLabel = (() => {
-    if (!data) return null;
-    if (info?.status) return info.status;
-    if (data.in_mempool) return 'pending';
-    if (data.confirmations != null && data.confirmations > 0) return 'confirmed';
-    return null;
+  // Merge activity + explorer into a single view model. Activity wins when
+  // both have the same field, because the wallet-transactions endpoint
+  // returns rich per-address data that the generic explorer may not.
+  const merged = (() => {
+    if (!activityTx && !explorerInfo) return null;
+    const amountAtomic = atomsString(activityTx?.amount ?? explorerInfo?.amount);
+    const amountHumanStr =
+      activityTx?.amount_human != null
+        ? String(activityTx.amount_human)
+        : explorerInfo?.amount_human != null
+        ? String(explorerInfo.amount_human)
+        : formatSov(amountAtomic);
+    const feeAtomic = atomsString(activityTx?.fee ?? explorerInfo?.fee);
+    const from =
+      activityTx?.from_wallet ??
+      (formatAddress(explorerInfo?.from) === 'Genesis Block'
+        ? null
+        : formatAddress(explorerInfo?.from));
+    const to =
+      activityTx?.to_address ??
+      (formatAddress(explorerInfo?.to) ?? null);
+    return {
+      hash: activityTx?.tx_hash ?? explorerInfo?.hash ?? hash,
+      type: activityTx?.tx_type ?? explorerInfo?.transaction_type ?? 'transaction',
+      amountHuman: amountHumanStr,
+      amountAtomic,
+      feeAtomic,
+      from,
+      to,
+      timestamp: activityTx?.timestamp ?? explorerInfo?.timestamp ?? 0,
+      blockHeight: activityTx?.block_height ?? data?.block_height ?? null,
+      confirmations: data?.confirmations ?? null,
+      status: (activityTx?.status ?? explorerInfo?.status) as string | undefined,
+      memo: activityTx?.memo ?? explorerInfo?.memo ?? null,
+      size: explorerInfo?.size ?? null,
+    };
   })();
 
-  const fromAddr = formatAddress(info?.from);
-  const toAddr = formatAddress(info?.to);
+  const statusLabel = (() => {
+    if (!merged) return null;
+    if (merged.status) return merged.status;
+    if (data?.in_mempool) return 'pending';
+    if (merged.confirmations != null && merged.confirmations > 0) return 'confirmed';
+    return null;
+  })();
 
   return (
     <SafeAreaView style={styles.container} edges={['top']}>
@@ -101,7 +162,7 @@ const TransactionDetailScreen: React.FC<any> = ({ navigation, route }) => {
       </View>
 
       <ScrollView contentContainerStyle={styles.content} showsVerticalScrollIndicator={false}>
-        {loading && !data && (
+        {loading && !merged && (
           <View style={styles.center}>
             <ActivityIndicator size="large" color={colors.primary} />
             <Text variant="caption" style={{ color: colors.text_secondary, marginTop: spacing.sm }}>
@@ -110,7 +171,7 @@ const TransactionDetailScreen: React.FC<any> = ({ navigation, route }) => {
           </View>
         )}
 
-        {error && (
+        {error && !merged && (
           <Card>
             <Text variant="body" style={{ color: colors.error }}>Failed to load transaction.</Text>
             <Pressable onPress={retry} style={{ marginTop: spacing.sm }}>
@@ -119,78 +180,214 @@ const TransactionDetailScreen: React.FC<any> = ({ navigation, route }) => {
           </Card>
         )}
 
-        {data && !info && (
+        {!loading && !merged && !error && (
           <Card>
             <Text variant="body" style={{ color: colors.text_secondary }}>Transaction not found.</Text>
           </Card>
         )}
 
-        {info && (
+        {merged && (() => {
+          // Direction: incoming / outgoing / neutral — drives icon, title,
+          // amount sign, and color. Inferred from tx_type keywords.
+          const typeLower = (merged.type || '').toLowerCase();
+          const direction: 'in' | 'out' | 'neutral' =
+            /in$|receive|credit|mint|reward/.test(typeLower)
+              ? 'in'
+              : /out$|send|debit|burn|fee|transfer$/.test(typeLower)
+              ? 'out'
+              : 'neutral';
+          const directionIcon =
+            direction === 'in' ? '↓' : direction === 'out' ? '↑' : '⇄';
+          const directionTitle =
+            direction === 'in'
+              ? 'Received'
+              : direction === 'out'
+              ? 'Sent'
+              : 'Transaction';
+          const amountSign =
+            direction === 'in' ? '+' : direction === 'out' ? '−' : '';
+          const amountColor =
+            direction === 'in'
+              ? colors.success
+              : direction === 'out'
+              ? colors.primary
+              : colors.text_primary;
+          const isPending = statusLabel === 'pending';
+          const statusDotColor = isPending
+            ? colors.warning
+            : statusLabel === 'confirmed'
+            ? colors.success
+            : colors.text_tertiary;
+          const typeSubtitle = merged.type
+            ? merged.type.replace(/_/g, ' ')
+            : '';
+          return (
           <>
-            {/* Summary */}
+            {/* Hero summary card: direction icon + title + big signed amount.
+                Replaces the previous pill badges with a single, meaningful
+                composition that communicates direction, status, and value at
+                a glance. */}
             <Card>
-              <Row justify="space-between" align="center" style={{ marginBottom: spacing.sm }}>
-                <Badge label={info.transaction_type} variant="info" size="sm" />
-                {statusLabel && (
-                  <Badge
-                    label={statusLabel}
-                    variant={statusLabel === 'confirmed' ? 'success' : 'warning'}
-                    size="sm"
-                  />
-                )}
+              <Row
+                style={{
+                  alignItems: 'center',
+                  gap: spacing.md,
+                  marginBottom: spacing.md,
+                }}
+              >
+                <View
+                  style={{
+                    width: 48,
+                    height: 48,
+                    borderRadius: 24,
+                    backgroundColor: amountColor + '22',
+                    borderWidth: 1,
+                    borderColor: amountColor + '55',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                  }}
+                >
+                  <Text style={{ fontSize: 22, color: amountColor, fontWeight: '700' }}>
+                    {directionIcon}
+                  </Text>
+                </View>
+                <Column gap="xs" style={{ flex: 1 }}>
+                  <Text
+                    style={{
+                      fontSize: typography.size.lg,
+                      fontWeight: typography.weight.semibold,
+                      color: colors.text_primary,
+                    }}
+                  >
+                    {directionTitle}
+                  </Text>
+                  <Row style={{ alignItems: 'center', gap: spacing.xs }}>
+                    <View
+                      style={{
+                        width: 6,
+                        height: 6,
+                        borderRadius: 3,
+                        backgroundColor: statusDotColor,
+                      }}
+                    />
+                    <Text
+                      style={{
+                        fontSize: typography.size.xs,
+                        color: colors.text_secondary,
+                      }}
+                    >
+                      {statusLabel ?? 'unknown'}
+                      {typeSubtitle ? ` · ${typeSubtitle}` : ''}
+                      {merged.timestamp ? ` · ${formatTimeAgo(merged.timestamp)}` : ''}
+                    </Text>
+                  </Row>
+                </Column>
               </Row>
+
               <View style={styles.amountHero}>
-                <Text style={styles.amountValue}>{formatAmount(info)}</Text>
-                <Text variant="caption" style={{ color: colors.text_secondary }}>SOV</Text>
+                <Text style={{ ...styles.amountValue, color: amountColor }}>
+                  {amountSign}
+                  {merged.amountHuman.toLocaleString('en-US', { maximumFractionDigits: 8 })}
+                </Text>
+                <Text
+                  style={{
+                    fontSize: typography.size.lg,
+                    color: colors.text_secondary,
+                    fontWeight: typography.weight.semibold,
+                  }}
+                >
+                  SOV
+                </Text>
               </View>
-              <Text variant="caption" style={{ color: colors.text_secondary, textAlign: 'center' }}>
-                Fee: {formatFee(info.fee)} SOV
-              </Text>
+
+              {merged.feeAtomic > 0 && (
+                <View
+                  style={{
+                    marginTop: spacing.md,
+                    paddingTop: spacing.sm,
+                    borderTopWidth: 1,
+                    borderTopColor: colors.border,
+                    flexDirection: 'row',
+                    justifyContent: 'space-between',
+                    alignItems: 'center',
+                  }}
+                >
+                  <Text
+                    style={{
+                      fontSize: typography.size.xs,
+                      color: colors.text_secondary,
+                      textTransform: 'uppercase',
+                      letterSpacing: 0.5,
+                    }}
+                  >
+                    Network fee
+                  </Text>
+                  <Text
+                    style={{
+                      fontSize: typography.size.sm,
+                      color: colors.text_primary,
+                      fontWeight: typography.weight.semibold,
+                    }}
+                  >
+                    {formatSov(merged.feeAtomic)}{' '}
+                    SOV
+                  </Text>
+                </View>
+              )}
             </Card>
 
             {/* Details */}
             <Card>
               <Column gap="xs">
                 <DetailRow label="Hash">
-                  <CopyableValue value={info.hash} />
+                  <CopyableValue value={merged.hash} />
                 </DetailRow>
                 <DetailRow label="From">
-                  {fromAddr === 'Genesis Block'
-                    ? <DetailText value="Genesis Block" />
-                    : fromAddr
-                    ? <CopyableValue value={fromAddr} />
+                  {merged.from
+                    ? <CopyableValue value={merged.from} />
                     : <DetailText value="—" dim />}
                 </DetailRow>
                 <DetailRow label="To">
-                  {toAddr
-                    ? <CopyableValue value={toAddr} />
+                  {merged.to
+                    ? <CopyableValue value={merged.to} />
                     : <DetailText value="—" dim />}
                 </DetailRow>
+                <DetailRow label="Amount">
+                  <DetailText value={`${merged.amountHuman} SOV`} />
+                </DetailRow>
+                {atomsIsPositive(merged.feeAtomic) && (
+                  <DetailRow label="Fee">
+                    <DetailText value={`${formatSov(merged.feeAtomic)} SOV`} />
+                  </DetailRow>
+                )}
                 <DetailRow label="Time">
-                  <DetailText value={`${formatTimestamp(info.timestamp)} · ${formatTimeAgo(info.timestamp)}`} />
+                  <DetailText value={`${formatTimestamp(merged.timestamp)} · ${formatTimeAgo(merged.timestamp)}`} />
                 </DetailRow>
-                {data.block_height != null && (
+                {merged.blockHeight != null && (
                   <DetailRow label="Block">
-                    <DetailText value={`#${data.block_height}`} />
+                    <DetailText value={`#${merged.blockHeight}`} />
                   </DetailRow>
                 )}
-                {data.confirmations != null && (
+                {merged.confirmations != null && (
                   <DetailRow label="Confirmations">
-                    <DetailText value={String(data.confirmations)} />
+                    <DetailText value={String(merged.confirmations)} />
                   </DetailRow>
                 )}
-                <DetailRow label="Size">
-                  <DetailText value={`${info.size} bytes`} />
-                </DetailRow>
-                {info.memo ? (
+                {merged.size != null && (
+                  <DetailRow label="Size">
+                    <DetailText value={`${merged.size} bytes`} />
+                  </DetailRow>
+                )}
+                {merged.memo ? (
                   <DetailRow label="Memo">
-                    <DetailText value={info.memo} />
+                    <DetailText value={merged.memo} />
                   </DetailRow>
                 ) : null}
               </Column>
             </Card>
           </>
-        )}
+          );
+        })()}
       </ScrollView>
     </SafeAreaView>
   );

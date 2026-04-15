@@ -100,12 +100,22 @@ export type {
 } from './molecules';
 
 // Organisms
-export { LoadingView, EmptyState, ErrorView, ErrorBoundary } from './organisms';
+export {
+  LoadingView,
+  EmptyState,
+  ErrorView,
+  ErrorBoundary,
+  StakeDaoModal,
+  StakeDetailModal,
+} from './organisms';
 export type {
   LoadingViewProps,
   EmptyStateProps,
   ErrorViewProps,
   ErrorBoundaryProps,
+  StakeDaoModalProps,
+  StakeDaoTarget,
+  StakeDetailModalProps,
 } from './organisms';
 
 // Native

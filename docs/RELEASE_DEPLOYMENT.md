@@ -10,9 +10,9 @@
 
 ## Keystore Credentials
 
-- **Password**: `Tachipirina1978!`
+- **Password**: `JEqWT2SygxdEf5MIA8x6`
 - **Alias**: `release-key`
-- **Key password**: `Tachipirina1978!`
+- **Key password**: `JEqWT2SygxdEf5MIA8x6`
 - **Type**: PKCS12
 - **Regenerated**: 2026-02-24 (keep this keystore safe — losing it means you can't upload updates)
 
@@ -21,9 +21,9 @@
 ```bash
 cd android
 
-RELEASE_KEYSTORE_PASSWORD="Tachipirina1978!" \
+RELEASE_KEYSTORE_PASSWORD="JEqWT2SygxdEf5MIA8x6" \
 RELEASE_KEY_ALIAS="release-key" \
-RELEASE_KEY_PASSWORD="Tachipirina1978!" \
+RELEASE_KEY_PASSWORD="JEqWT2SygxdEf5MIA8x6" \
 ./gradlew bundleRelease -x buildQuicJni
 ```
 
@@ -37,9 +37,9 @@ Requires the service account to have **Release Manager** role in Play Console (s
 cd android
 
 GOOGLE_PLAY_SERVICE_ACCOUNT_JSON="/Users/supertramp/Downloads/sovereign-network-mobile-906a1-a6a74897ca20.json" \
-RELEASE_KEYSTORE_PASSWORD="Tachipirina1978!" \
+RELEASE_KEYSTORE_PASSWORD="JEqWT2SygxdEf5MIA8x6" \
 RELEASE_KEY_ALIAS="release-key" \
-RELEASE_KEY_PASSWORD="Tachipirina1978!" \
+RELEASE_KEY_PASSWORD="JEqWT2SygxdEf5MIA8x6" \
 ./gradlew publishReleaseBundle -x buildQuicJni -PplayTrack=internal
 ```
 
@@ -77,7 +77,7 @@ You must submit the new certificate to Google:
 keytool -export -rfc \
   -keystore android/app/release.keystore \
   -alias release-key \
-  -storepass "Tachipirina1978!" \
+  -storepass "JEqWT2SygxdEf5MIA8x6" \
   -file upload_cert.pem
 ```
 
@@ -98,8 +98,8 @@ versionName "1.1.0"   // semantic version shown to users
 ```bash
 # Re-encode and push new keystore to GitHub secrets
 base64 < android/app/release.keystore | gh secret set RELEASE_KEYSTORE_FILE
-gh secret set RELEASE_KEYSTORE_PASSWORD --body "Tachipirina1978!"
+gh secret set RELEASE_KEYSTORE_PASSWORD --body "JEqWT2SygxdEf5MIA8x6"
 gh secret set RELEASE_KEY_ALIAS --body "release-key"
-gh secret set RELEASE_KEY_PASSWORD --body "Tachipirina1978!"
+gh secret set RELEASE_KEY_PASSWORD --body "JEqWT2SygxdEf5MIA8x6"
 gh secret set GOOGLE_PLAY_SERVICE_ACCOUNT_JSON < /Users/supertramp/Downloads/sovereign-network-mobile-906a1-a6a74897ca20.json
 ```

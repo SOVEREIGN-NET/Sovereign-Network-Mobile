@@ -1,4 +1,4 @@
-import React, { useMemo, useState } from 'react';
+import React, { useMemo, useState, useRef } from 'react';
 import {
   View,
   TouchableOpacity,
@@ -6,6 +6,9 @@ import {
   Alert,
   Modal,
   Clipboard,
+  Dimensions,
+  NativeScrollEvent,
+  NativeSyntheticEvent,
 } from 'react-native';
 import { useFocusEffect } from '@react-navigation/native';
 import {
@@ -19,8 +22,17 @@ import {
   SideDrawer,
   DrawerItem,
   Badge,
+  StakeDetailModal,
 } from '../components';
-import { useAuth, useAsyncData, useUserTokenBalances, useWalletList } from '../hooks';
+import {
+  useAuth,
+  useAsyncData,
+  useUserTokenBalances,
+  useWalletList,
+  useDaoStakes,
+} from '../hooks';
+import type { DaoStake } from '../hooks/useDaoStakes';
+import { WELFARE_DAOS } from '../constants';
 import { useTranslation } from '../i18n';
 import { colors, spacing, typography, borderRadius } from '../theme';
 import DomainRegistrationScreen from './DomainRegistrationScreen';
@@ -29,7 +41,9 @@ import appService, {
   WalletTransactionsResponse,
 } from '../services/AppService';
 import { QuicError } from '../types/api';
-import { atomicToHuman } from '../utils/tokenUnits';
+import { atomsToDisplayLocale } from '../utils/tokenUnits';
+
+const SOV_DECIMALS_LOCAL = 18;
 
 // Format large numbers with commas
 const formatBalance = (balance: number): string => {
@@ -42,19 +56,463 @@ const shortMiddle = (value: string | null | undefined, head = 8, tail = 6) => {
   return `${value.slice(0, head)}...${value.slice(-tail)}`;
 };
 
-const formatTxValue = (value: number): string => {
-  if (!Number.isFinite(value)) return '0';
-  const abs = Math.abs(value);
-  const looksAtomic = Number.isInteger(value) && abs >= 100_000;
-  const normalized = looksAtomic ? atomicToHuman(value) : value;
-  return normalized.toLocaleString('en-US', {
-    minimumFractionDigits: 0,
-    maximumFractionDigits: 8,
-  });
+// Format a SOV atoms value (string from node, or legacy number) as display SOV.
+const formatTxValue = (value: unknown): string => {
+  if (value == null) return '0';
+  const s = typeof value === 'number'
+    ? (Number.isFinite(value) ? String(Math.trunc(value)) : '0')
+    : String(value).trim();
+  if (!/^\d+$/.test(s)) return '0';
+  return atomsToDisplayLocale(s, SOV_DECIMALS_LOCAL, 8);
 };
 
 const FIXED_TAB_PANEL_HEIGHT = 320;
 const CORE_SYMBOLS = new Set(['SOV', 'UBI', 'SAVINGS']);
+
+// ---------------------------------------------------------------------------
+// WalletOptionsSheet: bottom-anchored settings list for the wallet card.
+// Replaces the previous inline row of 3 icon buttons (domains/profile/settings)
+// with a single gear button that opens this sheet.
+// ---------------------------------------------------------------------------
+
+interface WalletOptionsSheetProps {
+  visible: boolean;
+  onClose: () => void;
+  onSelectDomains: () => void;
+  onSelectProfile: () => void;
+  onSelectSettings: () => void;
+}
+
+interface WalletOptionRow {
+  id: 'domains' | 'profile' | 'settings';
+  icon: string;
+  title: string;
+  subtitle: string;
+  onPress: () => void;
+}
+
+const WalletOptionsSheet = ({
+  visible,
+  onClose,
+  onSelectDomains,
+  onSelectProfile,
+  onSelectSettings,
+}: WalletOptionsSheetProps) => {
+  const rows: WalletOptionRow[] = [
+    {
+      id: 'domains',
+      icon: '🌐',
+      title: 'Domains',
+      subtitle: 'Register and manage your .zhtp domains',
+      onPress: onSelectDomains,
+    },
+    {
+      id: 'profile',
+      icon: '👤',
+      title: 'Profile',
+      subtitle: 'View and edit your identity profile',
+      onPress: onSelectProfile,
+    },
+    {
+      id: 'settings',
+      icon: '⚙️',
+      title: 'Wallet Settings',
+      subtitle: 'Security, keys, and preferences',
+      onPress: onSelectSettings,
+    },
+  ];
+
+  return (
+    <Modal
+      visible={visible}
+      animationType="slide"
+      transparent
+      onRequestClose={onClose}
+    >
+      {/* Dimmed backdrop — tap to dismiss. */}
+      <TouchableOpacity
+        activeOpacity={1}
+        onPress={onClose}
+        style={{
+          flex: 1,
+          backgroundColor: 'rgba(0,0,0,0.55)',
+          justifyContent: 'flex-end',
+        }}
+      >
+        {/* Prevent taps inside the sheet from dismissing. */}
+        <TouchableOpacity
+          activeOpacity={1}
+          onPress={() => {}}
+          style={{
+            backgroundColor: colors.bg_darker,
+            borderTopLeftRadius: borderRadius.lg,
+            borderTopRightRadius: borderRadius.lg,
+            borderTopWidth: 1,
+            borderLeftWidth: 1,
+            borderRightWidth: 1,
+            borderColor: colors.border,
+            paddingTop: spacing.sm,
+            paddingBottom: spacing.xl,
+          }}
+        >
+          {/* Grabber */}
+          <View
+            style={{
+              alignSelf: 'center',
+              width: 36,
+              height: 4,
+              borderRadius: 2,
+              backgroundColor: colors.border,
+              marginBottom: spacing.md,
+            }}
+          />
+
+          {/* Header */}
+          <View
+            style={{
+              paddingHorizontal: spacing.lg,
+              paddingBottom: spacing.md,
+              borderBottomWidth: 1,
+              borderBottomColor: colors.border,
+            }}
+          >
+            <Text
+              style={{
+                fontSize: typography.size.lg,
+                fontWeight: typography.weight.semibold,
+                color: colors.text_primary,
+              }}
+            >
+              Wallet Options
+            </Text>
+            <Text
+              style={{
+                fontSize: typography.size.xs,
+                color: colors.text_secondary,
+                marginTop: spacing.xs,
+              }}
+            >
+              Manage your identity, domains, and settings
+            </Text>
+          </View>
+
+          {/* Rows */}
+          {rows.map((row, idx) => (
+            <TouchableOpacity
+              key={row.id}
+              onPress={row.onPress}
+              style={{
+                flexDirection: 'row',
+                alignItems: 'center',
+                paddingHorizontal: spacing.lg,
+                paddingVertical: spacing.md,
+                borderBottomWidth: idx < rows.length - 1 ? 1 : 0,
+                borderBottomColor: colors.border,
+              }}
+            >
+              <View
+                style={{
+                  width: 40,
+                  height: 40,
+                  borderRadius: borderRadius.full,
+                  backgroundColor: colors.bg_darkest,
+                  justifyContent: 'center',
+                  alignItems: 'center',
+                  marginRight: spacing.md,
+                  borderWidth: 1,
+                  borderColor: colors.border,
+                }}
+              >
+                <Text style={{ fontSize: typography.size.lg }}>{row.icon}</Text>
+              </View>
+              <View style={{ flex: 1 }}>
+                <Text
+                  style={{
+                    fontSize: typography.size.base,
+                    fontWeight: typography.weight.semibold,
+                    color: colors.text_primary,
+                  }}
+                >
+                  {row.title}
+                </Text>
+                <Text
+                  style={{
+                    fontSize: typography.size.xs,
+                    color: colors.text_secondary,
+                    marginTop: 2,
+                  }}
+                  numberOfLines={1}
+                >
+                  {row.subtitle}
+                </Text>
+              </View>
+              <Text
+                style={{
+                  fontSize: typography.size.lg,
+                  color: colors.text_tertiary,
+                  marginLeft: spacing.sm,
+                }}
+              >
+                ›
+              </Text>
+            </TouchableOpacity>
+          ))}
+
+          {/* Cancel */}
+          <TouchableOpacity
+            onPress={onClose}
+            style={{
+              marginTop: spacing.md,
+              marginHorizontal: spacing.lg,
+              paddingVertical: spacing.md,
+              borderRadius: borderRadius.base,
+              backgroundColor: colors.bg_darkest,
+              borderWidth: 1,
+              borderColor: colors.border,
+              alignItems: 'center',
+            }}
+          >
+            <Text
+              style={{
+                fontSize: typography.size.md,
+                fontWeight: typography.weight.semibold,
+                color: colors.text_secondary,
+              }}
+            >
+              Cancel
+            </Text>
+          </TouchableOpacity>
+        </TouchableOpacity>
+      </TouchableOpacity>
+    </Modal>
+  );
+};
+
+// ---------------------------------------------------------------------------
+// BalanceCarousel: horizontal paged wallet balance cards, one per token.
+// ---------------------------------------------------------------------------
+
+interface BalanceCarouselProps {
+  cards: Array<{
+    token_id: string;
+    symbol: string;
+    name: string;
+    /** Pre-formatted display string (locale, with commas). Null = unknown/error. */
+    balance: string | null;
+  }>;
+  walletId: string | undefined;
+  walletsLoading: boolean;
+  /** Aggregate SOV balance from useWalletList — more accurate than the
+   *  per-token balance endpoint for SOV (which may report only one wallet). */
+  totalSovBalance: number;
+  sovCurrencyLabel: string;
+  copyLabel: string;
+  onCopyWalletId: () => void;
+  activeIndex: number;
+  onActiveIndexChange: (index: number) => void;
+  scrollRef: React.RefObject<ScrollView | null>;
+}
+
+const BalanceCarousel = ({
+  cards,
+  walletId,
+  walletsLoading,
+  totalSovBalance,
+  sovCurrencyLabel,
+  copyLabel,
+  onCopyWalletId,
+  activeIndex,
+  onActiveIndexChange,
+  scrollRef,
+}: BalanceCarouselProps) => {
+  // One card per token; each card is full-width (minus horizontal padding).
+  const [cardWidth, setCardWidth] = useState(
+    Dimensions.get('window').width - spacing.sm * 2,
+  );
+
+  const handleLayout = (e: { nativeEvent: { layout: { width: number } } }) => {
+    const w = e.nativeEvent.layout.width;
+    if (w > 0 && Math.abs(w - cardWidth) > 0.5) {
+      setCardWidth(w);
+    }
+  };
+
+  const handleMomentumEnd = (e: NativeSyntheticEvent<NativeScrollEvent>) => {
+    const x = e.nativeEvent.contentOffset.x;
+    const next = Math.round(x / cardWidth);
+    if (next !== activeIndex && next >= 0 && next < cards.length) {
+      onActiveIndexChange(next);
+    }
+  };
+
+  return (
+    <View onLayout={handleLayout}>
+      <ScrollView
+        ref={scrollRef}
+        horizontal
+        pagingEnabled
+        showsHorizontalScrollIndicator={false}
+        onMomentumScrollEnd={handleMomentumEnd}
+        // Backup for slow drags that don't trigger momentum: also commit
+        // the active index when the user releases the finger. Without this,
+        // the active card index can stay stuck on the previous card after a
+        // slow scroll, causing send-button state (e.g. CBE lockout) to lag
+        // behind what the user sees.
+        onScrollEndDrag={handleMomentumEnd}
+        decelerationRate="fast"
+        snapToInterval={cardWidth}
+        snapToAlignment="start"
+      >
+        {cards.map(card => {
+          const isSov = (card.symbol || '').toUpperCase() === 'SOV';
+          // For SOV, prefer the wallet-list aggregate so multi-wallet users see
+          // their full balance. Other tokens use the per-wallet amount from the
+          // balances endpoint (pre-formatted string; null when decimals missing).
+          const displayBalance: string = isSov
+            ? totalSovBalance.toLocaleString('en-US', { maximumFractionDigits: 2 })
+            : card.balance ?? '—';
+          return (
+            <View
+              key={card.token_id}
+              style={{ width: cardWidth, paddingRight: 0 }}
+            >
+              <Card style={{ marginHorizontal: 0, overflow: 'hidden' }}>
+                <View
+                  style={{
+                    borderBottomWidth: 1,
+                    borderBottomColor: colors.primary,
+                    paddingHorizontal: spacing.sm,
+                    paddingTop: spacing.xs,
+                    paddingBottom: spacing.xs,
+                  }}
+                >
+                  <Text
+                    style={{
+                      fontSize: typography.size.xs,
+                      color: colors.text_secondary,
+                      marginBottom: spacing.xs,
+                    }}
+                  >
+                    WALLET ADDRESS ({card.symbol} transfers)
+                  </Text>
+                  <View
+                    style={{
+                      flexDirection: 'row',
+                      alignItems: 'center',
+                    }}
+                  >
+                    <ScrollView
+                      horizontal
+                      showsHorizontalScrollIndicator={false}
+                      contentContainerStyle={{ paddingRight: spacing.sm }}
+                      style={{ flex: 1 }}
+                    >
+                      <Text
+                        style={{
+                          fontSize: typography.size.sm,
+                          fontWeight: typography.weight.semibold,
+                          color: walletId
+                            ? colors.text_primary
+                            : colors.text_tertiary,
+                          letterSpacing: 0.5,
+                          fontFamily: 'Courier',
+                        }}
+                      >
+                        {walletId || '—'}
+                      </Text>
+                    </ScrollView>
+                    {walletId && (
+                      <TouchableOpacity
+                        onPress={onCopyWalletId}
+                        style={{ marginLeft: spacing.sm }}
+                      >
+                        <Text
+                          style={{
+                            fontSize: typography.size.xs,
+                            color: colors.primary,
+                          }}
+                        >
+                          {copyLabel}
+                        </Text>
+                      </TouchableOpacity>
+                    )}
+                  </View>
+                </View>
+
+                <View
+                  style={{
+                    paddingHorizontal: spacing.lg,
+                    paddingTop: spacing.lg,
+                    paddingBottom: spacing.xs,
+                    alignItems: 'center',
+                  }}
+                >
+                  <Text
+                    style={{
+                      fontSize: typography.size['5xl'],
+                      fontWeight: typography.weight.bold,
+                      color: colors.primary,
+                      marginBottom: spacing.sm,
+                    }}
+                  >
+                    {displayBalance}
+                  </Text>
+                  <Row style={{ alignItems: 'center', gap: spacing.sm }}>
+                    <Text
+                      style={{
+                        fontSize: typography.size.sm,
+                        color: colors.text_secondary,
+                      }}
+                    >
+                      {isSov ? sovCurrencyLabel : card.symbol}
+                      {card.name && card.name !== card.symbol
+                        ? ` · ${card.name}`
+                        : ''}
+                    </Text>
+                    {isSov && walletsLoading && (
+                      <Text
+                        style={{
+                          fontSize: typography.size.xs,
+                          color: colors.text_tertiary,
+                        }}
+                      >
+                        Syncing...
+                      </Text>
+                    )}
+                  </Row>
+                </View>
+              </Card>
+            </View>
+          );
+        })}
+      </ScrollView>
+
+      {cards.length > 1 && (
+        <View
+          style={{
+            flexDirection: 'row',
+            justifyContent: 'center',
+            gap: spacing.xs,
+            marginTop: spacing.sm,
+          }}
+        >
+          {cards.map((card, idx) => (
+            <View
+              key={card.token_id}
+              style={{
+                width: idx === activeIndex ? 20 : 6,
+                height: 6,
+                borderRadius: 3,
+                backgroundColor:
+                  idx === activeIndex ? colors.primary : colors.border,
+              }}
+            />
+          ))}
+        </View>
+      )}
+    </View>
+  );
+};
 
 const SIDScreen = ({ navigation, route }: any) => {
   const { t } = useTranslation();
@@ -77,13 +535,24 @@ const SIDScreen = ({ navigation, route }: any) => {
     loading: walletsLoading,
     refresh,
   } = useWalletList();
+  // Resolve the primary wallet ID early so per-wallet token balances can be
+  // fetched against the same address format used elsewhere in the app.
+  const primaryWalletId = useMemo(() => {
+    const wallet = walletByType?.primary ?? wallets?.[0] ?? null;
+    return wallet?.id || null;
+  }, [walletByType, wallets]);
   const {
     tokens,
     loading: tokensLoading,
     refresh: refreshTokens,
-  } = useUserTokenBalances();
+  } = useUserTokenBalances(primaryWalletId);
   const [drawerVisible, setDrawerVisible] = useState(false);
   const [activeWalletTab, setActiveWalletTab] = useState('Activity');
+  const [selectedStake, setSelectedStake] = useState<DaoStake | null>(null);
+  const daoStakes = useDaoStakes(primaryWalletId);
+  const [activeBalanceCardIndex, setActiveBalanceCardIndex] = useState(0);
+  const balanceScrollRef = useRef<ScrollView>(null);
+  const [walletOptionsVisible, setWalletOptionsVisible] = useState(false);
   const [domainRegistrationModalVisible, setDomainRegistrationModalVisible] =
     useState(false);
 
@@ -103,6 +572,26 @@ const SIDScreen = ({ navigation, route }: any) => {
       }),
     [tokens],
   );
+
+  // Ordered balance cards for the swipeable wallet carousel:
+  // SOV first, CBE second, remaining tokens alphabetical by symbol. Tokens with
+  // a zero balance are still shown so the user can see what's available.
+  const balanceCards = useMemo(() => {
+    const rank = (symbol: string) => {
+      const s = symbol.toUpperCase();
+      if (s === 'SOV') return 0;
+      if (s === 'CBE') return 1;
+      return 2;
+    };
+    return [...tokens].sort((a, b) => {
+      const ra = rank(a.symbol);
+      const rb = rank(b.symbol);
+      if (ra !== rb) return ra - rb;
+      return (a.symbol || '').localeCompare(b.symbol || '');
+    });
+  }, [tokens]);
+
+  const activeCardToken = balanceCards[activeBalanceCardIndex] ?? balanceCards[0] ?? null;
 
   const {
     data: activityData,
@@ -417,6 +906,7 @@ const SIDScreen = ({ navigation, route }: any) => {
             <View
               style={{
                 paddingHorizontal: spacing.sm,
+                paddingVertical: spacing.lg,
                 marginBottom: spacing.sm,
               }}
             >
@@ -437,173 +927,76 @@ const SIDScreen = ({ navigation, route }: any) => {
                   >
                     {selectedWallet?.name || t.wallet.empty.defaultWallet}
                   </Text>
-                  <Text
-                    style={{
-                      fontSize: typography.size.xs,
-                      color: colors.text_secondary,
-                      marginTop: spacing.xs,
-                    }}
-                    numberOfLines={1}
-                  >
-                    {truncateId(selectedWallet?.id)}
-                  </Text>
                 </View>
-                <Row style={{ gap: spacing.sm }}>
-                  <TouchableOpacity
-                    style={{
-                      width: 36,
-                      height: 36,
-                      borderRadius: borderRadius.full,
-                      backgroundColor: colors.bg_darker,
-                      justifyContent: 'center',
-                      alignItems: 'center',
-                      borderWidth: 1,
-                      borderColor: colors.border,
-                    }}
-                    onPress={() => setDomainRegistrationModalVisible(true)}
-                  >
-                    <Text style={{ fontSize: typography.size.xl }}>🌐</Text>
-                  </TouchableOpacity>
-                  <TouchableOpacity
-                    style={{
-                      width: 36,
-                      height: 36,
-                      borderRadius: borderRadius.full,
-                      backgroundColor: colors.bg_darker,
-                      justifyContent: 'center',
-                      alignItems: 'center',
-                      borderWidth: 1,
-                      borderColor: colors.border,
-                    }}
-                    onPress={() => navigation?.navigate('Profile')}
-                  >
-                    <Text style={{ fontSize: typography.size.xl }}>👤</Text>
-                  </TouchableOpacity>
-                  <TouchableOpacity
-                    style={{
-                      width: 36,
-                      height: 36,
-                      borderRadius: borderRadius.full,
-                      backgroundColor: colors.bg_darker,
-                      justifyContent: 'center',
-                      alignItems: 'center',
-                      borderWidth: 1,
-                      borderColor: colors.border,
-                    }}
-                    onPress={() => navigation?.navigate('WalletSettings')}
-                  >
-                    <Text style={{ fontSize: typography.size.xl }}>⚙️</Text>
-                  </TouchableOpacity>
-                </Row>
+                <TouchableOpacity
+                  style={{
+                    width: 36,
+                    height: 36,
+                    borderRadius: borderRadius.full,
+                    backgroundColor: colors.bg_darker,
+                    justifyContent: 'center',
+                    alignItems: 'center',
+                    borderWidth: 1,
+                    borderColor: colors.border,
+                  }}
+                  onPress={() => setWalletOptionsVisible(true)}
+                  accessibilityLabel="Wallet options"
+                >
+                  <Text style={{ fontSize: typography.size.xl }}>⚙️</Text>
+                </TouchableOpacity>
               </View>
             </View>
 
-            {/* Wallet Address Card - Always show, populate when data arrives */}
+            {/* Swipeable per-token balance carousel:
+                SOV first, CBE second, remaining tokens alphabetical. Each card
+                shows the same wallet ID (per-chain address rule — CBE and SOV
+                share the wallet_id) but highlights the balance in that token. */}
             <View style={{ paddingHorizontal: spacing.sm }}>
-              <Card style={{ marginHorizontal: 0, overflow: 'hidden' }}>
-                <View
-                  style={{
-                    borderTopWidth: 2,
-                    borderTopColor: colors.primary,
-                    paddingHorizontal: spacing.lg,
-                    paddingVertical: spacing.sm,
-                  }}
-                >
-                  <Text
-                    style={{
-                      fontSize: typography.size.xs,
-                      color: colors.text_secondary,
-                      marginBottom: spacing.md,
-                    }}
-                  >
-                    WALLET ADDRESS (for SOV transfers)
-                  </Text>
+              {balanceCards.length === 0 ? (
+                <Card style={{ marginHorizontal: 0, overflow: 'hidden' }}>
                   <View
                     style={{
-                      flexDirection: 'row',
+                      borderTopWidth: 2,
+                      borderTopColor: colors.primary,
+                      paddingHorizontal: spacing.lg,
+                      paddingVertical: spacing.xl,
                       alignItems: 'center',
-                      marginBottom: spacing.lg,
                     }}
                   >
-                    <ScrollView
-                      horizontal
-                      showsHorizontalScrollIndicator={false}
-                      contentContainerStyle={{ paddingRight: spacing.sm }}
-                      style={{ flex: 1 }}
+                    <Text
+                      style={{
+                        fontSize: typography.size['5xl'],
+                        fontWeight: typography.weight.bold,
+                        color: colors.primary,
+                        marginBottom: spacing.sm,
+                      }}
                     >
-                      <Text
-                        style={{
-                          fontSize: typography.size.sm,
-                          fontWeight: typography.weight.semibold,
-                          color: selectedWallet?.id
-                            ? colors.text_primary
-                            : colors.text_tertiary,
-                          letterSpacing: 0.5,
-                          fontFamily: 'Courier',
-                        }}
-                      >
-                        {selectedWallet?.id ? selectedWallet.id : '—'}
-                      </Text>
-                    </ScrollView>
-                    {selectedWallet?.id && (
-                      <TouchableOpacity
-                        onPress={() => copyToClipboard(selectedWallet.id)}
-                        style={{ marginLeft: spacing.sm }}
-                      >
-                        <Text
-                          style={{
-                            fontSize: typography.size.xs,
-                            color: colors.primary,
-                          }}
-                        >
-                          {t.wallet.actions.copy}
-                        </Text>
-                      </TouchableOpacity>
-                    )}
-                  </View>
-
-                </View>
-
-                {/* Balance Section */}
-                <View
-                  style={{
-                    paddingHorizontal: spacing.lg,
-                    paddingVertical: spacing.xs,
-                    alignItems: 'center',
-                  }}
-                >
-                  <Text
-                    style={{
-                      fontSize: typography.size['5xl'],
-                      fontWeight: typography.weight.bold,
-                      color: colors.primary,
-                      marginBottom: spacing.sm,
-                    }}
-                  >
-                    {formatBalance(totalBalance)}
-                  </Text>
-                  <Row style={{ alignItems: 'center', gap: spacing.sm }}>
+                      {formatBalance(totalBalance)}
+                    </Text>
                     <Text
                       style={{
                         fontSize: typography.size.sm,
                         color: colors.text_secondary,
                       }}
                     >
-                      {t.wallet.currency} (Total)
+                      {tokensLoading ? 'Loading tokens…' : t.wallet.currency}
                     </Text>
-                    {walletsLoading && (
-                      <Text
-                        style={{
-                          fontSize: typography.size.xs,
-                          color: colors.text_tertiary,
-                        }}
-                      >
-                        Syncing...
-                      </Text>
-                    )}
-                  </Row>
-                </View>
-              </Card>
+                  </View>
+                </Card>
+              ) : (
+                <BalanceCarousel
+                  cards={balanceCards}
+                  walletId={selectedWallet?.id}
+                  walletsLoading={walletsLoading}
+                  totalSovBalance={totalBalance}
+                  sovCurrencyLabel={t.wallet.currency}
+                  copyLabel={t.wallet.actions.copy}
+                  onCopyWalletId={() => copyToClipboard(selectedWallet?.id)}
+                  activeIndex={activeBalanceCardIndex}
+                  onActiveIndexChange={setActiveBalanceCardIndex}
+                  scrollRef={balanceScrollRef}
+                />
+              )}
             </View>
 
             {/* Send & Receive Buttons */}
@@ -615,29 +1008,46 @@ const SIDScreen = ({ navigation, route }: any) => {
                 marginBottom: spacing.md,
               }}
             >
-              <TouchableOpacity
-                style={{
-                  flex: 1,
-                  paddingVertical: spacing.lg,
-                  borderRadius: borderRadius.base,
-                  borderWidth: 2,
-                  borderColor: '#006688',
-                  justifyContent: 'center',
-                  alignItems: 'center',
-                }}
-                onPress={() => navigation?.navigate('SendTokens')}
-                disabled={isLoading}
-              >
-                <Text
-                  style={{
-                    fontSize: typography.size.md,
-                    fontWeight: typography.weight.semibold,
-                    color: colors.text_primary,
-                  }}
-                >
-                  ↑ {t.wallet.actions.send}
-                </Text>
-              </TouchableOpacity>
+              {(() => {
+                // Send is disabled when CBE is the active card — backend
+                // verification path for non-SOV wallet transfers isn't ready
+                // yet. Mirrors the in-screen lockout in SendTokensScreen.
+                const sendDisabled =
+                  isLoading ||
+                  (activeCardToken?.symbol || '').toUpperCase() === 'CBE';
+                return (
+                  <TouchableOpacity
+                    style={{
+                      flex: 1,
+                      paddingVertical: spacing.lg,
+                      borderRadius: borderRadius.base,
+                      borderWidth: 2,
+                      borderColor: sendDisabled ? colors.border : '#006688',
+                      backgroundColor: sendDisabled ? colors.bg_darker : 'transparent',
+                      justifyContent: 'center',
+                      alignItems: 'center',
+                      opacity: sendDisabled ? 0.5 : 1,
+                    }}
+                    onPress={() =>
+                      navigation?.navigate('SendTokens', {
+                        preselectedTokenId: activeCardToken?.token_id,
+                      })
+                    }
+                    disabled={sendDisabled}
+                  >
+                    <Text
+                      style={{
+                        fontSize: typography.size.md,
+                        fontWeight: typography.weight.semibold,
+                        color: sendDisabled ? colors.text_tertiary : colors.text_primary,
+                      }}
+                    >
+                      ↑ {t.wallet.actions.send}
+                      {activeCardToken ? ` ${activeCardToken.symbol}` : ''}
+                    </Text>
+                  </TouchableOpacity>
+                );
+              })()}
 
               <TouchableOpacity
                 style={{
@@ -649,7 +1059,11 @@ const SIDScreen = ({ navigation, route }: any) => {
                   justifyContent: 'center',
                   alignItems: 'center',
                 }}
-                onPress={() => navigation?.navigate('ReceiveTokens')}
+                onPress={() =>
+                  navigation?.navigate('ReceiveTokens', {
+                    preselectedTokenId: activeCardToken?.token_id,
+                  })
+                }
                 disabled={isLoading}
               >
                 <Text
@@ -660,6 +1074,7 @@ const SIDScreen = ({ navigation, route }: any) => {
                   }}
                 >
                   ↓ {t.wallet.actions.receive}
+                  {activeCardToken ? ` ${activeCardToken.symbol}` : ''}
                 </Text>
               </TouchableOpacity>
             </View>
@@ -686,7 +1101,7 @@ const SIDScreen = ({ navigation, route }: any) => {
               >
                 {[
                   { id: 'Tokens', label: t.wallet.tabs.tokens },
-                  { id: 'NFTs', label: t.wallet.tabs.nfts },
+                  { id: 'Staking', label: t.wallet.tabs.staking },
                   { id: 'Activity', label: t.wallet.tabs.activity },
                 ].map(tabItem => (
                   <TouchableOpacity
@@ -803,7 +1218,7 @@ const SIDScreen = ({ navigation, route }: any) => {
                                     color: colors.text_primary,
                                   }}
                                 >
-                                  {formatBalance(token.balance)}
+                                  {token.balance ?? '—'}
                                 </Text>
                               </Row>
                             </View>
@@ -814,18 +1229,129 @@ const SIDScreen = ({ navigation, route }: any) => {
                   </>
                 )}
 
-                {activeWalletTab === 'NFTs' && (
-                  <View
-                    style={{
-                      flex: 1,
-                      justifyContent: 'center',
-                      alignItems: 'center',
-                    }}
-                  >
-                    <Text style={{ color: colors.text_secondary }}>
-                      No NFTs available
-                    </Text>
-                  </View>
+                {activeWalletTab === 'Staking' && (
+                  <>
+                    {daoStakes.stakes.length === 0 ? (
+                      <View
+                        style={{
+                          flex: 1,
+                          justifyContent: 'center',
+                          alignItems: 'center',
+                          paddingHorizontal: spacing.lg,
+                        }}
+                      >
+                        <Text
+                          style={{
+                            color: colors.text_secondary,
+                            textAlign: 'center',
+                            marginBottom: spacing.xs,
+                          }}
+                        >
+                          No active stakes
+                        </Text>
+                        <Text
+                          style={{
+                            color: colors.text_tertiary,
+                            fontSize: typography.size.xs,
+                            textAlign: 'center',
+                          }}
+                        >
+                          Stake SOV in a welfare DAO from the DAO tab to support real outcomes.
+                        </Text>
+                      </View>
+                    ) : (
+                      <ScrollView
+                        style={{ flex: 1 }}
+                        showsVerticalScrollIndicator
+                        nestedScrollEnabled
+                        contentContainerStyle={{ gap: spacing.sm }}
+                      >
+                        {daoStakes.stakes.map((stake, idx) => {
+                          const dao = WELFARE_DAOS.find(
+                            d => d.id === stake.sector,
+                          );
+                          const accent = dao?.color ?? colors.primary;
+                          const amountSov = stake.amount / 1_000_000_000;
+                          const canUnstake =
+                            stake.unlocked || stake.blocks_remaining <= 0;
+                          const daysRemaining = Math.max(
+                            0,
+                            Math.round(stake.blocks_remaining / 7200),
+                          );
+                          return (
+                            <TouchableOpacity
+                              key={`${stake.sector_dao_key_id}-${idx}`}
+                              activeOpacity={0.85}
+                              onPress={() => setSelectedStake(stake)}
+                            >
+                              <Card
+                                style={{
+                                  marginHorizontal: 0,
+                                  borderWidth: 0.5,
+                                  borderColor: accent,
+                                }}
+                              >
+                                <View
+                                  style={{
+                                    paddingHorizontal: spacing.md,
+                                    paddingVertical: spacing.sm,
+                                  }}
+                                >
+                                  <Row
+                                    style={{
+                                      justifyContent: 'space-between',
+                                      alignItems: 'center',
+                                    }}
+                                  >
+                                    <View
+                                      style={{
+                                        flex: 1,
+                                        paddingRight: spacing.sm,
+                                      }}
+                                    >
+                                      <Text
+                                        style={{
+                                          fontSize: typography.size.base,
+                                          fontWeight:
+                                            typography.weight.semibold,
+                                          color: colors.text_primary,
+                                        }}
+                                      >
+                                        {dao?.name ?? stake.sector}
+                                      </Text>
+                                      <Text
+                                        numberOfLines={1}
+                                        style={{
+                                          fontSize: typography.size.xs,
+                                          color: canUnstake
+                                            ? accent
+                                            : colors.text_secondary,
+                                          marginTop: 2,
+                                        }}
+                                      >
+                                        {canUnstake
+                                          ? 'Unlocked · tap to unstake'
+                                          : `Locked · ${daysRemaining}d remaining`}
+                                      </Text>
+                                    </View>
+                                    <Text
+                                      style={{
+                                        fontSize: typography.size.base,
+                                        fontWeight: typography.weight.bold,
+                                        color: colors.text_primary,
+                                      }}
+                                    >
+                                      {formatBalance(amountSov)} SOV
+                                    </Text>
+                                  </Row>
+                                </View>
+                              </Card>
+                            </TouchableOpacity>
+                          );
+                        })}
+                      </ScrollView>
+                    )}
+                  </>
                 )}
 
                 {activeWalletTab === 'Activity' && (
@@ -872,7 +1398,7 @@ const SIDScreen = ({ navigation, route }: any) => {
                             <TouchableOpacity
                               key={tx.tx_hash}
                               activeOpacity={0.75}
-                              onPress={() => navigation.navigate('TransactionDetail', { hash: tx.tx_hash })}
+                              onPress={() => navigation.navigate('TransactionDetail', { hash: tx.tx_hash, activityTx: tx })}
                               style={{
                                 backgroundColor:
                                   index % 2 === 0 ? colors.bg_darker : colors.bg_dark,
@@ -945,7 +1471,7 @@ const SIDScreen = ({ navigation, route }: any) => {
                                       color: colors.text_primary,
                                     }}
                                   >
-                                    {formatTxValue(tx.amount_human != null ? Number(tx.amount_human) : Number(tx.amount || 0))}
+                                    {tx.amount_human != null ? String(tx.amount_human) : formatTxValue(tx.amount ?? 0)}
                                   </Text>
                                 </Row>
                                 <Text
@@ -954,7 +1480,7 @@ const SIDScreen = ({ navigation, route }: any) => {
                                     color: colors.text_secondary,
                                   }}
                                 >
-                                  Fee {formatTxValue(Number(tx.fee || 0) / 1e8)}
+                                  Fee {formatTxValue(tx.fee ?? 0)}
                                   {'  '}
                                   From {shortMiddle(tx.from_wallet)}
                                 </Text>
@@ -1054,6 +1580,39 @@ const SIDScreen = ({ navigation, route }: any) => {
           />
         </View>
       </Modal>
+
+      <WalletOptionsSheet
+        visible={walletOptionsVisible}
+        onClose={() => setWalletOptionsVisible(false)}
+        onSelectDomains={() => {
+          setWalletOptionsVisible(false);
+          setDomainRegistrationModalVisible(true);
+        }}
+        onSelectProfile={() => {
+          setWalletOptionsVisible(false);
+          navigation?.navigate('Profile');
+        }}
+        onSelectSettings={() => {
+          setWalletOptionsVisible(false);
+          navigation?.navigate('WalletSettings');
+        }}
+      />
+
+      <StakeDetailModal
+        visible={selectedStake !== null}
+        stake={selectedStake}
+        currentHeight={daoStakes.current_height}
+        onClose={() => setSelectedStake(null)}
+        onUnstake={stake => {
+          // TODO: wire up unstake transaction via lib-client once endpoint lands
+          console.log('[SIDScreen] unstake requested', stake);
+          setSelectedStake(null);
+          Alert.alert(
+            'Unstake submitted',
+            `Your intent to unstake ${(stake.amount / 1_000_000_000).toLocaleString()} SOV from ${stake.sector} has been recorded.`,
+          );
+        }}
+      />
 
     </View>
   );

@@ -585,6 +585,101 @@ pub extern "system" fn Java_com_sovereignnetworkmobile_Identity_nativeBuildToken
 }
 
 #[no_mangle]
+pub extern "system" fn Java_com_sovereignnetworkmobile_Identity_nativeBuildSovWalletTransfer<'local>(
+    mut env: JNIEnv<'local>,
+    _class: JClass<'local>,
+    handle: jlong,
+    from_wallet_id: JByteArray<'local>,
+    to_wallet_id: JByteArray<'local>,
+    amount: jlong,
+    chain_id: jint,
+    nonce: jlong,
+) -> JString<'local> {
+    if handle == 0 {
+        return JString::default();
+    }
+    let identity = unsafe { handle_ref(handle) };
+    let from = env.convert_byte_array(&from_wallet_id).unwrap_or_default();
+    let to = env.convert_byte_array(&to_wallet_id).unwrap_or_default();
+
+    let mut from_arr = [0u8; 32];
+    let len = std::cmp::min(from.len(), 32);
+    from_arr[..len].copy_from_slice(&from[..len]);
+
+    let mut to_arr = [0u8; 32];
+    let len = std::cmp::min(to.len(), 32);
+    to_arr[..len].copy_from_slice(&to[..len]);
+
+    match zhtp_client::build_sov_wallet_transfer_tx(
+        identity,
+        &from_arr,
+        &to_arr,
+        amount as u64,
+        chain_id as u8,
+        nonce as u64,
+    ) {
+        Ok(hex) => env.new_string(&hex).unwrap_or_default(),
+        Err(e) => {
+            log::error!("[Identity JNI] buildSovWalletTransfer failed: {}", e);
+            JString::default()
+        }
+    }
+}
+
+/// Build a signed token transfer where the sender is identified by an explicit
+/// wallet_id. Used for CBE and any token whose sender lives at wallet_id rather
+/// than the identity key. Mirrors `zhtp_client_build_token_wallet_transfer` in
+/// the C FFI layer used by iOS.
+#[no_mangle]
+pub extern "system" fn Java_com_sovereignnetworkmobile_Identity_nativeBuildTokenWalletTransfer<'local>(
+    mut env: JNIEnv<'local>,
+    _class: JClass<'local>,
+    handle: jlong,
+    token_id: JByteArray<'local>,
+    from_wallet_id: JByteArray<'local>,
+    to_wallet_id: JByteArray<'local>,
+    amount: jlong,
+    chain_id: jint,
+    nonce: jlong,
+) -> JString<'local> {
+    if handle == 0 {
+        return JString::default();
+    }
+    let identity = unsafe { handle_ref(handle) };
+    let tid = env.convert_byte_array(&token_id).unwrap_or_default();
+    let from = env.convert_byte_array(&from_wallet_id).unwrap_or_default();
+    let to = env.convert_byte_array(&to_wallet_id).unwrap_or_default();
+
+    let mut tid_arr = [0u8; 32];
+    let len = std::cmp::min(tid.len(), 32);
+    tid_arr[..len].copy_from_slice(&tid[..len]);
+
+    let mut from_arr = [0u8; 32];
+    let len = std::cmp::min(from.len(), 32);
+    from_arr[..len].copy_from_slice(&from[..len]);
+
+    let mut to_arr = [0u8; 32];
+    let len = std::cmp::min(to.len(), 32);
+    to_arr[..len].copy_from_slice(&to[..len]);
+
+    match zhtp_client::build_token_wallet_transfer_tx(
+        identity,
+        &tid_arr,
+        &from_arr,
+        &to_arr,
+        amount as u64,
+        chain_id as u8,
+        nonce as u64,
+    ) {
+        Ok(hex) => env.new_string(&hex).unwrap_or_default(),
+        Err(e) => {
+            log::error!("[Identity JNI] buildTokenWalletTransfer failed: {}", e);
+            JString::default()
+        }
+    }
+}
+
+#[no_mangle]
 pub extern "system" fn Java_com_sovereignnetworkmobile_Identity_nativeBuildTokenBurn<'local>(
     mut env: JNIEnv<'local>,
     _class: JClass<'local>,
@@ -607,6 +702,48 @@ pub extern "system" fn Java_com_sovereignnetworkmobile_Identity_nativeBuildToken
         Ok(hex) => env.new_string(&hex).unwrap_or_default(),
         Err(e) => {
             log::error!("[Identity JNI] buildTokenBurn failed: {}", e);
+            JString::default()
+        }
+    }
+}
+
+// ─── DAO stake transaction ─────────────────────────────────────────────────────
+
+/// Build a signed DAO stake transaction. Moves SOV from the caller's key_id
+/// wallet into a sector welfare DAO wallet, locked for `lock_blocks`.
+/// Returns hex-encoded bincode tx string, or an empty string on failure.
+#[no_mangle]
+pub extern "system" fn Java_com_sovereignnetworkmobile_Identity_nativeBuildDaoStake<'local>(
+    mut env: JNIEnv<'local>,
+    _class: JClass<'local>,
+    handle: jlong,
+    sector_dao_key_id: JByteArray<'local>,
+    amount: jlong,
+    nonce: jlong,
+    lock_blocks: jlong,
+    chain_id: jint,
+) -> JString<'local> {
+    if handle == 0 {
+        return JString::default();
+    }
+    let identity = unsafe { handle_ref(handle) };
+    let dao = env.convert_byte_array(&sector_dao_key_id).unwrap_or_default();
+
+    let mut dao_arr = [0u8; 32];
+    let len = std::cmp::min(dao.len(), 32);
+    dao_arr[..len].copy_from_slice(&dao[..len]);
+
+    match zhtp_client::dao_tx::build_dao_stake_tx(
+        identity,
+        dao_arr,
+        amount as u128,
+        nonce as u64,
+        lock_blocks as u64,
+        chain_id as u8,
+    ) {
+        Ok(hex) => env.new_string(&hex).unwrap_or_default(),
+        Err(e) => {
+            log::error!("[Identity JNI] buildDaoStake failed: {}", e);
             JString::default()
         }
     }

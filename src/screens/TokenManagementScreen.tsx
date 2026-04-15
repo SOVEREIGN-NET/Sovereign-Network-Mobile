@@ -23,6 +23,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { colors, spacing, typography, borderRadius } from '../theme';
 import tokenService from '../services/TokenService';
 import type { TokenInfoResponse } from '../types/token';
+import { atomsToDisplayLocale } from '../utils/tokenUnits';
 
 const TRACKED_TOKENS_KEY = 'sov:tracked_tokens';
 const LEGACY_CREATED_TOKENS_KEY = 'sov:created_tokens';
@@ -123,12 +124,24 @@ const TokenManagementScreen = ({ navigation }: any) => {
     ]);
   }, [loadTrackedIds, saveTrackedIds]);
 
-  const formatSupply = (supply: number, decimals: number) => {
-    const human = supply / Math.pow(10, decimals);
-    if (human >= 1e9) return `${(human / 1e9).toFixed(2)}B`;
-    if (human >= 1e6) return `${(human / 1e6).toFixed(2)}M`;
-    if (human >= 1e3) return `${(human / 1e3).toFixed(2)}K`;
-    return human.toLocaleString();
+  // Compact display for whole-token supply, using bigint so u128 values are safe.
+  // Returns "1.23B" / "4.56M" / "7.89K" / "123,456" style.
+  const formatSupply = (atoms: string, decimals: number) => {
+    if (!/^\d+$/.test(atoms)) return atoms;
+    const atomsBig = BigInt(atoms);
+    const divisor = 10n ** BigInt(decimals);
+    const whole = atomsBig / divisor;
+    // Compact only on the integer whole-token part.
+    if (whole >= 1_000_000_000n) return `${Number(whole / 10_000_000n) / 100}B`;
+    if (whole >= 1_000_000n) return `${Number(whole / 10_000n) / 100}M`;
+    if (whole >= 1_000n) return `${Number(whole / 10n) / 100}K`;
+    return atomsToDisplayLocale(atoms, decimals, 2);
+  };
+
+  // Raw atoms with locale commas (no decimal scaling).
+  const formatRawAtoms = (atoms: string) => {
+    if (!/^\d+$/.test(atoms)) return atoms;
+    return atoms.replace(/\B(?=(\d{3})+(?!\d))/g, ',');
   };
 
   if (loading) {
@@ -196,11 +209,11 @@ const TokenManagementScreen = ({ navigation }: any) => {
                   <Row label="Creator"      value={info.creator}      mono copyable />
                   <Row label="Decimals"     value={String(info.decimals)} />
                   <Row label="Total Supply"
-                    value={`${formatSupply(info.total_supply, info.decimals)} (${info.total_supply.toLocaleString()} raw)`}
+                    value={`${formatSupply(info.total_supply, info.decimals)} (${formatRawAtoms(info.total_supply)} raw)`}
                   />
                   <Row label="Max Supply"
                     value={info.max_supply != null
-                      ? `${formatSupply(info.max_supply, info.decimals)} (${info.max_supply.toLocaleString()} raw)`
+                      ? `${formatSupply(info.max_supply, info.decimals)} (${formatRawAtoms(info.max_supply)} raw)`
                       : 'Unlimited'}
                   />
                   <Row label="Deflationary"     value={info.is_deflationary ? 'Yes' : 'No'} />

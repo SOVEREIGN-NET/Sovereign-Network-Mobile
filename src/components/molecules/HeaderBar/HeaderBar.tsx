@@ -88,8 +88,8 @@ const HeaderBar: React.FC<HeaderBarProps> = ({
     container: {
       backgroundColor: colors.bg_dark,
       paddingHorizontal: spacing.lg,
-      paddingTop: spacing.md + insets.top,
-      paddingBottom: spacing.md,
+      paddingTop: spacing.xs + insets.top,
+      paddingBottom: spacing.xs,
       borderBottomWidth: 1,
       borderBottomColor: colors.border,
       ...shadows.sm,
@@ -99,7 +99,7 @@ const HeaderBar: React.FC<HeaderBarProps> = ({
       alignItems: 'center',
       justifyContent: 'space-between',
       position: 'relative',
-      minHeight: 40,
+      minHeight: 32,
     },
     sideSlot: {
       minWidth: 92,

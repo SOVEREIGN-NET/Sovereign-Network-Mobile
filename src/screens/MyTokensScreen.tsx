@@ -18,6 +18,7 @@ import {
 import { colors, spacing, typography, borderRadius } from '../theme';
 import { useAuth } from '../hooks/useAuth';
 import tokenService from '../services/TokenService';
+import { atomsToDisplayLocale } from '../utils/tokenUnits';
 
 // Storage keys
 const TRACKED_TOKENS_KEY = 'sov:tracked_tokens';
@@ -27,9 +28,16 @@ interface TokenWithInfo {
   token_id: string;
   name: string;
   symbol: string;
-  total_supply: number;
-  balance?: number;
+  /** Pre-formatted total supply (null if decimals unknown). */
+  totalSupplyDisplay: string | null;
+  /** Pre-formatted balance (undefined if not applicable, null if decimals unknown). */
+  balanceDisplay?: string | null;
 }
+
+const formatAtoms = (atoms: string | null | undefined, decimals: number | null | undefined): string | null => {
+  if (atoms == null || decimals == null || !Number.isFinite(decimals) || decimals < 0) return null;
+  return atomsToDisplayLocale(String(atoms), decimals);
+};
 
 const MyTokensScreen = ({ navigation }: any) => {
   const { currentIdentity } = useAuth();
@@ -57,16 +65,13 @@ const MyTokensScreen = ({ navigation }: any) => {
       try {
         const customTokens = await tokenService.getUserTokenBalances(hexAddress);
         if (customTokens && customTokens.length > 0) {
-          customTokens.forEach((token: any) => {
-            const decimals = token.decimals || 8;
-            const humanReadableBalance = token.balance / Math.pow(10, decimals);
-
+          customTokens.forEach(token => {
             const tokenInfo: TokenWithInfo = {
               token_id: token.token_id,
               name: token.name || 'Unknown',
               symbol: token.symbol || 'Token',
-              total_supply: token.total_supply || 0,
-              balance: humanReadableBalance,
+              totalSupplyDisplay: null,
+              balanceDisplay: formatAtoms(token.balance, token.decimals),
             };
             tokenMap.set(token.token_id, tokenInfo);
             allTokens.push(tokenInfo);
@@ -104,8 +109,8 @@ const MyTokensScreen = ({ navigation }: any) => {
                 token_id: tokenId,
                 name: tokenInfo.name || 'Unknown',
                 symbol: tokenInfo.symbol || 'Token',
-                total_supply: tokenInfo.total_supply || 0,
-                balance: 0,
+                totalSupplyDisplay: formatAtoms(tokenInfo.total_supply, tokenInfo.decimals),
+                balanceDisplay: '0',
               };
               tokenMap.set(tokenId, token);
               allTokens.push(token);
@@ -147,9 +152,6 @@ const MyTokensScreen = ({ navigation }: any) => {
     navigation?.navigate('TokenDetail', { tokenId: token.token_id });
   };
 
-  const formatBalance = (balance: number): string => {
-    return balance.toLocaleString('en-US', { maximumFractionDigits: 2 });
-  };
 
   return (
     <View style={{ flex: 1, backgroundColor: colors.bg_darkest }}>
@@ -216,7 +218,9 @@ const MyTokensScreen = ({ navigation }: any) => {
                             marginTop: spacing.xs,
                           }}
                         >
-                          {token.balance !== undefined ? `Balance: ${formatBalance(token.balance)}` : 'Total Supply: ' + formatBalance(token.total_supply)}
+                          {token.balanceDisplay !== undefined
+                            ? `Balance: ${token.balanceDisplay ?? '—'}`
+                            : `Total Supply: ${token.totalSupplyDisplay ?? '—'}`}
                         </Text>
                       </View>
 

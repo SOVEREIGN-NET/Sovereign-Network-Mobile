@@ -7,7 +7,8 @@ import { quicRequest } from './quic';
 import { nativeIdentityProvisioning } from './NativeIdentityProvisioning';
 import tokenService from './TokenService';
 import { maskIdentifier } from '../utils/maskIdentifier';
-import { CHAIN_ID, SOV_TOKEN_ID } from '../config';
+import { CHAIN_ID } from '../config';
+import { resolveTokenBySymbol } from '../hooks/useTokenRegistry';
 import type {
   DomainRegisterRequest,
   DomainRegisterResponse,
@@ -109,8 +110,14 @@ class DomainService {
       this.getDaoTreasuryWalletId(),
     ]);
 
+    const sovToken = await resolveTokenBySymbol('SOV');
+    if (!sovToken) {
+      throw new Error(
+        'SOV token not found in chain registry — node may be unavailable',
+      );
+    }
     const nonce = await tokenService.getTokenNonce(
-      SOV_TOKEN_ID || '',
+      sovToken.token_id,
       ownerPrimaryWalletId,
     );
 

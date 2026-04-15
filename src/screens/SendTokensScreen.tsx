@@ -13,12 +13,14 @@ import {
   LoadingView,
 } from '../components';
 import { useAuth, useWalletList } from '../hooks';
+import { getTokenRegistry } from '../hooks/useTokenRegistry';
 import { useAddressBook } from '../hooks/useAddressBook';
 import { useTranslation } from '../i18n';
 import { colors, spacing, typography, borderRadius } from '../theme';
 import tokenService from '../services/TokenService';
 import { TokenTransferRequest, SovTransferRequest } from '../types/token';
 import { humanToAtomic } from '../utils/tokenUnits';
+import { CHAIN_ID } from '../config';
 
 // Storage keys
 const TRACKED_TOKENS_KEY = 'sov:tracked_tokens';
@@ -45,10 +47,12 @@ interface TransferFormErrors {
   amount?: string;
 }
 
-const SendTokensScreen = ({ navigation }: any) => {
+const SendTokensScreen = ({ navigation, route }: any) => {
   const { t } = useTranslation();
   const { currentIdentity } = useAuth();
   const { wallets, refresh: refreshWallets } = useWalletList();
+  // Optional token preselected by the caller (e.g. SID screen carousel).
+  const preselectedTokenId: string | undefined = route?.params?.preselectedTokenId;
 
   // Token list and balance state
   const [allTokens, setAllTokens] = useState<SendableToken[]>([]);
@@ -157,14 +161,26 @@ const SendTokensScreen = ({ navigation }: any) => {
         }
       }
 
-      // 2. Load all token balances (includes SOV + custom tokens)
-      const hexAddress = currentIdentity.did.startsWith('did:zhtp:')
+      // 2. Load all token balances (includes SOV + custom tokens).
+      // IMPORTANT: Balances are keyed by the primary wallet ID, NOT the
+      // identity ID. CBE (and other tokens) are held at selectedWallet.id —
+      // querying by identity returns 0 for CBE. Fall back to identity only
+      // when no wallet is available yet.
+      const primaryWallet = wallets?.find(
+        w => (w.wallet_type || '').toLowerCase() === 'primary',
+      ) ?? wallets?.[0];
+      const identityHex = currentIdentity.did.startsWith('did:zhtp:')
         ? currentIdentity.did.substring('did:zhtp:'.length)
         : currentIdentity.did;
+      const balanceLookupAddress = primaryWallet?.id || identityHex;
 
-      console.log('[SendTokensScreen] Loading token balances for:', hexAddress);
+      console.log(
+        '[SendTokensScreen] Loading token balances for:',
+        balanceLookupAddress,
+        primaryWallet ? '(wallet)' : '(identity fallback)',
+      );
       try {
-        const allBalances = await tokenService.getUserTokenBalances(hexAddress);
+        const allBalances = await tokenService.getUserTokenBalances(balanceLookupAddress);
         if (allBalances && allBalances.length > 0) {
           // Find the SOV wallet entry we added above (if any)
           const sovEntry = tokens.find(t => t.type === 'sov');
@@ -282,12 +298,48 @@ const SendTokensScreen = ({ navigation }: any) => {
         );
       }
 
+      // 4. Merge in every token the chain knows about (registry), with
+      //    balance 0 if the user doesn't hold any. This guarantees CBE and
+      //    any future tokens show up as sendable even before the user
+      //    receives them. Registry comes from GET /api/v1/token/list.
+      try {
+        const registry = await getTokenRegistry();
+        for (const item of registry) {
+          if (tokenMap.has(item.token_id)) continue;
+          const symbol = (item.symbol || '').toUpperCase();
+          // SOV is always rendered from the wallet-list aggregate, not the
+          // registry row. Skip here to avoid a duplicate zero-balance SOV.
+          if (symbol === 'SOV' && tokens.some(t => t.type === 'sov')) continue;
+          const sendableToken: SendableToken = {
+            id: item.token_id,
+            symbol: item.symbol || 'Token',
+            name: item.name || 'Unknown',
+            balance: 0,
+            type: 'custom',
+            token_id: item.token_id,
+            decimals: item.decimals ?? 8,
+          };
+          tokenMap.set(item.token_id, sendableToken);
+          tokens.push(sendableToken);
+        }
+      } catch (registryError) {
+        console.warn(
+          '[SendTokensScreen] Failed to load token registry (non-fatal):',
+          registryError,
+        );
+      }
+
       setAllTokens(tokens);
 
       if (tokens.length > 0) {
-        // Default to SOV if available, otherwise first token
+        // Priority: route-preselected token → SOV → first available.
+        const preselected = preselectedTokenId
+          ? tokens.find(
+              t => t.token_id === preselectedTokenId || t.id === preselectedTokenId,
+            )
+          : null;
         const sovToken = tokens.find(t => t.type === 'sov');
-        setSelectedToken(sovToken || tokens[0]);
+        setSelectedToken(preselected || sovToken || tokens[0]);
       }
 
       // Default from-wallet for SOV transfers
@@ -394,19 +446,32 @@ const SendTokensScreen = ({ navigation }: any) => {
 
         await tokenService.transferSov(sovRequest);
       } else {
-        // Custom token: existing token transfer
+        // Custom token (e.g. CBE): wallet-to-wallet transfer.
+        //
+        // Like SOV, these tokens are held at wallet_id, not at the identity
+        // key. Route through transferTokenFromWallet so the signed tx carries
+        // the correct sender (`selectedWallet.id`) and the nonce is fetched
+        // against the sender — not the recipient.
         const tokenId = selectedToken.token_id;
         if (!tokenId) {
           throw new Error('Token ID missing for selected token.');
         }
 
-        const transferRequest: TokenTransferRequest = {
-          token_id: tokenId,
-          to: transferForm.recipient.trim(),
-          amount: baseUnits,
-        };
+        const primaryWallet =
+          wallets?.find(w => (w.wallet_type || '').toLowerCase() === 'primary') ??
+          wallets?.[0];
+        const fromWalletId = primaryWallet?.id;
+        if (!fromWalletId) {
+          throw new Error('No wallet available to send from.');
+        }
 
-        await tokenService.transferToken(transferRequest);
+        await tokenService.transferTokenFromWallet({
+          token_id: tokenId,
+          from_wallet_id: fromWalletId,
+          to_wallet_id: transferForm.recipient.trim(),
+          amount: baseUnits,
+          chain_id: CHAIN_ID,
+        });
       }
 
       setTransferStatus({
@@ -660,6 +725,39 @@ const SendTokensScreen = ({ navigation }: any) => {
             </Card>
           )}
 
+          {/* Choose from Contacts — compact shortcut, sits between token list
+              and the transfer form. Hidden when the address book is empty. */}
+          {selectedToken && addressBookEntries.length > 0 && (
+            <TouchableOpacity
+              onPress={() => setShowAddressBook(true)}
+              style={{
+                alignSelf: 'center',
+                flexDirection: 'row',
+                alignItems: 'center',
+                gap: spacing.xs,
+                paddingVertical: spacing.xs,
+                paddingHorizontal: spacing.md,
+                borderRadius: borderRadius.full,
+                borderWidth: 1,
+                borderColor: colors.primary + '60',
+                backgroundColor: colors.primary + '10',
+              }}
+            >
+              <Text style={{ fontSize: typography.size.sm, color: colors.primary }}>
+                👥
+              </Text>
+              <Text
+                style={{
+                  fontSize: typography.size.sm,
+                  fontWeight: typography.weight.semibold,
+                  color: colors.primary,
+                }}
+              >
+                Choose from Contacts
+              </Text>
+            </TouchableOpacity>
+          )}
+
           {/* Transfer Form */}
           {selectedToken && (
             <Card>
@@ -700,7 +798,10 @@ const SendTokensScreen = ({ navigation }: any) => {
                 </Row>
               </View>
 
-              {/* Sender Reference */}
+              {/* Sender Reference — wallet picker for SOV only.
+                  For custom tokens (CBE etc.) the sender is implicit, so we
+                  don't render the "Your DID" block here. */}
+              {selectedToken.type === 'sov' && (
               <View
                 style={{
                   marginBottom: spacing.lg,
@@ -721,11 +822,9 @@ const SendTokensScreen = ({ navigation }: any) => {
                     fontWeight: typography.weight.semibold,
                   }}
                 >
-                  {selectedToken.type === 'sov' ? 'Sending From' : 'Your DID'}
+                  Sending From
                 </Text>
-                {selectedToken.type === 'sov' &&
-                wallets &&
-                wallets.length > 0 ? (
+                {wallets && wallets.length > 0 ? (
                   <Column gap="sm">
                     <Text
                       style={{
@@ -824,19 +923,9 @@ const SendTokensScreen = ({ navigation }: any) => {
                       );
                     })}
                   </Column>
-                ) : (
-                  <Text
-                    style={{
-                      fontSize: typography.size.xs,
-                      color: colors.text_primary,
-                      fontFamily: 'Courier',
-                    }}
-                    numberOfLines={1}
-                  >
-                    {currentIdentity.did}
-                  </Text>
-                )}
+                ) : null}
               </View>
+              )}
 
               {/* Recipient Input - Changes based on token type */}
               <View>
@@ -847,15 +936,11 @@ const SendTokensScreen = ({ navigation }: any) => {
                     marginBottom: spacing.xs,
                   }}
                 >
-                  {selectedToken.type === 'sov' ? 'Recipient Wallet ID' : 'Recipient DID or Key ID'}
+                  Recipient Wallet Address
                 </Text>
                 <FormField
                   label=""
-                  placeholder={
-                    selectedToken.type === 'sov'
-                      ? '64 hex characters'
-                      : 'did:zhtp:... or 64/5184 hex'
-                  }
+                  placeholder="64 hex characters"
                   value={transferForm.recipient}
                   onChangeText={text => {
                     setTransferForm(prev => ({ ...prev, recipient: text }));
@@ -874,31 +959,6 @@ const SendTokensScreen = ({ navigation }: any) => {
                     </Text>
                   ) : null;
                 })()}
-                {addressBookEntries.length > 0 && (
-                  <TouchableOpacity
-                    onPress={() => setShowAddressBook(true)}
-                    style={{
-                      marginTop: spacing.sm,
-                      paddingVertical: spacing.md,
-                      paddingHorizontal: spacing.lg,
-                      borderRadius: borderRadius.base,
-                      borderWidth: 1.5,
-                      borderColor: colors.primary + '60',
-                      backgroundColor: colors.primary + '10',
-                      alignItems: 'center',
-                    }}
-                  >
-                    <Text
-                      style={{
-                        fontSize: typography.size.md,
-                        fontWeight: typography.weight.semibold,
-                        color: colors.primary,
-                      }}
-                    >
-                      Choose from Contacts
-                    </Text>
-                  </TouchableOpacity>
-                )}
               </View>
 
               {/* Amount */}
@@ -931,12 +991,50 @@ const SendTokensScreen = ({ navigation }: any) => {
               />
 
               {/* Action Buttons */}
+              {/* CBE sends are disabled until the node accepts wallet-based
+                  TokenTransfer for non-SOV tokens. The mobile signing path is
+                  ready (transferTokenFromWallet) — flip this back on once the
+                  backend verification path is fixed. */}
+              {(selectedToken.symbol || '').toUpperCase() === 'CBE' && (
+                <View
+                  style={{
+                    marginTop: spacing.md,
+                    padding: spacing.md,
+                    borderRadius: borderRadius.base,
+                    backgroundColor: colors.warning + '15',
+                    borderWidth: 1,
+                    borderColor: colors.warning + '55',
+                  }}
+                >
+                  <Text
+                    style={{
+                      fontSize: typography.size.sm,
+                      color: colors.warning,
+                      fontWeight: typography.weight.semibold,
+                      marginBottom: spacing.xs,
+                    }}
+                  >
+                    CBE transfers temporarily unavailable
+                  </Text>
+                  <Text
+                    style={{
+                      fontSize: typography.size.xs,
+                      color: colors.text_secondary,
+                    }}
+                  >
+                    Sending is disabled while the network verification path is being updated. Receiving CBE still works.
+                  </Text>
+                </View>
+              )}
               <Row gap="md" style={{ marginTop: spacing.lg }}>
                 <Button
                   variant="primary"
                   onPress={handleTransfer}
                   loading={isTransferring}
-                  disabled={isTransferring}
+                  disabled={
+                    isTransferring ||
+                    (selectedToken.symbol || '').toUpperCase() === 'CBE'
+                  }
                   style={{ flex: 1 }}
                 >
                   Send {selectedToken.symbol}

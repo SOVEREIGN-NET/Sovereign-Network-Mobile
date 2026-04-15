@@ -50,6 +50,9 @@ lib-blockchain = { path = "../../../../../../../The-Sovereign-Network/lib-blockc
 zhtp_client = { package = "lib-client", path = "../../../../../../../The-Sovereign-Network/lib-client" }
 
 [profile.release]
-lto = true
+# Thin LTO instead of fat: tolerant of rlibs without fully-embedded bitcode,
+# which fat LTO requires. Fat LTO breaks with rustc 1.92+ cross-compiling to
+# Android when lib-client is pulled in as a path dependency.
+lto = "thin"
 opt-level = "z"
 strip = true

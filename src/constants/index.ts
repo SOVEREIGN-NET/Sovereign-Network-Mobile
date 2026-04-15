@@ -133,3 +133,49 @@ export const IDENTITY_TYPES = {
   ORGANIZATION: 'organization',
   DEVELOPER: 'developer',
 } as const;
+
+// Welfare DAO brand colors — used consistently across the UI to identify each DAO
+export const WELFARE_DAOS = [
+  {
+    id: 'food',
+    name: 'Food Hub',
+    desc: 'Community food security network',
+    url: 'food.dao.sov',
+    wallet: '5ad4d36b1d3a1aa783c05f316d67309b2b60de4fb76324428237dd25c2f9ffb4',
+    color: '#8BA888',
+  },
+  {
+    id: 'health',
+    name: 'Health Hub',
+    desc: 'Decentralized healthcare access',
+    url: 'health.dao.sov',
+    wallet: '9f8d4ccf10869f9a95b4d3e76834da4140aed7fe6af7e8aa3af0d7074c4ac86c',
+    color: '#C97B7B',
+  },
+  {
+    id: 'education',
+    name: 'Education Hub',
+    desc: 'Open learning resources',
+    url: 'edu.dao.sov',
+    wallet: 'e4611cc1a4ebf28ad119e0c415b4300f53dd97703ee6aa793847c40fceea1d5d',
+    color: '#7A9BC4',
+  },
+  {
+    id: 'housing',
+    name: 'Housing Hub',
+    desc: 'Affordable housing collective',
+    url: 'housing.dao.sov',
+    wallet: 'ccf0caad2c80e51c2e43ceab4a8b5d1d34d4914da57534697ba8003cea3a4ca2',
+    color: '#B8956A',
+  },
+  {
+    id: 'energy',
+    name: 'Energy Hub',
+    desc: 'Renewable energy sharing',
+    url: 'energy.dao.sov',
+    wallet: 'cb4fc86f2f0177f24be863874845ef3e4560dd89e981d1ff4fe07372ea693768',
+    color: '#D4B35A',
+  },
+] as const;
+
+export type WelfareDaoId = (typeof WELFARE_DAOS)[number]['id'];
