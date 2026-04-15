@@ -1888,6 +1888,14 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "09edd9e8b54e49e587e4f6295a7d29c3ea94d469cb40ab8ca70b288248a81db2"
 
 [[package]]
+name = "lib-access-control"
+version = "0.1.0"
+dependencies = [
+ "lib-types",
+ "serde",
+]
+
+[[package]]
 name = "lib-blockchain"
 version = "0.1.0"
 dependencies = [
@@ -1898,6 +1906,7 @@ dependencies = [
  "chrono",
  "hex",
  "indexmap 2.13.0",
+ "lib-access-control",
  "lib-consensus",
  "lib-crypto",
  "lib-economy",
@@ -2041,6 +2050,7 @@ dependencies = [
  "hex",
  "hkdf",
  "hmac",
+ "lib-access-control",
  "lib-crypto",
  "lib-identity-core",
  "lib-proofs",
@@ -2142,6 +2152,7 @@ dependencies = [
  "log",
  "num_cpus",
  "serde",
+ "serde_json",
  "tracing",
 ]
 

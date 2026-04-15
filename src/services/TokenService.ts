@@ -107,10 +107,10 @@ class TokenService {
       await nativeIdentityProvisioning.signTokenCreateTransaction({
         name: request.name,
         symbol: request.symbol,
-        initialSupply: Number(request.initial_supply),
+        initialSupply: String(request.initial_supply),
         decimals: request.decimals,
         maxSupply:
-          request.max_supply != null ? Number(request.max_supply) : null,
+          request.max_supply != null ? String(request.max_supply) : null,
       });
     console.log(
       '[TokenService] Transaction signed, hex length:',

@@ -19,7 +19,9 @@ import { useTranslation } from '../i18n';
 import { colors, spacing, typography, borderRadius } from '../theme';
 import tokenService from '../services/TokenService';
 import { TokenTransferRequest, SovTransferRequest } from '../types/token';
-import { humanToAtomic } from '../utils/tokenUnits';
+import { humanToAtomic, atomsToNumber } from '../utils/tokenUnits';
+
+const SOV_DECIMALS = 18;
 import { CHAIN_ID } from '../config';
 
 // Storage keys
@@ -156,7 +158,7 @@ const SendTokensScreen = ({ navigation, route }: any) => {
             name: 'Sovereign',
             balance: totalSovBalance,
             type: 'sov',
-            decimals: 8,
+            decimals: SOV_DECIMALS,
           });
         }
       }
@@ -185,17 +187,28 @@ const SendTokensScreen = ({ navigation, route }: any) => {
           // Find the SOV wallet entry we added above (if any)
           const sovEntry = tokens.find(t => t.type === 'sov');
 
-          allBalances.forEach((token: any) => {
-            const rawBalance = token.balance || 0;
-            const decimals = token.decimals || 8;
-            const humanReadableBalance = rawBalance / Math.pow(10, decimals);
+          allBalances.forEach(token => {
             const symbol = String(token.symbol || '').toUpperCase();
+
+            // Skip tokens the node didn't tag with decimals — can't safely
+            // format or transfer without knowing the unit.
+            if (token.decimals == null || !Number.isFinite(token.decimals)) {
+              console.warn(
+                '[SendTokensScreen] Skipping token with missing decimals:',
+                token.token_id,
+                token.symbol,
+              );
+              return;
+            }
+
+            const decimals = token.decimals;
+            const rawAtoms = String(token.balance ?? '0');
+            const humanReadableBalance = atomsToNumber(rawAtoms, decimals);
 
             // If this is SOV, merge token_id into the existing wallet entry
             if (symbol === 'SOV' && sovEntry) {
               sovEntry.token_id = token.token_id;
               sovEntry.decimals = decimals;
-              // Use the higher balance (wallet endpoint may report different units)
               console.log(
                 '[SendTokensScreen] SOV token_id resolved from balances:',
                 token.token_id,
@@ -204,7 +217,6 @@ const SendTokensScreen = ({ navigation, route }: any) => {
               return;
             }
 
-            // Otherwise add as custom token
             const sendableToken: SendableToken = {
               id: token.token_id,
               symbol: token.symbol || 'Token',
@@ -221,12 +233,14 @@ const SendTokensScreen = ({ navigation, route }: any) => {
           // If we didn't have a wallet entry but got SOV from balances, add it
           if (!sovEntry) {
             const sovFromBalances = allBalances.find(
-              (t: any) => String(t.symbol || '').toUpperCase() === 'SOV',
+              t => String(t.symbol || '').toUpperCase() === 'SOV',
             );
-            if (sovFromBalances) {
-              const decimals = sovFromBalances.decimals || 8;
-              const balance =
-                (sovFromBalances.balance || 0) / Math.pow(10, decimals);
+            if (sovFromBalances && sovFromBalances.decimals != null) {
+              const decimals = sovFromBalances.decimals;
+              const balance = atomsToNumber(
+                String(sovFromBalances.balance ?? '0'),
+                decimals,
+              );
               tokens.unshift({
                 id: 'SOV',
                 symbol: 'SOV',
@@ -310,6 +324,14 @@ const SendTokensScreen = ({ navigation, route }: any) => {
           // SOV is always rendered from the wallet-list aggregate, not the
           // registry row. Skip here to avoid a duplicate zero-balance SOV.
           if (symbol === 'SOV' && tokens.some(t => t.type === 'sov')) continue;
+          if (item.decimals == null || !Number.isFinite(item.decimals)) {
+            console.warn(
+              '[SendTokensScreen] Registry token missing decimals, skipping:',
+              item.token_id,
+              item.symbol,
+            );
+            continue;
+          }
           const sendableToken: SendableToken = {
             id: item.token_id,
             symbol: item.symbol || 'Token',
@@ -317,7 +339,7 @@ const SendTokensScreen = ({ navigation, route }: any) => {
             balance: 0,
             type: 'custom',
             token_id: item.token_id,
-            decimals: item.decimals ?? 8,
+            decimals: item.decimals,
           };
           tokenMap.set(item.token_id, sendableToken);
           tokens.push(sendableToken);
@@ -425,7 +447,7 @@ const SendTokensScreen = ({ navigation, route }: any) => {
     try {
       console.log('[SendTokensScreen] Transferring:', selectedToken.symbol);
 
-      const decimals = selectedToken.decimals ?? 8;
+      const decimals = selectedToken.decimals ?? SOV_DECIMALS;
       const baseUnits = humanToAtomic(transferForm.amount, decimals);
       if (!baseUnits) {
         throw new Error(`Amount must have at most ${decimals} decimals`);

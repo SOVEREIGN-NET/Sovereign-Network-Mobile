@@ -181,7 +181,7 @@ pub fn build_token_create_transaction(
         &identity,
         name,
         symbol,
-        initial_supply,
+        initial_supply as u128,
         decimals,
         treasury_recipient,
         chain_id,
@@ -213,7 +213,7 @@ pub fn build_token_mint_transaction(
         to_arr[..to_pubkey.len()].copy_from_slice(to_pubkey);
     }
 
-    zhtp_client::build_mint_tx(&identity, &token_id_arr, &to_arr, amount, chain_id)
+    zhtp_client::build_mint_tx(&identity, &token_id_arr, &to_arr, amount as u128, chain_id)
         .map_err(|e| anyhow::anyhow!("Failed to build token mint transaction: {}", e))
 }
 
@@ -242,7 +242,7 @@ pub fn build_token_transfer_transaction(
         to_arr[..to_pubkey.len()].copy_from_slice(to_pubkey);
     }
 
-    zhtp_client::build_transfer_tx(&identity, &token_id_arr, &to_arr, amount, chain_id, nonce)
+    zhtp_client::build_transfer_tx(&identity, &token_id_arr, &to_arr, amount as u128, chain_id, nonce)
         .map_err(|e| anyhow::anyhow!("Failed to build token transfer transaction: {}", e))
 }
 
@@ -262,6 +262,6 @@ pub fn build_token_burn_transaction(
         token_id_arr[..token_id.len()].copy_from_slice(token_id);
     }
 
-    zhtp_client::build_burn_tx(&identity, &token_id_arr, amount, chain_id)
+    zhtp_client::build_burn_tx(&identity, &token_id_arr, amount as u128, chain_id)
         .map_err(|e| anyhow::anyhow!("Failed to build token burn transaction: {}", e))
 }

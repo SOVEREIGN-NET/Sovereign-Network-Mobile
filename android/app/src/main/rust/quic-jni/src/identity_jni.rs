@@ -495,7 +495,7 @@ pub extern "system" fn Java_com_sovereignnetworkmobile_Identity_nativeBuildToken
         identity,
         &name_str,
         &symbol_str,
-        initial_supply as u64,
+        initial_supply as u64 as u128,
         decimals as u8,
         treasury_arr_32,
         chain_id as u8,
@@ -533,7 +533,7 @@ pub extern "system" fn Java_com_sovereignnetworkmobile_Identity_nativeBuildToken
     let len = std::cmp::min(to.len(), 32);
     to_arr[..len].copy_from_slice(&to[..len]);
 
-    match zhtp_client::build_mint_tx(identity, &tid_arr, &to_arr, amount as u64, chain_id as u8) {
+    match zhtp_client::build_mint_tx(identity, &tid_arr, &to_arr, amount as u64 as u128, chain_id as u8) {
         Ok(hex) => env.new_string(&hex).unwrap_or_default(),
         Err(e) => {
             log::error!("[Identity JNI] buildTokenMint failed: {}", e);
@@ -572,7 +572,7 @@ pub extern "system" fn Java_com_sovereignnetworkmobile_Identity_nativeBuildToken
         identity,
         &tid_arr,
         &to_arr,
-        amount as u64,
+        amount as u64 as u128,
         chain_id as u8,
         nonce as u64,
     ) {
@@ -614,7 +614,7 @@ pub extern "system" fn Java_com_sovereignnetworkmobile_Identity_nativeBuildSovWa
         identity,
         &from_arr,
         &to_arr,
-        amount as u64,
+        amount as u64 as u128,
         chain_id as u8,
         nonce as u64,
     ) {
@@ -667,7 +667,7 @@ pub extern "system" fn Java_com_sovereignnetworkmobile_Identity_nativeBuildToken
         &tid_arr,
         &from_arr,
         &to_arr,
-        amount as u64,
+        amount as u64 as u128,
         chain_id as u8,
         nonce as u64,
     ) {
@@ -698,7 +698,7 @@ pub extern "system" fn Java_com_sovereignnetworkmobile_Identity_nativeBuildToken
     let len = std::cmp::min(tid.len(), 32);
     tid_arr[..len].copy_from_slice(&tid[..len]);
 
-    match zhtp_client::build_burn_tx(identity, &tid_arr, amount as u64, chain_id as u8) {
+    match zhtp_client::build_burn_tx(identity, &tid_arr, amount as u64 as u128, chain_id as u8) {
         Ok(hex) => env.new_string(&hex).unwrap_or_default(),
         Err(e) => {
             log::error!("[Identity JNI] buildTokenBurn failed: {}", e);

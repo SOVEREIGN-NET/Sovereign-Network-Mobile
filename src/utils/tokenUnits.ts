@@ -71,6 +71,24 @@ export function atomsToDisplay(
   return fracTrimmed ? `${wholeTrimmed}.${fracTrimmed}` : wholeTrimmed;
 }
 
+/**
+ * Convert atoms to a JS number representing whole tokens.
+ *
+ * Precision-safe for reasonable balances: the bigint→number cast only loses
+ * precision below ~1e-15 whole tokens, well below any display or comparison
+ * threshold. Use this when legacy code requires `number` (e.g. arithmetic,
+ * `sum + balance` reductions). Prefer {@link atomsToDisplay} for UI text.
+ */
+export function atomsToNumber(atoms: string, decimals: number): number {
+  if (!/^\d+$/.test(atoms)) return 0;
+  if (decimals <= 0) return Number(BigInt(atoms));
+  const divisor = 10n ** BigInt(decimals);
+  const big = BigInt(atoms);
+  const whole = big / divisor;
+  const frac = big % divisor;
+  return Number(whole) + Number(frac) / Number(divisor);
+}
+
 /** Format with thousands separators on the integer part. */
 export function atomsToDisplayLocale(
   atoms: string,
