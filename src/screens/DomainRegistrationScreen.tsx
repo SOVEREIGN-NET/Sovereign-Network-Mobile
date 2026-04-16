@@ -132,7 +132,8 @@ const DomainRegistrationScreen: React.FC<DomainRegistrationScreenProps> = ({
         const hasOwned = storedDomains.some(
           (d: DomainData) => d.owner === resolvedIdentityDid,
         );
-        setHasExistingDomain(hasOwned);
+        // Domain limit temporarily disabled for debugging
+        setHasExistingDomain(false);
       } catch (error) {
         console.warn(
           '[DomainRegistrationScreen] Failed to load existing domains:',
@@ -322,7 +323,8 @@ const DomainRegistrationScreen: React.FC<DomainRegistrationScreenProps> = ({
         REGISTERED_DOMAINS_KEY,
         JSON.stringify(storedDomains),
       );
-      setHasExistingDomain(true);
+      // Domain limit temporarily disabled for debugging
+      // setHasExistingDomain(true);
 
       setStatus({
         type: 'success',
@@ -450,7 +452,9 @@ const DomainRegistrationScreen: React.FC<DomainRegistrationScreenProps> = ({
                 backgroundColor:
                   status.type === 'success'
                     ? `${colors.success}15`
-                    : `${colors.error}15`,
+                    : status.type === 'error'
+                    ? `${colors.error}15`
+                    : `${colors.primary}15`,
                 borderRadius: borderRadius.md,
               }}
             >
@@ -458,7 +462,11 @@ const DomainRegistrationScreen: React.FC<DomainRegistrationScreenProps> = ({
                 style={{
                   fontSize: typography.size.sm,
                   color:
-                    status.type === 'success' ? colors.success : colors.error,
+                    status.type === 'success'
+                      ? colors.success
+                      : status.type === 'error'
+                      ? colors.error
+                      : colors.primary,
                 }}
               >
                 {status.message}

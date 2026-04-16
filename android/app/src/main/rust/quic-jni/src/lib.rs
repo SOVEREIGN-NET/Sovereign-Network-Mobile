@@ -39,9 +39,14 @@ pub extern "system" fn Java_com_sovereignnetworkmobile_NativeQuicBridge_nativeIn
     _class: JClass,
 ) -> jboolean {
     // Initialize Android logger
+    let log_level = if cfg!(debug_assertions) {
+        log::LevelFilter::Debug
+    } else {
+        log::LevelFilter::Warn
+    };
     android_logger::init_once(
         android_logger::Config::default()
-            .with_max_level(log::LevelFilter::Debug)
+            .with_max_level(log_level)
             .with_tag("[🌐 Web4]"),
     );
 

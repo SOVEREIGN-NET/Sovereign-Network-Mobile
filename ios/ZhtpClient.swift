@@ -113,13 +113,15 @@ private func cBufferFree(_ buf: ByteBuffer)
 // MARK: - C FFI Declarations: Token transactions (handle is opaque IdentityHandle*)
 
 /// Build signed token transfer transaction
+/// amount is u128 on the Rust side — passed as (lo, hi) register pair on ARM64.
 @_silgen_name("zhtp_client_build_token_transfer")
 private func cBuildTokenTransfer(
     _ handle: UnsafeMutableRawPointer,
     _ tokenId: UnsafePointer<UInt8>?,
     _ toPubkey: UnsafePointer<UInt8>?,
     _ toPubkeyLen: Int,
-    _ amount: UInt64,
+    _ amountLo: UInt64,
+    _ amountHi: UInt64,
     _ chainId: UInt8,
     _ nonce: UInt64
 ) -> UnsafeMutablePointer<CChar>?
@@ -131,7 +133,8 @@ private func cBuildTokenMint(
     _ tokenId: UnsafePointer<UInt8>?,
     _ toPubkey: UnsafePointer<UInt8>?,
     _ toPubkeyLen: Int,
-    _ amount: UInt64,
+    _ amountLo: UInt64,
+    _ amountHi: UInt64,
     _ chainId: UInt8
 ) -> UnsafeMutablePointer<CChar>?
 
@@ -141,7 +144,8 @@ private func cBuildTokenCreate(
     _ handle: UnsafeMutableRawPointer,
     _ name: UnsafePointer<CChar>?,
     _ symbol: UnsafePointer<CChar>?,
-    _ initialSupply: UInt64,
+    _ initialSupplyLo: UInt64,
+    _ initialSupplyHi: UInt64,
     _ decimals: UInt8,
     _ treasuryRecipient: UnsafePointer<UInt8>?,
     _ chainId: UInt8
@@ -152,7 +156,8 @@ private func cBuildTokenCreate(
 private func cBuildTokenBurn(
     _ handle: UnsafeMutableRawPointer,
     _ tokenId: UnsafePointer<UInt8>?,
-    _ amount: UInt64,
+    _ amountLo: UInt64,
+    _ amountHi: UInt64,
     _ chainId: UInt8
 ) -> UnsafeMutablePointer<CChar>?
 
@@ -162,7 +167,8 @@ private func cBuildSovWalletTransfer(
     _ handle: UnsafeMutableRawPointer,
     _ fromWalletId: UnsafePointer<UInt8>?,  // 32 bytes
     _ toWalletId: UnsafePointer<UInt8>?,    // 32 bytes
-    _ amount: UInt64,
+    _ amountLo: UInt64,
+    _ amountHi: UInt64,
     _ chainId: UInt8,
     _ nonce: UInt64
 ) -> UnsafeMutablePointer<CChar>?
@@ -175,7 +181,8 @@ private func cBuildTokenWalletTransfer(
     _ tokenId: UnsafePointer<UInt8>?,       // 32 bytes
     _ fromWalletId: UnsafePointer<UInt8>?,  // 32 bytes
     _ toWalletId: UnsafePointer<UInt8>?,    // 32 bytes
-    _ amount: UInt64,
+    _ amountLo: UInt64,
+    _ amountHi: UInt64,
     _ chainId: UInt8,
     _ nonce: UInt64
 ) -> UnsafeMutablePointer<CChar>?
@@ -186,7 +193,8 @@ private func cBuildTokenWalletTransfer(
 private func cBuildDaoStake(
     _ handle: UnsafeMutableRawPointer,
     _ sectorDaoKeyId: UnsafePointer<UInt8>?,  // exactly 32 bytes
-    _ amount: UInt64,                          // nSOV (1 SOV = 1e9 nSOV)
+    _ amountLo: UInt64,
+    _ amountHi: UInt64,
     _ nonce: UInt64,
     _ lockBlocks: UInt64,
     _ chainId: UInt8
@@ -718,7 +726,7 @@ public class ZhtpClient {
                     tokenIdPtr.baseAddress?.assumingMemoryBound(to: UInt8.self),
                     toPubkeyPtr.baseAddress?.assumingMemoryBound(to: UInt8.self),
                     toPublicKey.count,
-                    amount,
+                    amount, 0,
                     chainId,
                     nonce
                 )
@@ -745,7 +753,7 @@ public class ZhtpClient {
                     tokenIdPtr.baseAddress?.assumingMemoryBound(to: UInt8.self),
                     toPubkeyPtr.baseAddress?.assumingMemoryBound(to: UInt8.self),
                     toPublicKey.count,
-                    amount,
+                    amount, 0,
                     chainId
                 )
             }
@@ -785,7 +793,7 @@ public class ZhtpClient {
                         identity.getHandle(),
                         namePtr,
                         symbolPtr,
-                        initialSupply,
+                        initialSupply, 0,
                         decimals,
                         treasuryPtr.baseAddress,
                         chainId
@@ -810,7 +818,7 @@ public class ZhtpClient {
             cBuildTokenBurn(
                 identity.getHandle(),
                 tokenIdPtr.baseAddress?.assumingMemoryBound(to: UInt8.self),
-                amount,
+                amount, 0,
                 chainId
             )
         }) else {
@@ -845,7 +853,7 @@ public class ZhtpClient {
                     identity.getHandle(),
                     fromPtr.baseAddress?.assumingMemoryBound(to: UInt8.self),
                     toPtr.baseAddress?.assumingMemoryBound(to: UInt8.self),
-                    amount,
+                    amount, 0,
                     chainId,
                     nonce
                 )
@@ -889,7 +897,7 @@ public class ZhtpClient {
                         tokPtr.baseAddress?.assumingMemoryBound(to: UInt8.self),
                         fromPtr.baseAddress?.assumingMemoryBound(to: UInt8.self),
                         toPtr.baseAddress?.assumingMemoryBound(to: UInt8.self),
-                        amount,
+                        amount, 0,
                         chainId,
                         nonce
                     )
@@ -923,7 +931,7 @@ public class ZhtpClient {
             cBuildDaoStake(
                 identity.getHandle(),
                 daoPtr.baseAddress?.assumingMemoryBound(to: UInt8.self),
-                amount,
+                amount, 0,
                 nonce,
                 lockBlocks,
                 chainId

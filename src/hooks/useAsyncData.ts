@@ -54,14 +54,15 @@ export function useAsyncData<T>(
 
   useEffect(() => {
     if (skip) {
-      setState({ data: initialData, loading: false, error: null });
+      setState(prev => ({ data: prev.data ?? initialData, loading: false, error: null }));
       return;
     }
 
     let mounted = true;
 
     const fetchData = async () => {
-      setState(prev => ({ ...prev, loading: true, error: null }));
+      // Keep existing data visible while refreshing — never blank the screen.
+      setState(prev => ({ ...prev, loading: prev.data == null, error: null }));
       try {
         const result = await asyncFunctionRef.current();
         if (mounted) {
@@ -73,11 +74,12 @@ export function useAsyncData<T>(
         }
       } catch (error) {
         if (mounted) {
-          setState({
-            data: null,
+          // Preserve previous data on error — degrade gracefully.
+          setState(prev => ({
+            data: prev.data,
             loading: false,
             error: error instanceof Error ? error : new Error('Unknown error occurred'),
-          });
+          }));
         }
       }
     };

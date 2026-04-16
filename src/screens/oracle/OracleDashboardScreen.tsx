@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useMemo, useState } from 'react';
 import {
   View,
   ScrollView,
@@ -6,9 +6,12 @@ import {
   Pressable,
   ActivityIndicator,
   Platform,
+  Clipboard,
+  Alert,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Text, Card, Row, Column, Badge } from '../../components';
+import Svg, { Path, Circle, Line, Defs, LinearGradient, Stop } from 'react-native-svg';
 import { colors, spacing, borderRadius, typography } from '../../theme';
 import { useAsyncData } from '../../hooks';
 import {
@@ -22,7 +25,9 @@ import {
   OracleConfigResponse,
   OraclePair,
   VariationPeriod,
+  CbePriceResponse,
 } from '../../services/OracleService';
+import { atomsToDisplayLocale } from '../../utils/tokenUnits';
 import SimulatorTab from './SimulatorTab';
 
 const MONO_FONT = Platform.OS === 'ios' ? 'Menlo' : 'monospace';
@@ -34,11 +39,11 @@ const fmt = (v: unknown, decimals = 4, prefix = '$'): string => {
   return `${prefix}${n.toFixed(decimals)}`;
 };
 
-const fmtChange = (v: unknown): string => {
+const fmtChange = (v: unknown, decimals = 4): string => {
   const n = typeof v === 'number' ? v : parseFloat(v as any);
   if (!isFinite(n)) return '—';
   const sign = n >= 0 ? '+' : '';
-  return `${sign}${n.toFixed(4)}`;
+  return `${sign}${n.toFixed(decimals)}`;
 };
 
 const fmtPct = (v: unknown): string => {
@@ -60,22 +65,41 @@ const TABS: { key: Tab; label: string }[] = [
 const PAIRS: OraclePair[] = ['SOV/USD', 'CBE/USD'];
 const PERIODS: VariationPeriod[] = ['1h', '24h', '7d'];
 
+const PRICE_DECIMALS: Record<OraclePair, number> = {
+  'SOV/USD': 4,
+  'CBE/USD': 8,
+};
+
 // --- Shared sub-components ---
 
-const StatRow: React.FC<{ label: string; value: string; mono?: boolean }> = ({
-  label,
-  value,
-  mono,
-}) => (
-  <Row justify="space-between" align="center" style={styles.statRow}>
-    <Text variant="caption" style={{ color: colors.text_secondary }}>
-      {label}
-    </Text>
-    <Text variant="body" style={[{ fontWeight: '600' }, mono && styles.mono]}>
-      {value}
-    </Text>
-  </Row>
-);
+const StatRow: React.FC<{
+  label: string;
+  value: string;
+  mono?: boolean;
+  copyable?: boolean;
+}> = ({ label, value, mono, copyable }) => {
+  const handleCopy = () => {
+    Clipboard.setString(value);
+    Alert.alert('Copied', `${label} copied to clipboard`);
+  };
+  const Wrapper = copyable ? Pressable : View;
+  return (
+    <Wrapper onPress={copyable ? handleCopy : undefined} style={styles.statRow}>
+      <Row justify="space-between" align="center">
+        <Text variant="caption" style={{ color: colors.text_secondary, flexShrink: 0 }}>
+          {label}{copyable ? ' ⎘' : ''}
+        </Text>
+        <Text
+          variant="body"
+          {...(copyable ? { numberOfLines: 1, ellipsizeMode: 'middle' as const } : {})}
+          style={[{ fontWeight: '600', flexShrink: 1, textAlign: 'right', marginLeft: spacing.sm }, mono && styles.mono]}
+        >
+          {value}
+        </Text>
+      </Row>
+    </Wrapper>
+  );
+};
 
 const LoadingState: React.FC = () => (
   <ActivityIndicator
@@ -144,8 +168,345 @@ const PeriodToggle: React.FC<{
 
 // --- Price Tab ---
 
-const PriceTab: React.FC = () => {
-  const [pair, setPair] = useState<OraclePair>('SOV/USD');
+// --- Shared visual helpers ---
+
+const DEBT_COLORS: Record<string, string> = {
+  Green: colors.success,
+  Yellow: '#f5a623',
+  Orange: '#e8751a',
+  Red: colors.error,
+};
+
+const ProgressBar: React.FC<{ pct: number; color?: string; height?: number }> = ({
+  pct,
+  color = colors.primary,
+  height = 8,
+}) => (
+  <View style={{ height, borderRadius: height / 2, backgroundColor: `${colors.text_secondary}30`, overflow: 'hidden' }}>
+    <View style={{ width: `${Math.min(Math.max(pct, 0), 100)}%`, height: '100%', borderRadius: height / 2, backgroundColor: color }} />
+  </View>
+);
+
+/**
+ * Bonding curve visualization — draws the price curve across bands.
+ * Each band has a steeper slope (exponential-ish). The filled area
+ * and a dot mark the current position.
+ */
+const CURVE_W = 300;
+const CURVE_H = 120;
+const CURVE_PAD = { top: 12, right: 12, bottom: 20, left: 12 };
+const PLOT_W = CURVE_W - CURVE_PAD.left - CURVE_PAD.right;
+const PLOT_H = CURVE_H - CURVE_PAD.top - CURVE_PAD.bottom;
+
+const buildCurvePath = (bandCount: number, samples = 80): { x: number; y: number }[] => {
+  const points: { x: number; y: number }[] = [];
+  for (let i = 0; i <= samples; i++) {
+    const t = i / samples; // 0..1 across total supply
+    const band = Math.min(Math.floor(t * bandCount), bandCount - 1);
+    const exp = 1 + band * 0.6; // each band steeper
+    const bandStart = band / bandCount;
+    const bandEnd = (band + 1) / bandCount;
+    const localT = (t - bandStart) / (bandEnd - bandStart);
+    // Cumulative base price from prior bands
+    let baseY = 0;
+    for (let b = 0; b < band; b++) {
+      baseY += Math.pow(1, 1 + b * 0.6) / bandCount;
+    }
+    const y = baseY + (Math.pow(localT, exp) / bandCount);
+    points.push({ x: t, y });
+  }
+  // Normalize y to 0..1
+  const maxY = Math.max(...points.map(p => p.y), 0.001);
+  return points.map(p => ({ x: p.x, y: p.y / maxY }));
+};
+
+const BondingCurveChart: React.FC<{
+  currentBand: number;
+  bandCount: number;
+  bandPct: number;
+}> = ({ currentBand, bandCount, bandPct }) => {
+  const points = useMemo(() => buildCurvePath(bandCount), [bandCount]);
+
+  const progressT = (currentBand + (bandPct / 100)) / bandCount;
+
+  const toSvg = (p: { x: number; y: number }) => ({
+    sx: CURVE_PAD.left + p.x * PLOT_W,
+    sy: CURVE_PAD.top + (1 - p.y) * PLOT_H,
+  });
+
+  // Full curve path
+  const fullPath = points
+    .map((p, i) => {
+      const { sx, sy } = toSvg(p);
+      return `${i === 0 ? 'M' : 'L'}${sx.toFixed(1)},${sy.toFixed(1)}`;
+    })
+    .join(' ');
+
+  // Filled area path (up to current position)
+  const filledPoints = points.filter(p => p.x <= progressT + 0.005);
+  const lastFilledIdx = filledPoints.length - 1;
+  const filledPath =
+    filledPoints
+      .map((p, i) => {
+        const { sx, sy } = toSvg(p);
+        return `${i === 0 ? 'M' : 'L'}${sx.toFixed(1)},${sy.toFixed(1)}`;
+      })
+      .join(' ') +
+    ` L${toSvg(filledPoints[lastFilledIdx]).sx.toFixed(1)},${(CURVE_PAD.top + PLOT_H).toFixed(1)}` +
+    ` L${CURVE_PAD.left.toFixed(1)},${(CURVE_PAD.top + PLOT_H).toFixed(1)} Z`;
+
+  // Current position dot
+  const dotPoint = filledPoints[lastFilledIdx] ?? points[0];
+  const { sx: dotX, sy: dotY } = toSvg(dotPoint);
+
+  // Band divider lines
+  const bandLines = Array.from({ length: bandCount - 1 }, (_, i) => {
+    const x = CURVE_PAD.left + ((i + 1) / bandCount) * PLOT_W;
+    return x;
+  });
+
+  return (
+    <View style={{ alignItems: 'center' }}>
+      <Svg width={CURVE_W} height={CURVE_H} viewBox={`0 0 ${CURVE_W} ${CURVE_H}`}>
+        <Defs>
+          <LinearGradient id="fillGrad" x1="0" y1="0" x2="0" y2="1">
+            <Stop offset="0" stopColor={colors.primary} stopOpacity="0.35" />
+            <Stop offset="1" stopColor={colors.primary} stopOpacity="0.05" />
+          </LinearGradient>
+        </Defs>
+
+        {/* Band dividers */}
+        {bandLines.map((x, i) => (
+          <Line
+            key={i}
+            x1={x} y1={CURVE_PAD.top}
+            x2={x} y2={CURVE_PAD.top + PLOT_H}
+            stroke={colors.text_secondary}
+            strokeOpacity={0.15}
+            strokeWidth={1}
+            strokeDasharray="3,3"
+          />
+        ))}
+
+        {/* Filled area */}
+        {filledPoints.length > 1 && (
+          <Path d={filledPath} fill="url(#fillGrad)" />
+        )}
+
+        {/* Full curve */}
+        <Path d={fullPath} stroke={`${colors.text_secondary}40`} strokeWidth={1.5} fill="none" />
+
+        {/* Active curve segment */}
+        {filledPoints.length > 1 && (
+          <Path
+            d={filledPoints.map((p, i) => {
+              const { sx, sy } = toSvg(p);
+              return `${i === 0 ? 'M' : 'L'}${sx.toFixed(1)},${sy.toFixed(1)}`;
+            }).join(' ')}
+            stroke={colors.primary}
+            strokeWidth={2}
+            fill="none"
+          />
+        )}
+
+        {/* Current position dot */}
+        <Circle cx={dotX} cy={dotY} r={4} fill={colors.primary} />
+        <Circle cx={dotX} cy={dotY} r={7} fill={colors.primary} fillOpacity={0.2} />
+
+        {/* Band labels */}
+        {Array.from({ length: bandCount }, (_, i) => {
+          const cx = CURVE_PAD.left + ((i + 0.5) / bandCount) * PLOT_W;
+          return (
+            <Circle
+              key={`bl${i}`}
+              cx={cx}
+              cy={CURVE_PAD.top + PLOT_H + 10}
+              r={2.5}
+              fill={i <= currentBand ? colors.primary : `${colors.text_secondary}40`}
+            />
+          );
+        })}
+      </Svg>
+    </View>
+  );
+};
+
+const PoolBar: React.FC<{ reserve: string; treasury: string; liquidity: string }> = ({
+  reserve, treasury, liquidity,
+}) => {
+  const r = Number(BigInt(reserve || '0'));
+  const t = Number(BigInt(treasury || '0'));
+  const l = Number(BigInt(liquidity || '0'));
+  const total = r + t + l;
+  if (total === 0) return <ProgressBar pct={0} />;
+  const rPct = (r / total) * 100;
+  const tPct = (t / total) * 100;
+  const lPct = (l / total) * 100;
+  return (
+    <View>
+      <View style={{ flexDirection: 'row', height: 12, borderRadius: 6, overflow: 'hidden' }}>
+        <View style={{ width: `${rPct}%`, backgroundColor: colors.primary }} />
+        <View style={{ width: `${tPct}%`, backgroundColor: '#f5a623' }} />
+        <View style={{ width: `${lPct}%`, backgroundColor: colors.success }} />
+      </View>
+      <Row justify="space-between" style={{ marginTop: spacing.xs }}>
+        <Row align="center" style={{ gap: 4 }}>
+          <View style={{ width: 8, height: 8, borderRadius: 4, backgroundColor: colors.primary }} />
+          <Text variant="caption" style={{ color: colors.text_secondary, fontSize: 10 }}>Reserve 32%</Text>
+        </Row>
+        <Row align="center" style={{ gap: 4 }}>
+          <View style={{ width: 8, height: 8, borderRadius: 4, backgroundColor: '#f5a623' }} />
+          <Text variant="caption" style={{ color: colors.text_secondary, fontSize: 10 }}>Treasury 20%</Text>
+        </Row>
+        <Row align="center" style={{ gap: 4 }}>
+          <View style={{ width: 8, height: 8, borderRadius: 4, backgroundColor: colors.success }} />
+          <Text variant="caption" style={{ color: colors.text_secondary, fontSize: 10 }}>Liquidity 48%</Text>
+        </Row>
+      </Row>
+    </View>
+  );
+};
+
+const fmtAtoms18 = (v: string | undefined | null): string => {
+  if (!v || !/^\d+$/.test(v)) return '0';
+  return atomsToDisplayLocale(v, 18, 2);
+};
+
+// --- Bonding Curve Detail (CBE/USD) ---
+
+const BondingCurveDetail: React.FC<{ data: CbePriceResponse }> = ({ data }) => {
+  const dec = PRICE_DECIMALS['CBE/USD'];
+  const floorPrice = useMemo(() => {
+    if (!data.floor_price_atomic || !data.price_scale) return '—';
+    const floor = Number(BigInt(data.floor_price_atomic)) / Number(BigInt(data.price_scale));
+    return `$${floor.toFixed(dec)}`;
+  }, [data.floor_price_atomic, data.price_scale, dec]);
+
+  const debtColor = DEBT_COLORS[data.debt_state ?? 'Green'] ?? colors.text_secondary;
+
+  return (
+    <>
+      {/* Prices */}
+      <Card>
+        <Text variant="h3" style={{ marginBottom: spacing.sm }}>Prices</Text>
+        <Column gap="xs">
+          <StatRow label="CBE/USD" value={fmt(data.price, dec)} />
+          {data.cbe_sov_price != null && (
+            <StatRow label="CBE/SOV" value={fmt(data.cbe_sov_price, 6, '')} />
+          )}
+          <StatRow label="Floor Price" value={floorPrice} />
+          <StatRow label="Price (atomic)" value={data.price_atomic ?? '—'} mono copyable />
+        </Column>
+      </Card>
+
+      {/* Bonding Curve */}
+      {data.band_count != null && data.current_band != null && (
+        <Card>
+          <Row justify="space-between" align="center" style={{ marginBottom: spacing.xs }}>
+            <Text variant="h3">Bonding Curve</Text>
+            <Text variant="caption" style={{ color: colors.text_secondary }}>
+              Band {data.current_band + 1} of {data.band_count}
+            </Text>
+          </Row>
+          <BondingCurveChart
+            currentBand={data.current_band}
+            bandCount={data.band_count}
+            bandPct={data.band_progress_pct ?? 0}
+          />
+          <Text variant="caption" style={{ color: colors.text_secondary, marginTop: spacing.xs, textAlign: 'center' }}>
+            {(data.band_progress_pct ?? 0).toFixed(1)}% through current band — price accelerates per band
+          </Text>
+        </Card>
+      )}
+
+      {/* Supply */}
+      <Card>
+        <Text variant="h3" style={{ marginBottom: spacing.sm }}>Supply</Text>
+        <Column gap="xs">
+          <StatRow label="Circulating (curve-sold)" value={fmtAtoms18(data.circulating_supply)} />
+          <StatRow label="Total Ceiling" value={fmtAtoms18(data.total_supply_ceiling)} />
+          <StatRow label="Genesis Treasury" value={fmtAtoms18(data.genesis_treasury_allocation)} />
+        </Column>
+        {data.circulating_supply && data.total_supply_ceiling && (
+          <View style={{ marginTop: spacing.sm }}>
+            <ProgressBar
+              pct={Number(BigInt(data.circulating_supply)) / Number(BigInt(data.total_supply_ceiling)) * 100}
+              color={colors.primary}
+            />
+            <Text variant="caption" style={{ color: colors.text_secondary, marginTop: spacing.xs }}>
+              Supply sold via bonding curve
+            </Text>
+          </View>
+        )}
+      </Card>
+
+      {/* Graduation */}
+      <Card>
+        <Row justify="space-between" align="center" style={{ marginBottom: spacing.sm }}>
+          <Text variant="h3">Graduation</Text>
+          <Badge
+            label={data.graduated ? 'Graduated' : `${(data.graduation_progress_pct ?? 0).toFixed(1)}%`}
+            variant={data.graduated ? 'success' : 'default'}
+            size="sm"
+          />
+        </Row>
+        <ProgressBar pct={data.graduation_progress_pct ?? 0} color={data.graduated ? colors.success : colors.primary} />
+        <Text variant="caption" style={{ color: colors.text_secondary, marginTop: spacing.xs }}>
+          {data.graduated
+            ? 'Curve frozen — AMM is live, SOVRN burned'
+            : 'Progress toward AMM launch'}
+        </Text>
+      </Card>
+
+      {/* Pool Breakdown */}
+      <Card>
+        <Text variant="h3" style={{ marginBottom: spacing.sm }}>Pool Allocation</Text>
+        <PoolBar
+          reserve={String(data.reserve_balance ?? '0')}
+          treasury={data.sov_treasury_cbe_balance ?? '0'}
+          liquidity={data.liquidity_pool_balance ?? '0'}
+        />
+        <Column gap="xs" style={{ marginTop: spacing.sm }}>
+          <StatRow label="Reserve (floor backing)" value={fmtAtoms18(String(data.reserve_balance ?? '0'))} />
+          <StatRow label="SOV Treasury" value={fmtAtoms18(data.sov_treasury_cbe_balance)} />
+          <StatRow label="Liquidity Pool" value={fmtAtoms18(data.liquidity_pool_balance)} />
+        </Column>
+      </Card>
+
+      {/* Debt Health */}
+      <Card>
+        <Row justify="space-between" align="center" style={{ marginBottom: spacing.sm }}>
+          <Text variant="h3">Debt Health</Text>
+          <Badge
+            label={data.debt_state ?? 'Unknown'}
+            variant={data.debt_state === 'Green' ? 'success' : data.debt_state === 'Red' ? 'error' : 'warning'}
+            size="sm"
+          />
+        </Row>
+        <Column gap="xs">
+          <StatRow label="Outstanding Pre-backed" value={fmtAtoms18(data.outstanding_pre_backed)} />
+          <StatRow label="SOVRN Audit Supply" value={fmtAtoms18(data.sovrn_total_supply)} />
+        </Column>
+      </Card>
+
+      {/* Meta */}
+      <Card>
+        <Text variant="h3" style={{ marginBottom: spacing.sm }}>Details</Text>
+        <Column gap="xs">
+          <StatRow label="Phase" value={data.phase ?? '—'} />
+          <StatRow label="Source" value={data.source ?? '—'} />
+          <StatRow label="Epoch" value={String(data.current_epoch ?? '—')} />
+          <StatRow label="Token ID" value={data.token_id ?? '—'} mono copyable />
+        </Column>
+      </Card>
+    </>
+  );
+};
+
+// --- Price Tab ---
+
+const PriceTab: React.FC<{ pair: OraclePair }> = ({ pair }) => {
+  const dec = PRICE_DECIMALS[pair] ?? 4;
   const { data, loading, error, retry } = useAsyncData<OraclePriceResponse>(
     () => fetchOraclePrice(pair),
     [pair],
@@ -153,8 +514,6 @@ const PriceTab: React.FC = () => {
 
   return (
     <Column gap="md">
-      <PairToggle value={pair} onChange={setPair} />
-
       {loading && <LoadingState />}
       {!loading && error && (
         <ErrorState
@@ -169,7 +528,16 @@ const PriceTab: React.FC = () => {
               <Text variant="caption" style={styles.priceLabel}>
                 {data.pair}
               </Text>
-              <Text style={styles.priceValue}>{fmt(data.price)}</Text>
+              {(() => {
+                const priceStr = fmt(data.price, dec);
+                const len = priceStr.length;
+                const fontSize = len <= 8 ? 48 : len <= 12 ? 36 : len <= 16 ? 28 : 22;
+                return (
+                  <Text style={[styles.priceValue, { fontSize }]}>
+                    {priceStr}
+                  </Text>
+                );
+              })()}
               <Text variant="caption" style={{ color: colors.text_secondary }}>
                 Epoch #{data.current_epoch}
               </Text>
@@ -186,6 +554,7 @@ const PriceTab: React.FC = () => {
                 label="Price (atomic)"
                 value={data.price_atomic ?? '—'}
                 mono
+                copyable
               />
               <StatRow
                 label="Scale"
@@ -224,33 +593,14 @@ const PriceTab: React.FC = () => {
               )}
 
               {data.pair === 'CBE/USD' && (
-                <>
-                  <StatRow label="Phase" value={data.phase ?? '—'} />
-                  <StatRow
-                    label="Total Supply"
-                    value={
-                      data.total_supply != null
-                        ? data.total_supply.toLocaleString()
-                        : '—'
-                    }
-                  />
-                  <StatRow
-                    label="Reserve Balance"
-                    value={
-                      data.reserve_balance != null
-                        ? data.reserve_balance.toLocaleString()
-                        : '—'
-                    }
-                  />
-                  <StatRow
-                    label="Token ID"
-                    value={data.token_id ?? '—'}
-                    mono
-                  />
-                </>
+                <StatRow label="Source" value={data.source ?? '—'} />
               )}
             </Column>
           </Card>
+
+          {data.pair === 'CBE/USD' && (
+            <BondingCurveDetail data={data} />
+          )}
         </>
       )}
     </Column>
@@ -259,8 +609,8 @@ const PriceTab: React.FC = () => {
 
 // --- Variation Tab ---
 
-const VariationTab: React.FC = () => {
-  const [pair, setPair] = useState<OraclePair>('SOV/USD');
+const VariationTab: React.FC<{ pair: OraclePair }> = ({ pair }) => {
+  const dec = PRICE_DECIMALS[pair] ?? 4;
   const [period, setPeriod] = useState<VariationPeriod>('24h');
   const { data, loading, error, retry } = useAsyncData<OracleVariationResponse>(
     () => fetchOracleVariation(pair, period),
@@ -278,7 +628,6 @@ const VariationTab: React.FC = () => {
 
   return (
     <Column gap="md">
-      <PairToggle value={pair} onChange={setPair} />
       <PeriodToggle value={period} onChange={setPeriod} />
 
       {loading && <LoadingState />}
@@ -315,19 +664,19 @@ const VariationTab: React.FC = () => {
                 Statistics
               </Text>
               <Column gap="xs">
-                <StatRow label="Latest Price" value={fmt(data.latest_price)} />
+                <StatRow label="Latest Price" value={fmt(data.latest_price, dec)} />
                 <StatRow
                   label="Reference Price"
-                  value={fmt(data.reference_price)}
+                  value={fmt(data.reference_price, dec)}
                 />
                 <StatRow
                   label="Change"
-                  value={fmtChange(data.absolute_change)}
+                  value={fmtChange(data.absolute_change, dec)}
                 />
-                <StatRow label="High" value={fmt(data.high)} />
-                <StatRow label="Low" value={fmt(data.low)} />
-                <StatRow label="Mean" value={fmt(data.mean)} />
-                <StatRow label="Std Dev" value={fmt(data.stdev, 4, '')} />
+                <StatRow label="High" value={fmt(data.high, dec)} />
+                <StatRow label="Low" value={fmt(data.low, dec)} />
+                <StatRow label="Mean" value={fmt(data.mean, dec)} />
+                <StatRow label="Std Dev" value={fmt(data.stdev, dec, '')} />
                 <StatRow
                   label="Samples"
                   value={String(data.sample_count ?? '—')}
@@ -349,12 +698,12 @@ const VariationTab: React.FC = () => {
                 <Column gap="xs">
                   <StatRow
                     label="Current Price"
-                    value={fmt(data.current_price)}
+                    value={fmt(data.current_price, dec)}
                   />
-                  <StatRow label="Base Price" value={fmt(data.base_price)} />
+                  <StatRow label="Base Price" value={fmt(data.base_price, dec)} />
                   <StatRow
                     label="Change Since Base"
-                    value={fmtChange(data.absolute_change_since_base)}
+                    value={fmtChange(data.absolute_change_since_base, dec)}
                   />
                   <StatRow label="Phase" value={data.phase ?? '—'} />
                   <StatRow
@@ -657,6 +1006,7 @@ const ConfigTab: React.FC<{
 // --- Main screen ---
 
 const OracleDashboardScreen: React.FC<any> = ({ navigation }) => {
+  const [pair, setPair] = useState<OraclePair>('SOV/USD');
   const [activeTab, setActiveTab] = useState<Tab>('price');
 
   const status = useAsyncData<OracleStatusResponse>(() => fetchOracleStatus(), []);
@@ -674,6 +1024,10 @@ const OracleDashboardScreen: React.FC<any> = ({ navigation }) => {
           Oracle
         </Text>
         <View style={{ width: 48 }} />
+      </View>
+
+      <View style={{ paddingHorizontal: spacing.lg, marginTop: spacing.sm }}>
+        <PairToggle value={pair} onChange={setPair} />
       </View>
 
       <View style={styles.tabBar}>
@@ -703,8 +1057,8 @@ const OracleDashboardScreen: React.FC<any> = ({ navigation }) => {
           contentContainerStyle={styles.content}
           showsVerticalScrollIndicator={false}
         >
-          {activeTab === 'price' && <PriceTab />}
-          {activeTab === 'variation' && <VariationTab />}
+          {activeTab === 'price' && <PriceTab pair={pair} />}
+          {activeTab === 'variation' && <VariationTab pair={pair} />}
           {activeTab === 'status' && <StatusTab data={status} />}
           {activeTab === 'config' && <ConfigTab data={config} />}
         </ScrollView>
@@ -809,6 +1163,7 @@ const styles = StyleSheet.create({
   priceHero: {
     alignItems: 'center',
     paddingVertical: spacing.lg,
+    paddingHorizontal: spacing.md,
   },
   priceLabel: {
     color: colors.text_secondary,

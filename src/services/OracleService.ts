@@ -33,11 +33,39 @@ export interface CbePriceResponse {
   source: 'bonding_curve';
   token_id: string;
   phase: string;
+
+  // Prices
   price_atomic: string;
   price: number;
   price_scale: string;
+  cbe_sov_price?: number;
+  floor_price_atomic?: string;
+
+  // Supply
   total_supply: number;
+  circulating_supply?: string;
+  total_supply_ceiling?: string;
+  genesis_treasury_allocation?: string;
+
+  // Band progress
+  current_band?: number;
+  band_count?: number;
+  band_progress_pct?: number;
+
+  // Graduation
+  graduation_progress_pct?: number;
+  graduated?: boolean;
+
+  // Pool balances
   reserve_balance: number;
+  sov_treasury_cbe_balance?: string;
+  liquidity_pool_balance?: string;
+
+  // Audit & debt
+  sovrn_total_supply?: string;
+  debt_state?: 'Green' | 'Yellow' | 'Orange' | 'Red';
+  outstanding_pre_backed?: string;
+
   current_epoch: number;
 }
 

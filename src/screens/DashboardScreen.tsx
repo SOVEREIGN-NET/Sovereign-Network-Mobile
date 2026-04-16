@@ -1,6 +1,8 @@
 import React, { useMemo, useState } from 'react';
 import { View, TextInput, Animated, Pressable } from 'react-native';
 import { useNetworkNotices } from '../hooks/useNetworkNotices';
+import { useAsyncData } from '../hooks/useAsyncData';
+import { fetchOracleStatus, OracleStatusResponse } from '../services/OracleService';
 import {
   useTrendingTokens,
   formatTokenPrice,
@@ -57,6 +59,15 @@ const DashboardScreen: React.FC<any> = ({ navigation }) => {
   const [urlInput, setUrlInput] = useState('zhtp://central.sov');
   const trendingTokensData = useTrendingTokens();
   const trendingDappsData = useTrendingDapps();
+  const { data: oracleStatus } = useAsyncData<OracleStatusResponse>(
+    () => fetchOracleStatus(),
+    [],
+  );
+  const oracleHealthy = useMemo(() => {
+    if (!oracleStatus) return null; // unknown
+    const lf = oracleStatus.latest_finalized_price;
+    return lf != null && oracleStatus.current_epoch - lf.epoch_id <= 2;
+  }, [oracleStatus]);
 
   const drawerItems: DrawerItem[] = useMemo(() => {
     const items: DrawerItem[] = [
@@ -314,79 +325,42 @@ const DashboardScreen: React.FC<any> = ({ navigation }) => {
           </Column>
         </Card>
 
-        <Card>
-          <Row
-            justify="space-between"
-            align="center"
-            style={{ marginBottom: spacing.sm }}
-          >
-            <Text variant="h3">Explorer</Text>
-            <Badge label="Featured" variant="info" size="sm" />
-          </Row>
-          <Pressable
-            onPress={() => navigation.navigate('ExplorerDashboard')}
-            style={{
-              flexDirection: 'row',
-              alignItems: 'center',
-              justifyContent: 'space-between',
-              paddingVertical: spacing.sm,
-              paddingHorizontal: spacing.md,
-              borderRadius: borderRadius.lg,
-              backgroundColor: colors.bg_darker,
-              borderWidth: 1,
-              borderColor: colors.border,
-            }}
-          >
-            <Column gap="xs" style={{ flex: 1 }}>
-              <Text variant="body" style={{ fontWeight: '600' }}>
-                Open Sovereign Explorer
-              </Text>
-              <Text variant="caption" style={{ color: colors.text_secondary }}>
-                Browse accounts, transactions, validators, and network status
-              </Text>
-            </Column>
-            <Text variant="body" style={{ color: colors.text_secondary }}>
-              →
-            </Text>
-          </Pressable>
-        </Card>
+        <Pressable onPress={() => navigation.navigate('ExplorerDashboard')}>
+          <Card>
+            <Row justify="space-between" align="center">
+              <Column gap="xs" style={{ flex: 1 }}>
+                <Text variant="body" style={{ fontWeight: '700' }}>
+                  Explorer
+                </Text>
+                <Text variant="caption" style={{ color: colors.text_secondary }}>
+                  Accounts, transactions, validators
+                </Text>
+              </Column>
+              <Text style={{ fontSize: 18, color: colors.text_secondary, opacity: 0.5 }}>→</Text>
+            </Row>
+          </Card>
+        </Pressable>
 
-        <Card>
-          <Row
-            justify="space-between"
-            align="center"
-            style={{ marginBottom: spacing.sm }}
-          >
-            <Text variant="h3">Oracle</Text>
-            <Badge label="Public" variant="default" size="sm" />
-          </Row>
-          <Pressable
-            onPress={() => navigation.navigate('OracleDashboard')}
-            style={{
-              flexDirection: 'row',
-              alignItems: 'center',
-              justifyContent: 'space-between',
-              paddingVertical: spacing.sm,
-              paddingHorizontal: spacing.md,
-              borderRadius: borderRadius.lg,
-              backgroundColor: colors.bg_darker,
-              borderWidth: 1,
-              borderColor: colors.border,
-            }}
-          >
-            <Column gap="xs" style={{ flex: 1 }}>
-              <Text variant="body" style={{ fontWeight: '600' }}>
-                SOV/USD Price Oracle
-              </Text>
-              <Text variant="caption" style={{ color: colors.text_secondary }}>
-                Live price feed, committee status, and oracle config
-              </Text>
-            </Column>
-            <Text variant="body" style={{ color: colors.text_secondary }}>
-              →
-            </Text>
-          </Pressable>
-        </Card>
+        <Pressable onPress={() => navigation.navigate('OracleDashboard')}>
+          <Card>
+            <Row justify="space-between" align="center">
+              <Column gap="xs" style={{ flex: 1 }}>
+                <Text variant="body" style={{ fontWeight: '700' }}>
+                  Price Oracle
+                </Text>
+                <Text variant="caption" style={{ color: colors.text_secondary }}>
+                  SOV/USD · CBE/USD · Bonding curve
+                </Text>
+              </Column>
+              <Text style={{
+                fontSize: 18,
+                color: oracleHealthy == null
+                  ? colors.text_secondary
+                  : oracleHealthy ? '#2ecc71' : colors.error,
+              }}>→</Text>
+            </Row>
+          </Card>
+        </Pressable>
 
         <Card>
           <Row

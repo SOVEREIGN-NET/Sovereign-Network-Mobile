@@ -8,6 +8,7 @@ import { nativeIdentityProvisioning } from './NativeIdentityProvisioning';
 import tokenService from './TokenService';
 import { maskIdentifier } from '../utils/maskIdentifier';
 import { CHAIN_ID } from '../config';
+import { humanToAtomic } from '../utils/tokenUnits';
 import { resolveTokenBySymbol } from '../hooks/useTokenRegistry';
 import type {
   DomainRegisterRequest,
@@ -121,11 +122,16 @@ class DomainService {
       ownerPrimaryWalletId,
     );
 
+    const feeAtoms = humanToAtomic(String(fee), 18);
+    if (!feeAtoms) {
+      throw new Error(`Invalid domain fee amount: ${fee}`);
+    }
+
     const feePaymentTx =
       await nativeIdentityProvisioning.signSovWalletTransferTransaction({
         fromWalletId: ownerPrimaryWalletId,
         toWalletId: daoTreasuryWalletId,
-        amount: fee,
+        amount: Number(feeAtoms),
         nonce: nonce,
         chainId: CHAIN_ID,
       });
