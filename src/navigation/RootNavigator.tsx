@@ -1,12 +1,14 @@
-import React from 'react';
+import React, { useEffect, useRef } from 'react';
 import {
   NavigationContainer,
+  NavigationContainerRef,
   DefaultTheme,
   DarkTheme,
 } from '@react-navigation/native';
 import { createNativeStackNavigator } from '@react-navigation/native-stack';
 import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
-import { useColorScheme, View } from 'react-native';
+import { Linking, useColorScheme, View } from 'react-native';
+import { parseBrowserAuthLink } from '../services/BrowserAuthService';
 import { colors } from '../theme/tokens';
 import { RootStackParamList } from '../types/navigation';
 
@@ -30,6 +32,8 @@ import SettingsScreen from '../screens/SettingsScreen';
 import ClaimUBIScreen from '../screens/ClaimUBIScreen';
 import StakeTokensScreen from '../screens/StakeTokensScreen';
 import BackupIdentityScreen from '../screens/BackupIdentityScreen';
+import BrowserAuthScreen from '../screens/BrowserAuthScreen';
+import QRScanScreen from '../screens/QRScanScreen';
 import BiometricVerificationScreen from '../screens/BiometricVerificationScreen';
 import BrowserScreen from '../screens/BrowserScreen';
 import ProfileScreen from '../screens/ProfileScreen';
@@ -253,6 +257,29 @@ const SIDStack = () => {
           headerBackTitle: '',
           headerStyle: { backgroundColor: colors.bg_dark },
           headerTintColor: colors.text_primary,
+        }}
+      />
+      <Stack.Screen
+        name="BrowserAuth"
+        component={BrowserAuthScreen as any}
+        options={{
+          headerShown: true,
+          title: 'Browser sign-in',
+          headerBackTitle: '',
+          headerStyle: { backgroundColor: colors.bg_dark },
+          headerTintColor: colors.text_primary,
+        }}
+      />
+      <Stack.Screen
+        name="QRScan"
+        component={QRScanScreen as any}
+        options={{
+          headerShown: true,
+          title: 'Scan QR code',
+          headerBackTitle: '',
+          headerStyle: { backgroundColor: colors.bg_dark },
+          headerTintColor: colors.text_primary,
+          presentation: 'modal',
         }}
       />
       <Stack.Screen
@@ -516,9 +543,46 @@ const AuthStack = () => {
 const RootNavigator = () => {
   const scheme = useColorScheme();
   const navTheme = scheme === 'dark' ? DarkTheme : DefaultTheme;
+  const navigationRef = useRef<NavigationContainerRef<RootStackParamList> | null>(null);
+
+  // Deep-link handler for `zhtp://auth?challenge=…`. Kept here rather
+  // than in App.tsx because the NavigationContainer (and its
+  // navigate API) lives in this file. See BrowserAuthService for the
+  // link grammar.
+  useEffect(() => {
+    const routeAuthUrl = (url: string | null | undefined) => {
+      if (!url) return;
+      try {
+        const parsed = parseBrowserAuthLink(url);
+        if (!parsed) return; // not an auth link — let React Navigation's
+        // built-in linking (if any) handle it or ignore.
+        // Navigate once the container is ready; if we're bootstrapping
+        // the nav tree, stash the URL on next tick.
+        const tryNavigate = () => {
+          if (navigationRef.current?.isReady()) {
+            navigationRef.current.navigate('BrowserAuth' as never, { url } as never);
+          } else {
+            setTimeout(tryNavigate, 50);
+          }
+        };
+        tryNavigate();
+      } catch {
+        // Malformed auth link — let the BrowserAuth screen show the
+        // parse error if the user navigates manually; ignore at deep
+        // link time so we don't pop a random screen.
+      }
+    };
+
+    // Cold start: app was launched by the deep link.
+    Linking.getInitialURL().then(routeAuthUrl).catch(() => {});
+
+    // Warm path: app was already running.
+    const sub = Linking.addEventListener('url', event => routeAuthUrl(event.url));
+    return () => sub.remove();
+  }, []);
 
   return (
-    <NavigationContainer theme={navTheme}>
+    <NavigationContainer ref={navigationRef} theme={navTheme}>
       <Stack.Navigator screenOptions={{ headerShown: false }}>
         <Stack.Screen name="MainTabs" component={MainTabs} />
         <Stack.Screen
