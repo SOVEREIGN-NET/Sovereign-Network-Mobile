@@ -35,3 +35,6 @@ export { SectionLabel } from './SectionLabel';
 export type { SectionLabelProps } from './SectionLabel';
 
 export { ActivityDot } from './ActivityDot';
+
+export { RefreshRing } from './RefreshRing';
+export type { RefreshRingProps } from './RefreshRing';

@@ -6,9 +6,7 @@ import { colors, spacing, borderRadius, typography } from '../../theme';
 import { useAsyncData } from '../../hooks';
 import { fetchTransaction, TransactionDetailResponse } from '../../services/ExplorerService';
 import type { WalletTransaction } from '../../services/AppService';
-import { atomsToDisplayLocale } from '../../utils/tokenUnits';
-
-const SOV_DECIMALS = 18;
+import { atomsToDisplayLocale, SOV_DECIMALS } from '../../utils/tokenUnits';
 
 /** Normalize a raw atoms value (string or legacy number) to a canonical decimal string. */
 const atomsString = (v: unknown): string => {
@@ -22,8 +20,16 @@ const atomsIsPositive = (v: unknown): boolean => {
   return s !== '0';
 };
 
-const formatSov = (atoms: unknown, fractionDigits = 8): string =>
-  atomsToDisplayLocale(atomsString(atoms), SOV_DECIMALS, fractionDigits);
+/**
+ * Format atoms for display using the token's decimals. `decimals` defaults
+ * to SOV_DECIMALS for SOV-only values (e.g. fees), but for the main tx
+ * amount the caller should pass the tx's own `decimals` when present.
+ */
+const formatAtoms = (
+  atoms: unknown,
+  decimals: number = SOV_DECIMALS,
+  fractionDigits = 8,
+): string => atomsToDisplayLocale(atomsString(atoms), decimals, fractionDigits);
 
 const MONO_FONT = Platform.OS === 'ios' ? 'Menlo' : 'monospace';
 
@@ -45,11 +51,13 @@ function formatTimeAgo(ts: number): string {
 function formatAmount(info: TransactionDetailResponse['transaction']): string {
   if (!info) return '—';
   if (info.amount_human != null) return String(info.amount_human);
-  return formatSov(info.amount);
+  // Explorer response has no decimals field today — fall back to SOV.
+  return formatAtoms(info.amount);
 }
 
 function formatFee(fee: unknown): string {
-  return formatSov(fee);
+  // Fees are always paid in SOV (18 decimals).
+  return formatAtoms(fee, SOV_DECIMALS);
 }
 
 function formatAddress(addr: string | null | undefined): string | null {
@@ -111,12 +119,17 @@ const TransactionDetailScreen: React.FC<any> = ({ navigation, route }) => {
   const merged = (() => {
     if (!activityTx && !explorerInfo) return null;
     const amountAtomic = atomsString(activityTx?.amount ?? explorerInfo?.amount);
+    // Use the tx's own decimals when the backend tags them; otherwise fall
+    // back to SOV. The activity row is the authoritative source because the
+    // /wallet/transactions endpoint is the one being upgraded to carry
+    // per-row `decimals`.
+    const amountDecimals = activityTx?.decimals ?? SOV_DECIMALS;
     const amountHumanStr =
       activityTx?.amount_human != null
         ? String(activityTx.amount_human)
         : explorerInfo?.amount_human != null
         ? String(explorerInfo.amount_human)
-        : formatSov(amountAtomic);
+        : formatAtoms(amountAtomic, amountDecimals);
     const feeAtomic = atomsString(activityTx?.fee ?? explorerInfo?.fee);
     const from =
       activityTx?.from_wallet ??
@@ -329,7 +342,7 @@ const TransactionDetailScreen: React.FC<any> = ({ navigation, route }) => {
                       fontWeight: typography.weight.semibold,
                     }}
                   >
-                    {formatSov(merged.feeAtomic)}{' '}
+                    {formatAtoms(merged.feeAtomic, SOV_DECIMALS)}{' '}
                     SOV
                   </Text>
                 </View>
@@ -357,7 +370,7 @@ const TransactionDetailScreen: React.FC<any> = ({ navigation, route }) => {
                 </DetailRow>
                 {atomsIsPositive(merged.feeAtomic) && (
                   <DetailRow label="Fee">
-                    <DetailText value={`${formatSov(merged.feeAtomic)} SOV`} />
+                    <DetailText value={`${formatAtoms(merged.feeAtomic, SOV_DECIMALS)} SOV`} />
                   </DetailRow>
                 )}
                 <DetailRow label="Time">

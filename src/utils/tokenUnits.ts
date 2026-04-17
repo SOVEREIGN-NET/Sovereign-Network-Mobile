@@ -1,4 +1,13 @@
-const SOV_DECIMALS = 18;
+/**
+ * Default decimals for the native SOV token.
+ *
+ * Exported so callers that legitimately fall back (e.g. rendering a row that
+ * came from an endpoint which doesn't tag each tx with its token's decimals)
+ * can reference the same constant instead of re-hardcoding `18` in their file.
+ * Prefer reading decimals from the transaction / token metadata when the
+ * backend provides it — this is the last-resort default only.
+ */
+export const SOV_DECIMALS = 18;
 
 /** @deprecated Lossy — relies on JS number. Use {@link atomsToDisplay} / {@link atomsToBigInt}. */
 export function atomicToHuman(atomic: number, decimals: number = SOV_DECIMALS): number {
@@ -87,6 +96,147 @@ export function atomsToNumber(atoms: string, decimals: number): number {
   const whole = big / divisor;
   const frac = big % divisor;
   return Number(whole) + Number(frac) / Number(divisor);
+}
+
+// ---- Exact price formatting (no float, no trimming) ----------------------
+//
+// Oracle prices arrive from the node as a (`price_atomic`, `price_scale`)
+// pair of decimal strings. The convenience `price: number` field on the
+// response is lossy — it's a JS double pre-computed server-side and
+// rounds below ~15 significant digits. Every view that displays a price
+// MUST derive the string from the atomic pair via `formatAtomicPrice` so
+// two views of the same asset render bit-identical characters.
+//
+// Concretely: for `price_atomic = "12345"`, `price_scale = "100000"`
+// we return `"0.12345"` — all digits, no rounding, no `toFixed` cut-off.
+// Callers decide how to lay out long strings (dynamic font size,
+// wrapping, etc.) but NEVER drop digits to fit.
+
+/**
+ * Options for {@link formatAtomicPrice}.
+ *
+ * The defaults (`minFractionDigits: 8`, `maxFractionDigits: 18`) are
+ * tuned for the app's price surfaces: every price rendered anywhere in
+ * the app shows **at least** 8 decimals so that SOV ($0.00003400) and
+ * CBE ($0.00012300) line up with identical label widths, and UP TO 18
+ * decimals when the underlying atoms carry more precision (so we never
+ * silently drop significant digits to make layout "fit").
+ */
+export interface FormatAtomicPriceOptions {
+  /** Minimum digits shown after the decimal point. Padded with `0`s. */
+  minFractionDigits?: number;
+  /** Absolute cap on digits shown after the decimal point. */
+  maxFractionDigits?: number;
+}
+
+const PRICE_DEFAULT_MIN_FRAC = 8;
+const PRICE_DEFAULT_MAX_FRAC = 18;
+
+/**
+ * Divide `numStr / denomStr` and render the result as a decimal string
+ * with no precision loss. Both inputs are non-negative integer decimal
+ * strings (atoms). The denominator is always one of the oracle `*_scale`
+ * fields — in practice a power of ten, but this implementation handles
+ * any positive integer denominator via long division.
+ *
+ * The fractional part is zero-padded to `minFractionDigits` and trimmed
+ * at `maxFractionDigits`. Trailing non-significant zeros *beyond* the
+ * minimum are preserved so labels across the app line up pixel-for-pixel.
+ *
+ * Returns `"0"` for any malformed input (callers should show `—` upstream).
+ */
+export function formatAtomicPrice(
+  numStr: string | null | undefined,
+  denomStr: string | null | undefined,
+  opts?: FormatAtomicPriceOptions,
+): string {
+  const minFrac = opts?.minFractionDigits ?? PRICE_DEFAULT_MIN_FRAC;
+  const maxFrac = Math.max(minFrac, opts?.maxFractionDigits ?? PRICE_DEFAULT_MAX_FRAC);
+
+  if (!numStr || !denomStr) return padZero('0', minFrac);
+  const n = numStr.trim();
+  const d = denomStr.trim();
+  if (!/^\d+$/.test(n) || !/^\d+$/.test(d)) return padZero('0', minFrac);
+  const denom = BigInt(d);
+  if (denom === 0n) return padZero('0', minFrac);
+  const num = BigInt(n);
+
+  const whole = num / denom;
+  let remainder = num % denom;
+
+  // Long-divide the fractional part up to `maxFrac` digits.
+  let frac = '';
+  for (let i = 0; i < maxFrac && remainder !== 0n; i++) {
+    remainder *= 10n;
+    const digit = remainder / denom;
+    frac += digit.toString();
+    remainder = remainder % denom;
+  }
+
+  // Pad up to the min, but do NOT trim below it. We only trim zeros past
+  // the minimum, and only if maxFrac permits — the whole point of
+  // minFractionDigits is that $0.00003400 and $0.12340000 have the same
+  // number of characters in the fractional part.
+  if (frac.length < minFrac) {
+    frac = frac.padEnd(minFrac, '0');
+  } else if (frac.length > minFrac) {
+    // Strip trailing zeros beyond the minimum.
+    frac = frac.replace(/0+$/, '');
+    if (frac.length < minFrac) frac = frac.padEnd(minFrac, '0');
+  }
+
+  return `${whole.toString()}.${frac}`;
+}
+
+function padZero(whole: string, minFrac: number): string {
+  if (minFrac <= 0) return whole;
+  return `${whole}.${'0'.repeat(minFrac)}`;
+}
+
+/**
+ * Same as {@link formatAtomicPrice}, but prefixed with a currency symbol
+ * and with thousands separators on the integer part.
+ */
+export function formatAtomicPriceDisplay(
+  numStr: string | null | undefined,
+  denomStr: string | null | undefined,
+  currencyPrefix: string = '$',
+  opts?: FormatAtomicPriceOptions,
+): string {
+  const plain = formatAtomicPrice(numStr, denomStr, opts);
+  const [whole, frac] = plain.split('.');
+  const wholeWithSep = whole.replace(/\B(?=(\d{3})+(?!\d))/g, ',');
+  return frac
+    ? `${currencyPrefix}${wholeWithSep}.${frac}`
+    : `${currencyPrefix}${wholeWithSep}`;
+}
+
+// ---- FFI transport: amounts as u128 strings -------------------------------
+//
+// The native signing bridges (iOS Swift + Android JNI) parse amounts as
+// decimal strings and split them into two u64 halves (lo, hi) at the final
+// FFI boundary. JS code MUST NOT convert atoms strings to JS `Number` —
+// 1000 SOV at 18 decimals = 1e21 atoms, which exceeds the u64 range and
+// loses precision as a double. This one-liner is the single valid way to
+// prepare a bigint-derived atoms string for bridge calls.
+
+/**
+ * Sanity-check that a string is a valid u128 atoms value ("0" or digits
+ * only, no negative, no fraction, ≤ 2^128-1). Returns the trimmed string,
+ * or throws. Use this at the boundary before every native bridge call so
+ * the native side never has to second-guess what it received.
+ */
+export const U128_MAX = (1n << 128n) - 1n;
+
+export function validateAtomsString(atoms: string): string {
+  const s = atoms.trim();
+  if (!/^\d+$/.test(s)) {
+    throw new Error(`validateAtomsString: not a non-negative integer: "${atoms}"`);
+  }
+  if (BigInt(s) > U128_MAX) {
+    throw new Error(`validateAtomsString: exceeds u128 max: "${atoms}"`);
+  }
+  return s;
 }
 
 /** Format with thousands separators on the integer part. */

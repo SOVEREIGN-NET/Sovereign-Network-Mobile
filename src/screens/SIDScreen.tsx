@@ -30,6 +30,7 @@ import {
   useUserTokenBalances,
   useWalletList,
   useDaoStakes,
+  useNodeConnectionStatus,
 } from '../hooks';
 import type { DaoStake } from '../hooks/useDaoStakes';
 import { WELFARE_DAOS } from '../constants';
@@ -41,9 +42,7 @@ import appService, {
   WalletTransactionsResponse,
 } from '../services/AppService';
 import { QuicError } from '../types/api';
-import { atomsToDisplayLocale } from '../utils/tokenUnits';
-
-const SOV_DECIMALS_LOCAL = 18;
+import { atomsToDisplayLocale, SOV_DECIMALS } from '../utils/tokenUnits';
 
 // Format large numbers with commas
 const formatBalance = (balance: number): string => {
@@ -56,14 +55,44 @@ const shortMiddle = (value: string | null | undefined, head = 8, tail = 6) => {
   return `${value.slice(0, head)}...${value.slice(-tail)}`;
 };
 
-// Format a SOV atoms value (string from node, or legacy number) as display SOV.
-const formatTxValue = (value: unknown): string => {
+/**
+ * Format an atoms value for a tx row.
+ *
+ * `decimals` MUST come from the tx (or token metadata). The default of
+ * `SOV_DECIMALS` is only a fallback for rows that don't carry decimals
+ * yet — do not rely on it for non-SOV tokens.
+ */
+const formatTxValue = (
+  value: unknown,
+  decimals: number = SOV_DECIMALS,
+): string => {
   if (value == null) return '0';
   const s = typeof value === 'number'
     ? (Number.isFinite(value) ? String(Math.trunc(value)) : '0')
     : String(value).trim();
   if (!/^\d+$/.test(s)) return '0';
-  return atomsToDisplayLocale(s, SOV_DECIMALS_LOCAL, 8);
+  return atomsToDisplayLocale(s, decimals, 8);
+};
+
+/**
+ * Resolve decimals for a given transaction row. Prefers, in order:
+ *   1. `tx.decimals` from the backend (authoritative when present).
+ *   2. Token decimals looked up by `tx.token_id` in a caller-provided map.
+ *   3. The `SOV_DECIMALS` default — only reached for rows that don't tag
+ *      themselves and aren't in the registry.
+ */
+const resolveTxDecimals = (
+  tx: WalletTransaction,
+  tokenDecimalsById?: Record<string, number>,
+): number => {
+  if (tx.decimals != null && Number.isFinite(tx.decimals)) {
+    return tx.decimals;
+  }
+  if (tx.token_id && tokenDecimalsById) {
+    const d = tokenDecimalsById[tx.token_id.toLowerCase()];
+    if (d != null && Number.isFinite(d)) return d;
+  }
+  return SOV_DECIMALS;
 };
 
 const FIXED_TAB_PANEL_HEIGHT = 320;
@@ -447,16 +476,22 @@ const BalanceCarousel = ({
                     alignItems: 'center',
                   }}
                 >
-                  <Text
-                    style={{
-                      fontSize: typography.size['5xl'],
-                      fontWeight: typography.weight.bold,
-                      color: colors.primary,
-                      marginBottom: spacing.sm,
-                    }}
-                  >
-                    {displayBalance}
-                  </Text>
+                  {(() => {
+                    const len = displayBalance.length;
+                    const fontSize = len <= 8 ? typography.size['5xl'] : len <= 12 ? 32 : len <= 16 ? 26 : 20;
+                    return (
+                      <Text
+                        style={{
+                          fontSize,
+                          fontWeight: typography.weight.bold,
+                          color: colors.primary,
+                          marginBottom: spacing.sm,
+                        }}
+                      >
+                        {displayBalance}
+                      </Text>
+                    );
+                  })()}
                   <Row style={{ alignItems: 'center', gap: spacing.sm }}>
                     <Text
                       style={{
@@ -528,6 +563,7 @@ const SIDScreen = ({ navigation, route }: any) => {
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
+  const { isConnected: nodeConnected } = useNodeConnectionStatus();
   const {
     wallets,
     walletByType,
@@ -573,23 +609,66 @@ const SIDScreen = ({ navigation, route }: any) => {
     [tokens],
   );
 
+  /**
+   * token_id → decimals lookup built from the user's tokens. Used as a
+   * fallback for WalletTransaction rows that don't carry their own
+   * `decimals` field but do tag a `token_id`.
+   */
+  const tokenDecimalsById = useMemo<Record<string, number>>(() => {
+    const map: Record<string, number> = {};
+    for (const t of tokens) {
+      if (!t.token_id) continue;
+      if (t.decimals != null && Number.isFinite(t.decimals)) {
+        map[t.token_id.toLowerCase()] = t.decimals;
+      }
+    }
+    return map;
+  }, [tokens]);
+
   // Ordered balance cards for the swipeable wallet carousel:
-  // SOV first, CBE second, remaining tokens alphabetical by symbol. Tokens with
-  // a zero balance are still shown so the user can see what's available.
+  // SOV first, CBE second, then wallet-type cards (Savings, UBI),
+  // then remaining tokens alphabetical. All shown even at zero balance.
   const balanceCards = useMemo(() => {
     const rank = (symbol: string) => {
       const s = symbol.toUpperCase();
       if (s === 'SOV') return 0;
       if (s === 'CBE') return 1;
+      if (s === 'SAVINGS') return 3;
+      if (s === 'UBI') return 4;
       return 2;
     };
-    return [...tokens].sort((a, b) => {
+
+    // Build wallet-type cards for Savings and UBI from the wallet list.
+    const walletCards: typeof tokens = (wallets ?? [])
+      .filter(w => {
+        const t = (w.wallet_type || '').toLowerCase();
+        return t === 'savings' || t === 'ubi';
+      })
+      .map(w => ({
+        token_id: `wallet:${w.id}`,
+        symbol: w.wallet_type.toUpperCase(),
+        name: w.name || `${w.wallet_type} Wallet`,
+        decimals: null,
+        balance: w.total_balance.toLocaleString('en-US', { maximumFractionDigits: 2 }),
+        atomicBalance: '0',
+      }));
+
+    // Merge tokens + wallet cards, dedupe by symbol
+    const seen = new Set<string>();
+    const all = [...tokens, ...walletCards].filter(t => {
+      const key = t.symbol.toUpperCase();
+      if (seen.has(key)) return false;
+      seen.add(key);
+      return true;
+    });
+
+    return all.sort((a, b) => {
       const ra = rank(a.symbol);
       const rb = rank(b.symbol);
       if (ra !== rb) return ra - rb;
       return (a.symbol || '').localeCompare(b.symbol || '');
     });
-  }, [tokens]);
+  }, [tokens, wallets]);
 
   const activeCardToken = balanceCards[activeBalanceCardIndex] ?? balanceCards[0] ?? null;
 
@@ -963,16 +1042,23 @@ const SIDScreen = ({ navigation, route }: any) => {
                       alignItems: 'center',
                     }}
                   >
-                    <Text
-                      style={{
-                        fontSize: typography.size['5xl'],
-                        fontWeight: typography.weight.bold,
-                        color: colors.primary,
-                        marginBottom: spacing.sm,
-                      }}
-                    >
-                      {formatBalance(totalBalance)}
-                    </Text>
+                    {(() => {
+                      const balStr = formatBalance(totalBalance);
+                      const len = balStr.length;
+                      const fontSize = len <= 8 ? typography.size['5xl'] : len <= 12 ? 32 : len <= 16 ? 26 : 20;
+                      return (
+                        <Text
+                          style={{
+                            fontSize,
+                            fontWeight: typography.weight.bold,
+                            color: colors.primary,
+                            marginBottom: spacing.sm,
+                          }}
+                        >
+                          {balStr}
+                        </Text>
+                      );
+                    })()}
                     <Text
                       style={{
                         fontSize: typography.size.sm,
@@ -1012,9 +1098,13 @@ const SIDScreen = ({ navigation, route }: any) => {
                 // Send is disabled when CBE is the active card — backend
                 // verification path for non-SOV wallet transfers isn't ready
                 // yet. Mirrors the in-screen lockout in SendTokensScreen.
+                const activeSymbol = (activeCardToken?.symbol || '').toUpperCase();
+                const isWalletCard = activeSymbol === 'SAVINGS' || activeSymbol === 'UBI';
                 const sendDisabled =
                   isLoading ||
-                  (activeCardToken?.symbol || '').toUpperCase() === 'CBE';
+                  !nodeConnected ||
+                  isWalletCard ||
+                  activeSymbol === 'CBE';
                 return (
                   <TouchableOpacity
                     style={{
@@ -1049,34 +1139,43 @@ const SIDScreen = ({ navigation, route }: any) => {
                 );
               })()}
 
-              <TouchableOpacity
-                style={{
-                  flex: 1,
-                  paddingVertical: spacing.lg,
-                  borderRadius: borderRadius.base,
-                  borderWidth: 2,
-                  borderColor: '#006688',
-                  justifyContent: 'center',
-                  alignItems: 'center',
-                }}
-                onPress={() =>
-                  navigation?.navigate('ReceiveTokens', {
-                    preselectedTokenId: activeCardToken?.token_id,
-                  })
-                }
-                disabled={isLoading}
-              >
-                <Text
-                  style={{
-                    fontSize: typography.size.md,
-                    fontWeight: typography.weight.semibold,
-                    color: colors.text_primary,
-                  }}
-                >
-                  ↓ {t.wallet.actions.receive}
-                  {activeCardToken ? ` ${activeCardToken.symbol}` : ''}
-                </Text>
-              </TouchableOpacity>
+              {(() => {
+                const activeSymbolR = (activeCardToken?.symbol || '').toUpperCase();
+                const isWalletCardR = activeSymbolR === 'SAVINGS' || activeSymbolR === 'UBI';
+                const receiveDisabled = isLoading || isWalletCardR;
+                return (
+                  <TouchableOpacity
+                    style={{
+                      flex: 1,
+                      paddingVertical: spacing.lg,
+                      borderRadius: borderRadius.base,
+                      borderWidth: 2,
+                      borderColor: receiveDisabled ? colors.border : '#006688',
+                      backgroundColor: receiveDisabled ? colors.bg_darker : 'transparent',
+                      justifyContent: 'center',
+                      alignItems: 'center',
+                      opacity: receiveDisabled ? 0.5 : 1,
+                    }}
+                    onPress={() =>
+                      navigation?.navigate('ReceiveTokens', {
+                        preselectedTokenId: activeCardToken?.token_id,
+                      })
+                    }
+                    disabled={receiveDisabled}
+                  >
+                    <Text
+                      style={{
+                        fontSize: typography.size.md,
+                        fontWeight: typography.weight.semibold,
+                        color: receiveDisabled ? colors.text_tertiary : colors.text_primary,
+                      }}
+                    >
+                      ↓ {t.wallet.actions.receive}
+                      {activeCardToken ? ` ${activeCardToken.symbol}` : ''}
+                    </Text>
+                  </TouchableOpacity>
+                );
+              })()}
             </View>
 
             {/* Tabbed Wallet Content (fixed height, internal scroll) */}
@@ -1394,6 +1493,7 @@ const SIDScreen = ({ navigation, route }: any) => {
                           const statusColor = isPending
                             ? colors.warning
                             : colors.success;
+                          const txDecimals = resolveTxDecimals(tx, tokenDecimalsById);
                           return (
                             <TouchableOpacity
                               key={tx.tx_hash}
@@ -1471,7 +1571,7 @@ const SIDScreen = ({ navigation, route }: any) => {
                                       color: colors.text_primary,
                                     }}
                                   >
-                                    {tx.amount_human != null ? String(tx.amount_human) : formatTxValue(tx.amount ?? 0)}
+                                    {tx.amount_human != null ? String(tx.amount_human) : formatTxValue(tx.amount ?? 0, txDecimals)}
                                   </Text>
                                 </Row>
                                 <Text
@@ -1480,7 +1580,7 @@ const SIDScreen = ({ navigation, route }: any) => {
                                     color: colors.text_secondary,
                                   }}
                                 >
-                                  Fee {formatTxValue(tx.fee ?? 0)}
+                                  Fee {formatTxValue(tx.fee ?? 0, SOV_DECIMALS)}
                                   {'  '}
                                   From {shortMiddle(tx.from_wallet)}
                                 </Text>

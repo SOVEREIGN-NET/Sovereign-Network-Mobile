@@ -41,7 +41,7 @@ class NativeIdentityProvisioning(reactContext: ReactApplicationContext) :
 
         @JvmStatic private external fun nativeBuildTokenCreate(
             identityJson: String, name: String, symbol: String,
-            initialSupply: Long, decimals: Int,
+            initialSupplyAtoms: String, decimals: Int,
             treasuryRecipient: ByteArray, chainId: Int
         ): String
     }
@@ -349,9 +349,12 @@ class NativeIdentityProvisioning(reactContext: ReactApplicationContext) :
             try {
                 val name = params.getString("name") ?: ""
                 val symbol = params.getString("symbol") ?: ""
-                val initialSupply = parseAmount(params, "initialSupply")
+                val initialSupplyAtoms = parseAmountAtoms(params, "initialSupply")
                     ?: run {
-                        promise.reject("INVALID_PARAMS", "initialSupply must be a valid integer string or number")
+                        promise.reject(
+                            "INVALID_PARAMS",
+                            "initialSupply must be a decimal u128 atoms string",
+                        )
                         return@execute
                     }
                 val decimals = params.getInt("decimals")
@@ -362,7 +365,7 @@ class NativeIdentityProvisioning(reactContext: ReactApplicationContext) :
                     return@execute
                 }
 
-                Log.d(TAG, "Building token create transaction: $name/$symbol with supply=$initialSupply")
+                Log.d(TAG, "Building token create transaction: $name/$symbol atoms=$initialSupplyAtoms")
 
                 val identityJson = identity.serialize()
                 if (identityJson == null) {
@@ -370,7 +373,7 @@ class NativeIdentityProvisioning(reactContext: ReactApplicationContext) :
                     return@execute
                 }
                 val hexSignedTx = nativeBuildTokenCreate(
-                    identityJson, name, symbol, initialSupply, decimals,
+                    identityJson, name, symbol, initialSupplyAtoms, decimals,
                     TREASURY_RECIPIENT, 0x03
                 )
                 if (hexSignedTx.isEmpty()) {
@@ -394,9 +397,12 @@ class NativeIdentityProvisioning(reactContext: ReactApplicationContext) :
             try {
                 val tokenId = params.getString("tokenId") ?: ""
                 val recipientDid = params.getString("recipientDid") ?: ""
-                val amount = parseAmount(params, "amount")
+                val amountAtoms = parseAmountAtoms(params, "amount")
                     ?: run {
-                        promise.reject("INVALID_PARAMS", "amount must be a valid integer string or number")
+                        promise.reject(
+                            "INVALID_PARAMS",
+                            "amount must be a decimal u128 atoms string",
+                        )
                         return@execute
                     }
 
@@ -409,9 +415,9 @@ class NativeIdentityProvisioning(reactContext: ReactApplicationContext) :
                 val tokenIdBytes = hexToBytes(tokenId)
                 val recipientBytes = hexToBytes(recipientDid)
 
-                Log.d(TAG, "Building token mint transaction: $tokenId -> $recipientDid")
+                Log.d(TAG, "Building token mint transaction: $tokenId -> $recipientDid atoms=$amountAtoms")
 
-                val hexSignedTx = identity.buildTokenMint(tokenIdBytes, recipientBytes, amount)
+                val hexSignedTx = identity.buildTokenMint(tokenIdBytes, recipientBytes, amountAtoms)
                 if (hexSignedTx == null) {
                     promise.reject("SIGNING_ERROR", "Failed to build token mint transaction")
                     return@execute
@@ -433,9 +439,12 @@ class NativeIdentityProvisioning(reactContext: ReactApplicationContext) :
             try {
                 val tokenId = params.getString("tokenId") ?: ""
                 val toAddress = params.getString("toAddress") ?: ""
-                val amount = parseAmount(params, "amount")
+                val amountAtoms = parseAmountAtoms(params, "amount")
                     ?: run {
-                        promise.reject("INVALID_PARAMS", "amount must be a valid integer string or number")
+                        promise.reject(
+                            "INVALID_PARAMS",
+                            "amount must be a decimal u128 atoms string",
+                        )
                         return@execute
                     }
 
@@ -450,12 +459,12 @@ class NativeIdentityProvisioning(reactContext: ReactApplicationContext) :
                 val senderAddress = normalizeDidToAddress(identity.did)
                 val nonce = fetchTokenTransferNonce(tokenId.lowercase(), senderAddress)
 
-                Log.d(TAG, "Building token transfer transaction: $tokenId -> $toAddress (nonce=$nonce)")
+                Log.d(TAG, "Building token transfer transaction: $tokenId -> $toAddress atoms=$amountAtoms nonce=$nonce")
 
                 val hexSignedTx = identity.buildTokenTransfer(
                     tokenIdBytes,
                     toAddressBytes,
-                    amount,
+                    amountAtoms,
                     nonce = nonce,
                 )
                 if (hexSignedTx == null) {
@@ -478,9 +487,12 @@ class NativeIdentityProvisioning(reactContext: ReactApplicationContext) :
         executor.execute {
             try {
                 val tokenId = params.getString("tokenId") ?: ""
-                val amount = parseAmount(params, "amount")
+                val amountAtoms = parseAmountAtoms(params, "amount")
                     ?: run {
-                        promise.reject("INVALID_PARAMS", "amount must be a valid integer string or number")
+                        promise.reject(
+                            "INVALID_PARAMS",
+                            "amount must be a decimal u128 atoms string",
+                        )
                         return@execute
                     }
 
@@ -491,9 +503,9 @@ class NativeIdentityProvisioning(reactContext: ReactApplicationContext) :
                 }
 
                 val tokenIdBytes = hexToBytes(tokenId)
-                Log.d(TAG, "Building token burn transaction: $tokenId amount=$amount")
+                Log.d(TAG, "Building token burn transaction: $tokenId atoms=$amountAtoms")
 
-                val hexSignedTx = identity.buildTokenBurn(tokenIdBytes, amount)
+                val hexSignedTx = identity.buildTokenBurn(tokenIdBytes, amountAtoms)
                 if (hexSignedTx == null) {
                     promise.reject("SIGNING_ERROR", "Failed to build token burn transaction")
                     return@execute
@@ -515,9 +527,15 @@ class NativeIdentityProvisioning(reactContext: ReactApplicationContext) :
             try {
                 val fromWalletIdHex = params.getString("fromWalletId") ?: ""
                 val toWalletIdHex = params.getString("toWalletId") ?: ""
-                val amount = parseAmount(params, "amount")
+                // amount is a decimal u128 atoms string — JS side MUST NOT
+                // pass a JS Number here because 1000 SOV = 1e21 atoms would
+                // lose precision. See src/services/TokenService.coerceAmountAtoms.
+                val amountAtoms = parseAmountAtoms(params, "amount")
                     ?: run {
-                        promise.reject("INVALID_PARAMS", "amount must be a valid integer string or number")
+                        promise.reject(
+                            "INVALID_PARAMS",
+                            "amount must be a decimal u128 atoms string (no negatives, no fractions)",
+                        )
                         return@execute
                     }
                 val chainId = if (params.hasKey("chainId") && !params.isNull("chainId")) {
@@ -577,12 +595,12 @@ class NativeIdentityProvisioning(reactContext: ReactApplicationContext) :
                     }
                 }
 
-                Log.d(TAG, "Building SOV wallet transfer: $fromWalletIdHex -> $toWalletIdHex (nonce=$nonce)")
+                Log.d(TAG, "Building SOV wallet transfer: $fromWalletIdHex -> $toWalletIdHex atoms=$amountAtoms nonce=$nonce")
 
                 val hexSignedTx = identity.buildSovWalletTransfer(
                     fromWalletId,
                     toWalletId,
-                    amount,
+                    amountAtoms,
                     chainId = chainId,
                     nonce = nonce,
                 )
@@ -613,9 +631,12 @@ class NativeIdentityProvisioning(reactContext: ReactApplicationContext) :
                 val tokenIdHex = params.getString("tokenId") ?: ""
                 val fromWalletIdHex = params.getString("fromWalletId") ?: ""
                 val toWalletIdHex = params.getString("toWalletId") ?: ""
-                val amount = parseAmount(params, "amount")
+                val amountAtoms = parseAmountAtoms(params, "amount")
                     ?: run {
-                        promise.reject("INVALID_PARAMS", "amount must be a valid integer string or number")
+                        promise.reject(
+                            "INVALID_PARAMS",
+                            "amount must be a decimal u128 atoms string",
+                        )
                         return@execute
                     }
                 val chainId = if (params.hasKey("chainId") && !params.isNull("chainId")) {
@@ -650,13 +671,13 @@ class NativeIdentityProvisioning(reactContext: ReactApplicationContext) :
                 val fromWalletIdBytes = hexToBytes(fromWalletIdHex)
                 val toWalletIdBytes = hexToBytes(toWalletIdHex)
 
-                Log.d(TAG, "Building token wallet transfer: token=$tokenIdHex from=$fromWalletIdHex to=$toWalletIdHex nonce=$nonce")
+                Log.d(TAG, "Building token wallet transfer: token=$tokenIdHex from=$fromWalletIdHex to=$toWalletIdHex atoms=$amountAtoms nonce=$nonce")
 
                 val hexSignedTx = identity.buildTokenWalletTransfer(
                     tokenIdBytes,
                     fromWalletIdBytes,
                     toWalletIdBytes,
-                    amount,
+                    amountAtoms,
                     chainId = chainId,
                     nonce = nonce,
                 )
@@ -685,9 +706,12 @@ class NativeIdentityProvisioning(reactContext: ReactApplicationContext) :
         executor.execute {
             try {
                 val sectorDaoKeyIdHex = params.getString("sectorDaoKeyId") ?: ""
-                val amount = parseAmount(params, "amount")
+                val amountAtoms = parseAmountAtoms(params, "amount")
                     ?: run {
-                        promise.reject("INVALID_PARAMS", "amount must be a valid integer string or number")
+                        promise.reject(
+                            "INVALID_PARAMS",
+                            "amount must be a decimal u128 atoms string",
+                        )
                         return@execute
                     }
                 val lockBlocks = parseAmount(params, "lockBlocks")
@@ -721,12 +745,12 @@ class NativeIdentityProvisioning(reactContext: ReactApplicationContext) :
 
                 Log.d(
                     TAG,
-                    "Building DAO stake: dao=$sectorDaoKeyIdHex amount=$amount nonce=$nonce lockBlocks=$lockBlocks chainId=$chainId",
+                    "Building DAO stake: dao=$sectorDaoKeyIdHex atoms=$amountAtoms nonce=$nonce lockBlocks=$lockBlocks chainId=$chainId",
                 )
 
                 val hexSignedTx = identity.buildDaoStake(
                     sectorDaoKeyId = daoKeyIdBytes,
-                    amount = amount,
+                    amountAtoms = amountAtoms,
                     nonce = nonce,
                     lockBlocks = lockBlocks,
                     chainId = chainId,
@@ -1283,6 +1307,42 @@ class NativeIdentityProvisioning(reactContext: ReactApplicationContext) :
                 }
                 else -> params.getDouble(key).toLong()
             }
+        } catch (e: Exception) {
+            null
+        }
+    }
+
+    /**
+     * Parse an amount as a decimal u128 atoms STRING. Used for every token
+     * amount passed to the signing bridge. Rejects fractions, negatives,
+     * and any value above 2^128-1. Returns null on invalid input.
+     *
+     * This is the Android mirror of `coerceAmountAtoms` in TokenService.ts
+     * and `parseU128Halves` in ZhtpClient.swift. Keep the three in sync.
+     */
+    private fun parseAmountAtoms(params: ReadableMap, key: String): String? {
+        if (!params.hasKey(key) || params.isNull(key)) return null
+        return try {
+            val str = when (params.getType(key).name) {
+                "String" -> params.getString(key)?.trim() ?: return null
+                "Number" -> {
+                    // Only accept numbers that round-trip to a non-negative
+                    // integer and fit in the JS "safe integer" range. Anything
+                    // larger must have been passed as a string — or the
+                    // precision is already gone before we got here.
+                    val d = params.getDouble(key)
+                    if (d < 0.0 || d != Math.floor(d) || d > 9_007_199_254_740_992.0) {
+                        return null
+                    }
+                    d.toLong().toString()
+                }
+                else -> return null
+            }
+            if (!str.matches(Regex("^\\d+$"))) return null
+            val bi = java.math.BigInteger(str)
+            val u128Max = java.math.BigInteger.ONE.shiftLeft(128).subtract(java.math.BigInteger.ONE)
+            if (bi.signum() < 0 || bi > u128Max) return null
+            str
         } catch (e: Exception) {
             null
         }

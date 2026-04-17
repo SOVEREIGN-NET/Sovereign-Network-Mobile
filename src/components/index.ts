@@ -13,6 +13,7 @@ export {
   Switch,
   SectionLabel,
   ActivityDot,
+  RefreshRing,
 } from './atoms';
 export type {
   CardProps,
@@ -34,6 +35,7 @@ export type {
   CheckboxProps,
   SwitchProps,
   SectionLabelProps,
+  RefreshRingProps,
 } from './atoms';
 
 // Molecules

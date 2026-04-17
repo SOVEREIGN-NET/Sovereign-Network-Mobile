@@ -67,9 +67,22 @@ export interface PoUWSubmitResponse {
 export interface WalletTransaction {
   tx_hash: string;
   tx_type: string;
-  amount: number;
+  /** Raw amount in atoms. Width is the token's u128, so backend serializes as
+   *  string when it exceeds 2^53; tolerate either here. */
+  amount: number | string;
+  /** Pre-formatted amount in whole token units. When present, trust this
+   *  over re-formatting `amount` — the backend knows the token's decimals. */
   amount_human?: number | string;
-  fee: number;
+  /** Raw fee in atoms (SOV). May be number or string for the same reason as amount. */
+  fee: number | string;
+  /** Token decimals for this tx. Optional — use with `amount` when the backend
+   *  provides it to avoid assuming SOV's 18 decimals for every row. */
+  decimals?: number;
+  /** Hex token id this tx operates on. Optional — used to resolve decimals
+   *  from a token registry when the row doesn't carry `decimals` directly. */
+  token_id?: string;
+  /** Token symbol — handy for display (e.g. "SOV", "CBE") when available. */
+  symbol?: string;
   from_wallet: string | null;
   to_address: string | null;
   timestamp: number;

@@ -905,19 +905,23 @@ class NativeIdentityProvisioning: NSObject, UIDocumentPickerDelegate {
                     return
                 }
 
-                // Parse initialSupply - accept both String and NSNumber
-                // String is preferred to preserve exact value without float precision loss
-                var initialSupplyValue: UInt64 = 0
+                // initialSupply is a decimal u128 atoms string (see parseU128Halves).
+                let initialSupplyString: String
                 if let supplyStr = params["initialSupply"] as? String {
-                    guard let parsed = UInt64(supplyStr) else {
-                        reject("INVALID_PARAMS", "initialSupply must be a valid integer string", nil)
+                    initialSupplyString = supplyStr
+                } else if let supplyNum = params["initialSupply"] as? NSNumber {
+                    let d = supplyNum.doubleValue
+                    if !d.isFinite || d < 0 || d != d.rounded() || d > Double(UInt64.max) {
+                        reject("INVALID_PARAMS", "initialSupply NSNumber \(d) is not a safe integer — pass as decimal string", nil)
                         return
                     }
-                    initialSupplyValue = parsed
-                } else if let supplyNum = params["initialSupply"] as? NSNumber {
-                    initialSupplyValue = supplyNum.uint64Value
+                    initialSupplyString = supplyNum.stringValue
                 } else {
-                    reject("INVALID_PARAMS", "initialSupply is required (string or number)", nil)
+                    reject("INVALID_PARAMS", "initialSupply is required (decimal u128 string)", nil)
+                    return
+                }
+                guard parseU128Halves(initialSupplyString) != nil else {
+                    reject("INVALID_PARAMS", "initialSupply \"\(initialSupplyString)\" is not a valid non-negative u128", nil)
                     return
                 }
 
@@ -934,7 +938,7 @@ class NativeIdentityProvisioning: NSObject, UIDocumentPickerDelegate {
                 print("[NativeIdentityProvisioning] Building signed token create transaction")
                 print("[NativeIdentityProvisioning]   Name: \(name)")
                 print("[NativeIdentityProvisioning]   Symbol: \(symbol)")
-                print("[NativeIdentityProvisioning]   Supply: \(initialSupplyValue) (parsed from string)")
+                print("[NativeIdentityProvisioning]   Supply atoms: \(initialSupplyString)")
 
                 // Resolve the *registered* identity (same one used by UHP auth),
                 // not just whatever was last stored — which may be an unregistered key.
@@ -969,7 +973,7 @@ class NativeIdentityProvisioning: NSObject, UIDocumentPickerDelegate {
                 let hexSignedTx = try ZhtpClient.buildTokenCreate(
                     name: name,
                     symbol: symbol,
-                    initialSupply: initialSupplyValue,
+                    initialSupplyAtoms: initialSupplyString,
                     decimals: decimals.uint8Value,
                     using: identity,
                     chainId: 0x03  // development
@@ -1015,25 +1019,32 @@ class NativeIdentityProvisioning: NSObject, UIDocumentPickerDelegate {
                     return
                 }
 
-                // Parse amount - accept both String and Number
-                // String is preferred to preserve exact value without float precision loss
-                var amountValue: UInt64 = 0
+                // amount is a decimal u128 atoms STRING. NSNumber is accepted
+                // only if it is a non-negative safe integer — anything larger
+                // has already lost precision on the JS side and must have been
+                // passed as a string. See ZhtpClient.parseU128Halves.
+                let amountAtomsString: String
                 if let amountStr = params["amount"] as? String {
-                    guard let parsed = UInt64(amountStr) else {
-                        reject("INVALID_PARAMS", "amount must be a valid integer string", nil)
+                    amountAtomsString = amountStr
+                } else if let amountNum = params["amount"] as? NSNumber {
+                    let d = amountNum.doubleValue
+                    if !d.isFinite || d < 0 || d != d.rounded() || d > Double(UInt64.max) {
+                        reject("INVALID_PARAMS", "amount NSNumber \(d) is not a non-negative safe integer — pass atoms as a decimal string", nil)
                         return
                     }
-                    amountValue = parsed
-                } else if let amountNum = params["amount"] as? NSNumber {
-                    amountValue = amountNum.uint64Value
+                    amountAtomsString = amountNum.stringValue
                 } else {
-                    reject("INVALID_PARAMS", "amount must be a string or number", nil)
+                    reject("INVALID_PARAMS", "amount must be a decimal u128 string (or integer number)", nil)
+                    return
+                }
+                guard parseU128Halves(amountAtomsString) != nil else {
+                    reject("INVALID_PARAMS", "amount \"\(amountAtomsString)\" is not a valid non-negative u128", nil)
                     return
                 }
 
                 print("[NativeIdentityProvisioning] Building signed token mint transaction")
                 print("[NativeIdentityProvisioning]   Token ID: \(tokenId)")
-                print("[NativeIdentityProvisioning]   Amount: \(amountValue)")
+                print("[NativeIdentityProvisioning]   AmountAtoms: \(amountAtomsString)")
                 print("[NativeIdentityProvisioning]   Recipient: \(recipientDid)")
 
                 guard let identityAny = IdentityHandleStore.shared.getLatestIdentity(),
@@ -1053,7 +1064,7 @@ class NativeIdentityProvisioning: NSObject, UIDocumentPickerDelegate {
                 let hexSignedTx = try ZhtpClient.buildTokenMint(
                     tokenId: tokenIdData,
                     toPublicKey: recipientPubkey,
-                    amount: amountValue,
+                    amountAtoms: amountAtomsString,
                     using: identity,
                     chainId: 0x03  // development
                 )
@@ -1096,19 +1107,26 @@ class NativeIdentityProvisioning: NSObject, UIDocumentPickerDelegate {
                     return
                 }
 
-                // Parse amount - accept both String and Number
-                // String is preferred to preserve exact value without float precision loss
-                var amountValue: UInt64 = 0
+                // amount is a decimal u128 atoms STRING. NSNumber is accepted
+                // only if it is a non-negative safe integer — anything larger
+                // has already lost precision on the JS side and must have been
+                // passed as a string. See ZhtpClient.parseU128Halves.
+                let amountAtomsString: String
                 if let amountStr = params["amount"] as? String {
-                    guard let parsed = UInt64(amountStr) else {
-                        reject("INVALID_PARAMS", "amount must be a valid integer string", nil)
+                    amountAtomsString = amountStr
+                } else if let amountNum = params["amount"] as? NSNumber {
+                    let d = amountNum.doubleValue
+                    if !d.isFinite || d < 0 || d != d.rounded() || d > Double(UInt64.max) {
+                        reject("INVALID_PARAMS", "amount NSNumber \(d) is not a non-negative safe integer — pass atoms as a decimal string", nil)
                         return
                     }
-                    amountValue = parsed
-                } else if let amountNum = params["amount"] as? NSNumber {
-                    amountValue = amountNum.uint64Value
+                    amountAtomsString = amountNum.stringValue
                 } else {
-                    reject("INVALID_PARAMS", "amount must be a string or number", nil)
+                    reject("INVALID_PARAMS", "amount must be a decimal u128 string (or integer number)", nil)
+                    return
+                }
+                guard parseU128Halves(amountAtomsString) != nil else {
+                    reject("INVALID_PARAMS", "amount \"\(amountAtomsString)\" is not a valid non-negative u128", nil)
                     return
                 }
 
@@ -1129,7 +1147,7 @@ class NativeIdentityProvisioning: NSObject, UIDocumentPickerDelegate {
 
                 print("[NativeIdentityProvisioning] Building signed token transfer transaction")
                 print("[NativeIdentityProvisioning]   Token ID: \(tokenId)")
-                print("[NativeIdentityProvisioning]   Amount: \(amountValue)")
+                print("[NativeIdentityProvisioning]   AmountAtoms: \(amountAtomsString)")
                 print("[NativeIdentityProvisioning]   Nonce: \(nonceValue)")
                 print("[NativeIdentityProvisioning]   To: \(toAddress)")
 
@@ -1150,7 +1168,7 @@ class NativeIdentityProvisioning: NSObject, UIDocumentPickerDelegate {
                 let hexSignedTx = try ZhtpClient.buildTokenTransfer(
                     tokenId: tokenIdData,
                     toPublicKey: toPubkey,
-                    amount: amountValue,
+                    amountAtoms: amountAtomsString,
                     nonce: nonceValue,
                     using: identity,
                     chainId: 0x03  // development
@@ -1198,17 +1216,23 @@ class NativeIdentityProvisioning: NSObject, UIDocumentPickerDelegate {
                     return
                 }
 
-                var amountValue: UInt64 = 0
+                // amount is a decimal u128 atoms STRING — see parseU128Halves.
+                let amountAtomsString: String
                 if let amountStr = params["amount"] as? String {
-                    guard let parsed = UInt64(amountStr) else {
-                        reject("INVALID_PARAMS", "amount must be a valid integer string", nil)
+                    amountAtomsString = amountStr
+                } else if let amountNum = params["amount"] as? NSNumber {
+                    let d = amountNum.doubleValue
+                    if !d.isFinite || d < 0 || d != d.rounded() || d > Double(UInt64.max) {
+                        reject("INVALID_PARAMS", "amount NSNumber \(d) is not a non-negative safe integer — pass atoms as a decimal string", nil)
                         return
                     }
-                    amountValue = parsed
-                } else if let amountNum = params["amount"] as? NSNumber {
-                    amountValue = amountNum.uint64Value
+                    amountAtomsString = amountNum.stringValue
                 } else {
-                    reject("INVALID_PARAMS", "amount must be a string or number", nil)
+                    reject("INVALID_PARAMS", "amount must be a decimal u128 string (or integer number)", nil)
+                    return
+                }
+                guard parseU128Halves(amountAtomsString) != nil else {
+                    reject("INVALID_PARAMS", "amount \"\(amountAtomsString)\" is not a valid non-negative u128", nil)
                     return
                 }
 
@@ -1225,7 +1249,7 @@ class NativeIdentityProvisioning: NSObject, UIDocumentPickerDelegate {
 
                 let hexSignedTx = try ZhtpClient.buildTokenBurn(
                     tokenId: tokenIdData,
-                    amount: amountValue,
+                    amountAtoms: amountAtomsString,
                     using: identity,
                     chainId: 0x03
                 )
@@ -1257,18 +1281,29 @@ class NativeIdentityProvisioning: NSObject, UIDocumentPickerDelegate {
                     return
                 }
 
-                // Parse amount - accept both String and Number
-                var amountValue: UInt64 = 0
+                // Parse amount as a decimal u128 string. JS side MUST pass a
+                // string for values > 2^53 (e.g. 1000 SOV at 18 decimals =
+                // 1e21 atoms — doesn't fit in an NSNumber without precision
+                // loss). NSNumber path is kept only for small legacy callers.
+                let amountAtomsString: String
                 if let amountStr = params["amount"] as? String {
-                    guard let parsed = UInt64(amountStr) else {
-                        reject("INVALID_PARAMS", "amount must be a valid integer string", nil)
+                    amountAtomsString = amountStr
+                } else if let amountNum = params["amount"] as? NSNumber {
+                    // Reject non-integer / unsafe-int NSNumbers outright — they
+                    // would have lost precision on the JS side already.
+                    let d = amountNum.doubleValue
+                    if !d.isFinite || d < 0 || d != d.rounded() || d > Double(UInt64.max) {
+                        reject("INVALID_PARAMS", "amount NSNumber \(d) is not a non-negative safe integer — pass atoms as a decimal string", nil)
                         return
                     }
-                    amountValue = parsed
-                } else if let amountNum = params["amount"] as? NSNumber {
-                    amountValue = amountNum.uint64Value
+                    amountAtomsString = amountNum.stringValue
                 } else {
-                    reject("INVALID_PARAMS", "amount must be a string or number", nil)
+                    reject("INVALID_PARAMS", "amount must be a decimal u128 string (or integer number)", nil)
+                    return
+                }
+                // Early validation: reject malformed strings before doing any work.
+                guard parseU128Halves(amountAtomsString) != nil else {
+                    reject("INVALID_PARAMS", "amount \"\(amountAtomsString)\" is not a valid non-negative u128", nil)
                     return
                 }
 
@@ -1305,20 +1340,10 @@ class NativeIdentityProvisioning: NSObject, UIDocumentPickerDelegate {
                     return
                 }
 
-                print("[NativeIdentityProvisioning] >>> PARSED nonce from JS: \(nonceValue)")
-                print("[NativeIdentityProvisioning] >>> PASSING nonce to ZhtpClient: \(nonceValue)")
-                
-                // DEBUG: Log all params as hex string for verification
-                print("[NativeIdentityProvisioning] DEBUG: fromWalletIdHex = \(fromWalletIdHex)")
-                print("[NativeIdentityProvisioning] DEBUG: toWalletIdHex = \(toWalletIdHex)")
-                print("[NativeIdentityProvisioning] DEBUG: amountValue = \(amountValue)")
-                print("[NativeIdentityProvisioning] DEBUG: nonceValue = \(nonceValue)")
-                print("[NativeIdentityProvisioning] DEBUG: chainId = \(chainId)")
-
                 print("[NativeIdentityProvisioning] Building signed SOV wallet transfer transaction")
                 print("[NativeIdentityProvisioning]   From: \(fromWalletIdHex)")
                 print("[NativeIdentityProvisioning]   To: \(toWalletIdHex)")
-                print("[NativeIdentityProvisioning]   Amount: \(amountValue)")
+                print("[NativeIdentityProvisioning]   AmountAtoms: \(amountAtomsString)")
                 print("[NativeIdentityProvisioning]   Nonce: \(nonceValue)")
 
                 guard let identityAny = IdentityHandleStore.shared.getLatestIdentity(),
@@ -1352,7 +1377,7 @@ class NativeIdentityProvisioning: NSObject, UIDocumentPickerDelegate {
                 let hexSignedTx = try ZhtpClient.buildSovWalletTransfer(
                     fromWalletId: fromWalletId,
                     toWalletId: toWalletId,
-                    amount: amountValue,
+                    amountAtoms: amountAtomsString,
                     nonce: nonceValue,
                     using: identity,
                     chainId: chainId
@@ -1392,17 +1417,23 @@ class NativeIdentityProvisioning: NSObject, UIDocumentPickerDelegate {
                     return
                 }
 
-                var amountValue: UInt64 = 0
+                // amount is a decimal u128 atoms STRING — see parseU128Halves.
+                let amountAtomsString: String
                 if let amountStr = params["amount"] as? String {
-                    guard let parsed = UInt64(amountStr) else {
-                        reject("INVALID_PARAMS", "amount must be a valid integer string", nil)
+                    amountAtomsString = amountStr
+                } else if let amountNum = params["amount"] as? NSNumber {
+                    let d = amountNum.doubleValue
+                    if !d.isFinite || d < 0 || d != d.rounded() || d > Double(UInt64.max) {
+                        reject("INVALID_PARAMS", "amount NSNumber \(d) is not a non-negative safe integer — pass atoms as a decimal string", nil)
                         return
                     }
-                    amountValue = parsed
-                } else if let amountNum = params["amount"] as? NSNumber {
-                    amountValue = amountNum.uint64Value
+                    amountAtomsString = amountNum.stringValue
                 } else {
-                    reject("INVALID_PARAMS", "amount must be a string or number", nil)
+                    reject("INVALID_PARAMS", "amount must be a decimal u128 string (or integer number)", nil)
+                    return
+                }
+                guard parseU128Halves(amountAtomsString) != nil else {
+                    reject("INVALID_PARAMS", "amount \"\(amountAtomsString)\" is not a valid non-negative u128", nil)
                     return
                 }
 
@@ -1451,14 +1482,14 @@ class NativeIdentityProvisioning: NSObject, UIDocumentPickerDelegate {
                 print("[NativeIdentityProvisioning]   Token ID: \(tokenIdHex)")
                 print("[NativeIdentityProvisioning]   From: \(fromWalletIdHex)")
                 print("[NativeIdentityProvisioning]   To: \(toWalletIdHex)")
-                print("[NativeIdentityProvisioning]   Amount: \(amountValue)")
+                print("[NativeIdentityProvisioning]   AmountAtoms: \(amountAtomsString)")
                 print("[NativeIdentityProvisioning]   Nonce: \(nonceValue)")
 
                 let hexSignedTx = try ZhtpClient.buildTokenWalletTransfer(
                     tokenId: tokenIdData,
                     fromWalletId: fromWalletIdData,
                     toWalletId: toWalletIdData,
-                    amount: amountValue,
+                    amountAtoms: amountAtomsString,
                     nonce: nonceValue,
                     using: identity,
                     chainId: chainId
@@ -1494,17 +1525,23 @@ class NativeIdentityProvisioning: NSObject, UIDocumentPickerDelegate {
                     return
                 }
 
-                var amountValue: UInt64 = 0
+                // amount is a decimal u128 atoms STRING — see parseU128Halves.
+                let amountAtomsString: String
                 if let s = params["amount"] as? String {
-                    guard let v = UInt64(s) else {
-                        reject("INVALID_PARAMS", "amount must be a valid integer string", nil)
+                    amountAtomsString = s
+                } else if let n = params["amount"] as? NSNumber {
+                    let d = n.doubleValue
+                    if !d.isFinite || d < 0 || d != d.rounded() || d > Double(UInt64.max) {
+                        reject("INVALID_PARAMS", "amount NSNumber \(d) is not a non-negative safe integer — pass atoms as a decimal string", nil)
                         return
                     }
-                    amountValue = v
-                } else if let n = params["amount"] as? NSNumber {
-                    amountValue = n.uint64Value
+                    amountAtomsString = n.stringValue
                 } else {
-                    reject("INVALID_PARAMS", "amount is required (string or number)", nil)
+                    reject("INVALID_PARAMS", "amount is required (decimal u128 string)", nil)
+                    return
+                }
+                guard parseU128Halves(amountAtomsString) != nil else {
+                    reject("INVALID_PARAMS", "amount \"\(amountAtomsString)\" is not a valid non-negative u128", nil)
                     return
                 }
 
@@ -1555,11 +1592,11 @@ class NativeIdentityProvisioning: NSObject, UIDocumentPickerDelegate {
                     return
                 }
 
-                print("[NativeIdentityProvisioning] Building DAO stake tx dao=\(sectorDaoKeyIdHex) amount=\(amountValue) nonce=\(nonceValue) lockBlocks=\(lockBlocksValue) chainId=\(chainId)")
+                print("[NativeIdentityProvisioning] Building DAO stake tx dao=\(sectorDaoKeyIdHex) atoms=\(amountAtomsString) nonce=\(nonceValue) lockBlocks=\(lockBlocksValue) chainId=\(chainId)")
 
                 let hexSignedTx = try ZhtpClient.buildDaoStake(
                     sectorDaoKeyId: sectorDaoKeyId,
-                    amount: amountValue,
+                    amountAtoms: amountAtomsString,
                     nonce: nonceValue,
                     lockBlocks: lockBlocksValue,
                     using: identity,

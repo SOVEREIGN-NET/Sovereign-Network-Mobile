@@ -108,38 +108,42 @@ class Identity private constructor(
         @JvmStatic private external fun nativeSignRegistrationProof(handle: Long, timestamp: Long): ByteArray?
 
         // ─── JNI: Token transactions (returns hex-encoded signed tx) ───
+        // All amounts are decimal u128 atoms STRINGS. u64/Long is not wide
+        // enough for 18-decimal tokens (1000 SOV = 1e21 atoms > u64::MAX).
+        // The JNI parses the string via `parse_amount_atoms` in Rust.
         @JvmStatic private external fun nativeBuildTokenCreate(
             handle: Long, name: String, symbol: String,
-            initialSupply: Long, decimals: Int, chainId: Int
+            initialSupplyAtoms: String, decimals: Int,
+            treasuryRecipient: ByteArray, chainId: Int
         ): String?
 
         @JvmStatic private external fun nativeBuildTokenMint(
             handle: Long, tokenId: ByteArray, toPubkey: ByteArray,
-            amount: Long, chainId: Int
+            amountAtoms: String, chainId: Int
         ): String?
 
         @JvmStatic private external fun nativeBuildTokenTransfer(
             handle: Long, tokenId: ByteArray, toPubkey: ByteArray,
-            amount: Long, chainId: Int, nonce: Long
+            amountAtoms: String, chainId: Int, nonce: Long
         ): String?
 
         @JvmStatic private external fun nativeBuildTokenBurn(
-            handle: Long, tokenId: ByteArray, amount: Long, chainId: Int
+            handle: Long, tokenId: ByteArray, amountAtoms: String, chainId: Int
         ): String?
 
         @JvmStatic private external fun nativeBuildSovWalletTransfer(
             handle: Long, fromWalletId: ByteArray, toWalletId: ByteArray,
-            amount: Long, chainId: Int, nonce: Long
+            amountAtoms: String, chainId: Int, nonce: Long
         ): String?
 
         @JvmStatic private external fun nativeBuildTokenWalletTransfer(
             handle: Long, tokenId: ByteArray, fromWalletId: ByteArray,
-            toWalletId: ByteArray, amount: Long, chainId: Int, nonce: Long
+            toWalletId: ByteArray, amountAtoms: String, chainId: Int, nonce: Long
         ): String?
 
         @JvmStatic private external fun nativeBuildDaoStake(
             handle: Long, sectorDaoKeyId: ByteArray,
-            amount: Long, nonce: Long, lockBlocks: Long, chainId: Int
+            amountAtoms: String, nonce: Long, lockBlocks: Long, chainId: Int
         ): String?
 
         // ─── JNI: Domain requests (returns JSON for REST API) ───
@@ -209,32 +213,62 @@ class Identity private constructor(
     fun signRegistrationProof(timestamp: Long): ByteArray? = nativeSignRegistrationProof(handle, timestamp)
 
     // ─── Token transactions ───
+    //
+    // Every amount parameter is a decimal u128 atoms STRING. See
+    // buildSovWalletTransfer for rationale. Do NOT add Long-typed overloads —
+    // u64 silently truncates 18-decimal values and caused a production bug
+    // where 1000 SOV became 3.87 SOV on-chain.
 
-    fun buildTokenCreate(name: String, symbol: String, supply: Long, decimals: Int, chainId: Int = 0x03): String? =
-        nativeBuildTokenCreate(handle, name, symbol, supply, decimals, chainId)
+    fun buildTokenCreate(
+        name: String,
+        symbol: String,
+        initialSupplyAtoms: String,
+        decimals: Int,
+        treasuryRecipient: ByteArray,
+        chainId: Int = 0x03,
+    ): String? = nativeBuildTokenCreate(
+        handle, name, symbol, initialSupplyAtoms, decimals, treasuryRecipient, chainId,
+    )
 
-    fun buildTokenMint(tokenId: ByteArray, toPubkey: ByteArray, amount: Long, chainId: Int = 0x03): String? =
-        nativeBuildTokenMint(handle, tokenId, toPubkey, amount, chainId)
+    fun buildTokenMint(
+        tokenId: ByteArray,
+        toPubkey: ByteArray,
+        amountAtoms: String,
+        chainId: Int = 0x03,
+    ): String? = nativeBuildTokenMint(handle, tokenId, toPubkey, amountAtoms, chainId)
 
     fun buildTokenTransfer(
         tokenId: ByteArray,
         toPubkey: ByteArray,
-        amount: Long,
+        amountAtoms: String,
         chainId: Int = 0x03,
-        nonce: Long = 0L
-    ): String? = nativeBuildTokenTransfer(handle, tokenId, toPubkey, amount, chainId, nonce)
+        nonce: Long = 0L,
+    ): String? = nativeBuildTokenTransfer(
+        handle, tokenId, toPubkey, amountAtoms, chainId, nonce,
+    )
 
-    fun buildTokenBurn(tokenId: ByteArray, amount: Long, chainId: Int = 0x03): String? =
-        nativeBuildTokenBurn(handle, tokenId, amount, chainId)
+    fun buildTokenBurn(
+        tokenId: ByteArray,
+        amountAtoms: String,
+        chainId: Int = 0x03,
+    ): String? = nativeBuildTokenBurn(handle, tokenId, amountAtoms, chainId)
 
-    /** Build signed SOV wallet-to-wallet transfer. fromWalletId and toWalletId must each be 32 bytes. */
+    /**
+     * Build signed SOV wallet-to-wallet transfer.
+     *
+     * fromWalletId and toWalletId must each be 32 bytes.
+     * `amountAtoms` is a decimal u128 STRING in atoms (18 decimals for SOV),
+     * NOT a Long. u64 is not wide enough — 1000 SOV = 1e21 atoms, which
+     * wraps to 3.87 SOV if squeezed into Long. The JNI parses the string
+     * into u128.
+     */
     fun buildSovWalletTransfer(
         fromWalletId: ByteArray,
         toWalletId: ByteArray,
-        amount: Long,
+        amountAtoms: String,
         chainId: Int = 0x03,
         nonce: Long = 0L
-    ): String? = nativeBuildSovWalletTransfer(handle, fromWalletId, toWalletId, amount, chainId, nonce)
+    ): String? = nativeBuildSovWalletTransfer(handle, fromWalletId, toWalletId, amountAtoms, chainId, nonce)
 
     /**
      * Build signed token transfer where the sender is identified by an explicit
@@ -245,19 +279,26 @@ class Identity private constructor(
         tokenId: ByteArray,
         fromWalletId: ByteArray,
         toWalletId: ByteArray,
-        amount: Long,
+        amountAtoms: String,
         chainId: Int = 0x03,
-        nonce: Long = 0L
-    ): String? = nativeBuildTokenWalletTransfer(handle, tokenId, fromWalletId, toWalletId, amount, chainId, nonce)
+        nonce: Long = 0L,
+    ): String? = nativeBuildTokenWalletTransfer(
+        handle, tokenId, fromWalletId, toWalletId, amountAtoms, chainId, nonce,
+    )
 
-    /** Build signed DAO stake. sectorDaoKeyId must be 32 bytes. amount in nSOV. */
+    /**
+     * Build signed DAO stake. sectorDaoKeyId must be 32 bytes.
+     * `amountAtoms` is a decimal u128 atoms string (18 decimals for SOV).
+     */
     fun buildDaoStake(
         sectorDaoKeyId: ByteArray,
-        amount: Long,
+        amountAtoms: String,
         nonce: Long,
         lockBlocks: Long,
         chainId: Int = 0x03,
-    ): String? = nativeBuildDaoStake(handle, sectorDaoKeyId, amount, nonce, lockBlocks, chainId)
+    ): String? = nativeBuildDaoStake(
+        handle, sectorDaoKeyId, amountAtoms, nonce, lockBlocks, chainId,
+    )
 
     // ─── Domain requests (returns JSON for REST API) ───
 

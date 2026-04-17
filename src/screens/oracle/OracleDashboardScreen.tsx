@@ -1,4 +1,4 @@
-import React, { useMemo, useState } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import {
   View,
   ScrollView,
@@ -10,10 +10,11 @@ import {
   Alert,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { Text, Card, Row, Column, Badge } from '../../components';
+import { Text, Card, Row, Column, Badge, RefreshRing } from '../../components';
 import Svg, { Path, Circle, Line, Defs, LinearGradient, Stop } from 'react-native-svg';
 import { colors, spacing, borderRadius, typography } from '../../theme';
-import { useAsyncData } from '../../hooks';
+import { useOracleData } from '../../hooks/useOracleData';
+import type { UseOracleDataResult } from '../../hooks/useOracleData';
 import {
   fetchOraclePrice,
   fetchOracleVariation,
@@ -27,8 +28,16 @@ import {
   VariationPeriod,
   CbePriceResponse,
 } from '../../services/OracleService';
-import { atomsToDisplayLocale } from '../../utils/tokenUnits';
+import { atomsToDisplayLocale, formatAtomicPriceDisplay } from '../../utils/tokenUnits';
 import SimulatorTab from './SimulatorTab';
+
+/**
+ * Auto-refresh cadence for every oracle endpoint. 30s is a compromise
+ * between "fresh enough for a price view" and "don't hammer the node
+ * while the user is idling on the screen". The hook never blanks the
+ * last-known value between fetches.
+ */
+const ORACLE_POLL_MS = 30_000;
 
 const MONO_FONT = Platform.OS === 'ios' ? 'Menlo' : 'monospace';
 
@@ -101,7 +110,13 @@ const StatRow: React.FC<{
   );
 };
 
-const LoadingState: React.FC = () => (
+/**
+ * Full-screen spinner — only used during the very first load when we
+ * have neither fresh data nor a cached value from a previous session.
+ * Everything else (refetch, error with prior value) keeps the last
+ * known value on screen and uses the inline RefreshRing instead.
+ */
+const InitialLoadingState: React.FC = () => (
   <ActivityIndicator
     size="large"
     color={colors.primary}
@@ -109,6 +124,11 @@ const LoadingState: React.FC = () => (
   />
 );
 
+/**
+ * Shown only when there is no cached data AND the latest fetch failed.
+ * If we have cached data we keep displaying it and surface the error
+ * via the RefreshRing's stale state instead.
+ */
 const ErrorState: React.FC<{ message?: string; onRetry: () => void }> = ({
   message,
   onRetry,
@@ -121,6 +141,59 @@ const ErrorState: React.FC<{ message?: string; onRetry: () => void }> = ({
     </Pressable>
   </Card>
 );
+
+/**
+ * Compact "last updated · refresh" row rendered at the top of every tab
+ * that polls. Tapping the ring triggers an immediate retry.
+ */
+const StaleHeader: React.FC<{
+  lastFetchedAt: number | null;
+  nextRefetchAt: number | null;
+  loading: boolean;
+  stale: boolean;
+  onRetry: () => void;
+  errorMessage?: string | null;
+}> = ({ lastFetchedAt, nextRefetchAt, loading, stale, onRetry, errorMessage }) => {
+  const [, forceTick] = React.useReducer(x => x + 1, 0);
+  useEffect(() => {
+    // Re-render once a second so the "updated Xs ago" label stays live.
+    const id = setInterval(forceTick, 1000);
+    return () => clearInterval(id);
+  }, []);
+
+  const agoLabel = useMemo(() => {
+    if (lastFetchedAt == null) return 'not yet updated';
+    const s = Math.max(0, Math.floor((Date.now() - lastFetchedAt) / 1000));
+    if (s < 5) return 'just now';
+    if (s < 60) return `updated ${s}s ago`;
+    const m = Math.floor(s / 60);
+    if (m < 60) return `updated ${m}m ago`;
+    const h = Math.floor(m / 60);
+    return `updated ${h}h ago`;
+  }, [lastFetchedAt]);
+
+  return (
+    <Row justify="space-between" align="center" style={{ paddingHorizontal: spacing.xs }}>
+      <Text
+        variant="caption"
+        style={{
+          color: stale ? '#f5a623' : colors.text_secondary,
+          fontSize: typography.size.xs,
+        }}
+      >
+        {errorMessage ? `⚠ ${errorMessage}` : agoLabel}
+      </Text>
+      <RefreshRing
+        lastFetchedAt={lastFetchedAt}
+        nextRefetchAt={nextRefetchAt}
+        loading={loading}
+        stale={stale}
+        onRetry={onRetry}
+        size={16}
+      />
+    </Row>
+  );
+};
 
 const PairToggle: React.FC<{
   value: OraclePair;
@@ -507,21 +580,38 @@ const BondingCurveDetail: React.FC<{ data: CbePriceResponse }> = ({ data }) => {
 
 const PriceTab: React.FC<{ pair: OraclePair }> = ({ pair }) => {
   const dec = PRICE_DECIMALS[pair] ?? 4;
-  const { data, loading, error, retry } = useAsyncData<OraclePriceResponse>(
-    () => fetchOraclePrice(pair),
-    [pair],
-  );
+  const { data, loading, error, stale, lastFetchedAt, nextRefetchAt, retry } =
+    useOracleData<OraclePriceResponse>({
+      cacheKey: `price:${pair}`,
+      fetcher: () => fetchOraclePrice(pair),
+      intervalMs: ORACLE_POLL_MS,
+      deps: [pair],
+    });
+
+  // First-ever visit with no disk cache → show spinner. On every
+  // subsequent poll we keep the last value and show the RefreshRing.
+  const showInitialLoading = loading && data == null;
+  // Error card only when we have nothing at all to show.
+  const showErrorOnly = error != null && data == null && !loading;
 
   return (
     <Column gap="md">
-      {loading && <LoadingState />}
-      {!loading && error && (
+      <StaleHeader
+        lastFetchedAt={lastFetchedAt}
+        nextRefetchAt={nextRefetchAt}
+        loading={loading}
+        stale={stale}
+        onRetry={retry}
+        errorMessage={error && data != null ? 'last value — node unreachable' : null}
+      />
+      {showInitialLoading && <InitialLoadingState />}
+      {showErrorOnly && (
         <ErrorState
-          message={error.message || 'No price available — tap to retry'}
+          message={error?.message || 'No price available — tap to retry'}
           onRetry={retry}
         />
       )}
-      {!loading && !error && data && (
+      {data && (
         <>
           <Card>
             <View style={styles.priceHero}>
@@ -529,7 +619,18 @@ const PriceTab: React.FC<{ pair: OraclePair }> = ({ pair }) => {
                 {data.pair}
               </Text>
               {(() => {
-                const priceStr = fmt(data.price, dec);
+                // Identical formatter to Dashboard: exact BigInt division
+                // of the atomic pair via `formatAtomicPriceDisplay`. The
+                // `fmt(data.price, dec)` path is kept only as a fallback
+                // for any pair that doesn't carry `price_atomic` / a scale.
+                const scale =
+                  (data as any).oracle_price_scale ??
+                  (data as any).price_scale ??
+                  null;
+                const priceStr =
+                  data.price_atomic && scale
+                    ? formatAtomicPriceDisplay(data.price_atomic, scale, '$')
+                    : fmt(data.price, dec);
                 const len = priceStr.length;
                 const fontSize = len <= 8 ? 48 : len <= 12 ? 36 : len <= 16 ? 28 : 22;
                 return (
@@ -612,10 +713,13 @@ const PriceTab: React.FC<{ pair: OraclePair }> = ({ pair }) => {
 const VariationTab: React.FC<{ pair: OraclePair }> = ({ pair }) => {
   const dec = PRICE_DECIMALS[pair] ?? 4;
   const [period, setPeriod] = useState<VariationPeriod>('24h');
-  const { data, loading, error, retry } = useAsyncData<OracleVariationResponse>(
-    () => fetchOracleVariation(pair, period),
-    [pair, period],
-  );
+  const { data, loading, error, stale, lastFetchedAt, nextRefetchAt, retry } =
+    useOracleData<OracleVariationResponse>({
+      cacheKey: `variation:${pair}:${period}`,
+      fetcher: () => fetchOracleVariation(pair, period),
+      intervalMs: ORACLE_POLL_MS,
+      deps: [pair, period],
+    });
 
   const pctRaw =
     data == null
@@ -626,18 +730,29 @@ const VariationTab: React.FC<{ pair: OraclePair }> = ({ pair }) => {
   const pct = typeof pctRaw === 'number' && isFinite(pctRaw) ? pctRaw : 0;
   const changeIsPositive = pct >= 0;
 
+  const showInitialLoading = loading && data == null;
+  const showErrorOnly = error != null && data == null && !loading;
+
   return (
     <Column gap="md">
       <PeriodToggle value={period} onChange={setPeriod} />
+      <StaleHeader
+        lastFetchedAt={lastFetchedAt}
+        nextRefetchAt={nextRefetchAt}
+        loading={loading}
+        stale={stale}
+        onRetry={retry}
+        errorMessage={error && data != null ? 'last value — node unreachable' : null}
+      />
 
-      {loading && <LoadingState />}
-      {!loading && error && (
+      {showInitialLoading && <InitialLoadingState />}
+      {showErrorOnly && (
         <ErrorState
-          message={error.message || 'No variation data — tap to retry'}
+          message={error?.message || 'No variation data — tap to retry'}
           onRetry={retry}
         />
       )}
-      {!loading && !error && data && (
+      {data && (
         <>
           <Card>
             <View style={styles.priceHero}>
@@ -753,19 +868,30 @@ const VariationTab: React.FC<{ pair: OraclePair }> = ({ pair }) => {
 // --- Status Tab ---
 
 const StatusTab: React.FC<{
-  data: ReturnType<typeof useAsyncData<OracleStatusResponse>>;
+  data: UseOracleDataResult<OracleStatusResponse>;
 }> = ({ data }) => {
-  if (data.loading) return <LoadingState />;
-  if (data.error) return <ErrorState onRetry={data.retry} />;
-  if (!data.data) return null;
-
   const d = data.data;
+  const showInitialLoading = data.loading && d == null;
+  const showErrorOnly = data.error != null && d == null && !data.loading;
+
+  if (showInitialLoading) return <InitialLoadingState />;
+  if (showErrorOnly) return <ErrorState onRetry={data.retry} message={data.error?.message} />;
+  if (!d) return null;
+
   const isHealthy =
     d.latest_finalized_price !== null &&
     d.current_epoch - d.latest_finalized_price.epoch_id <= 2;
 
   return (
     <Column gap="md">
+      <StaleHeader
+        lastFetchedAt={data.lastFetchedAt}
+        nextRefetchAt={data.nextRefetchAt}
+        loading={data.loading}
+        stale={data.stale}
+        onRetry={data.retry}
+        errorMessage={data.error ? 'last value — node unreachable' : null}
+      />
       <Card>
         <Row
           justify="space-between"
@@ -853,16 +979,26 @@ const StatusTab: React.FC<{
 // --- Config Tab ---
 
 const ConfigTab: React.FC<{
-  data: ReturnType<typeof useAsyncData<OracleConfigResponse>>;
+  data: UseOracleDataResult<OracleConfigResponse>;
 }> = ({ data }) => {
-  if (data.loading) return <LoadingState />;
-  if (data.error) return <ErrorState onRetry={data.retry} />;
-  if (!data.data) return null;
-
   const d = data.data;
+  const showInitialLoading = data.loading && d == null;
+  const showErrorOnly = data.error != null && d == null && !data.loading;
+
+  if (showInitialLoading) return <InitialLoadingState />;
+  if (showErrorOnly) return <ErrorState onRetry={data.retry} message={data.error?.message} />;
+  if (!d) return null;
 
   return (
     <Column gap="md">
+      <StaleHeader
+        lastFetchedAt={data.lastFetchedAt}
+        nextRefetchAt={data.nextRefetchAt}
+        loading={data.loading}
+        stale={data.stale}
+        onRetry={data.retry}
+        errorMessage={data.error ? 'last value — node unreachable' : null}
+      />
       <Card>
         <Text variant="h3" style={{ marginBottom: spacing.sm }}>
           Parameters
@@ -1009,8 +1145,16 @@ const OracleDashboardScreen: React.FC<any> = ({ navigation }) => {
   const [pair, setPair] = useState<OraclePair>('SOV/USD');
   const [activeTab, setActiveTab] = useState<Tab>('price');
 
-  const status = useAsyncData<OracleStatusResponse>(() => fetchOracleStatus(), []);
-  const config = useAsyncData<OracleConfigResponse>(() => fetchOracleConfig(), []);
+  const status = useOracleData<OracleStatusResponse>({
+    cacheKey: 'status',
+    fetcher: () => fetchOracleStatus(),
+    intervalMs: ORACLE_POLL_MS,
+  });
+  const config = useOracleData<OracleConfigResponse>({
+    cacheKey: 'config',
+    fetcher: () => fetchOracleConfig(),
+    intervalMs: ORACLE_POLL_MS,
+  });
 
   return (
     <SafeAreaView style={styles.container} edges={['top']}>

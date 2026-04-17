@@ -132,13 +132,8 @@ const DomainRegistrationScreen: React.FC<DomainRegistrationScreenProps> = ({
         const hasOwned = storedDomains.some(
           (d: DomainData) => d.owner === resolvedIdentityDid,
         );
-        // Domain limit temporarily disabled for debugging
-        setHasExistingDomain(false);
-      } catch (error) {
-        console.warn(
-          '[DomainRegistrationScreen] Failed to load existing domains:',
-          error,
-        );
+        setHasExistingDomain(hasOwned);
+      } catch {
         setHasExistingDomain(false);
       }
     };
@@ -323,8 +318,7 @@ const DomainRegistrationScreen: React.FC<DomainRegistrationScreenProps> = ({
         REGISTERED_DOMAINS_KEY,
         JSON.stringify(storedDomains),
       );
-      // Domain limit temporarily disabled for debugging
-      // setHasExistingDomain(true);
+      setHasExistingDomain(true);
 
       setStatus({
         type: 'success',
@@ -830,6 +824,7 @@ const DomainRegistrationScreen: React.FC<DomainRegistrationScreenProps> = ({
             onPress={handleRegister}
             disabled={
               loading ||
+              hasExistingDomain ||
               availabilityStatus.available === false ||
               !domain ||
               !resolvedIdentityDid
@@ -837,6 +832,7 @@ const DomainRegistrationScreen: React.FC<DomainRegistrationScreenProps> = ({
             style={{
               backgroundColor:
                 loading ||
+                hasExistingDomain ||
                 availabilityStatus.available === false ||
                 !domain ||
                 !resolvedIdentityDid
@@ -846,6 +842,8 @@ const DomainRegistrationScreen: React.FC<DomainRegistrationScreenProps> = ({
           >
             {loading
               ? 'Registering...'
+              : hasExistingDomain
+              ? 'Limit: 1 domain per identity'
               : !resolvedIdentityDid
               ? 'Unlock Identity to Register'
               : 'Register Domain'}

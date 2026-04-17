@@ -1,4 +1,4 @@
-import React, { useMemo, useState } from 'react';
+import React, { useMemo, useState, useEffect } from 'react';
 import { View, TextInput, Animated, Pressable } from 'react-native';
 import { useNetworkNotices } from '../hooks/useNetworkNotices';
 import { useAsyncData } from '../hooks/useAsyncData';
@@ -59,9 +59,14 @@ const DashboardScreen: React.FC<any> = ({ navigation }) => {
   const [urlInput, setUrlInput] = useState('zhtp://central.sov');
   const trendingTokensData = useTrendingTokens();
   const trendingDappsData = useTrendingDapps();
+  // Defer oracle fetch so it doesn't compete with mount rendering.
+  const [oracleReady, setOracleReady] = useState(false);
+  useEffect(() => { const t = setTimeout(() => setOracleReady(true), 600); return () => clearTimeout(t); }, []);
   const { data: oracleStatus } = useAsyncData<OracleStatusResponse>(
     () => fetchOracleStatus(),
     [],
+    null,
+    !oracleReady,
   );
   const oracleHealthy = useMemo(() => {
     if (!oracleStatus) return null; // unknown
@@ -257,9 +262,9 @@ const DashboardScreen: React.FC<any> = ({ navigation }) => {
               });
 
               return (
-                <Animated.View
+                <Pressable
                   key={dapp.id}
-                  onTouchEnd={() => openBrowser(dapp.url)}
+                  onPress={() => openBrowser(dapp.url)}
                   style={{
                     flexDirection: 'row',
                     justifyContent: 'space-between',
@@ -319,7 +324,7 @@ const DashboardScreen: React.FC<any> = ({ navigation }) => {
                       active users
                     </Text>
                   </Animated.View>
-                </Animated.View>
+                </Pressable>
               );
             })}
           </Column>
@@ -421,7 +426,16 @@ const DashboardScreen: React.FC<any> = ({ navigation }) => {
                       variant="body"
                       style={{ fontWeight: '600', color: colors.text_primary }}
                     >
-                      {formatTokenPrice(token.price)}
+                      {/*
+                        `priceDisplay` is `formatAtomicPriceDisplay(priceAtomic,
+                        priceScale)` — exact BigInt division of the node's
+                        atomic pair. Same formatter and same source as the
+                        Oracle view, so the two surfaces render bit-identical
+                        strings for the same fetch. Falls back to the legacy
+                        float formatter only when the atomic pair wasn't
+                        provided by the response.
+                      */}
+                      {token.priceDisplay || formatTokenPrice(token.price)}
                     </Text>
                     {token.showVariation && (
                       <Row gap="xs" align="center">

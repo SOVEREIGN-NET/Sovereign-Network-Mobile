@@ -72,15 +72,20 @@ export function useAsyncData<T>(
             error: null,
           });
         }
-      } catch (error) {
-        if (mounted) {
-          // Preserve previous data on error — degrade gracefully.
-          setState(prev => ({
-            data: prev.data,
-            loading: false,
-            error: error instanceof Error ? error : new Error('Unknown error occurred'),
-          }));
-        }
+      } catch (caught) {
+        if (!mounted) return;
+        // Normalize before the setState closure so the action never references
+        // the catch binding lexically — some bundlers/runtimes (Hermes with
+        // certain minification paths) lose that scope when React replays the
+        // action during a later render, producing "Property 'error' doesn't exist".
+        const normalizedError =
+          caught instanceof Error ? caught : new Error('Unknown error occurred');
+        // Preserve previous data on error — degrade gracefully.
+        setState(prev => ({
+          data: prev.data,
+          loading: false,
+          error: normalizedError,
+        }));
       }
     };
 
