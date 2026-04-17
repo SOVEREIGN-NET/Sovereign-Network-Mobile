@@ -612,7 +612,30 @@ pub extern "system" fn Java_com_sovereignnetworkmobile_NativeIdentityProvisionin
     create_identity_bundle_map(&mut env, result)
 }
 
-/// Build signed token create transaction
+/// Shared amount parser for the NativeIdentityProvisioning legacy bridge
+/// (identity-json path). Same contract as identity_jni::parse_amount_atoms.
+fn parse_amount_atoms_provisioning(env: &mut JNIEnv, amount: &JString, site: &str) -> Option<u128> {
+    let raw: String = match env.get_string(amount) {
+        Ok(s) => s.into(),
+        Err(e) => {
+            log::error!("[NativeIdentityProvisioning] {}: invalid amount JString: {}", site, e);
+            return None;
+        }
+    };
+    match raw.trim().parse::<u128>() {
+        Ok(v) => Some(v),
+        Err(e) => {
+            log::error!(
+                "[NativeIdentityProvisioning] {}: amount \"{}\" is not a non-negative u128: {}",
+                site, raw, e
+            );
+            None
+        }
+    }
+}
+
+/// Build signed token create transaction.
+/// initial_supply_atoms is a decimal u128 string (NOT jlong — see the 1000→3.87 SOV bug).
 #[no_mangle]
 pub extern "system" fn Java_com_sovereignnetworkmobile_NativeIdentityProvisioning_nativeBuildTokenCreate<'local>(
     mut env: JNIEnv<'local>,
@@ -620,7 +643,7 @@ pub extern "system" fn Java_com_sovereignnetworkmobile_NativeIdentityProvisionin
     identity_json: JString<'local>,
     name: JString<'local>,
     symbol: JString<'local>,
-    initial_supply: jni::sys::jlong,
+    initial_supply_atoms: JString<'local>,
     decimals: jni::sys::jint,
     treasury_recipient: JByteArray<'local>,
     chain_id: jni::sys::jint,
@@ -637,6 +660,14 @@ pub extern "system" fn Java_com_sovereignnetworkmobile_NativeIdentityProvisionin
         Ok(s) => s.into(),
         Err(_) => return env.new_string("").unwrap_or_default(),
     };
+    let initial_supply: u128 = match parse_amount_atoms_provisioning(
+        &mut env,
+        &initial_supply_atoms,
+        "nativeBuildTokenCreate",
+    ) {
+        Some(v) => v,
+        None => return env.new_string("").unwrap_or_default(),
+    };
 
     let treasury_arr: Vec<u8> = env.convert_byte_array(treasury_recipient).unwrap_or_default();
     let mut treasury_recipient_arr = [0u8; 32];
@@ -648,7 +679,7 @@ pub extern "system" fn Java_com_sovereignnetworkmobile_NativeIdentityProvisionin
         &identity_json_str,
         &name_str,
         &symbol_str,
-        initial_supply as u64,
+        initial_supply,
         decimals as u8,
         treasury_recipient_arr,
         chain_id as u8,
@@ -661,7 +692,7 @@ pub extern "system" fn Java_com_sovereignnetworkmobile_NativeIdentityProvisionin
     }
 }
 
-/// Build signed token mint transaction
+/// Build signed token mint transaction (legacy identity-json path).
 #[no_mangle]
 pub extern "system" fn Java_com_sovereignnetworkmobile_NativeIdentityProvisioning_nativeBuildTokenMint<'local>(
     mut env: JNIEnv<'local>,
@@ -669,13 +700,18 @@ pub extern "system" fn Java_com_sovereignnetworkmobile_NativeIdentityProvisionin
     identity_json: JString<'local>,
     token_id: JByteArray<'local>,
     to_pubkey: JByteArray<'local>,
-    amount: jni::sys::jlong,
+    amount_atoms: JString<'local>,
     chain_id: jni::sys::jint,
 ) -> JString<'local> {
     let identity_json_str: String = match env.get_string(&identity_json) {
         Ok(s) => s.into(),
         Err(_) => return env.new_string("").unwrap_or_default(),
     };
+    let amount: u128 =
+        match parse_amount_atoms_provisioning(&mut env, &amount_atoms, "nativeBuildTokenMint") {
+            Some(v) => v,
+            None => return env.new_string("").unwrap_or_default(),
+        };
     let token_id_bytes: Vec<u8> = match env.convert_byte_array(&token_id) {
         Ok(b) => b,
         Err(_) => return env.new_string("").unwrap_or_default(),
@@ -689,7 +725,7 @@ pub extern "system" fn Java_com_sovereignnetworkmobile_NativeIdentityProvisionin
         &identity_json_str,
         &token_id_bytes,
         &to_pubkey_bytes,
-        amount as u64,
+        amount,
         chain_id as u8,
     ) {
         Ok(hex_tx) => env.new_string(&hex_tx).unwrap_or_default(),
@@ -700,7 +736,7 @@ pub extern "system" fn Java_com_sovereignnetworkmobile_NativeIdentityProvisionin
     }
 }
 
-/// Build signed token transfer transaction
+/// Build signed token transfer transaction (legacy identity-json path).
 #[no_mangle]
 pub extern "system" fn Java_com_sovereignnetworkmobile_NativeIdentityProvisioning_nativeBuildTokenTransfer<'local>(
     mut env: JNIEnv<'local>,
@@ -708,13 +744,21 @@ pub extern "system" fn Java_com_sovereignnetworkmobile_NativeIdentityProvisionin
     identity_json: JString<'local>,
     token_id: JByteArray<'local>,
     to_pubkey: JByteArray<'local>,
-    amount: jni::sys::jlong,
+    amount_atoms: JString<'local>,
     chain_id: jni::sys::jint,
     nonce: jni::sys::jlong,
 ) -> JString<'local> {
     let identity_json_str: String = match env.get_string(&identity_json) {
         Ok(s) => s.into(),
         Err(_) => return env.new_string("").unwrap_or_default(),
+    };
+    let amount: u128 = match parse_amount_atoms_provisioning(
+        &mut env,
+        &amount_atoms,
+        "nativeBuildTokenTransfer",
+    ) {
+        Some(v) => v,
+        None => return env.new_string("").unwrap_or_default(),
     };
     let token_id_bytes: Vec<u8> = match env.convert_byte_array(&token_id) {
         Ok(b) => b,
@@ -729,7 +773,7 @@ pub extern "system" fn Java_com_sovereignnetworkmobile_NativeIdentityProvisionin
         &identity_json_str,
         &token_id_bytes,
         &to_pubkey_bytes,
-        amount as u64,
+        amount,
         chain_id as u8,
         nonce as u64,
     ) {

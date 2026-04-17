@@ -159,6 +159,41 @@ interface RequestOptions {
   timeout?: number;
 }
 
+/**
+ * A native error or 401 body indicating the current UHP session has
+ * desynced from the server (counter replay, framing mismatch, stale
+ * session cache). The client-side remedy is to drop the session and
+ * re-handshake on the next call.
+ */
+const SESSION_DESYNC_PATTERNS = [
+  /invalid counter/i,
+  /possible replay/i,
+  /not enough bytes for length header/i,
+  /session (not found|expired|mismatch)/i,
+];
+
+function matchesSessionDesync(text: string | undefined): boolean {
+  if (!text) return false;
+  return SESSION_DESYNC_PATTERNS.some(p => p.test(text));
+}
+
+/**
+ * Force any cached UHP session to be abandoned so the next authenticated
+ * request performs a fresh handshake. Best-effort: ignore native errors.
+ */
+async function resetAuthSession(): Promise<void> {
+  if (!NativeQuic?.cancelAll) return;
+  try {
+    await NativeQuic.cancelAll();
+  } catch {
+    /* best-effort */
+  }
+  latestAuthSessionIdPrefix = null;
+  // Small gap so any in-flight native drain finishes closing its handle
+  // before we queue the retry onto a fresh handshake.
+  await new Promise<void>(resolve => setTimeout(() => resolve(), 100));
+}
+
 async function rawRequest(
   path: string,
   options: RequestOptions & { alpnOverride?: 'public' | 'authenticated' } = {},
@@ -202,10 +237,56 @@ async function rawRequest(
     console.log('[quic] request:', method, redactDidInPath(path), `(${alpn})`);
   }
 
-  const response: QuicRawResponse = await NativeQuic.request(
-    url,
-    requestOptions,
-  );
+  // Attempt the request up to MAX_ATTEMPTS times, recycling the UHP session
+  // between attempts when the failure signature matches a known desync
+  // (framing error at native layer, or 401 "Invalid counter" from the
+  // server). Stale server-side session caches can take more than one fresh
+  // handshake to clear, so a single retry is not always enough.
+  const MAX_ATTEMPTS = 3;
+  const attempt = async (): Promise<QuicRawResponse> => {
+    for (let i = 1; i <= MAX_ATTEMPTS; i++) {
+      let current: QuicRawResponse;
+      try {
+        current = await NativeQuic.request(url, requestOptions);
+      } catch (err: unknown) {
+        const msg = err instanceof Error ? err.message : String(err);
+        const retryable =
+          alpn === 'authenticated' && matchesSessionDesync(msg);
+        if (!retryable || i === MAX_ATTEMPTS) throw err;
+        if (__DEV__) {
+          console.warn(
+            `[quic] session desync detected (attempt ${i}/${MAX_ATTEMPTS}), re-handshaking:`,
+            msg,
+          );
+        }
+        await resetAuthSession();
+        continue;
+      }
+
+      // 401 counter-replay ⇒ server sees a stale session for us; drop ours
+      // and try again.
+      if (
+        alpn === 'authenticated' &&
+        current.status === 401 &&
+        matchesSessionDesync(current.body) &&
+        i < MAX_ATTEMPTS
+      ) {
+        if (__DEV__) {
+          console.warn(
+            `[quic] 401 counter-replay detected (attempt ${i}/${MAX_ATTEMPTS}), re-handshaking`,
+          );
+        }
+        await resetAuthSession();
+        continue;
+      }
+
+      return current;
+    }
+    // Unreachable: loop either returns or throws.
+    throw new Error('QUIC request exhausted retry attempts');
+  };
+
+  const response = await attempt();
 
   if (alpn === 'authenticated') {
     const sid = (response as any)?.sessionIdPrefix;

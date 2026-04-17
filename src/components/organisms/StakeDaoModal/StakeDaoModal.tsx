@@ -224,15 +224,14 @@ export const StakeDaoModal = React.memo(
                       Amount
                     </Text>
 
-                    {/* Custom input with accent border on focus */}
+                    {/* Custom input — disabled, coming soon */}
                     <View
                       style={[
                         styles.inputWrap,
                         {
-                          borderColor: isFocused
-                            ? accent
-                            : hexToRgba(accent, 0.18),
+                          borderColor: hexToRgba(accent, 0.18),
                           backgroundColor: colors.bg_darkest,
+                          opacity: 0.5,
                         },
                       ]}
                     >
@@ -247,6 +246,7 @@ export const StakeDaoModal = React.memo(
                         returnKeyType="done"
                         style={styles.input}
                         maxLength={16}
+                        editable={false}
                       />
                       <Text
                         style={{
@@ -259,31 +259,38 @@ export const StakeDaoModal = React.memo(
                         SOV
                       </Text>
                     </View>
+                    <Text
+                      style={{
+                        color: colors.text_secondary,
+                        fontSize: typography.size.xs,
+                        marginTop: spacing.xs,
+                        fontStyle: 'italic',
+                      }}
+                    >
+                      Staking coming soon
+                    </Text>
 
-                    {/* Quick-amount chips */}
-                    <View style={styles.chipsRow}>
+                    {/* Quick-amount chips — disabled */}
+                    <View style={[styles.chipsRow, { opacity: 0.35 }]}>
                       {QUICK_AMOUNTS.map(value => {
                         const selected = parsed === value;
                         return (
                           <TouchableOpacity
                             key={value}
-                            onPress={() => handleQuickAmount(value)}
-                            activeOpacity={0.7}
+                            onPress={() => {}}
+                            activeOpacity={1}
+                            disabled
                             style={[
                               styles.chip,
                               {
-                                borderColor: selected
-                                  ? accent
-                                  : hexToRgba(accent, 0.2),
-                                backgroundColor: selected
-                                  ? hexToRgba(accent, 0.15)
-                                  : 'transparent',
+                                borderColor: hexToRgba(accent, 0.2),
+                                backgroundColor: 'transparent',
                               },
                             ]}
                           >
                             <Text
                               style={{
-                                color: selected ? accent : colors.text_secondary,
+                                color: colors.text_secondary,
                                 fontSize: typography.size.sm,
                                 fontWeight: typography.weight.semibold,
                               }}
@@ -345,39 +352,28 @@ export const StakeDaoModal = React.memo(
 
                     {/* Submit */}
                     <TouchableOpacity
-                      onPress={handleSubmit}
-                      disabled={!canSubmit}
-                      activeOpacity={0.85}
+                      onPress={() => {}}
+                      disabled
+                      activeOpacity={1}
                       style={[
                         styles.submit,
                         {
-                          backgroundColor: canSubmit
-                            ? accent
-                            : hexToRgba(accent, 0.25),
-                          shadowColor: accent,
-                          shadowOpacity: canSubmit ? 0.45 : 0,
+                          backgroundColor: hexToRgba(accent, 0.25),
+                          shadowOpacity: 0,
                         },
                       ]}
                       accessibilityRole="button"
-                      accessibilityLabel={
-                        canSubmit
-                          ? `Stake ${parsed} SOV in ${dao.name}`
-                          : 'Enter an amount to stake'
-                      }
+                      accessibilityLabel="Staking coming soon"
                     >
                       <Text
                         style={{
-                          color: canSubmit
-                            ? colors.white
-                            : colors.text_tertiary,
+                          color: colors.text_tertiary,
                           fontSize: typography.size.md,
                           fontWeight: typography.weight.bold,
                           letterSpacing: 0.3,
                         }}
                       >
-                        {canSubmit
-                          ? `Stake ${parsed} SOV`
-                          : 'Enter an amount'}
+                        Coming soon
                       </Text>
                     </TouchableOpacity>
 

@@ -5,6 +5,7 @@
 
 import { quicRequest, publicQuicRequest } from './quic';
 import { nativeIdentityProvisioning } from './NativeIdentityProvisioning';
+import { validateAtomsString } from '../utils/tokenUnits';
 import type {
   TokenCreateRequest,
   TokenCreateResponse,
@@ -20,6 +21,35 @@ import type {
   TokenBalanceResponse,
   TokenListResponse,
 } from '../types/token';
+
+/**
+ * Coerce a caller-supplied amount (string | number | bigint) into a
+ * validated u128 atoms STRING suitable for the native signing bridges.
+ *
+ * This is the one-and-only amount sanitizer for this service. Every
+ * `amount` field passed to a native signer goes through here so the
+ * bridges never have to guess the shape and never see a lossy JS Number
+ * for values > 2^53.
+ */
+function coerceAmountAtoms(amount: string | number | bigint): string {
+  if (typeof amount === 'bigint') return validateAtomsString(amount.toString());
+  if (typeof amount === 'number') {
+    if (!Number.isFinite(amount) || amount < 0) {
+      throw new Error(`coerceAmountAtoms: invalid number ${amount}`);
+    }
+    // Only safe if amount is an integer within Number.MAX_SAFE_INTEGER.
+    // Callers must switch to a decimal string for anything larger (e.g.
+    // 18-decimal SOV atoms). This guard makes the silent-overflow bug
+    // that cost us 1000 SOV → 3.87 SOV impossible to reintroduce.
+    if (!Number.isInteger(amount) || amount > Number.MAX_SAFE_INTEGER) {
+      throw new Error(
+        `coerceAmountAtoms: number ${amount} is not a safe integer — pass the atoms as a decimal string instead`,
+      );
+    }
+    return validateAtomsString(amount.toString());
+  }
+  return validateAtomsString(amount);
+}
 
 const normalizeDIDToAddress = (did: string): string => {
   if (did.startsWith('did:zhtp:')) {
@@ -134,7 +164,7 @@ class TokenService {
     const signingResult =
       await nativeIdentityProvisioning.signTokenMintTransaction({
         tokenId: request.token_id,
-        amount: Number(request.amount),
+        amount: coerceAmountAtoms(request.amount),
         recipientDid: normalizeDIDToAddress(request.to),
       });
     console.log(
@@ -183,7 +213,7 @@ class TokenService {
       await nativeIdentityProvisioning.signTokenTransferTransaction({
         tokenId: request.token_id,
         toAddress: normalizeDIDToAddress(request.to),
-        amount: Number(request.amount),
+        amount: coerceAmountAtoms(request.amount),
         nonce: nonce,
       });
     console.log(
@@ -239,7 +269,7 @@ class TokenService {
         tokenId: request.token_id,
         fromWalletId: request.from_wallet_id,
         toWalletId: request.to_wallet_id,
-        amount: Number(request.amount),
+        amount: coerceAmountAtoms(request.amount),
         nonce,
         chainId: request.chain_id,
       });
@@ -291,10 +321,11 @@ class TokenService {
     console.log(
       '[TokenService] >>> CALLING native signSovWalletTransferTransaction...',
     );
+    const atomsStr = coerceAmountAtoms(request.amount);
     console.log('[TokenService] >>> PARAMS:', {
       fromWalletId: request.from_wallet_id,
       toWalletId: request.to_wallet_id,
-      amount: Number(request.amount),
+      amount: atomsStr,
       nonce: nonce,
     });
 
@@ -302,7 +333,7 @@ class TokenService {
       await nativeIdentityProvisioning.signSovWalletTransferTransaction({
         fromWalletId: request.from_wallet_id,
         toWalletId: request.to_wallet_id,
-        amount: Number(request.amount),
+        amount: atomsStr,
         nonce: nonce,
       });
     console.log(
@@ -387,7 +418,7 @@ class TokenService {
     const signingResult =
       await nativeIdentityProvisioning.signTokenBurnTransaction({
         tokenId: request.token_id,
-        amount: Number(request.amount),
+        amount: coerceAmountAtoms(request.amount),
       });
     console.log(
       '[TokenService] Burn transaction signed, hex length:',

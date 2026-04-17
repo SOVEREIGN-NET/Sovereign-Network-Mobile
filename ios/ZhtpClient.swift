@@ -4,6 +4,42 @@
 
 import Foundation
 
+// MARK: - u128 amount parsing (single source of truth)
+//
+// Token amounts on the Rust side are u128. Swift has no native UInt128,
+// and UInt64 is NOT large enough — e.g. 1000 SOV at 18 decimals is 1e21
+// atoms which overflows u64. Callers MUST pass the amount as a decimal
+// string and use `parseU128Halves` to split it into the (lo, hi) pair
+// the C FFI accepts.
+//
+// Do NOT add helper overloads that take `amount: UInt64`. The previous
+// version of this file had one and it silently truncated 1000 SOV to
+// 3.87 SOV in production.
+
+/// Parse a decimal u128 string into `(lo, hi)` UInt64 halves.
+/// Returns `nil` on non-digit input or on u128 overflow.
+public func parseU128Halves(_ s: String) -> (lo: UInt64, hi: UInt64)? {
+    if s.isEmpty { return nil }
+    var hi: UInt64 = 0
+    var lo: UInt64 = 0
+    for ch in s {
+        guard let d = ch.wholeNumberValue, (0...9).contains(d) else { return nil }
+        // (hi, lo) = (hi, lo) * 10 + d, with overflow detection.
+        let (loMulHi, loMulLo) = lo.multipliedFullWidth(by: 10)
+        let (addedLo, addOv) = loMulLo.addingReportingOverflow(UInt64(d))
+        let carryFromAdd: UInt64 = addOv ? 1 : 0
+        let (hiMulHi, hiMulLo) = hi.multipliedFullWidth(by: 10)
+        if hiMulHi != 0 { return nil }
+        let (hiSum1, hiOv1) = hiMulLo.addingReportingOverflow(loMulHi)
+        if hiOv1 { return nil }
+        let (hiSum2, hiOv2) = hiSum1.addingReportingOverflow(carryFromAdd)
+        if hiOv2 { return nil }
+        lo = addedLo
+        hi = hiSum2
+    }
+    return (lo, hi)
+}
+
 // MARK: - C FFI Declarations: Identity
 
 // Generate identity
@@ -710,15 +746,19 @@ public class ZhtpClient {
 
     // MARK: Token transactions — handle is opaque IdentityHandle*
 
-    /// Build signed token transfer transaction (returns hex-encoded string ready for API)
+    /// Build signed token transfer transaction.
+    /// `amountAtoms` is a decimal u128 atoms string (NOT UInt64 — see parseU128Halves).
     public static func buildTokenTransfer(
         tokenId: Data,
         toPublicKey: Data,
-        amount: UInt64,
+        amountAtoms: String,
         nonce: UInt64,
         using identity: Identity,
         chainId: UInt8 = 0x03  // development
     ) throws -> String {
+        guard let (amountLo, amountHi) = parseU128Halves(amountAtoms) else {
+            throw ClientError.signingError("amountAtoms must be a non-negative u128 decimal string; got \"\(amountAtoms)\"")
+        }
         guard let hexPtr = tokenId.withUnsafeBytes({ tokenIdPtr in
             toPublicKey.withUnsafeBytes { toPubkeyPtr in
                 cBuildTokenTransfer(
@@ -726,7 +766,7 @@ public class ZhtpClient {
                     tokenIdPtr.baseAddress?.assumingMemoryBound(to: UInt8.self),
                     toPubkeyPtr.baseAddress?.assumingMemoryBound(to: UInt8.self),
                     toPublicKey.count,
-                    amount, 0,
+                    amountLo, amountHi,
                     chainId,
                     nonce
                 )
@@ -738,14 +778,18 @@ public class ZhtpClient {
         return String(cString: hexPtr)
     }
 
-    /// Build signed token mint transaction (returns hex-encoded string ready for API)
+    /// Build signed token mint transaction.
+    /// `amountAtoms` is a decimal u128 atoms string.
     public static func buildTokenMint(
         tokenId: Data,
         toPublicKey: Data,
-        amount: UInt64,
+        amountAtoms: String,
         using identity: Identity,
         chainId: UInt8 = 0x03  // development
     ) throws -> String {
+        guard let (amountLo, amountHi) = parseU128Halves(amountAtoms) else {
+            throw ClientError.signingError("amountAtoms must be a non-negative u128 decimal string; got \"\(amountAtoms)\"")
+        }
         guard let hexPtr = tokenId.withUnsafeBytes({ tokenIdPtr in
             toPublicKey.withUnsafeBytes { toPubkeyPtr in
                 cBuildTokenMint(
@@ -753,7 +797,7 @@ public class ZhtpClient {
                     tokenIdPtr.baseAddress?.assumingMemoryBound(to: UInt8.self),
                     toPubkeyPtr.baseAddress?.assumingMemoryBound(to: UInt8.self),
                     toPublicKey.count,
-                    amount, 0,
+                    amountLo, amountHi,
                     chainId
                 )
             }
@@ -776,15 +820,19 @@ public class ZhtpClient {
         return result
     }()
 
-    /// Build signed token create transaction (returns hex-encoded string ready for API)
+    /// Build signed token create transaction.
+    /// `initialSupplyAtoms` is a decimal u128 atoms string.
     public static func buildTokenCreate(
         name: String,
         symbol: String,
-        initialSupply: UInt64,
+        initialSupplyAtoms: String,
         decimals: UInt8,
         using identity: Identity,
         chainId: UInt8 = 0x03  // development
     ) throws -> String {
+        guard let (supplyLo, supplyHi) = parseU128Halves(initialSupplyAtoms) else {
+            throw ClientError.signingError("initialSupplyAtoms must be a non-negative u128 decimal string; got \"\(initialSupplyAtoms)\"")
+        }
         var treasury = treasuryRecipientBytes
         guard let hexPtr = name.withCString({ namePtr in
             symbol.withCString { symbolPtr in
@@ -793,7 +841,7 @@ public class ZhtpClient {
                         identity.getHandle(),
                         namePtr,
                         symbolPtr,
-                        initialSupply, 0,
+                        supplyLo, supplyHi,
                         decimals,
                         treasuryPtr.baseAddress,
                         chainId
@@ -807,18 +855,22 @@ public class ZhtpClient {
         return String(cString: hexPtr)
     }
 
-    /// Build signed token burn transaction (returns hex-encoded string ready for API)
+    /// Build signed token burn transaction.
+    /// `amountAtoms` is a decimal u128 atoms string.
     public static func buildTokenBurn(
         tokenId: Data,
-        amount: UInt64,
+        amountAtoms: String,
         using identity: Identity,
         chainId: UInt8 = 0x03  // development
     ) throws -> String {
+        guard let (amountLo, amountHi) = parseU128Halves(amountAtoms) else {
+            throw ClientError.signingError("amountAtoms must be a non-negative u128 decimal string; got \"\(amountAtoms)\"")
+        }
         guard let hexPtr = tokenId.withUnsafeBytes({ tokenIdPtr in
             cBuildTokenBurn(
                 identity.getHandle(),
                 tokenIdPtr.baseAddress?.assumingMemoryBound(to: UInt8.self),
-                amount, 0,
+                amountLo, amountHi,
                 chainId
             )
         }) else {
@@ -828,18 +880,23 @@ public class ZhtpClient {
         return String(cString: hexPtr)
     }
 
-    /// Build signed SOV wallet-to-wallet transfer transaction (returns hex-encoded string ready for API)
-    /// fromWalletId and toWalletId must each be exactly 32 bytes
+    /// Build signed SOV wallet-to-wallet transfer transaction (returns hex-encoded string ready for API).
+    /// fromWalletId and toWalletId must each be exactly 32 bytes.
+    /// `amountAtoms` is a decimal u128 string in atoms (18 decimals for SOV) —
+    /// NOT a JS Number or UInt64. See parseU128Halves for the rationale.
     public static func buildSovWalletTransfer(
         fromWalletId: Data,
         toWalletId: Data,
-        amount: UInt64,
+        amountAtoms: String,
         nonce: UInt64,
         using identity: Identity,
         chainId: UInt8 = 0x03  // development
     ) throws -> String {
-        print("[ZhtpClient] buildSovWalletTransfer called with nonce = \(nonce), amount = \(amount)")
-        
+        guard let (amountLo, amountHi) = parseU128Halves(amountAtoms) else {
+            throw ClientError.signingError("amountAtoms must be a non-negative u128 decimal string; got \"\(amountAtoms)\"")
+        }
+        print("[ZhtpClient] buildSovWalletTransfer nonce=\(nonce) atoms=\(amountAtoms) lo=\(amountLo) hi=\(amountHi)")
+
         guard fromWalletId.count == 32 else {
             throw ClientError.signingError("fromWalletId must be exactly 32 bytes, got \(fromWalletId.count)")
         }
@@ -853,7 +910,7 @@ public class ZhtpClient {
                     identity.getHandle(),
                     fromPtr.baseAddress?.assumingMemoryBound(to: UInt8.self),
                     toPtr.baseAddress?.assumingMemoryBound(to: UInt8.self),
-                    amount, 0,
+                    amountLo, amountHi,
                     chainId,
                     nonce
                 )
@@ -872,12 +929,15 @@ public class ZhtpClient {
         tokenId: Data,
         fromWalletId: Data,
         toWalletId: Data,
-        amount: UInt64,
+        amountAtoms: String,
         nonce: UInt64,
         using identity: Identity,
         chainId: UInt8 = 0x03  // development
     ) throws -> String {
-        print("[ZhtpClient] buildTokenWalletTransfer called nonce=\(nonce) amount=\(amount)")
+        guard let (amountLo, amountHi) = parseU128Halves(amountAtoms) else {
+            throw ClientError.signingError("amountAtoms must be a non-negative u128 decimal string; got \"\(amountAtoms)\"")
+        }
+        print("[ZhtpClient] buildTokenWalletTransfer nonce=\(nonce) atoms=\(amountAtoms) lo=\(amountLo) hi=\(amountHi)")
 
         guard tokenId.count == 32 else {
             throw ClientError.signingError("tokenId must be exactly 32 bytes, got \(tokenId.count)")
@@ -897,7 +957,7 @@ public class ZhtpClient {
                         tokPtr.baseAddress?.assumingMemoryBound(to: UInt8.self),
                         fromPtr.baseAddress?.assumingMemoryBound(to: UInt8.self),
                         toPtr.baseAddress?.assumingMemoryBound(to: UInt8.self),
-                        amount, 0,
+                        amountLo, amountHi,
                         chainId,
                         nonce
                     )
@@ -915,13 +975,16 @@ public class ZhtpClient {
     /// `sectorDaoKeyId` must be exactly 32 bytes. Amount is in nSOV.
     public static func buildDaoStake(
         sectorDaoKeyId: Data,
-        amount: UInt64,
+        amountAtoms: String,
         nonce: UInt64,
         lockBlocks: UInt64,
         using identity: Identity,
         chainId: UInt8 = 0x03
     ) throws -> String {
-        print("[ZhtpClient] buildDaoStake amount=\(amount) nonce=\(nonce) lockBlocks=\(lockBlocks) chainId=\(chainId)")
+        guard let (amountLo, amountHi) = parseU128Halves(amountAtoms) else {
+            throw ClientError.signingError("amountAtoms must be a non-negative u128 decimal string; got \"\(amountAtoms)\"")
+        }
+        print("[ZhtpClient] buildDaoStake atoms=\(amountAtoms) lo=\(amountLo) hi=\(amountHi) nonce=\(nonce) lockBlocks=\(lockBlocks) chainId=\(chainId)")
 
         guard sectorDaoKeyId.count == 32 else {
             throw ClientError.signingError("sectorDaoKeyId must be exactly 32 bytes, got \(sectorDaoKeyId.count)")
@@ -931,7 +994,7 @@ public class ZhtpClient {
             cBuildDaoStake(
                 identity.getHandle(),
                 daoPtr.baseAddress?.assumingMemoryBound(to: UInt8.self),
-                amount, 0,
+                amountLo, amountHi,
                 nonce,
                 lockBlocks,
                 chainId

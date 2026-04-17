@@ -72,6 +72,7 @@ const SendTokensScreen = ({ navigation, route }: any) => {
   });
   const [errors, setErrors] = useState<TransferFormErrors>({});
   const [isTransferring, setIsTransferring] = useState(false);
+  const [showConfirmation, setShowConfirmation] = useState(false);
   const [selectedFromWallet, setSelectedFromWallet] = useState<string | null>(
     null,
   );
@@ -435,8 +436,15 @@ const SendTokensScreen = ({ navigation, route }: any) => {
     return Object.keys(newErrors).length === 0;
   };
 
-  // Handle transfer
+  // Open confirmation modal (validates first)
+  const handleReview = () => {
+    if (!selectedToken || !validateTransfer()) return;
+    setShowConfirmation(true);
+  };
+
+  // Handle transfer (called from confirmation modal)
   const handleTransfer = async () => {
+    setShowConfirmation(false);
     if (!selectedToken || !validateTransfer()) {
       return;
     }
@@ -820,136 +828,7 @@ const SendTokensScreen = ({ navigation, route }: any) => {
                 </Row>
               </View>
 
-              {/* Sender Reference — wallet picker for SOV only.
-                  For custom tokens (CBE etc.) the sender is implicit, so we
-                  don't render the "Your DID" block here. */}
-              {selectedToken.type === 'sov' && (
-              <View
-                style={{
-                  marginBottom: spacing.lg,
-                  padding: spacing.md,
-                  backgroundColor: colors.bg_darker,
-                  borderRadius: borderRadius.base,
-                  borderWidth: 1,
-                  borderColor: colors.border,
-                }}
-              >
-                <Text
-                  style={{
-                    fontSize: typography.size.xs,
-                    color: colors.text_secondary,
-                    marginBottom: spacing.sm,
-                    textTransform: 'uppercase',
-                    letterSpacing: 0.5,
-                    fontWeight: typography.weight.semibold,
-                  }}
-                >
-                  Sending From
-                </Text>
-                {wallets && wallets.length > 0 ? (
-                  <Column gap="sm">
-                    <Text
-                      style={{
-                        fontSize: typography.size.xs,
-                        color: colors.text_secondary,
-                      }}
-                    >
-                      Primary wallet is selected by default. Choose another
-                      wallet below.
-                    </Text>
-                    {wallets.map(wallet => {
-                      const isSelected = wallet.id === selectedFromWallet;
-                      const isPrimary =
-                        (wallet.wallet_type || '').toLowerCase() === 'primary';
-                      return (
-                        <TouchableOpacity
-                          key={wallet.id}
-                          onPress={() => setSelectedFromWallet(wallet.id)}
-                          disabled={isTransferring}
-                          style={{
-                            paddingVertical: spacing.sm,
-                            paddingHorizontal: spacing.md,
-                            borderRadius: borderRadius.base,
-                            borderWidth: 1,
-                            borderColor: isSelected
-                              ? colors.primary
-                              : colors.border_light,
-                            backgroundColor: isSelected
-                              ? colors.primary + '15'
-                              : colors.bg_medium,
-                          }}
-                        >
-                          <Row
-                            style={{
-                              justifyContent: 'space-between',
-                              alignItems: 'center',
-                            }}
-                          >
-                            <Column gap="xs" style={{ flex: 1 }}>
-                              <Row style={{ alignItems: 'center', gap: spacing.xs }}>
-                                <Text
-                                  style={{
-                                    fontSize: typography.size.sm,
-                                    color: colors.text_primary,
-                                    fontWeight: typography.weight.semibold,
-                                  }}
-                                >
-                                  {wallet.wallet_type} Wallet
-                                </Text>
-                                {isPrimary && (
-                                  <Text
-                                    style={{
-                                      fontSize: typography.size.xs,
-                                      color: colors.primary,
-                                      fontWeight: typography.weight.semibold,
-                                    }}
-                                  >
-                                    Default
-                                  </Text>
-                                )}
-                              </Row>
-                              <Text
-                                style={{
-                                  fontSize: typography.size.xs,
-                                  color: colors.text_secondary,
-                                  fontFamily: 'Courier',
-                                }}
-                              >
-                                {shortenWalletId(wallet.id)}
-                              </Text>
-                            </Column>
-                            <Column gap="xs" style={{ alignItems: 'flex-end' }}>
-                              <Text
-                                style={{
-                                  fontSize: typography.size.sm,
-                                  color: colors.text_primary,
-                                  fontWeight: typography.weight.semibold,
-                                }}
-                              >
-                                {wallet.available_balance.toFixed(2)} SOV
-                              </Text>
-                              <Text
-                                style={{
-                                  fontSize: typography.size.xs,
-                                  color: isSelected
-                                    ? colors.primary
-                                    : colors.text_tertiary,
-                                  fontWeight: typography.weight.semibold,
-                                }}
-                              >
-                                {isSelected ? 'Selected' : 'Tap to use'}
-                              </Text>
-                            </Column>
-                          </Row>
-                        </TouchableOpacity>
-                      );
-                    })}
-                  </Column>
-                ) : null}
-              </View>
-              )}
-
-              {/* Recipient Input - Changes based on token type */}
+              {/* Recipient Input */}
               <View>
                 <Text
                   style={{
@@ -1051,7 +930,7 @@ const SendTokensScreen = ({ navigation, route }: any) => {
               <Row gap="md" style={{ marginTop: spacing.lg }}>
                 <Button
                   variant="primary"
-                  onPress={handleTransfer}
+                  onPress={handleReview}
                   loading={isTransferring}
                   disabled={
                     isTransferring ||
@@ -1059,7 +938,7 @@ const SendTokensScreen = ({ navigation, route }: any) => {
                   }
                   style={{ flex: 1 }}
                 >
-                  Send {selectedToken.symbol}
+                  Send
                 </Button>
                 <Button
                   variant="secondary"
@@ -1285,6 +1164,162 @@ const SendTokensScreen = ({ navigation, route }: any) => {
             </View>
           </View>
         </KeyboardAvoidingView>
+      </Modal>
+
+      {/* ── Confirmation Modal ── */}
+      <Modal
+        visible={showConfirmation}
+        transparent
+        animationType="fade"
+        onRequestClose={() => setShowConfirmation(false)}
+      >
+        <View style={{
+          flex: 1,
+          backgroundColor: 'rgba(0,0,0,0.7)',
+          justifyContent: 'center',
+          paddingHorizontal: spacing.lg,
+        }}>
+          <View style={{
+            backgroundColor: colors.bg_dark,
+            borderRadius: borderRadius.lg,
+            overflow: 'hidden',
+          }}>
+            {/* Header */}
+            <View style={{
+              backgroundColor: colors.primary,
+              paddingVertical: spacing.md,
+              paddingHorizontal: spacing.lg,
+            }}>
+              <Text style={{
+                color: colors.bg_darkest,
+                fontSize: typography.size.md,
+                fontWeight: typography.weight.bold,
+                textAlign: 'center',
+              }}>
+                Confirm Transfer
+              </Text>
+            </View>
+
+            {/* Details */}
+            <View style={{ padding: spacing.lg }}>
+              {/* Amount */}
+              <View style={{ alignItems: 'center', marginBottom: spacing.lg }}>
+                <Text style={{
+                  fontSize: 32,
+                  fontWeight: typography.weight.bold,
+                  color: colors.text_primary,
+                }}>
+                  {transferForm.amount} {selectedToken?.symbol}
+                </Text>
+              </View>
+
+              {/* Rows */}
+              <View style={{ gap: spacing.md }}>
+                <View style={{
+                  flexDirection: 'row',
+                  justifyContent: 'space-between',
+                  paddingVertical: spacing.sm,
+                  borderBottomWidth: 1,
+                  borderBottomColor: `${colors.border}50`,
+                }}>
+                  <Text style={{ fontSize: typography.size.sm, color: colors.text_secondary }}>
+                    To
+                  </Text>
+                  <Text style={{
+                    fontSize: typography.size.sm,
+                    color: colors.text_primary,
+                    fontFamily: 'Courier',
+                    maxWidth: '60%',
+                  }} numberOfLines={1} ellipsizeMode="middle">
+                    {transferForm.recipient}
+                  </Text>
+                </View>
+
+                <View style={{
+                  flexDirection: 'row',
+                  justifyContent: 'space-between',
+                  paddingVertical: spacing.sm,
+                  borderBottomWidth: 1,
+                  borderBottomColor: `${colors.border}50`,
+                }}>
+                  <Text style={{ fontSize: typography.size.sm, color: colors.text_secondary }}>
+                    From
+                  </Text>
+                  <Text style={{
+                    fontSize: typography.size.sm,
+                    color: colors.text_primary,
+                    fontFamily: 'Courier',
+                    maxWidth: '60%',
+                  }} numberOfLines={1} ellipsizeMode="middle">
+                    {selectedFromWallet ?? 'Primary Wallet'}
+                  </Text>
+                </View>
+
+                <View style={{
+                  flexDirection: 'row',
+                  justifyContent: 'space-between',
+                  paddingVertical: spacing.sm,
+                  borderBottomWidth: 1,
+                  borderBottomColor: `${colors.border}50`,
+                }}>
+                  <Text style={{ fontSize: typography.size.sm, color: colors.text_secondary }}>
+                    Token
+                  </Text>
+                  <Text style={{ fontSize: typography.size.sm, color: colors.text_primary }}>
+                    {selectedToken?.name} ({selectedToken?.symbol})
+                  </Text>
+                </View>
+
+                <View style={{
+                  flexDirection: 'row',
+                  justifyContent: 'space-between',
+                  paddingVertical: spacing.sm,
+                }}>
+                  <Text style={{ fontSize: typography.size.sm, color: colors.text_secondary }}>
+                    Network
+                  </Text>
+                  <Text style={{ fontSize: typography.size.sm, color: colors.text_primary }}>
+                    Sovereign Network
+                  </Text>
+                </View>
+              </View>
+
+              {/* Warning */}
+              <View style={{
+                marginTop: spacing.lg,
+                padding: spacing.sm,
+                backgroundColor: `${colors.warning}15`,
+                borderRadius: borderRadius.sm,
+              }}>
+                <Text style={{
+                  fontSize: typography.size.xs,
+                  color: colors.warning,
+                  textAlign: 'center',
+                }}>
+                  Transactions are irreversible. Please verify the recipient address.
+                </Text>
+              </View>
+
+              {/* Buttons */}
+              <Row gap="md" style={{ marginTop: spacing.lg }}>
+                <Button
+                  variant="secondary"
+                  onPress={() => setShowConfirmation(false)}
+                  style={{ flex: 1 }}
+                >
+                  Back
+                </Button>
+                <Button
+                  variant="primary"
+                  onPress={handleTransfer}
+                  style={{ flex: 1 }}
+                >
+                  Confirm
+                </Button>
+              </Row>
+            </View>
+          </View>
+        </View>
       </Modal>
 
     </ScreenLayout>

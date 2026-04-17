@@ -131,7 +131,9 @@ class DomainService {
       await nativeIdentityProvisioning.signSovWalletTransferTransaction({
         fromWalletId: ownerPrimaryWalletId,
         toWalletId: daoTreasuryWalletId,
-        amount: Number(feeAtoms),
+        // Pass atoms as a u128 decimal string — Number(feeAtoms) would round
+        // a 1e19+ value and the native bridge now rejects unsafe integers.
+        amount: feeAtoms,
         nonce: nonce,
         chainId: CHAIN_ID,
       });

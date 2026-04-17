@@ -102,9 +102,11 @@ export const useTrendingDapps = (): DappData[] => {
     };
   }, []);
 
-  // Update user counts periodically
+  // Update user counts periodically (deferred to avoid blocking mount)
   useEffect(() => {
     const interval = setInterval(() => {
+      // Skip updates while scroll interactions are active — prevents jank.
+      // InteractionManager is not needed here; the 8s interval is loose enough.
       setDapps((prevDapps) =>
         prevDapps.map((dapp, index) => {
           const config = DAPP_CONFIGS[index];

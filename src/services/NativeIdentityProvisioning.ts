@@ -342,7 +342,7 @@ class NativeIdentityProvisioningBridge {
    */
   async signTokenMintTransaction(params: {
     tokenId: string;
-    amount: number;
+    amount: string; // decimal-atoms u128 string — NOT a JS Number (see TokenService.coerceAmountAtoms)
     recipientDid: string;
   }): Promise<{ signed_tx: string }> {
     if (!this.nativeModule) {
@@ -361,7 +361,7 @@ class NativeIdentityProvisioningBridge {
   async signTokenTransferTransaction(params: {
     tokenId: string;
     toAddress: string;
-    amount: number;
+    amount: string; // decimal-atoms u128 string — NOT a JS Number (see TokenService.coerceAmountAtoms)
     nonce: number;
   }): Promise<{ signed_tx: string }> {
     if (!this.nativeModule) {
@@ -379,7 +379,7 @@ class NativeIdentityProvisioningBridge {
    */
   async signTokenBurnTransaction(params: {
     tokenId: string;
-    amount: number;
+    amount: string; // decimal-atoms u128 string — NOT a JS Number (see TokenService.coerceAmountAtoms)
   }): Promise<{ signed_tx: string }> {
     if (!this.nativeModule) {
       throw new Error(
@@ -398,7 +398,7 @@ class NativeIdentityProvisioningBridge {
   async signSovWalletTransferTransaction(params: {
     fromWalletId: string;
     toWalletId: string;
-    amount: number;
+    amount: string; // decimal-atoms u128 string — NOT a JS Number (see TokenService.coerceAmountAtoms)
     nonce: number;
     chainId?: number;
   }): Promise<{ signed_tx: string }> {
@@ -421,7 +421,7 @@ class NativeIdentityProvisioningBridge {
     tokenId: string;
     fromWalletId: string;
     toWalletId: string;
-    amount: number;
+    amount: string; // decimal-atoms u128 string — NOT a JS Number (see TokenService.coerceAmountAtoms)
     nonce: number;
     chainId?: number;
   }): Promise<{ signed_tx: string }> {
@@ -440,7 +440,7 @@ class NativeIdentityProvisioningBridge {
    */
   async signDaoStakeTransaction(params: {
     sectorDaoKeyId: string;
-    amount: number;
+    amount: string; // decimal-atoms u128 string — NOT a JS Number (see TokenService.coerceAmountAtoms)
     nonce: number;
     lockBlocks: number;
     chainId?: number;

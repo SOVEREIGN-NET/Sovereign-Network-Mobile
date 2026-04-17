@@ -241,12 +241,28 @@ class NativeQuicModule(reactContext: ReactApplicationContext) :
      */
     @ReactMethod
     fun cancelAll(promise: Promise) {
+        // Fail any queued authenticated requests and drop the "handshake in
+        // progress" latches so the very next request triggers a fresh UHP
+        // handshake. Without this, a stuck session keeps recycling itself.
+        val abandoned: List<QuinnQueuedRequest> = synchronized(connectionLock) {
+            val all = quinnRequestQueue.values.flatten()
+            quinnRequestQueue.clear()
+            quinnHandshakeInProgress.clear()
+            quinnSessionIdPrefixByIdentity.clear()
+            all
+        }
+        abandoned.forEach { req ->
+            try {
+                req.promise.reject("QUIC_CANCELLED", "Session reset", null)
+            } catch (_: Exception) { /* ignore double-resolve */ }
+        }
+
         try {
             val result = NativeQuicBridge.cancelAll()
-            Log.d(TAG, "[🌐 Web4] Cancelled all requests: $result")
+            Log.d(TAG, "[🌐 Web4] Cancelled all requests: $result (abandoned=${abandoned.size})")
             promise.resolve(result)
         } catch (e: Exception) {
-            Log.e(TAG, "[🌐 Web4] Error cancelling requests", e)
+            Log.e(TAG, "[🌐 Web4] Error cancelling native requests", e)
             promise.resolve(false)
         }
     }
