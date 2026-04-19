@@ -22,6 +22,17 @@
 	<string>$(MARKETING_VERSION)</string>
 	<key>CFBundleSignature</key>
 	<string>????</string>
+	<key>CFBundleURLTypes</key>
+	<array>
+		<dict>
+			<key>CFBundleURLName</key>
+			<string>com.sovereignnetwork.zhtp.auth</string>
+			<key>CFBundleURLSchemes</key>
+			<array>
+				<string>zhtp</string>
+			</array>
+		</dict>
+	</array>
 	<key>CFBundleVersion</key>
 	<string>$(CURRENT_PROJECT_VERSION)</string>
 	<key>LSRequiresIPhoneOS</key>
@@ -43,6 +54,8 @@
 			</dict>
 		</dict>
 	</dict>
+	<key>NSCameraUsageDescription</key>
+	<string>We use the camera only to scan the QR code shown by your browser when signing in. No frames are stored or transmitted.</string>
 	<key>NSFaceIDUsageDescription</key>
 	<string>We use Face ID to secure access to your identity and wallet keys</string>
 	<key>NSLocationWhenInUseUsageDescription</key>
