@@ -1,10 +1,6 @@
 /**
  * Token Management Screen
-<<<<<<< HEAD
  * Full token info for each tracked token. Delete is a secondary action.
-=======
- * Manage tracked tokens - view status and remove token IDs that no longer exist
->>>>>>> origin/main
  */
 
 import React, { useState, useEffect, useCallback } from 'react';
