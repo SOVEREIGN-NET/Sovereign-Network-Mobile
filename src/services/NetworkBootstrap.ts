@@ -19,7 +19,14 @@ import { NativeModules } from 'react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import networkDirectoryService from './NetworkDirectoryService';
 import type { DirectoryValidator } from './NetworkDirectoryService';
-import { DEFAULT_NODE_HOST, DEFAULT_NODE_PORT } from '../config';
+import {
+  DEFAULT_NODE_HOST,
+  DEFAULT_NODE_PORT,
+  ZDNS_HOST,
+  ZDNS_PORT,
+  ZDNS_DIRECTORY_NAME,
+  QUIC_PORT,
+} from '../config';
 
 interface NativeQuicModule {
   setActiveValidator(
@@ -42,17 +49,11 @@ const nativeQuic: NativeQuicModule | undefined =
 const LAST_VALIDATOR_KEY = 'sov:active_validator_v1';
 const BOOTSTRAP_TIMEOUT_MS = 3500;
 
-// ZDNS — the only infrastructure address the app hardcodes. A records of
-// `directory.sov` return live validator IPs, any of which can be dialed in
-// public mode to fetch the authoritative directory with SPKI pins.
-const ZDNS_HOST = '91.98.113.188';
-const ZDNS_PORT = 53;
-const DIRECTORY_NAME = 'directory.sov';
-const QUIC_PORT = 9334;
-
 /**
  * Resolve the validator IP set via ZDNS. Returns empty on any failure so
  * the caller can fall back to the hardcoded bootstrap target.
+ * Server address + port + directory name are wired from .env via
+ * GeneratedConfig — see `scripts/generate-config.js`.
  */
 async function resolveValidatorIPs(): Promise<string[]> {
   if (!nativeQuic?.resolveDirectory) return [];
@@ -60,7 +61,7 @@ async function resolveValidatorIPs(): Promise<string[]> {
     const ips = await nativeQuic.resolveDirectory(
       ZDNS_HOST,
       ZDNS_PORT,
-      DIRECTORY_NAME,
+      ZDNS_DIRECTORY_NAME,
     );
     if (!Array.isArray(ips) || ips.length === 0) return [];
     console.log(`[NetworkBootstrap] ZDNS resolved ${ips.length} IP(s): ${ips.join(', ')}`);

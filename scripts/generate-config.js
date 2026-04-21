@@ -151,6 +151,13 @@ const nodeRegistry = parseNodeRegistry(envConfig.ZHTP_NODE_REGISTRY);
 const controlNodeEntry = nodeRegistry.find(n => n.host === nodeHost) || nodeRegistry[0];
 const certificatePin = controlNodeEntry?.pin || '';
 
+// ZDNS bootstrap config — A-record of `directory.sov` on the ZDNS server
+// seeds the validator list. Overridable via .env for staging/custom topologies.
+const zdnsHost = envConfig.ZDNS_HOST || '91.98.113.188';
+const zdnsPort = parseInt(envConfig.ZDNS_PORT || '53', 10);
+const zdnsDirectoryName = envConfig.ZDNS_DIRECTORY_NAME || 'directory.sov';
+const quicPort = parseInt(envConfig.QUIC_PORT || '9334', 10);
+
 // 1. Generate JSON config for React Native
 const generatedConfig = {
   ZHTP_NODE_URL: nodeUrl,
@@ -160,6 +167,10 @@ const generatedConfig = {
   SOV_TOKEN_ID: sovTokenId,
   CHAIN_ID: chainId,
   NODE_REGISTRY: nodeRegistry,
+  ZDNS_HOST: zdnsHost,
+  ZDNS_PORT: zdnsPort,
+  ZDNS_DIRECTORY_NAME: zdnsDirectoryName,
+  QUIC_PORT: quicPort,
   BUILD_INFO: buildInfo,
 };
 
