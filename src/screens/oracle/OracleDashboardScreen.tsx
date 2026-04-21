@@ -1211,7 +1211,12 @@ const OracleDashboardScreen: React.FC<any> = ({ navigation }) => {
   );
 };
 
-const styles = StyleSheet.create({
+// Build at render time so theme-dependent colours track `applyTheme`.
+// A plain `styles = StyleSheet.create(...)` at module scope would
+// snapshot the charcoal palette at app boot and stay dark forever
+// after a theme swap — which is exactly what kept the Oracle tabs
+// looking dark in light mode.
+const makeStyles = () => StyleSheet.create({
   container: {
     flex: 1,
     backgroundColor: colors.bg_darkest,
@@ -1318,6 +1323,31 @@ const styles = StyleSheet.create({
     fontWeight: '700',
     color: colors.primary,
     marginBottom: spacing.xs,
+  },
+});
+
+/**
+ * `styles` is a proxy that rebuilds the stylesheet every time any of
+ * its keys is read. Lets the rest of this file keep using
+ * `styles.container`, `styles.tabBar`, etc. without touching every
+ * inner component to thread a `makeStyles()` call through. A small
+ * per-render cache prevents rebuilding once per property access on
+ * the same render pass; the cache is reset when `colors.bg_darkest`
+ * changes (i.e. a theme swap has mutated the shared palette).
+ */
+type OracleStyles = ReturnType<typeof makeStyles>;
+let cachedOracleStyles: OracleStyles | null = null;
+let cachedOracleThemeKey: string | null = null;
+const styles = new Proxy({} as OracleStyles, {
+  get(_target, prop: string) {
+    // `colors.bg_darkest` as a cheap palette-identity key: it rotates
+    // whenever `applyTheme` rewrites the shared `colors` object. One
+    // comparison per style-access is negligible next to layout cost.
+    if (cachedOracleStyles === null || cachedOracleThemeKey !== colors.bg_darkest) {
+      cachedOracleStyles = makeStyles();
+      cachedOracleThemeKey = colors.bg_darkest;
+    }
+    return (cachedOracleStyles as unknown as Record<string, unknown>)[prop];
   },
 });
 

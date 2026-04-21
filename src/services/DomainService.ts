@@ -5,11 +5,7 @@
 
 import { quicRequest } from './quic';
 import { nativeIdentityProvisioning } from './NativeIdentityProvisioning';
-import tokenService from './TokenService';
 import { maskIdentifier } from '../utils/maskIdentifier';
-import { CHAIN_ID } from '../config';
-import { humanToAtomic } from '../utils/tokenUnits';
-import { resolveTokenBySymbol } from '../hooks/useTokenRegistry';
 import type {
   DomainRegisterRequest,
   DomainRegisterResponse,
@@ -24,46 +20,6 @@ import type {
 } from '../types/domain';
 
 class DomainService {
-  private normalizeIdentityId(identityOrDid: string): string {
-    return identityOrDid.startsWith('did:zhtp:')
-      ? identityOrDid.substring('did:zhtp:'.length)
-      : identityOrDid;
-  }
-
-  private async getPrimaryWalletId(ownerDid: string): Promise<string> {
-    const identityId = this.normalizeIdentityId(ownerDid);
-    const walletList = await quicRequest<{
-      wallets?: Array<{
-        wallet_id?: string;
-        id?: string;
-        wallet_type?: string;
-      }>;
-    }>(`/api/v1/wallet/list/${identityId}`);
-
-    const primaryWallet = walletList.wallets?.find(
-      wallet => (wallet.wallet_type || '').toLowerCase() === 'primary',
-    );
-    const walletId = primaryWallet?.wallet_id || primaryWallet?.id;
-    if (!walletId) {
-      throw new Error('Primary wallet not found for identity');
-    }
-    return walletId;
-  }
-
-  private async getDaoTreasuryWalletId(): Promise<string> {
-    const data = await quicRequest<{
-      treasury?: {
-        treasury_wallet_id?: string | null;
-      };
-    }>('/api/v1/dao/treasury/status');
-
-    const treasuryWalletId = data.treasury?.treasury_wallet_id;
-    if (!treasuryWalletId) {
-      throw new Error('DAO treasury wallet id is not available');
-    }
-    return treasuryWalletId;
-  }
-
   /**
    * GET /api/v1/web4/domains/status/{domain}
    * Check domain availability.
@@ -96,7 +52,8 @@ class DomainService {
 
   /**
    * POST /api/v1/web4/domains/register
-   * Domain registration now requires a canonical fee payment transaction.
+   * Node builds the SOV fee transfer as a system transaction — the app
+   * only signs an ownership proof over "domain|timestamp|fee".
    */
   async registerDomain(
     request: DomainRegisterRequest,
@@ -106,37 +63,6 @@ class DomainService {
     const fee =
       Number.isFinite(request.fee) && request.fee > 0 ? request.fee : 10;
     const timestamp = Math.floor(Date.now() / 1000);
-    const [ownerPrimaryWalletId, daoTreasuryWalletId] = await Promise.all([
-      this.getPrimaryWalletId(request.owner),
-      this.getDaoTreasuryWalletId(),
-    ]);
-
-    const sovToken = await resolveTokenBySymbol('SOV');
-    if (!sovToken) {
-      throw new Error(
-        'SOV token not found in chain registry — node may be unavailable',
-      );
-    }
-    const nonce = await tokenService.getTokenNonce(
-      sovToken.token_id,
-      ownerPrimaryWalletId,
-    );
-
-    const feeAtoms = humanToAtomic(String(fee), 18);
-    if (!feeAtoms) {
-      throw new Error(`Invalid domain fee amount: ${fee}`);
-    }
-
-    const feePaymentTx =
-      await nativeIdentityProvisioning.signSovWalletTransferTransaction({
-        fromWalletId: ownerPrimaryWalletId,
-        toWalletId: daoTreasuryWalletId,
-        // Pass atoms as a u128 decimal string — Number(feeAtoms) would round
-        // a 1e19+ value and the native bridge now rejects unsafe integers.
-        amount: feeAtoms,
-        nonce: nonce,
-        chainId: CHAIN_ID,
-      });
 
     const signatureMessage = `${request.domain}|${timestamp}|${fee}`;
     const signature = await nativeIdentityProvisioning.signMessage(
@@ -151,7 +77,6 @@ class DomainService {
       signature,
       timestamp,
       fee,
-      fee_payment_tx: feePaymentTx.signed_tx,
     });
 
     console.log(

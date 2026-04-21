@@ -2,6 +2,7 @@ import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { Alert, Platform, StyleSheet, View } from 'react-native';
 
 import { Button, Card, Column, LoadingView, ScreenLayout, Text } from '../components';
+import { useTranslation } from '../i18n';
 import { colors, spacing, typography } from '../theme';
 import {
   CameraPermissionStatus,
@@ -29,6 +30,7 @@ import { parseBrowserAuthLink } from '../services/BrowserAuthService';
  *     └─ unsupported   → message + "Go back" (missing native module)
  */
 const QRScanScreen = ({ navigation }: any) => {
+  const { t } = useTranslation();
   const [status, setStatus] = useState<CameraPermissionStatus>(() =>
     getCameraPermissionStatus(),
   );
@@ -70,13 +72,13 @@ const QRScanScreen = ({ navigation }: any) => {
     const opened = await openAppSettings();
     if (!opened) {
       Alert.alert(
-        'Open Settings manually',
+        t.qrScan.blocked.manualTitle,
         Platform.OS === 'android'
-          ? 'Go to Settings → Apps → Sovereign Network → Permissions → Camera and allow access.'
-          : 'Go to Settings → Sovereign Network → Camera and toggle it on.',
+          ? t.qrScan.blocked.manualHintAndroid
+          : t.qrScan.blocked.manualHintIos,
       );
     }
-  }, []);
+  }, [t]);
 
   const onScanned = useCallback(
     (rawValue: string) => {
@@ -92,12 +94,12 @@ const QRScanScreen = ({ navigation }: any) => {
         // proceed. We do NOT mark `handledRef` so the scanner keeps
         // running; they might present a different QR.
         Alert.alert(
-          'Invalid QR',
-          err?.message ?? 'QR did not contain a valid zhtp://auth link.',
+          t.qrScan.invalidQr.title,
+          err?.message ?? t.qrScan.invalidQr.body,
         );
       }
     },
-    [navigation],
+    [navigation, t],
   );
 
   const onCancel = useCallback(() => {
@@ -119,11 +121,11 @@ const QRScanScreen = ({ navigation }: any) => {
           onAllow={retryPermission}
           onCancel={onCancel}
           checking={checking}
-          title="Camera access required"
-          body={
-            'Scanning the browser QR code needs camera access. We use the camera only for this scan — no frames are stored or sent anywhere.'
-          }
-          primaryLabel="Allow camera"
+          title={t.qrScan.permission.title}
+          body={t.qrScan.permission.body}
+          primaryLabel={t.qrScan.permission.allow}
+          checkingLabel={t.qrScan.permission.requesting}
+          cancelLabel={t.qrScan.permission.cancel}
         />
       );
 
@@ -133,11 +135,11 @@ const QRScanScreen = ({ navigation }: any) => {
           onAllow={goToSettings}
           onCancel={onCancel}
           checking={false}
-          title="Camera is blocked"
-          body={
-            'Camera access was previously denied. Open your device Settings and allow camera access for this app, then come back and try again.'
-          }
-          primaryLabel="Open Settings"
+          title={t.qrScan.blocked.title}
+          body={t.qrScan.blocked.body}
+          primaryLabel={t.qrScan.blocked.openSettings}
+          checkingLabel={t.qrScan.permission.requesting}
+          cancelLabel={t.qrScan.permission.cancel}
         />
       );
 
@@ -145,10 +147,9 @@ const QRScanScreen = ({ navigation }: any) => {
       return (
         <DeadEndView
           onCancel={onCancel}
-          title="Camera unavailable"
-          body={
-            'A system policy (for example parental controls or a mobile device management profile) prevents this app from using the camera. You can still paste the auth link manually from the previous screen.'
-          }
+          title={t.qrScan.restricted.title}
+          body={t.qrScan.restricted.body}
+          backLabel={t.qrScan.goBack}
         />
       );
 
@@ -157,10 +158,9 @@ const QRScanScreen = ({ navigation }: any) => {
       return (
         <DeadEndView
           onCancel={onCancel}
-          title="Scanner unavailable"
-          body={
-            'The camera module is not available in this build. Use the paste option on the previous screen to enter the auth link instead.'
-          }
+          title={t.qrScan.unsupported.title}
+          body={t.qrScan.unsupported.body}
+          backLabel={t.qrScan.goBack}
         />
       );
   }
@@ -175,6 +175,7 @@ const GrantedView: React.FC<{
   onScanned: (value: string) => void;
   onCancel: () => void;
 }> = ({ onScanned, onCancel }) => {
+  const { t } = useTranslation();
   let Camera: any;
   let useCameraDevice: any;
   let useCodeScanner: any;
@@ -188,8 +189,9 @@ const GrantedView: React.FC<{
     return (
       <DeadEndView
         onCancel={onCancel}
-        title="Scanner unavailable"
-        body="The camera module failed to load. Use the paste option instead."
+        title={t.qrScan.unsupported.title}
+        body={t.qrScan.unsupported.failed}
+        backLabel={t.qrScan.goBack}
       />
     );
   }
@@ -211,8 +213,9 @@ const GrantedView: React.FC<{
     return (
       <DeadEndView
         onCancel={onCancel}
-        title="No back camera"
-        body="This device doesn't expose a rear camera to the app. Use the paste option instead."
+        title={t.qrScan.noBackCamera.title}
+        body={t.qrScan.noBackCamera.body}
+        backLabel={t.qrScan.goBack}
       />
     );
   }
@@ -236,11 +239,11 @@ const GrantedView: React.FC<{
             borderRadius: 8,
           }}
         >
-          Point the camera at the browser&apos;s QR code
+          {t.qrScan.granted.prompt}
         </Text>
         <View style={{ flex: 1 }} />
         <Button variant="secondary" onPress={onCancel}>
-          Cancel
+          {t.qrScan.granted.cancel}
         </Button>
       </View>
     </View>
@@ -255,10 +258,12 @@ const DeniedView: React.FC<{
   title: string;
   body: string;
   primaryLabel: string;
+  checkingLabel: string;
+  cancelLabel: string;
   onAllow: () => void;
   onCancel: () => void;
   checking: boolean;
-}> = ({ title, body, primaryLabel, onAllow, onCancel, checking }) => (
+}> = ({ title, body, primaryLabel, checkingLabel, cancelLabel, onAllow, onCancel, checking }) => (
   <ScreenLayout paddingTop={spacing.md}>
     <Card>
       <Column gap="md">
@@ -276,10 +281,10 @@ const DeniedView: React.FC<{
         </Text>
         <Column gap="sm">
           <Button variant="primary" onPress={onAllow} disabled={checking}>
-            {checking ? 'Requesting…' : primaryLabel}
+            {checking ? checkingLabel : primaryLabel}
           </Button>
           <Button variant="secondary" onPress={onCancel}>
-            Cancel
+            {cancelLabel}
           </Button>
         </Column>
       </Column>
@@ -295,8 +300,9 @@ const DeniedView: React.FC<{
 const DeadEndView: React.FC<{
   title: string;
   body: string;
+  backLabel: string;
   onCancel: () => void;
-}> = ({ title, body, onCancel }) => (
+}> = ({ title, body, backLabel, onCancel }) => (
   <ScreenLayout paddingTop={spacing.md}>
     <Card>
       <Column gap="md">
@@ -313,7 +319,7 @@ const DeadEndView: React.FC<{
           {body}
         </Text>
         <Button variant="secondary" onPress={onCancel}>
-          Go back
+          {backLabel}
         </Button>
       </Column>
     </Card>

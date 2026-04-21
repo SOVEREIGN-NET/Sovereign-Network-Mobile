@@ -6,7 +6,7 @@
 import { useState, useCallback, useEffect } from 'react';
 import RealAuthService from '../services/RealAuthService';
 import { isQuicSupported, testQuicConnection } from '../services/quic';
-import { DEFAULT_NODE_HOST, DEFAULT_NODE_PORT } from '../config';
+import { getActiveTarget } from '../services/NetworkBootstrap';
 import { useTranslation } from '../i18n';
 
 export interface ProtocolInfo {
@@ -96,7 +96,8 @@ export function useNodeConnection(
         return;
       }
 
-      const result = await testQuicConnection(DEFAULT_NODE_HOST, DEFAULT_NODE_PORT);
+      const target = getActiveTarget();
+      const result = await testQuicConnection(target.host, target.port);
       const connected = !!result.success;
       console.log(`[👆 SignIn:checkConnection] Result: ${connected ? 'CONNECTED' : 'DISCONNECTED'}`);
 

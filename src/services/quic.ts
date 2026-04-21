@@ -13,6 +13,9 @@
 import { NativeModules, Platform } from 'react-native';
 import { DEFAULT_NODE_HOST, DEFAULT_NODE_PORT, QUIC_CONFIG } from '../config';
 import SecureIdentityStorage from './SecureIdentityStorage';
+// Gate the transport on ZDNS bootstrap — ensures the first request dials
+// the DNS-selected validator, not the hardcoded fallback.
+import { bootstrapReady } from './NetworkBootstrap';
 import type {
   QuicRequestOptions,
   QuicRawResponse,
@@ -201,6 +204,10 @@ async function rawRequest(
   if (!NativeQuic) {
     throw new Error('NativeQuic module not available');
   }
+
+  // Wait for ZDNS bootstrap (resolves quickly or times out — never hangs).
+  // This is why the very first request no longer dials the hardcoded target.
+  await bootstrapReady;
 
   const method: HttpMethod = options.method ?? 'GET';
   const headers: Record<string, string> = { ...options.headers };
@@ -457,6 +464,9 @@ export async function testQuicConnection(
   port: number,
 ): Promise<QuicConnectionTestResult> {
   if (!NativeQuic) throw new Error('NativeQuic module not available');
+  // Gate on ZDNS bootstrap too — the test probe should reflect the active
+  // validator, not the hardcoded default.
+  await bootstrapReady;
   return await NativeQuic.testConnection(host, port);
 }
 

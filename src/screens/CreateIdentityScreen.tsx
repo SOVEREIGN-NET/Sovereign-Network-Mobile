@@ -207,7 +207,13 @@ const CreateIdentityScreen = ({ navigation }: CreateIdentityScreenProps) => {
   }
 
   return (
-    <ScreenLayout paddingTop={spacing.xl}>
+    <ScreenLayout
+      paddingTop={spacing.xl}
+      safeAreaEdges={['top', 'bottom']}
+      onBack={() => navigation.goBack()}
+      backLabel={t.app.back ?? 'Back'}
+      keyboardAvoiding
+    >
       <Column gap="xl">
         {/* Node Connection Status */}
         <Card>

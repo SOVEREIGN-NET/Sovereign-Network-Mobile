@@ -822,8 +822,14 @@ const SimulatorTab: React.FC = () => {
 };
 
 // ── Styles ────────────────────────────────────────────────────────────────────
+//
+// Wrapped in a Proxy so `ss.X` re-evaluates after a theme swap — see
+// OracleDashboardScreen for the same pattern and rationale. `applyTheme`
+// rewrites the shared `colors` object in place; every access on `ss`
+// checks whether the palette identity changed and regenerates the
+// stylesheet on demand.
 
-const ss = StyleSheet.create({
+const makeSimStyles = () => StyleSheet.create({
   grid: { flexDirection: 'row', flexWrap: 'wrap', gap: spacing.xs },
   metric: {
     flex: 1, minWidth: '47%', backgroundColor: colors.bg_darker,
@@ -890,6 +896,19 @@ const ss = StyleSheet.create({
   track: { height: 4, borderRadius: 2 },
   fill: { height: '100%', borderRadius: 2 },
   thumb: { position: 'absolute', width: 16, height: 16, borderRadius: 8, marginLeft: -8, top: 4 },
+});
+
+type SimStyles = ReturnType<typeof makeSimStyles>;
+let cachedSimStyles: SimStyles | null = null;
+let cachedSimThemeKey: string | null = null;
+const ss = new Proxy({} as SimStyles, {
+  get(_t, prop: string) {
+    if (cachedSimStyles === null || cachedSimThemeKey !== colors.bg_darkest) {
+      cachedSimStyles = makeSimStyles();
+      cachedSimThemeKey = colors.bg_darkest;
+    }
+    return (cachedSimStyles as unknown as Record<string, unknown>)[prop];
+  },
 });
 
 export default SimulatorTab;

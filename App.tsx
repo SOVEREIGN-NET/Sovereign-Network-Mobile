@@ -16,13 +16,23 @@ import {
 import RootNavigator from './src/navigation/RootNavigator';
 import { colors } from './src/theme';
 import { Text } from './src/components'; // NavigationContainer is handled by each navigator
-import { useTranslation } from './src/i18n';
+import { hydrateLanguageFromStorage, useTranslation } from './src/i18n';
 import { config } from './src/config';
 import { installLogGuard } from './src/utils/logging';
 import { useNodeConnectionStatus } from './src/hooks/useNodeConnectionStatus';
 import { useChainReregistration } from './src/hooks/useChainReregistration';
+// Side-effect import: kicks off ZDNS bootstrap at module load. The QUIC
+// transport awaits `bootstrapReady` before dispatching — see src/services/quic.ts.
+import './src/services/NetworkBootstrap';
 
 installLogGuard();
+
+// Fire-and-forget: asynchronously restore the user's last language
+// choice from AsyncStorage. We don't await this because the default
+// ('en') renders fine immediately; `useTranslation` subscribers will
+// re-render automatically when the stored value loads and
+// `setLanguage` fires its notification.
+hydrateLanguageFromStorage().catch(() => {});
 
 /**
  * AppContent component that uses auth context to determine which navigator to show
@@ -116,12 +126,20 @@ function AppContent() {
  * App content with theme context available
  */
 function AppWithTheme() {
-  const { colors: themeColors } = useTheme();
+  const { theme, colors: themeColors } = useTheme();
+
+  // Bind the OS status bar to the active theme. On the charcoal
+  // palette we keep the original white glyphs ("light-content") so
+  // they read against the dark bar; on the light palette we flip to
+  // "dark-content" so the clock / battery / signal icons remain
+  // visible against the cream background. Android also needs the
+  // `backgroundColor` for the system bar tint — already wired.
+  const barStyle = theme === 'light' ? 'dark-content' : 'light-content';
 
   return (
     <>
       <StatusBar
-        barStyle="light-content"
+        barStyle={barStyle}
         backgroundColor={themeColors.bg_darkest}
       />
       <AuthProvider>

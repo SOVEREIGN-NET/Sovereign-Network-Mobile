@@ -14,8 +14,9 @@ import { NativeModules, Platform } from 'react-native';
 import { nativeIdentityProvisioning } from './NativeIdentityProvisioning';
 import { walletKeychainService } from './WalletKeychainService';
 import SecureIdentityStorage from './SecureIdentityStorage';
-import { DEFAULT_SOV_NODE_URL, DEFAULT_NODE_HOST, DEFAULT_NODE_PORT } from '../config';
+import { DEFAULT_SOV_NODE_URL } from '../config';
 import { isQuicSupported, testQuicConnection, quicRequestRaw, publicQuicRequest } from './quic';
+import { getActiveTarget } from './NetworkBootstrap';
 import IdentityCleanup from './IdentityCleanup';
 import SeedVaultService from './SeedVaultService';
 import { maskIdentifier } from '../utils/maskIdentifier';
@@ -306,7 +307,8 @@ class RealAuthService {
       console.log(`[RealAuthService] QUIC supported: ${supported}`);
       if (!supported) return false;
 
-      const result = await testQuicConnection(DEFAULT_NODE_HOST, DEFAULT_NODE_PORT);
+      const target = getActiveTarget();
+      const result = await testQuicConnection(target.host, target.port);
       const connected = !!result.success;
       console.log('[RealAuthService]', connected ? 'CONNECTED' : 'DISCONNECTED');
       return connected;

@@ -185,7 +185,10 @@ const StatRow: React.FC<{ label: string; value: string }> = ({ label, value }) =
   </Row>
 );
 
-const styles = StyleSheet.create({
+// Module-scope StyleSheet.create snapshots theme colours at app boot,
+// which kept Explorer screens dark after a theme swap. Proxy wrapper
+// below rebuilds the sheet whenever `colors.bg_darkest` changes.
+const makeStyles = () => StyleSheet.create({
   container: {
     flex: 1,
     backgroundColor: colors.bg_darkest,
@@ -245,6 +248,20 @@ const styles = StyleSheet.create({
     fontFamily: MONO_FONT,
     fontSize: typography.size.sm,
     color: colors.primary,
+  },
+});
+
+// Proxy: rebuild on theme swap (keyed by `colors.bg_darkest`).
+type S = ReturnType<typeof makeStyles>;
+let _cached: S | null = null;
+let _key: string | null = null;
+const styles = new Proxy({} as S, {
+  get(_t, prop: string) {
+    if (_cached === null || _key !== colors.bg_darkest) {
+      _cached = makeStyles();
+      _key = colors.bg_darkest;
+    }
+    return (_cached as unknown as Record<string, unknown>)[prop];
   },
 });
 

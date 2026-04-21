@@ -15,23 +15,21 @@ import {
 } from '../components';
 import { useAuth } from '../hooks';
 import { useNativeSettings } from '../hooks/useNativeSettings';
-import { useTranslation } from '../i18n';
+import {
+  useTranslation,
+  setLanguage as setI18nLanguage,
+} from '../i18n';
 import { colors, spacing, typography, borderRadius } from '../theme';
 import { setUseMockService } from '../context/AuthContext';
 import { DEFAULT_SOV_NODE_URL } from '../config';
-
-type Language = 'en' | 'es' | 'fr' | 'de';
 
 const SettingsScreen = ({ navigation }: any) => {
   const { t } = useTranslation();
   const { currentIdentity, signOut, isLoading } = useAuth();
   const { clearNodeTrust } = useNativeSettings();
 
-  // Local state for settings (would be persisted in real app)
-  const [language, setLanguage] = useState<Language>('en');
   const [notificationsEnabled, setNotificationsEnabled] = useState(true);
   const [analyticsEnabled, setAnalyticsEnabled] = useState(true);
-  const [showLanguageOptions, setShowLanguageOptions] = useState(false);
 
   // Force mock-data feature disabled in all builds.
   useEffect(() => {
@@ -82,7 +80,7 @@ const SettingsScreen = ({ navigation }: any) => {
         {
           text: t.settings.reset.confirm,
           onPress: () => {
-            setLanguage('en');
+            setI18nLanguage('en');
             setNotificationsEnabled(true);
             setAnalyticsEnabled(true);
             Alert.alert(
@@ -130,7 +128,6 @@ const SettingsScreen = ({ navigation }: any) => {
     );
   };
 
-  const languageLabel = t.settings.languages[language];
 
   return (
     <View style={{ flex: 1, backgroundColor: colors.bg_darkest }}>
@@ -187,74 +184,11 @@ const SettingsScreen = ({ navigation }: any) => {
               </Column>
             </Card>
 
-            {/* Language Settings */}
-            <Card>
-              <Text
-                style={{
-                  fontSize: typography.size.sm,
-                  fontWeight: typography.weight.semibold,
-                  color: colors.text_primary,
-                  marginBottom: spacing.md,
-                }}
-              >
-                {t.settings.language.title}
-              </Text>
-
-              <Pressable
-                onPress={() => setShowLanguageOptions(!showLanguageOptions)}
-                style={{
-                  backgroundColor: colors.bg_darker,
-                  padding: spacing.md,
-                  borderRadius: borderRadius.base,
-                  borderWidth: 1,
-                  borderColor: colors.border,
-                  flexDirection: 'row',
-                  justifyContent: 'space-between',
-                  alignItems: 'center',
-                }}
-              >
-                <Text style={{ color: colors.text_primary }}>
-                  {languageLabel}
-                </Text>
-                <Text style={{ color: colors.text_secondary }}>
-                  {showLanguageOptions ? '▲' : '▼'}
-                </Text>
-              </Pressable>
-
-              {showLanguageOptions && (
-                <Column gap="sm" style={{ marginTop: spacing.sm }}>
-                  {(['en', 'es', 'fr', 'de'] as const).map(lang => (
-                    <Pressable
-                      key={lang}
-                      onPress={() => {
-                        setLanguage(lang);
-                        setShowLanguageOptions(false);
-                      }}
-                      style={{
-                        backgroundColor:
-                          language === lang ? colors.primary : colors.bg_darker,
-                        padding: spacing.md,
-                        borderRadius: borderRadius.base,
-                        borderWidth: 1,
-                        borderColor:
-                          language === lang ? colors.primary : colors.border,
-                      }}
-                    >
-                      <Text
-                        style={{
-                          color:
-                            language === lang
-                              ? colors.white
-                              : colors.text_primary,
-                        }}
-                      >
-                        {t.settings.languages[lang]}
-                      </Text>
-                    </Pressable>
-                  ))}
-                </Column>
-              )}
-            </Card>
+            {/* Language switcher lives in Wallet Settings
+                (SID tab → Settings → Wallet Settings) — see
+                `WalletSettingsScreen.tsx`. Keeping it there colocates
+                the user's locale preference with the rest of their
+                per-identity configuration. */}
 
             {/* Notification & Privacy Settings */}
             <Card>

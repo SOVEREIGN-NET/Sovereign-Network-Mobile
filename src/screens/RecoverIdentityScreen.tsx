@@ -11,6 +11,7 @@ import {
   Button,
   Text,
   Column,
+  Row,
   LoadingView,
   ScreenLayout,
   ErrorAlert,
@@ -24,12 +25,14 @@ import { colors, spacing, typography, borderRadius } from '../theme';
 import { RootStackParamList } from '../types/navigation';
 import RealAuthService from '../services/RealAuthService';
 import SecureIdentityStorage from '../services/SecureIdentityStorage';
+import SeedVaultService from '../services/SeedVaultService';
 
 type RecoverIdentityScreenProps = NativeStackScreenProps<RootStackParamList, 'RecoverIdentity'>;
 
 type RecoveryMethod = 'seed';
 
-const RecoverIdentityScreen = (_props: RecoverIdentityScreenProps) => {
+const RecoverIdentityScreen = (props: RecoverIdentityScreenProps) => {
+  const _props = props;
   const { t } = useTranslation();
   const { recoverIdentity, getMasterSeedPhrase, isLoading, error, migrationRequired } = useAuth();
 
@@ -46,6 +49,28 @@ const RecoverIdentityScreen = (_props: RecoverIdentityScreenProps) => {
   const [validatedSeedData, setValidatedSeedData] = useState<string | null>(null);
   const [newPassword, setNewPassword] = useState('');
   const [confirmNewPassword, setConfirmNewPassword] = useState('');
+  // Opt-in save-to-secure-chain state for the recovered seed. User taps the
+  // button on the password card to persist; we don't auto-save.
+  const [vaultState, setVaultState] = useState<'idle' | 'saving' | 'saved' | 'error'>('idle');
+  const [vaultError, setVaultError] = useState<string | null>(null);
+
+  const handleSaveSeedToChain = async () => {
+    if (!validatedSeedData) {
+      setVaultError('No validated seed to save');
+      setVaultState('error');
+      return;
+    }
+    setVaultState('saving');
+    setVaultError(null);
+    try {
+      const words = validatedSeedData.trim().split(/\s+/);
+      await SeedVaultService.saveSeedPhrase(words);
+      setVaultState('saved');
+    } catch (err: any) {
+      setVaultError(err?.message || 'Failed to save to secure storage');
+      setVaultState('error');
+    }
+  };
 
   useEffect(() => {
     if (migrationRequired) {
@@ -193,7 +218,12 @@ const RecoverIdentityScreen = (_props: RecoverIdentityScreenProps) => {
   ];
 
   return (
-    <ScreenLayout>
+    <ScreenLayout
+      safeAreaEdges={['top', 'bottom']}
+      onBack={() => props.navigation.goBack()}
+      backLabel={t.app.back ?? 'Back'}
+      keyboardAvoiding
+    >
       <Column gap="xl">
         {/* Error Message */}
         {displayError && <ErrorAlert message={displayError} icon="❌" />}
@@ -201,8 +231,6 @@ const RecoverIdentityScreen = (_props: RecoverIdentityScreenProps) => {
           <Card
             style={{
               backgroundColor: colors.bg_darker,
-              borderLeftWidth: 4,
-              borderLeftColor: colors.warning,
             }}
           >
             <Column gap="xs">
@@ -244,8 +272,46 @@ const RecoverIdentityScreen = (_props: RecoverIdentityScreenProps) => {
           </Column>
         </Card>
 
-        {/* Seed Phrase Recovery */}
-        {recoveryMethod === 'seed' && (
+        {/* Seed verified summary (password phase) — replaces the 24-word
+            input card once the seed has been validated, so the password
+            fields below aren't pushed off-screen by the keyboard. */}
+        {recoveryMethod === 'seed' && recoveryPhase === 'password' && (
+          <Card>
+            <Column gap="xs">
+              <Row align="center" style={{ gap: spacing.sm }}>
+                <Text
+                  style={{
+                    color: colors.success,
+                    fontSize: typography.size.md,
+                    fontWeight: typography.weight.bold,
+                  }}
+                >
+                  ✓
+                </Text>
+                <Text
+                  style={{
+                    color: colors.text_primary,
+                    fontSize: typography.size.sm,
+                    fontWeight: typography.weight.semibold,
+                  }}
+                >
+                  Seed phrase verified
+                </Text>
+              </Row>
+              <Text
+                style={{
+                  color: colors.text_secondary,
+                  fontSize: typography.size.xs,
+                }}
+              >
+                Set a local password below to finish restoring your identity.
+              </Text>
+            </Column>
+          </Card>
+        )}
+
+        {/* Seed Phrase Recovery (input phase) */}
+        {recoveryMethod === 'seed' && recoveryPhase === 'seed' && (
           <Card>
             <Column gap="sm">
               <Text
@@ -353,8 +419,6 @@ const RecoverIdentityScreen = (_props: RecoverIdentityScreenProps) => {
                   backgroundColor: colors.bg_darker,
                   padding: spacing.md,
                   borderRadius: borderRadius.base,
-                  borderLeftWidth: 4,
-                  borderLeftColor: colors.warning,
                   marginTop: spacing.md,
                 }}
               >
@@ -424,6 +488,60 @@ const RecoverIdentityScreen = (_props: RecoverIdentityScreenProps) => {
                 autoCorrect={false}
                 spellCheck={false}
               />
+
+              {/* Opt-in: persist the recovered seed to the device's secure
+                  chain (iOS Keychain / Android EncryptedSharedPreferences).
+                  User-triggered only — tap the button if you want the seed
+                  saved for future recovery on this device. */}
+              <View
+                style={{
+                  backgroundColor: colors.bg_darker,
+                  padding: spacing.md,
+                  borderRadius: borderRadius.base,
+                  marginTop: spacing.sm,
+                }}
+              >
+                <Text
+                  style={{
+                    color: colors.text_primary,
+                    fontSize: typography.size.sm,
+                    fontWeight: typography.weight.semibold,
+                    marginBottom: spacing.xs,
+                  }}
+                >
+                  Save seed to secure chain
+                </Text>
+                <Text
+                  style={{
+                    color: colors.text_secondary,
+                    fontSize: typography.size.xs,
+                    marginBottom: spacing.sm,
+                  }}
+                >
+                  Store the 24-word seed in this device's hardware-backed
+                  keystore so you can recover without retyping it. Skip if
+                  you prefer to keep it only on paper.
+                </Text>
+                <Button
+                  variant="secondary"
+                  onPress={handleSaveSeedToChain}
+                  loading={vaultState === 'saving'}
+                  disabled={vaultState === 'saving' || vaultState === 'saved'}
+                >
+                  {vaultState === 'saved' ? 'Saved ✓' : 'Save to secure chain'}
+                </Button>
+                {vaultState === 'error' && vaultError && (
+                  <Text
+                    style={{
+                      color: colors.error,
+                      fontSize: typography.size.xs,
+                      marginTop: spacing.xs,
+                    }}
+                  >
+                    {vaultError}
+                  </Text>
+                )}
+              </View>
             </Column>
           </Card>
         )}

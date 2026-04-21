@@ -15,3 +15,5 @@ export type { StakeDaoModalProps, StakeDaoTarget } from './StakeDaoModal';
 
 export { StakeDetailModal } from './StakeDetailModal';
 export type { StakeDetailModalProps } from './StakeDetailModal';
+
+export { PouwRewardsCard } from './PouwRewardsCard';

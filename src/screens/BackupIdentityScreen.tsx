@@ -445,8 +445,6 @@ const BackupIdentityScreen = ({ navigation }: BackupIdentityScreenProps) => {
                       <View
                         style={{
                           backgroundColor: colors.error + '20',
-                          borderLeftWidth: 4,
-                          borderLeftColor: colors.error,
                           padding: spacing.md,
                           borderRadius: borderRadius.base,
                           marginBottom: spacing.md,

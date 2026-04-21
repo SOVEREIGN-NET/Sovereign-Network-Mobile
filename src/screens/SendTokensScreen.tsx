@@ -20,6 +20,15 @@ import { colors, spacing, typography, borderRadius } from '../theme';
 import tokenService from '../services/TokenService';
 import { TokenTransferRequest, SovTransferRequest } from '../types/token';
 import { humanToAtomic, atomsToNumber } from '../utils/tokenUnits';
+import { WELFARE_DAOS } from '../constants';
+
+// Welfare tokens ($FOOD, $HEAL, $EDU, $HOME, $ENRG) are staking receipts —
+// they're yield from DAO stakes, not peer-to-peer transferable assets. Hide
+// them from the Send screen so users don't attempt to send what the node
+// won't accept.
+const WELFARE_TOKEN_IDS: ReadonlySet<string> = new Set(
+  WELFARE_DAOS.map(d => d.tokenId),
+);
 
 const SOV_DECIMALS = 18;
 import { CHAIN_ID } from '../config';
@@ -191,6 +200,11 @@ const SendTokensScreen = ({ navigation, route }: any) => {
           allBalances.forEach(token => {
             const symbol = String(token.symbol || '').toUpperCase();
 
+            // Welfare DAO tokens are staking yield, not transferable — hide.
+            if (token.token_id && WELFARE_TOKEN_IDS.has(token.token_id)) {
+              return;
+            }
+
             // Skip tokens the node didn't tag with decimals — can't safely
             // format or transfer without knowing the unit.
             if (token.decimals == null || !Number.isFinite(token.decimals)) {
@@ -283,6 +297,8 @@ const SendTokensScreen = ({ navigation, route }: any) => {
 
         // Fetch token info for each tracked token
         for (const tokenId of trackedTokenIds) {
+          // Welfare tokens are staking yield — never expose in Send picker.
+          if (WELFARE_TOKEN_IDS.has(tokenId)) continue;
           if (!tokenMap.has(tokenId)) {
             // Token not in balance list, try to get info and add with 0 balance
             try {
@@ -320,6 +336,8 @@ const SendTokensScreen = ({ navigation, route }: any) => {
       try {
         const registry = await getTokenRegistry();
         for (const item of registry) {
+          // Welfare tokens are staking yield — never expose in Send picker.
+          if (WELFARE_TOKEN_IDS.has(item.token_id)) continue;
           if (tokenMap.has(item.token_id)) continue;
           const symbol = (item.symbol || '').toUpperCase();
           // SOV is always rendered from the wallet-list aggregate, not the

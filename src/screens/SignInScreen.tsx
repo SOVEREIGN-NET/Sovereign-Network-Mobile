@@ -129,7 +129,12 @@ const SignInScreen = ({ navigation }: SignInScreenProps) => {
   }
 
   return (
-    <ScreenLayout>
+    <ScreenLayout
+      safeAreaEdges={['top', 'bottom']}
+      onBack={() => navigation.goBack()}
+      backLabel={t.app.back ?? 'Back'}
+      keyboardAvoiding
+    >
       <Column gap="xl">
         {/* Welcome Header */}
         <View

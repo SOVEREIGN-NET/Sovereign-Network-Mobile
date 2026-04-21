@@ -1,9 +1,19 @@
 #!/bin/bash
 # Build Android native libraries (quic-jni wrapper + lib-client)
 # This builds the quic-jni JNI wrapper which uses lib-client from The-Sovereign-Network
-# Requires: Rust with Android targets, Android NDK
+# Requires: Rust nightly with Android targets, Android NDK
+#
+# lib-client (pulled in via path dep) pins its workspace to nightly in
+# `../../../../../../../The-Sovereign-Network/rust-toolchain.toml` because
+# transitive deps (e.g. plonky2_field via neural-mesh-compression) use
+# nightly-only features. When cargo compiles quic-jni from this directory
+# it would otherwise default to stable and fail with E0554 — so we force
+# the toolchain here.
 
 set -euo pipefail
+
+# Force nightly to match lib-client's workspace toolchain.
+export RUSTUP_TOOLCHAIN="${RUSTUP_TOOLCHAIN:-nightly}"
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 cd "$SCRIPT_DIR"

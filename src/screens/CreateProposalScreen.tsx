@@ -158,8 +158,6 @@ const CreateProposalScreen = ({ navigation }: any) => {
                 backgroundColor: colors.error,
                 padding: spacing.md,
                 borderRadius: borderRadius.base,
-                borderLeftWidth: 4,
-                borderLeftColor: colors.error_dark,
               }}
             >
               <Text style={{ color: colors.white }}>❌ {error}</Text>
@@ -347,8 +345,6 @@ const CreateProposalScreen = ({ navigation }: any) => {
                 backgroundColor: colors.bg_darker,
                 padding: spacing.md,
                 borderRadius: borderRadius.base,
-                borderLeftWidth: 4,
-                borderLeftColor: colors.info,
               }}
             >
               <Text

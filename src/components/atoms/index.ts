@@ -38,3 +38,6 @@ export { ActivityDot } from './ActivityDot';
 
 export { RefreshRing } from './RefreshRing';
 export type { RefreshRingProps } from './RefreshRing';
+
+export { Skeleton } from './Skeleton';
+export type { SkeletonProps } from './Skeleton';

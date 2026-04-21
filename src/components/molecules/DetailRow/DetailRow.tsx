@@ -10,7 +10,8 @@ export interface DetailRowProps {
   emphasized?: boolean;
 }
 
-const styles = StyleSheet.create({
+// Build at render time so theme-dependent colours track `applyTheme`.
+const makeStyles = () => StyleSheet.create({
   row: {
     flexDirection: 'row',
     justifyContent: 'space-between',
@@ -53,6 +54,7 @@ export const DetailRow = React.memo(
     style,
     emphasized = false,
   }: DetailRowProps) => {
+    const styles = makeStyles();
     const labelStyle = [styles.label, emphasized && styles.labelEmphasized];
     const valueStyle = [
       styles.value,

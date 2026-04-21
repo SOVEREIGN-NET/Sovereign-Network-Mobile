@@ -186,8 +186,6 @@ const ConfirmTransactionScreen = ({ navigation, route }: any) => {
           <Card
             style={{
               backgroundColor: colors.warning,
-              borderLeftWidth: 4,
-              borderLeftColor: colors.error,
             }}
           >
             <Text

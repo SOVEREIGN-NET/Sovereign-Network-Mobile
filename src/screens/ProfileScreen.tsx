@@ -78,62 +78,149 @@ const ProfileScreen = ({ navigation }: any) => {
   };
 
   if (!currentIdentity || isLoading) {
-    // Guest mode - show sign-in prompt
     if (isLoading) {
       return <LoadingView />;
     }
+    // Guest mode — considered landing with preview card + dual CTAs.
     return (
       <View style={{ flex: 1, backgroundColor: colors.bg_darkest }}>
-        <ScreenLayout paddingTop={spacing.lg}>
+        <ScreenLayout centerContent>
           <View
             style={{
               flex: 1,
               justifyContent: 'center',
               alignItems: 'center',
               paddingHorizontal: spacing.lg,
+              gap: spacing.xl,
             }}
           >
-            <Text style={{ fontSize: 48, marginBottom: spacing.md }}>👤</Text>
-            <Text
+            {/* Preview card — shows what a profile looks like, faded */}
+            <View
               style={{
-                fontSize: typography.size.xl,
-                fontWeight: typography.weight.semibold,
-                color: colors.text_primary,
-                marginBottom: spacing.sm,
-                textAlign: 'center',
+                width: '100%',
+                maxWidth: 340,
+                backgroundColor: colors.bg_darker,
+                borderRadius: borderRadius.lg,
+                borderWidth: 1,
+                borderColor: colors.border,
+                padding: spacing.lg,
+                opacity: 0.55,
               }}
             >
-              Sign in to view your profile
-            </Text>
-            <Text
-              style={{
-                fontSize: typography.size.md,
-                color: colors.text_secondary,
-                marginBottom: spacing.xl,
-                textAlign: 'center',
-              }}
-            >
-              Create an identity to personalize your experience
-            </Text>
-            <TouchableOpacity
-              style={{
-                backgroundColor: colors.primary,
-                paddingVertical: spacing.md,
-                paddingHorizontal: spacing.xl,
-                borderRadius: borderRadius.md,
-              }}
-              onPress={() => navigation.navigate('SignIn')}
-            >
-              <Text
+              <View
                 style={{
-                  color: colors.text_primary,
-                  fontSize: typography.size.md,
-                  fontWeight: typography.weight.semibold,
+                  flexDirection: 'row',
+                  alignItems: 'center',
+                  gap: spacing.md,
+                  marginBottom: spacing.md,
                 }}
               >
-                Sign In
+                <View
+                  style={{
+                    width: 48,
+                    height: 48,
+                    borderRadius: 24,
+                    backgroundColor: colors.primary,
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                  }}
+                >
+                  <Text
+                    style={{
+                      color: colors.text_primary,
+                      fontSize: typography.size.lg,
+                      fontWeight: typography.weight.bold,
+                    }}
+                  >
+                    S
+                  </Text>
+                </View>
+                <View style={{ flex: 1 }}>
+                  <View
+                    style={{
+                      height: 12,
+                      width: '70%',
+                      backgroundColor: colors.text_secondary,
+                      opacity: 0.3,
+                      borderRadius: 6,
+                      marginBottom: 6,
+                    }}
+                  />
+                  <View
+                    style={{
+                      height: 10,
+                      width: '45%',
+                      backgroundColor: colors.text_secondary,
+                      opacity: 0.2,
+                      borderRadius: 5,
+                    }}
+                  />
+                </View>
+              </View>
+              <View
+                style={{
+                  height: 10,
+                  width: '85%',
+                  backgroundColor: colors.text_secondary,
+                  opacity: 0.15,
+                  borderRadius: 5,
+                  marginBottom: 8,
+                }}
+              />
+              <View
+                style={{
+                  height: 10,
+                  width: '60%',
+                  backgroundColor: colors.text_secondary,
+                  opacity: 0.15,
+                  borderRadius: 5,
+                }}
+              />
+            </View>
+
+            {/* Copy */}
+            <View style={{ alignItems: 'center', maxWidth: 340 }}>
+              <Text
+                style={{
+                  fontSize: typography.size['2xl'],
+                  fontWeight: typography.weight.bold,
+                  color: colors.text_primary,
+                  textAlign: 'center',
+                  marginBottom: spacing.sm,
+                  letterSpacing: -0.3,
+                }}
+              >
+                Your sovereign identity
               </Text>
-            </TouchableOpacity>
+              <Text
+                style={{
+                  fontSize: typography.size.md,
+                  color: colors.text_secondary,
+                  textAlign: 'center',
+                  lineHeight: 22,
+                }}
+              >
+                A post-quantum identity you own — no emails, no passwords on a
+                server. Wallet, profile, and reputation under a single key
+                only you control.
+              </Text>
+            </View>
+
+            {/* CTAs — match SID guest for consistency */}
+            <View style={{ width: '100%', maxWidth: 320, gap: spacing.md }}>
+              <Button
+                variant="primary"
+                onPress={() => navigation.navigate('SignIn')}
+              >
+                Sign In
+              </Button>
+              <Button
+                variant="secondary"
+                onPress={() => navigation.navigate('CreateIdentity')}
+              >
+                Create Account
+              </Button>
+            </View>
           </View>
         </ScreenLayout>
       </View>
@@ -274,8 +361,6 @@ const ProfileScreen = ({ navigation }: any) => {
                     paddingHorizontal: spacing.md,
                     backgroundColor: colors.bg_darker,
                     borderRadius: borderRadius.base,
-                    borderLeftWidth: 3,
-                    borderLeftColor: colors.primary,
                   }}
                 >
                   <Text

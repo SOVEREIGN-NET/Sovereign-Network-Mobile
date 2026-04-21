@@ -125,7 +125,9 @@ const DetailRow: React.FC<{ label: string; value?: string; children?: React.Reac
   </View>
 );
 
-const styles = StyleSheet.create({
+// Module-scope StyleSheet.create snapshots theme colours at boot.
+// Proxy wrapper below rebuilds on theme swap. See BlockDetailScreen.
+const makeStyles = () => StyleSheet.create({
   container: { flex: 1, backgroundColor: colors.bg_darkest },
   header: {
     flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between',
@@ -143,6 +145,19 @@ const styles = StyleSheet.create({
     marginBottom: 4, textTransform: 'uppercase', letterSpacing: 0.5,
   },
   mono: { fontFamily: MONO_FONT, fontSize: typography.size.sm, color: colors.text_primary },
+});
+
+type S = ReturnType<typeof makeStyles>;
+let _cached: S | null = null;
+let _key: string | null = null;
+const styles = new Proxy({} as S, {
+  get(_t, prop: string) {
+    if (_cached === null || _key !== colors.bg_darkest) {
+      _cached = makeStyles();
+      _key = colors.bg_darkest;
+    }
+    return (_cached as unknown as Record<string, unknown>)[prop];
+  },
 });
 
 export default IdentityDetailScreen;

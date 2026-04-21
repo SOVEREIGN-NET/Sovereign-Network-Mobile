@@ -22,6 +22,7 @@ import {
   Column,
   DrawerItem,
   HeaderBar,
+  PouwRewardsCard,
   Row,
   ScreenLayout,
   SideDrawer,
@@ -366,6 +367,12 @@ const DashboardScreen: React.FC<any> = ({ navigation }) => {
             </Row>
           </Card>
         </Pressable>
+
+        {/* PoUW Rewards — interactive visualization of the network's
+            Proof-of-Useful-Work reward distribution. Data comes from
+            the public `/api/v1/pouw/status` endpoint on the same 60s
+            polling cadence as the oracle prices. */}
+        <PouwRewardsCard />
 
         <Card>
           <Row

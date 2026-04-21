@@ -14,7 +14,7 @@ import {
   StakeDaoModal,
   StakeDaoTarget,
 } from '../components';
-import { useAsyncData, useWalletList } from '../hooks';
+import { useAsyncData, useWalletList, useAuth } from '../hooks';
 import { useDAOStats, formatTreasury } from '../hooks/useDAOStats';
 import { useTranslation } from '../i18n';
 import MockDataService from '../services/MockDataService';
@@ -27,6 +27,8 @@ const DAOScreen = ({ navigation }: any) => {
   const [drawerVisible, setDrawerVisible] = useState(false);
   const [stakeTarget, setStakeTarget] = useState<StakeDaoTarget | null>(null);
   const [stakeSubmitting, setStakeSubmitting] = useState(false);
+  const { currentIdentity } = useAuth();
+  const isLoggedIn = !!currentIdentity;
   const daoStats = useDAOStats();
   const { walletByType, wallets } = useWalletList();
   const primaryWalletId = useMemo(() => {
@@ -48,6 +50,7 @@ const DAOScreen = ({ navigation }: any) => {
       name: dao.name,
       desc: dao.desc,
       color: dao.color,
+      symbol: dao.symbol,
     });
   };
 
@@ -290,15 +293,46 @@ const DAOScreen = ({ navigation }: any) => {
                   borderColor: dao.color,
                 }}
               >
-                <Text
+                <View
                   style={{
-                    color: colors.text_primary,
-                    fontWeight: typography.weight.semibold,
+                    flexDirection: 'row',
+                    alignItems: 'center',
                     marginBottom: spacing.sm,
+                    gap: spacing.sm,
                   }}
                 >
-                  {dao.name}
-                </Text>
+                  <Text
+                    style={{
+                      color: colors.text_primary,
+                      fontWeight: typography.weight.semibold,
+                      flexShrink: 1,
+                    }}
+                  >
+                    {dao.name}
+                  </Text>
+                  <View
+                    style={{
+                      paddingHorizontal: spacing.sm,
+                      paddingVertical: 2,
+                      borderRadius: 999,
+                      backgroundColor: `${dao.color}22`,
+                      borderWidth: 1,
+                      borderColor: dao.color,
+                    }}
+                  >
+                    <Text
+                      style={{
+                        color: dao.color,
+                        fontSize: typography.size.xs,
+                        fontWeight: typography.weight.semibold,
+                        letterSpacing: 0.5,
+                        fontFamily: 'Courier',
+                      }}
+                    >
+                      {dao.symbol}
+                    </Text>
+                  </View>
+                </View>
                 <Text
                   style={{
                     color: colors.text_secondary,
@@ -310,9 +344,13 @@ const DAOScreen = ({ navigation }: any) => {
                 </Text>
                 <Button
                   variant="secondary"
-                  onPress={() => openStakeModal(dao)}
+                  onPress={() =>
+                    isLoggedIn
+                      ? openStakeModal(dao)
+                      : navigation.navigate('SignIn')
+                  }
                 >
-                  Launch {dao.name}
+                  {isLoggedIn ? `Launch ${dao.name}` : 'Sign in to stake'}
                 </Button>
                 <Text
                   style={{
@@ -342,42 +380,9 @@ const DAOScreen = ({ navigation }: any) => {
           </Column>
         </Card>
 
-        {/* Governance */}
-        <Card>
-          <Text variant="h3" style={{ marginBottom: spacing.lg }}>
-            {t.dao.governance.section}
-          </Text>
-          <Card
-            style={{
-              backgroundColor: colors.bg_darker,
-              padding: spacing.lg,
-            }}
-          >
-            <Text
-              style={{
-                color: colors.text_primary,
-                fontWeight: typography.weight.semibold,
-                marginBottom: spacing.sm,
-              }}
-            >
-              {t.dao.governance.activeProposals}
-            </Text>
-            <Text
-              style={{
-                color: colors.text_secondary,
-                fontSize: typography.size.sm,
-                marginBottom: spacing.md,
-              }}
-            >
-              {proposals.length > 0
-                ? `${proposals.length} proposals waiting for your vote`
-                : t.dao.governance.noProposals}
-            </Text>
-            <Button variant="primary" onPress={() => {}} disabled>
-              {t.dao.governance.viewProposals}
-            </Button>
-          </Card>
-        </Card>
+        {/* Governance card hidden — will return when voting/proposal flow
+            lands on-chain. Keep the imports/state around the section dead
+            so re-enabling is a one-line toggle. */}
       </ScreenLayout>
 
       <StakeDaoModal

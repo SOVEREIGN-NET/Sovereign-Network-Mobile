@@ -1,14 +1,16 @@
-import React, { useEffect, useRef } from 'react';
+import React, { useEffect, useMemo, useRef } from 'react';
 import {
   NavigationContainer,
   NavigationContainerRef,
   DefaultTheme,
   DarkTheme,
+  Theme as NavigationTheme,
 } from '@react-navigation/native';
 import { createNativeStackNavigator } from '@react-navigation/native-stack';
 import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
-import { Linking, useColorScheme, View } from 'react-native';
+import { Linking, View } from 'react-native';
 import { parseBrowserAuthLink } from '../services/BrowserAuthService';
+import { useTheme } from '../context/ThemeContext';
 import { colors } from '../theme/tokens';
 import { RootStackParamList } from '../types/navigation';
 
@@ -541,8 +543,27 @@ const AuthStack = () => {
 };
 
 const RootNavigator = () => {
-  const scheme = useColorScheme();
-  const navTheme = scheme === 'dark' ? DarkTheme : DefaultTheme;
+  // Bind React Navigation's theme to the app's own theme context so
+  // the NavigationContainer's background (the blank space behind
+  // screens) switches along with the rest of the UI. Without this,
+  // the nav container keeps its default dark canvas even after the
+  // user picks the light theme, which is the "main window stays
+  // dark" bug reported by users.
+  const { theme, colors: themeColors } = useTheme();
+  const navTheme: NavigationTheme = useMemo(() => {
+    const base = theme === 'light' ? DefaultTheme : DarkTheme;
+    return {
+      ...base,
+      colors: {
+        ...base.colors,
+        background: themeColors.bg_darkest,
+        card: themeColors.bg_dark,
+        text: themeColors.text_primary,
+        border: themeColors.border,
+        primary: themeColors.primary,
+      },
+    };
+  }, [theme, themeColors]);
   const navigationRef = useRef<NavigationContainerRef<RootStackParamList> | null>(null);
 
   // Deep-link handler for `zhtp://auth?challenge=…`. Kept here rather

@@ -103,7 +103,7 @@ const WalletDetailScreen: React.FC<any> = ({ navigation, route }) => {
   );
 };
 
-const styles = StyleSheet.create({
+const makeStyles = () => StyleSheet.create({
   container: { flex: 1, backgroundColor: colors.bg_darkest },
   header: {
     flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between',
@@ -125,6 +125,20 @@ const styles = StyleSheet.create({
     backgroundColor: colors.bg_darker, borderWidth: 1, borderColor: colors.border,
   },
   mono: { fontFamily: MONO_FONT, fontSize: typography.size.sm, color: colors.text_primary },
+});
+
+// Theme-reactive stylesheet proxy — see BlockDetailScreen.
+type S = ReturnType<typeof makeStyles>;
+let _cached: S | null = null;
+let _key: string | null = null;
+const styles = new Proxy({} as S, {
+  get(_t, prop: string) {
+    if (_cached === null || _key !== colors.bg_darkest) {
+      _cached = makeStyles();
+      _key = colors.bg_darkest;
+    }
+    return (_cached as unknown as Record<string, unknown>)[prop];
+  },
 });
 
 export default WalletDetailScreen;

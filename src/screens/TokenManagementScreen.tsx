@@ -180,7 +180,7 @@ const TokenManagementScreen = ({ navigation }: any) => {
           </View>
         ) : (
           tokens.map(({ tokenId, info, error }) => (
-            <View key={tokenId} style={{ backgroundColor: colors.bg_lighter, borderRadius: borderRadius.lg, padding: spacing.md, marginBottom: spacing.md, borderLeftWidth: 3, borderLeftColor: info ? colors.primary : colors.error }}>
+            <View key={tokenId} style={{ backgroundColor: colors.bg_lighter, borderRadius: borderRadius.lg, padding: spacing.md, marginBottom: spacing.md }}>
 
               {/* Token header */}
               <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: spacing.md }}>

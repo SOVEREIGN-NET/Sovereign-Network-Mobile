@@ -97,7 +97,11 @@ const DetailRow: React.FC<{ label: string; value?: string; children?: React.Reac
   </View>
 );
 
-const styles = StyleSheet.create({
+// Module-scope StyleSheet.create snapshots theme colours at app boot,
+// which kept Explorer screens dark after a theme swap. Build the
+// sheet at render time and wrap it in a Proxy below so every
+// `styles.X` access rebuilds on theme change.
+const makeStyles = () => StyleSheet.create({
   container: { flex: 1, backgroundColor: colors.bg_darkest },
   header: {
     flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between',
@@ -115,6 +119,22 @@ const styles = StyleSheet.create({
     marginBottom: 4, textTransform: 'uppercase', letterSpacing: 0.5,
   },
   mono: { fontFamily: MONO_FONT, fontSize: typography.size.sm, color: colors.text_primary },
+});
+
+// Proxy wrapper: rebuild the stylesheet whenever the shared `colors`
+// object has been mutated by `applyTheme`. `colors.bg_darkest` is the
+// cheap palette-identity key — it flips on every theme swap.
+type S = ReturnType<typeof makeStyles>;
+let _cached: S | null = null;
+let _key: string | null = null;
+const styles = new Proxy({} as S, {
+  get(_t, prop: string) {
+    if (_cached === null || _key !== colors.bg_darkest) {
+      _cached = makeStyles();
+      _key = colors.bg_darkest;
+    }
+    return (_cached as unknown as Record<string, unknown>)[prop];
+  },
 });
 
 export default BlockDetailScreen;

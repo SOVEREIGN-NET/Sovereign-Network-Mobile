@@ -21,50 +21,56 @@ export interface InputProps extends Omit<TextInputProps, 'style'> {
   textInputStyle?: TextStyle;
 }
 
-const baseStyles = StyleSheet.create({
-  container: {
-    marginBottom: spacing.md,
-  },
-  labelContainer: {
-    marginBottom: spacing.sm,
-  },
-  label: {
-    fontSize: typography.size.sm,
-    color: colors.text_primary,
-    fontWeight: '600' as const,
-  },
-  icon: {
-    fontSize: typography.size.lg,
-    marginRight: spacing.sm,
-  },
-  rightIcon: {
-    marginLeft: spacing.sm,
-    marginRight: 0,
-  },
-  input: {
-    flex: 1,
-    color: colors.text_primary,
-    fontSize: typography.size.md,
-    paddingVertical: spacing.md,
-    paddingHorizontal: spacing.sm,
-  },
-  errorContainer: {
-    marginTop: spacing.sm,
-  },
-  errorText: {
-    fontSize: typography.size.sm,
-    color: colors.error,
-    fontWeight: '500' as const,
-  },
-  hintContainer: {
-    marginTop: spacing.sm,
-  },
-  hintText: {
-    fontSize: typography.size.sm,
-    color: colors.text_tertiary,
-    fontWeight: '400' as const,
-  },
-});
+/**
+ * Build the style sheet at render time so theme-dependent colours
+ * (`colors.text_primary`, `colors.error`, etc.) come from the live
+ * palette. See `applyTheme` in `theme/tokens`.
+ */
+const makeStyles = () =>
+  StyleSheet.create({
+    container: {
+      marginBottom: spacing.md,
+    },
+    labelContainer: {
+      marginBottom: spacing.sm,
+    },
+    label: {
+      fontSize: typography.size.sm,
+      color: colors.text_primary,
+      fontWeight: '600' as const,
+    },
+    icon: {
+      fontSize: typography.size.lg,
+      marginRight: spacing.sm,
+    },
+    rightIcon: {
+      marginLeft: spacing.sm,
+      marginRight: 0,
+    },
+    input: {
+      flex: 1,
+      color: colors.text_primary,
+      fontSize: typography.size.md,
+      paddingVertical: spacing.md,
+      paddingHorizontal: spacing.sm,
+    },
+    errorContainer: {
+      marginTop: spacing.sm,
+    },
+    errorText: {
+      fontSize: typography.size.sm,
+      color: colors.error,
+      fontWeight: '500' as const,
+    },
+    hintContainer: {
+      marginTop: spacing.sm,
+    },
+    hintText: {
+      fontSize: typography.size.sm,
+      color: colors.text_tertiary,
+      fontWeight: '400' as const,
+    },
+  });
 
 export const Input = React.forwardRef<TextInput | null, InputProps>(
   (
@@ -83,6 +89,7 @@ export const Input = React.forwardRef<TextInput | null, InputProps>(
     },
     ref,
   ) => {
+      const baseStyles = makeStyles();
       const [isFocused, setIsFocused] = useState(false);
 
       const handleFocus = (e: any) => {
@@ -95,7 +102,15 @@ export const Input = React.forwardRef<TextInput | null, InputProps>(
         onBlur?.(e);
       };
 
-      const borderColor = error ? '#ff6b6b' : isFocused ? '#00d4ff' : 'rgba(255, 0, 212, 0.06)';
+      // Resolve border / field / placeholder colours from the live
+      // palette so the Input respects the current theme. Hardcoded
+      // hex values were the reason the Send-Tokens fields stayed dark
+      // on the light theme.
+      const borderColor = error
+        ? colors.error
+        : isFocused
+        ? colors.primary
+        : colors.border;
 
       return (
         <View style={[baseStyles.container, containerStyle]}>
@@ -109,7 +124,7 @@ export const Input = React.forwardRef<TextInput | null, InputProps>(
             style={{
               flexDirection: 'row',
               alignItems: 'center',
-              backgroundColor: '#2f2f2f',
+              backgroundColor: colors.bg_medium,
               borderRadius: 10,
               paddingHorizontal: 18,
               borderWidth: 1,
@@ -121,7 +136,7 @@ export const Input = React.forwardRef<TextInput | null, InputProps>(
             <TextInput
               ref={ref}
               style={baseStyles.input}
-              placeholderTextColor="#888888"
+              placeholderTextColor={colors.text_placeholder}
               onFocus={handleFocus}
               onBlur={handleBlur}
               {...Object.fromEntries(

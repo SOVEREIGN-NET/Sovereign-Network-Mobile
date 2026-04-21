@@ -14,6 +14,7 @@ import { useFocusEffect } from '@react-navigation/native';
 import {
   Card,
   Text,
+  Button,
   LoadingView,
   Column,
   Row,
@@ -22,6 +23,7 @@ import {
   SideDrawer,
   DrawerItem,
   Badge,
+  Skeleton,
   StakeDetailModal,
 } from '../components';
 import {
@@ -127,26 +129,28 @@ const WalletOptionsSheet = ({
   onSelectProfile,
   onSelectSettings,
 }: WalletOptionsSheetProps) => {
+  const { t } = useTranslation();
+  const sheet = t.sidScreen.walletOptionsSheet;
   const rows: WalletOptionRow[] = [
     {
       id: 'domains',
       icon: '🌐',
-      title: 'Domains',
-      subtitle: 'Register and manage your .zhtp domains',
+      title: sheet.rows.domainsTitle,
+      subtitle: sheet.rows.domainsSubtitle,
       onPress: onSelectDomains,
     },
     {
       id: 'profile',
       icon: '👤',
-      title: 'Profile',
-      subtitle: 'View and edit your identity profile',
+      title: sheet.rows.profileTitle,
+      subtitle: sheet.rows.profileSubtitle,
       onPress: onSelectProfile,
     },
     {
       id: 'settings',
       icon: '⚙️',
-      title: 'Wallet Settings',
-      subtitle: 'Security, keys, and preferences',
+      title: sheet.rows.settingsTitle,
+      subtitle: sheet.rows.settingsSubtitle,
       onPress: onSelectSettings,
     },
   ];
@@ -212,7 +216,7 @@ const WalletOptionsSheet = ({
                 color: colors.text_primary,
               }}
             >
-              Wallet Options
+              {sheet.title}
             </Text>
             <Text
               style={{
@@ -221,7 +225,7 @@ const WalletOptionsSheet = ({
                 marginTop: spacing.xs,
               }}
             >
-              Manage your identity, domains, and settings
+              {sheet.subtitle}
             </Text>
           </View>
 
@@ -308,7 +312,7 @@ const WalletOptionsSheet = ({
                 color: colors.text_secondary,
               }}
             >
-              Cancel
+              {sheet.cancel}
             </Text>
           </TouchableOpacity>
         </TouchableOpacity>
@@ -354,6 +358,7 @@ const BalanceCarousel = ({
   onActiveIndexChange,
   scrollRef,
 }: BalanceCarouselProps) => {
+  const { t } = useTranslation();
   // One card per token; each card is full-width (minus horizontal padding).
   const [cardWidth, setCardWidth] = useState(
     Dimensions.get('window').width - spacing.sm * 2,
@@ -511,7 +516,7 @@ const BalanceCarousel = ({
                           color: colors.text_tertiary,
                         }}
                       >
-                        Syncing...
+                        {t.sidScreen.tokens.syncing}
                       </Text>
                     )}
                   </Row>
@@ -823,81 +828,117 @@ const SIDScreen = ({ navigation, route }: any) => {
           visible={drawerVisible}
           onClose={() => setDrawerVisible(false)}
           items={drawerItems}
-          title="Menu"
+          title={t.sidScreen.menu}
         />
 
-        <ScreenLayout paddingTop={spacing.md}>
+        <ScreenLayout paddingTop={spacing.md} centerContent>
           <View
             style={{
               flex: 1,
               justifyContent: 'center',
               alignItems: 'center',
               paddingHorizontal: spacing.lg,
+              gap: spacing.xl,
             }}
           >
-            <Text style={{ fontSize: 48, marginBottom: spacing.md }}>🔐</Text>
-            <Text
+            {/* Wallet-card preview — faded, typographic. No icons. */}
+            <View
               style={{
-                fontSize: typography.size.xl,
-                fontWeight: typography.weight.semibold,
-                color: colors.text_primary,
-                marginBottom: spacing.sm,
-                textAlign: 'center',
+                width: '100%',
+                maxWidth: 340,
+                backgroundColor: colors.bg_darker,
+                borderRadius: borderRadius.lg,
+                borderWidth: 1,
+                borderColor: colors.border,
+                paddingVertical: spacing.lg,
+                paddingHorizontal: spacing.lg,
+                opacity: 0.55,
               }}
             >
-              Sign in to access your wallet
-            </Text>
-            <Text
-              style={{
-                fontSize: typography.size.md,
-                color: colors.text_secondary,
-                marginBottom: spacing.xl,
-                textAlign: 'center',
-              }}
-            >
-              Create an identity to manage your wallets, domains, and more
-            </Text>
-            <TouchableOpacity
-              style={{
-                backgroundColor: colors.primary,
-                paddingVertical: spacing.md,
-                paddingHorizontal: spacing.xl,
-                borderRadius: borderRadius.md,
-                marginBottom: spacing.md,
-              }}
-              onPress={() => navigation.navigate('SignIn')}
-            >
+              <Text
+                style={{
+                  color: colors.text_tertiary,
+                  fontSize: typography.size.xs,
+                  letterSpacing: 1.5,
+                  textTransform: 'uppercase',
+                  marginBottom: spacing.xs,
+                }}
+              >
+                Your wallet
+              </Text>
               <Text
                 style={{
                   color: colors.text_primary,
-                  fontSize: typography.size.md,
-                  fontWeight: typography.weight.semibold,
+                  fontSize: typography.size['2xl'],
+                  fontWeight: typography.weight.bold,
+                  letterSpacing: -0.5,
+                  marginBottom: spacing.md,
                 }}
               >
-                Sign In
+                0.0000 SOV
               </Text>
-            </TouchableOpacity>
-            <TouchableOpacity
-              style={{
-                backgroundColor: 'transparent',
-                paddingVertical: spacing.md,
-                paddingHorizontal: spacing.xl,
-                borderRadius: borderRadius.md,
-                borderWidth: 1,
-                borderColor: colors.primary,
-              }}
-              onPress={() => navigation.navigate('CreateIdentity')}
-            >
+              <View
+                style={{
+                  height: 10,
+                  width: '70%',
+                  backgroundColor: colors.text_secondary,
+                  opacity: 0.18,
+                  borderRadius: 5,
+                  marginBottom: 8,
+                }}
+              />
+              <View
+                style={{
+                  height: 10,
+                  width: '45%',
+                  backgroundColor: colors.text_secondary,
+                  opacity: 0.18,
+                  borderRadius: 5,
+                }}
+              />
+            </View>
+
+            {/* Copy */}
+            <View style={{ alignItems: 'center', maxWidth: 340 }}>
               <Text
                 style={{
-                  color: colors.primary,
-                  fontSize: typography.size.md,
-                  fontWeight: typography.weight.medium,
+                  fontSize: typography.size['2xl'],
+                  fontWeight: typography.weight.bold,
+                  color: colors.text_primary,
+                  textAlign: 'center',
+                  marginBottom: spacing.sm,
+                  letterSpacing: -0.3,
                 }}
               >
-                Create Account
+                {t.sidScreen.guest.signInTitle}
               </Text>
-            </TouchableOpacity>
+              <Text
+                style={{
+                  fontSize: typography.size.md,
+                  color: colors.text_secondary,
+                  textAlign: 'center',
+                  lineHeight: 22,
+                }}
+              >
+                {t.sidScreen.guest.signInBody}
+              </Text>
+            </View>
+
+            {/* CTAs */}
+            <View style={{ width: '100%', maxWidth: 320, gap: spacing.md }}>
+              <Button
+                variant="primary"
+                onPress={() => navigation.navigate('SignIn')}
+              >
+                {t.sidScreen.guest.signIn}
+              </Button>
+              <Button
+                variant="secondary"
+                onPress={() => navigation.navigate('CreateIdentity')}
+              >
+                {t.sidScreen.guest.createAccount}
+              </Button>
+            </View>
           </View>
         </ScreenLayout>
       </View>
@@ -935,7 +976,7 @@ const SIDScreen = ({ navigation, route }: any) => {
 
     if (textToCopy) {
       Clipboard.setString(textToCopy);
-      Alert.alert('Copied', 'Wallet ID copied to clipboard');
+      Alert.alert(t.sidScreen.copy.title, t.sidScreen.copy.walletId);
     }
   };
 
@@ -951,7 +992,7 @@ const SIDScreen = ({ navigation, route }: any) => {
         visible={drawerVisible}
         onClose={() => setDrawerVisible(false)}
         items={drawerItems}
-        title="Menu"
+        title={t.sidScreen.menu}
       />
 
       {welcomeName !== null && (
@@ -970,7 +1011,7 @@ const SIDScreen = ({ navigation, route }: any) => {
               textAlign: 'center',
             }}
           >
-            Welcome back, {welcomeName}!
+            {t.sidScreen.welcomeBack.replace('{name}', welcomeName)}
           </Text>
         </View>
       )}
@@ -1032,6 +1073,12 @@ const SIDScreen = ({ navigation, route }: any) => {
                 share the wallet_id) but highlights the balance in that token. */}
             <View style={{ paddingHorizontal: spacing.sm }}>
               {balanceCards.length === 0 ? (
+                // Reserved-height skeleton that mirrors the carousel's
+                // inner dimensions (large numeric + caption). Keeping
+                // the vertical space identical to the carousel state
+                // eliminates the "card jumps up when data arrives"
+                // flash — the real carousel lands in the exact slot
+                // the skeleton occupied.
                 <Card style={{ marginHorizontal: 0, overflow: 'hidden' }}>
                   <View
                     style={{
@@ -1042,31 +1089,52 @@ const SIDScreen = ({ navigation, route }: any) => {
                       alignItems: 'center',
                     }}
                   >
-                    {(() => {
-                      const balStr = formatBalance(totalBalance);
-                      const len = balStr.length;
-                      const fontSize = len <= 8 ? typography.size['5xl'] : len <= 12 ? 32 : len <= 16 ? 26 : 20;
-                      return (
+                    {walletsLoading || tokensLoading ? (
+                      <>
+                        <Skeleton
+                          width={180}
+                          height={48}
+                          radius={borderRadius.sm}
+                          style={{ marginBottom: spacing.sm }}
+                        />
+                        <Skeleton width={80} height={14} radius={borderRadius.sm} />
+                      </>
+                    ) : (
+                      <>
+                        {(() => {
+                          const balStr = formatBalance(totalBalance);
+                          const len = balStr.length;
+                          const fontSize =
+                            len <= 8
+                              ? typography.size['5xl']
+                              : len <= 12
+                              ? 32
+                              : len <= 16
+                              ? 26
+                              : 20;
+                          return (
+                            <Text
+                              style={{
+                                fontSize,
+                                fontWeight: typography.weight.bold,
+                                color: colors.primary,
+                                marginBottom: spacing.sm,
+                              }}
+                            >
+                              {balStr}
+                            </Text>
+                          );
+                        })()}
                         <Text
                           style={{
-                            fontSize,
-                            fontWeight: typography.weight.bold,
-                            color: colors.primary,
-                            marginBottom: spacing.sm,
+                            fontSize: typography.size.sm,
+                            color: colors.text_secondary,
                           }}
                         >
-                          {balStr}
+                          {t.wallet.currency}
                         </Text>
-                      );
-                    })()}
-                    <Text
-                      style={{
-                        fontSize: typography.size.sm,
-                        color: colors.text_secondary,
-                      }}
-                    >
-                      {tokensLoading ? 'Loading tokens…' : t.wallet.currency}
-                    </Text>
+                      </>
+                    )}
                   </View>
                 </Card>
               ) : (
@@ -1245,18 +1313,27 @@ const SIDScreen = ({ navigation, route }: any) => {
               >
                 {activeWalletTab === 'Tokens' && (
                   <>
+                    {/* Token row skeleton — same height rhythm as the
+                        rendered per-token Card list below. Keeps the
+                        tab panel content stable while balances stream
+                        in. */}
                     {tokensLoading ? (
-                      <View
-                        style={{
-                          flex: 1,
-                          justifyContent: 'center',
-                          alignItems: 'center',
-                        }}
-                      >
-                        <Text style={{ color: colors.text_secondary }}>
-                          Loading tokens...
-                        </Text>
-                      </View>
+                      <Column gap="sm" style={{ paddingTop: spacing.sm }}>
+                        {[0, 1, 2].map(i => (
+                          <Row
+                            key={i}
+                            align="center"
+                            style={{ gap: spacing.md, paddingVertical: spacing.xs }}
+                          >
+                            <Skeleton width={40} height={40} radius={20} />
+                            <Column gap="xs" style={{ flex: 1 }}>
+                              <Skeleton height={14} width={'50%'} />
+                              <Skeleton height={10} width={'30%'} />
+                            </Column>
+                            <Skeleton height={16} width={72} />
+                          </Row>
+                        ))}
+                      </Column>
                     ) : customOwnedTokens.length === 0 ? (
                       <View
                         style={{
@@ -1266,7 +1343,7 @@ const SIDScreen = ({ navigation, route }: any) => {
                         }}
                       >
                         <Text style={{ color: colors.text_secondary }}>
-                          No tokens available
+                          {t.sidScreen.tokens.empty}
                         </Text>
                       </View>
                     ) : (
@@ -1455,18 +1532,28 @@ const SIDScreen = ({ navigation, route }: any) => {
 
                 {activeWalletTab === 'Activity' && (
                   <>
+                    {/* Skeleton rows that match the real activity row
+                        height — three placeholder cards stacked with
+                        the same vertical rhythm as the rendered
+                        transaction list. This stops the "activity
+                        flashes empty then pops 5 rows" jump. */}
                     {activityLoading ? (
-                      <View
-                        style={{
-                          flex: 1,
-                          justifyContent: 'center',
-                          alignItems: 'center',
-                        }}
-                      >
-                        <Text style={{ color: colors.text_secondary }}>
-                          Loading activity...
-                        </Text>
-                      </View>
+                      <Column gap="sm" style={{ paddingHorizontal: spacing.md, paddingVertical: spacing.sm }}>
+                        {[0, 1, 2].map(i => (
+                          <Row
+                            key={i}
+                            align="center"
+                            style={{ gap: spacing.md, paddingVertical: spacing.xs }}
+                          >
+                            <Skeleton width={36} height={36} radius={18} />
+                            <Column gap="xs" style={{ flex: 1 }}>
+                              <Skeleton height={12} width={'60%'} />
+                              <Skeleton height={10} width={'40%'} />
+                            </Column>
+                            <Skeleton height={14} width={64} />
+                          </Row>
+                        ))}
+                      </Column>
                     ) : !activityData?.transactions?.length ? (
                       <View
                         style={{
@@ -1505,8 +1592,6 @@ const SIDScreen = ({ navigation, route }: any) => {
                                 borderBottomWidth:
                                   index === activityData.transactions.length - 1 ? 0 : 1,
                                 borderBottomColor: colors.border,
-                                borderLeftWidth: isPending ? 3 : 0,
-                                borderLeftColor: colors.warning,
                               }}
                             >
                               <View
@@ -1630,14 +1715,14 @@ const SIDScreen = ({ navigation, route }: any) => {
                       </Text>
                     </Row>
                     <Row style={{ alignItems: 'center', gap: spacing.sm }}>
-                      <Badge label="Coming soon" variant="info" size="sm" />
+                      <Badge label={t.sidScreen.tokens.comingSoon} variant="info" size="sm" />
                       <Text
                         style={{
                           fontSize: typography.size.xs,
                           color: colors.text_secondary,
                         }}
                       >
-                        Coming soon
+                        {t.sidScreen.tokens.comingSoon}
                       </Text>
                     </Row>
                   </Column>
