@@ -18,6 +18,7 @@ import {
   borderRadius,
   typography,
   shadows,
+  createThemeReactiveStyles,
 } from '../../../theme';
 
 export interface StakeDaoTarget {
@@ -583,18 +584,5 @@ const makeStyles = () => StyleSheet.create({
 });
 
 // Theme-reactive stylesheet proxy — rebuilds when `colors.bg_darkest` changes
-// (i.e. on theme toggle). Same pattern used in the explorer/oracle screens.
-type S = ReturnType<typeof makeStyles>;
-let _cached: S | null = null;
-let _key: string | null = null;
-const styles = new Proxy({} as S, {
-  get(_t, prop: string) {
-    if (_cached === null || _key !== colors.bg_darkest) {
-      _cached = makeStyles();
-      _key = colors.bg_darkest;
-    }
-    return (_cached as unknown as Record<string, unknown>)[prop];
-  },
-});
-
+const styles = createThemeReactiveStyles(makeStyles);
 export default StakeDaoModal;

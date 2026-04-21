@@ -21,7 +21,7 @@ import Svg, {
   Text as SvgText,
 } from 'react-native-svg';
 import { Text, Card, Row, Column } from '../../components';
-import { colors, spacing, borderRadius, typography } from '../../theme';
+import { colors, spacing, borderRadius, typography , createThemeReactiveStyles } from '../../theme';
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
 
@@ -898,17 +898,5 @@ const makeSimStyles = () => StyleSheet.create({
   thumb: { position: 'absolute', width: 16, height: 16, borderRadius: 8, marginLeft: -8, top: 4 },
 });
 
-type SimStyles = ReturnType<typeof makeSimStyles>;
-let cachedSimStyles: SimStyles | null = null;
-let cachedSimThemeKey: string | null = null;
-const ss = new Proxy({} as SimStyles, {
-  get(_t, prop: string) {
-    if (cachedSimStyles === null || cachedSimThemeKey !== colors.bg_darkest) {
-      cachedSimStyles = makeSimStyles();
-      cachedSimThemeKey = colors.bg_darkest;
-    }
-    return (cachedSimStyles as unknown as Record<string, unknown>)[prop];
-  },
-});
-
+const ss = createThemeReactiveStyles(makeSimStyles);
 export default SimulatorTab;

@@ -25,6 +25,7 @@ import {
   Badge,
   Skeleton,
   StakeDetailModal,
+  GuestEntryCard,
 } from '../components';
 import {
   useAuth,
@@ -832,114 +833,71 @@ const SIDScreen = ({ navigation, route }: any) => {
         />
 
         <ScreenLayout paddingTop={spacing.md} centerContent>
-          <View
-            style={{
-              flex: 1,
-              justifyContent: 'center',
-              alignItems: 'center',
-              paddingHorizontal: spacing.lg,
-              gap: spacing.xl,
-            }}
-          >
-            {/* Wallet-card preview — faded, typographic. No icons. */}
-            <View
-              style={{
-                width: '100%',
-                maxWidth: 340,
-                backgroundColor: colors.bg_darker,
-                borderRadius: borderRadius.lg,
-                borderWidth: 1,
-                borderColor: colors.border,
-                paddingVertical: spacing.lg,
-                paddingHorizontal: spacing.lg,
-                opacity: 0.55,
-              }}
-            >
-              <Text
-                style={{
-                  color: colors.text_tertiary,
-                  fontSize: typography.size.xs,
-                  letterSpacing: 1.5,
-                  textTransform: 'uppercase',
-                  marginBottom: spacing.xs,
-                }}
-              >
-                Your wallet
-              </Text>
-              <Text
-                style={{
-                  color: colors.text_primary,
-                  fontSize: typography.size['2xl'],
-                  fontWeight: typography.weight.bold,
-                  letterSpacing: -0.5,
-                  marginBottom: spacing.md,
-                }}
-              >
-                0.0000 SOV
-              </Text>
+          <GuestEntryCard
+            headline={t.sidScreen.guest.signInTitle}
+            body={t.sidScreen.guest.signInBody}
+            signInLabel={t.sidScreen.guest.signIn}
+            createLabel={t.sidScreen.guest.createAccount}
+            onSignIn={() => navigation.navigate('SignIn')}
+            onCreate={() => navigation.navigate('CreateIdentity')}
+            preview={
               <View
                 style={{
-                  height: 10,
-                  width: '70%',
-                  backgroundColor: colors.text_secondary,
-                  opacity: 0.18,
-                  borderRadius: 5,
-                  marginBottom: 8,
-                }}
-              />
-              <View
-                style={{
-                  height: 10,
-                  width: '45%',
-                  backgroundColor: colors.text_secondary,
-                  opacity: 0.18,
-                  borderRadius: 5,
-                }}
-              />
-            </View>
-
-            {/* Copy */}
-            <View style={{ alignItems: 'center', maxWidth: 340 }}>
-              <Text
-                style={{
-                  fontSize: typography.size['2xl'],
-                  fontWeight: typography.weight.bold,
-                  color: colors.text_primary,
-                  textAlign: 'center',
-                  marginBottom: spacing.sm,
-                  letterSpacing: -0.3,
+                  width: '100%',
+                  maxWidth: 340,
+                  backgroundColor: colors.bg_darker,
+                  borderRadius: borderRadius.lg,
+                  borderWidth: 1,
+                  borderColor: colors.border,
+                  paddingVertical: spacing.lg,
+                  paddingHorizontal: spacing.lg,
+                  opacity: 0.55,
                 }}
               >
-                {t.sidScreen.guest.signInTitle}
-              </Text>
-              <Text
-                style={{
-                  fontSize: typography.size.md,
-                  color: colors.text_secondary,
-                  textAlign: 'center',
-                  lineHeight: 22,
-                }}
-              >
-                {t.sidScreen.guest.signInBody}
-              </Text>
-            </View>
-
-            {/* CTAs */}
-            <View style={{ width: '100%', maxWidth: 320, gap: spacing.md }}>
-              <Button
-                variant="primary"
-                onPress={() => navigation.navigate('SignIn')}
-              >
-                {t.sidScreen.guest.signIn}
-              </Button>
-              <Button
-                variant="secondary"
-                onPress={() => navigation.navigate('CreateIdentity')}
-              >
-                {t.sidScreen.guest.createAccount}
-              </Button>
-            </View>
-          </View>
+                <Text
+                  style={{
+                    color: colors.text_tertiary,
+                    fontSize: typography.size.xs,
+                    letterSpacing: 1.5,
+                    textTransform: 'uppercase',
+                    marginBottom: spacing.xs,
+                  }}
+                >
+                  Your wallet
+                </Text>
+                <Text
+                  style={{
+                    color: colors.text_primary,
+                    fontSize: typography.size['2xl'],
+                    fontWeight: typography.weight.bold,
+                    letterSpacing: -0.5,
+                    marginBottom: spacing.md,
+                  }}
+                >
+                  0.0000 SOV
+                </Text>
+                <View
+                  style={{
+                    height: 10,
+                    width: '70%',
+                    backgroundColor: colors.text_secondary,
+                    opacity: 0.18,
+                    borderRadius: 5,
+                    marginBottom: 8,
+                  }}
+                />
+                <View
+                  style={{
+                    height: 10,
+                    width: '45%',
+                    backgroundColor: colors.text_secondary,
+                    opacity: 0.18,
+                    borderRadius: 5,
+                  }}
+                />
+              </View>
+            }
+          />
         </ScreenLayout>
       </View>
     );

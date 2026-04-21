@@ -2,7 +2,7 @@ import React, { useState } from 'react';
 import { View, ScrollView, StyleSheet, Pressable, ActivityIndicator, Clipboard, Platform } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Text, Card, Column } from '../../components';
-import { colors, spacing, borderRadius, typography } from '../../theme';
+import { colors, spacing, borderRadius, typography , createThemeReactiveStyles } from '../../theme';
 import { useAsyncData } from '../../hooks';
 import { fetchIdentity, IdentityResponse } from '../../services/ExplorerService';
 
@@ -147,17 +147,5 @@ const makeStyles = () => StyleSheet.create({
   mono: { fontFamily: MONO_FONT, fontSize: typography.size.sm, color: colors.text_primary },
 });
 
-type S = ReturnType<typeof makeStyles>;
-let _cached: S | null = null;
-let _key: string | null = null;
-const styles = new Proxy({} as S, {
-  get(_t, prop: string) {
-    if (_cached === null || _key !== colors.bg_darkest) {
-      _cached = makeStyles();
-      _key = colors.bg_darkest;
-    }
-    return (_cached as unknown as Record<string, unknown>)[prop];
-  },
-});
-
+const styles = createThemeReactiveStyles(makeStyles);
 export default IdentityDetailScreen;

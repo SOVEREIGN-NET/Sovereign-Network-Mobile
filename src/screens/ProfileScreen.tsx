@@ -20,6 +20,7 @@ import {
   ScreenLayout,
   DetailRow,
   SectionLabel,
+  GuestEntryCard,
 } from '../components';
 import { useAuth, useAsyncData } from '../hooks';
 import { useTranslation } from '../i18n';
@@ -85,143 +86,98 @@ const ProfileScreen = ({ navigation }: any) => {
     return (
       <View style={{ flex: 1, backgroundColor: colors.bg_darkest }}>
         <ScreenLayout centerContent>
-          <View
-            style={{
-              flex: 1,
-              justifyContent: 'center',
-              alignItems: 'center',
-              paddingHorizontal: spacing.lg,
-              gap: spacing.xl,
-            }}
-          >
-            {/* Preview card — shows what a profile looks like, faded */}
-            <View
-              style={{
-                width: '100%',
-                maxWidth: 340,
-                backgroundColor: colors.bg_darker,
-                borderRadius: borderRadius.lg,
-                borderWidth: 1,
-                borderColor: colors.border,
-                padding: spacing.lg,
-                opacity: 0.55,
-              }}
-            >
+          <GuestEntryCard
+            headline="Your sovereign identity"
+            body="A post-quantum identity you own — no emails, no passwords on a server. Wallet, profile, and reputation under a single key only you control."
+            signInLabel="Sign In"
+            createLabel="Create Account"
+            onSignIn={() => navigation.navigate('SignIn')}
+            onCreate={() => navigation.navigate('CreateIdentity')}
+            preview={
               <View
                 style={{
-                  flexDirection: 'row',
-                  alignItems: 'center',
-                  gap: spacing.md,
-                  marginBottom: spacing.md,
+                  width: '100%',
+                  maxWidth: 340,
+                  backgroundColor: colors.bg_darker,
+                  borderRadius: borderRadius.lg,
+                  borderWidth: 1,
+                  borderColor: colors.border,
+                  padding: spacing.lg,
+                  opacity: 0.55,
                 }}
               >
                 <View
                   style={{
-                    width: 48,
-                    height: 48,
-                    borderRadius: 24,
-                    backgroundColor: colors.primary,
+                    flexDirection: 'row',
                     alignItems: 'center',
-                    justifyContent: 'center',
+                    gap: spacing.md,
+                    marginBottom: spacing.md,
                   }}
                 >
-                  <Text
+                  <View
                     style={{
-                      color: colors.text_primary,
-                      fontSize: typography.size.lg,
-                      fontWeight: typography.weight.bold,
+                      width: 48,
+                      height: 48,
+                      borderRadius: 24,
+                      backgroundColor: colors.primary,
+                      alignItems: 'center',
+                      justifyContent: 'center',
                     }}
                   >
-                    S
-                  </Text>
+                    <Text
+                      style={{
+                        color: colors.text_primary,
+                        fontSize: typography.size.lg,
+                        fontWeight: typography.weight.bold,
+                      }}
+                    >
+                      S
+                    </Text>
+                  </View>
+                  <View style={{ flex: 1 }}>
+                    <View
+                      style={{
+                        height: 12,
+                        width: '70%',
+                        backgroundColor: colors.text_secondary,
+                        opacity: 0.3,
+                        borderRadius: 6,
+                        marginBottom: 6,
+                      }}
+                    />
+                    <View
+                      style={{
+                        height: 10,
+                        width: '45%',
+                        backgroundColor: colors.text_secondary,
+                        opacity: 0.2,
+                        borderRadius: 5,
+                      }}
+                    />
+                  </View>
                 </View>
-                <View style={{ flex: 1 }}>
-                  <View
-                    style={{
-                      height: 12,
-                      width: '70%',
-                      backgroundColor: colors.text_secondary,
-                      opacity: 0.3,
-                      borderRadius: 6,
-                      marginBottom: 6,
-                    }}
-                  />
-                  <View
-                    style={{
-                      height: 10,
-                      width: '45%',
-                      backgroundColor: colors.text_secondary,
-                      opacity: 0.2,
-                      borderRadius: 5,
-                    }}
-                  />
-                </View>
+                <View
+                  style={{
+                    height: 10,
+                    width: '85%',
+                    backgroundColor: colors.text_secondary,
+                    opacity: 0.15,
+                    borderRadius: 5,
+                    marginBottom: 8,
+                  }}
+                />
+                <View
+                  style={{
+                    height: 10,
+                    width: '60%',
+                    backgroundColor: colors.text_secondary,
+                    opacity: 0.15,
+                    borderRadius: 5,
+                  }}
+                />
               </View>
-              <View
-                style={{
-                  height: 10,
-                  width: '85%',
-                  backgroundColor: colors.text_secondary,
-                  opacity: 0.15,
-                  borderRadius: 5,
-                  marginBottom: 8,
-                }}
-              />
-              <View
-                style={{
-                  height: 10,
-                  width: '60%',
-                  backgroundColor: colors.text_secondary,
-                  opacity: 0.15,
-                  borderRadius: 5,
-                }}
-              />
-            </View>
-
-            {/* Copy */}
-            <View style={{ alignItems: 'center', maxWidth: 340 }}>
-              <Text
-                style={{
-                  fontSize: typography.size['2xl'],
-                  fontWeight: typography.weight.bold,
-                  color: colors.text_primary,
-                  textAlign: 'center',
-                  marginBottom: spacing.sm,
-                  letterSpacing: -0.3,
-                }}
-              >
-                Your sovereign identity
-              </Text>
-              <Text
-                style={{
-                  fontSize: typography.size.md,
-                  color: colors.text_secondary,
-                  textAlign: 'center',
-                  lineHeight: 22,
-                }}
-              >
-                A post-quantum identity you own — no emails, no passwords on a
-                server. Wallet, profile, and reputation under a single key
-                only you control.
-              </Text>
-            </View>
-
-            {/* CTAs — match SID guest for consistency */}
-            <View style={{ width: '100%', maxWidth: 320, gap: spacing.md }}>
-              <Button
-                variant="primary"
-                onPress={() => navigation.navigate('SignIn')}
-              >
-                Sign In
-              </Button>
-              <Button
-                variant="secondary"
-                onPress={() => navigation.navigate('CreateIdentity')}
-              >
-                Create Account
-              </Button>
-            </View>
-          </View>
+            }
+          />
         </ScreenLayout>
       </View>
     );

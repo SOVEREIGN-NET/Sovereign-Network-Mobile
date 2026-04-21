@@ -12,7 +12,7 @@ import {
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Text, Card, Row, Column, Badge, RefreshRing } from '../../components';
 import Svg, { Path, Circle, Line, Defs, LinearGradient, Stop } from 'react-native-svg';
-import { colors, spacing, borderRadius, typography } from '../../theme';
+import { colors, spacing, borderRadius, typography , createThemeReactiveStyles } from '../../theme';
 import { useOracleData } from '../../hooks/useOracleData';
 import type { UseOracleDataResult } from '../../hooks/useOracleData';
 import {
@@ -1335,20 +1335,5 @@ const makeStyles = () => StyleSheet.create({
  * the same render pass; the cache is reset when `colors.bg_darkest`
  * changes (i.e. a theme swap has mutated the shared palette).
  */
-type OracleStyles = ReturnType<typeof makeStyles>;
-let cachedOracleStyles: OracleStyles | null = null;
-let cachedOracleThemeKey: string | null = null;
-const styles = new Proxy({} as OracleStyles, {
-  get(_target, prop: string) {
-    // `colors.bg_darkest` as a cheap palette-identity key: it rotates
-    // whenever `applyTheme` rewrites the shared `colors` object. One
-    // comparison per style-access is negligible next to layout cost.
-    if (cachedOracleStyles === null || cachedOracleThemeKey !== colors.bg_darkest) {
-      cachedOracleStyles = makeStyles();
-      cachedOracleThemeKey = colors.bg_darkest;
-    }
-    return (cachedOracleStyles as unknown as Record<string, unknown>)[prop];
-  },
-});
-
+const styles = createThemeReactiveStyles(makeStyles);
 export default OracleDashboardScreen;

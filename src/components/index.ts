@@ -112,6 +112,7 @@ export {
   StakeDaoModal,
   StakeDetailModal,
   PouwRewardsCard,
+  GuestEntryCard,
 } from './organisms';
 export type {
   LoadingViewProps,
@@ -121,6 +122,7 @@ export type {
   StakeDaoModalProps,
   StakeDaoTarget,
   StakeDetailModalProps,
+  GuestEntryCardProps,
 } from './organisms';
 
 // Native

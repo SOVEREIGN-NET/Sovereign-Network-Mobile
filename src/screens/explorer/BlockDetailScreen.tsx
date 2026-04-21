@@ -2,7 +2,7 @@ import React, { useState } from 'react';
 import { View, ScrollView, StyleSheet, Pressable, ActivityIndicator, Clipboard, Platform } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Text, Card, Row, Column } from '../../components';
-import { colors, spacing, borderRadius, typography } from '../../theme';
+import { colors, spacing, borderRadius, typography , createThemeReactiveStyles } from '../../theme';
 import { useAsyncData } from '../../hooks';
 import { fetchBlock, BlockDetailResponse } from '../../services/ExplorerService';
 
@@ -123,18 +123,5 @@ const makeStyles = () => StyleSheet.create({
 
 // Proxy wrapper: rebuild the stylesheet whenever the shared `colors`
 // object has been mutated by `applyTheme`. `colors.bg_darkest` is the
-// cheap palette-identity key — it flips on every theme swap.
-type S = ReturnType<typeof makeStyles>;
-let _cached: S | null = null;
-let _key: string | null = null;
-const styles = new Proxy({} as S, {
-  get(_t, prop: string) {
-    if (_cached === null || _key !== colors.bg_darkest) {
-      _cached = makeStyles();
-      _key = colors.bg_darkest;
-    }
-    return (_cached as unknown as Record<string, unknown>)[prop];
-  },
-});
-
+const styles = createThemeReactiveStyles(makeStyles);
 export default BlockDetailScreen;
