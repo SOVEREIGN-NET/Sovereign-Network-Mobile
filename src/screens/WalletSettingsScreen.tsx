@@ -34,6 +34,9 @@ const PICKABLE_LANGUAGES: PickableLanguage[] = ['en', 'es'];
  *  both settings read as obviously-toggles at a glance. */
 const PICKABLE_THEMES: ThemeType[] = ['charcoal', 'light'];
 
+/** Platform-aware monospace font for hash / address readouts. */
+const MONO_FONT = Platform.OS === 'ios' ? 'Menlo' : 'monospace';
+
 const WalletSettingsScreen = ({ navigation }: any) => {
   // `language` drives the "which pill is active" highlight; `t` is
   // the live translation object. `useTranslation` subscribes to the
@@ -423,7 +426,7 @@ const BuildInfoRow = ({
         fontSize: typography.size.xs,
         color: colors.text_primary,
         fontWeight: typography.weight.semibold,
-        fontFamily: mono ? (Platform.OS === 'ios' ? 'Menlo' : 'monospace') : undefined,
+        fontFamily: mono ? MONO_FONT : undefined,
         flexShrink: 1,
         textAlign: 'right',
         marginLeft: spacing.md,

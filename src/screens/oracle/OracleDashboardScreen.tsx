@@ -632,7 +632,7 @@ const PriceTab: React.FC<{ pair: OraclePair }> = ({ pair }) => {
                     ? formatAtomicPriceDisplay(data.price_atomic, scale, '$')
                     : fmt(data.price, dec);
                 const len = priceStr.length;
-                const fontSize = len <= 8 ? 48 : len <= 12 ? 36 : len <= 16 ? 28 : 22;
+                const fontSize = resolvePriceFontSize(len);
                 return (
                   <Text style={[styles.priceValue, { fontSize }]}>
                     {priceStr}
@@ -1140,6 +1140,14 @@ const ConfigTab: React.FC<{
 };
 
 // --- Main screen ---
+
+/** Price display font size — scales down as the formatted string grows. */
+const resolvePriceFontSize = (len: number): number => {
+  if (len <= 8) return 48;
+  if (len <= 12) return 36;
+  if (len <= 16) return 28;
+  return 22;
+};
 
 const OracleDashboardScreen: React.FC<any> = ({ navigation }) => {
   const [pair, setPair] = useState<OraclePair>('SOV/USD');

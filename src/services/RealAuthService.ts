@@ -45,6 +45,13 @@ export interface MigrationResult {
   newSeedPhrase: string[];
 }
 
+/** Strip the `did:zhtp:` prefix from a DID, returning just the identity id,
+ * or `undefined` if the input is missing/empty. */
+function stripDidPrefix(did: string | undefined): string | undefined {
+  if (!did) return undefined;
+  return did.startsWith('did:zhtp:') ? did.substring('did:zhtp:'.length) : did;
+}
+
 function withTimeout<T>(promise: Promise<T>, ms: number, label: string): Promise<T> {
   let timeoutId: ReturnType<typeof setTimeout> | undefined;
   const timeout = new Promise<never>((_, reject) => {
@@ -405,11 +412,7 @@ class RealAuthService {
       const serverIdentityId = responseOk ? (payload?.identity as Record<string, unknown>)?.identity_id as string | undefined : undefined;
       const didFromServer = responseOk ? (payload?.identity as Record<string, unknown>)?.did as string | undefined : undefined;
       const identityDid = restored?.did || didFromServer;
-      const identityId = identityDid
-        ? identityDid.startsWith('did:zhtp:')
-          ? identityDid.substring('did:zhtp:'.length)
-          : identityDid
-        : serverIdentityId;
+      const identityId = stripDidPrefix(identityDid) ?? serverIdentityId;
       if (!identityId) {
         throw new Error('Recovery failed: missing identity id');
       }

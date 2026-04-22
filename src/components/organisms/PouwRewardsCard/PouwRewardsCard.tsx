@@ -46,6 +46,27 @@ const ATOMS_PER_SOV = 10n ** BigInt(SOV_DECIMALS);
 // breaking the 2×3 grid's vertical rhythm.
 const STATS_CELL_MIN_HEIGHT = 80;
 
+/** Header badge copy: exhausted > stale > live (order of precedence). */
+const resolveBadgeLabel = (
+  exhausted: boolean,
+  stale: boolean,
+  t: ReturnType<typeof useTranslation>['t'],
+): string => {
+  if (exhausted) return t.pouwCard.exhaustedBadge;
+  if (stale) return t.pouwCard.staleBadge;
+  return t.pouwCard.liveBadge;
+};
+
+/** Header badge variant — same precedence as the label. */
+const resolveBadgeVariant = (
+  exhausted: boolean,
+  stale: boolean,
+): 'error' | 'warning' | 'success' => {
+  if (exhausted) return 'error';
+  if (stale) return 'warning';
+  return 'success';
+};
+
 export const PouwRewardsCard: React.FC = () => {
   const { t } = useTranslation();
   const [activeTab, setActiveTab] = useState<Tab>('overview');
@@ -98,16 +119,8 @@ export const PouwRewardsCard: React.FC = () => {
         </Column>
         <Row align="center" style={{ gap: spacing.sm }}>
           <Badge
-            label={
-              budgetExhausted
-                ? t.pouwCard.exhaustedBadge
-                : status.stale
-                ? t.pouwCard.staleBadge
-                : t.pouwCard.liveBadge
-            }
-            variant={
-              budgetExhausted ? 'error' : status.stale ? 'warning' : 'success'
-            }
+            label={resolveBadgeLabel(budgetExhausted, status.stale, t)}
+            variant={resolveBadgeVariant(budgetExhausted, status.stale)}
             size="sm"
           />
           <RefreshRing

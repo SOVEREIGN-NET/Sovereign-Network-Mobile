@@ -106,11 +106,10 @@ export const Input = React.forwardRef<TextInput | null, InputProps>(
       // palette so the Input respects the current theme. Hardcoded
       // hex values were the reason the Send-Tokens fields stayed dark
       // on the light theme.
-      const borderColor = error
-        ? colors.error
-        : isFocused
-        ? colors.primary
-        : colors.border;
+      let borderColor: string;
+      if (error) borderColor = colors.error;
+      else if (isFocused) borderColor = colors.primary;
+      else borderColor = colors.border;
 
       return (
         <View style={[baseStyles.container, containerStyle]}>

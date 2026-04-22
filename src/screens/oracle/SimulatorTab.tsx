@@ -275,6 +275,16 @@ const ParamRow: React.FC<{ label: string; children: React.ReactNode }> = ({ labe
 
 // ── Main component ────────────────────────────────────────────────────────────
 
+/** Curve-mode badge copy: graduated takes precedence over the oracle probe. */
+const resolveCurveModeLabel = (
+  graduated: boolean,
+  mode: 'derived' | string,
+): string => {
+  if (graduated) return 'Graduated';
+  if (mode === 'derived') return 'Live Curve';
+  return 'Genesis Ref';
+};
+
 const SimulatorTab: React.FC = () => {
   const [sim, setSim] = useState<SimState>(INIT);
   const [bands, setBands] = useState<Band[]>(DEFAULT_BANDS);
@@ -509,7 +519,7 @@ const SimulatorTab: React.FC = () => {
             <Row justify="space-between" align="center">
               <View style={[ss.badge, sim.graduated ? ss.badgeGrad : ss.badgeGenesis]}>
                 <Text variant="caption" style={ss.badgeText}>
-                  {sim.graduated ? 'Graduated' : oracleMode === 'derived' ? 'Live Curve' : 'Genesis Ref'}
+                  {resolveCurveModeLabel(sim.graduated, oracleMode)}
                 </Text>
               </View>
               <Row gap="md">
