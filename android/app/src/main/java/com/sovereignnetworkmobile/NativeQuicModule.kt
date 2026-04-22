@@ -169,74 +169,84 @@ class NativeQuicModule(reactContext: ReactApplicationContext) :
         executor.execute {
             try {
                 ensureInitialized()
-
-                val method = if (options.hasKey("method")) options.getString("method") else "GET"
-                val timeout = if (options.hasKey("timeout")) options.getInt("timeout") else DEFAULT_TIMEOUT
-                val body = if (options.hasKey("body")) options.getString("body") else ""
-                val insecure = if (options.hasKey("insecure")) options.getBoolean("insecure") else true
-                val alpn = if (options.hasKey("alpn")) options.getString("alpn") else "authenticated"
-
-                // Convert headers to JSON
-                val headersJson = if (options.hasKey("headers")) {
-                    val headers = options.getMap("headers")
-                    val jsonObj = JSONObject()
-                    headers?.let {
-                        val iterator = it.keySetIterator()
-                        while (iterator.hasNextKey()) {
-                            val key = iterator.nextKey()
-                            jsonObj.put(key, it.getString(key))
-                        }
-                    }
-                    jsonObj.toString()
+                val opts = parseRequestOptions(options)
+                if (opts.alpn == "public") {
+                    dispatchPublicRequest(url, opts, promise)
                 } else {
-                    "{}"
+                    dispatchAuthenticatedRequest(url, opts, promise)
                 }
-
-                val alpnMode = alpn ?: "authenticated"
-
-                if (alpnMode == "public") {
-                    val result = NativeQuicBridge.request(
-                        url = url,
-                        method = method ?: "GET",
-                        headersJson = headersJson,
-                        body = body ?: "",
-                        timeoutSecs = timeout,
-                        insecure = insecure,
-                        alpn = alpnMode
-                    )
-                    handleStringResponse(result, promise)
-                    return@execute
-                }
-
-                val parsedUrl = parseQuicUrl(url)
-                if (parsedUrl == null) {
-                    promise.reject("QUIC_ERROR", "Invalid URL", null)
-                    return@execute
-                }
-
-                val identityId = extractIdentityId(parsedUrl.path, body, headersJson)
-                if (identityId.isNullOrEmpty()) {
-                    promise.reject("QUIC_ERROR", "Missing identity_id for authenticated request", null)
-                    return@execute
-                }
-
-                Log.d(TAG, "[🌐 Web4] Auth request identity_id=${maskIdentifier(identityId)} path=${parsedUrl.path}")
-                Log.d(TAG, "[PoUW] Enqueueing authenticated request for identity=${maskIdentifier(identityId)}")
-                enqueueAuthenticatedRequest(
-                    identityId = identityId,
-                    parsedUrl = parsedUrl,
-                    method = method ?: "GET",
-                    headersJson = headersJson,
-                    body = body ?: "",
-                    promise = promise
-                )
-                return@execute
-
             } catch (e: Exception) {
                 Log.e(TAG, "[🌐 Web4] Request error", e)
                 promise.reject("QUIC_ERROR", "Request failed: ${e.message}", e)
             }
         }
+    }
+
+    /** Normalised bundle of the fields `request()` pulls off its `options` map. */
+    private data class RequestOptions(
+        val method: String,
+        val timeout: Int,
+        val body: String,
+        val insecure: Boolean,
+        val alpn: String,
+        val headersJson: String,
+    )
+
+    private fun parseRequestOptions(options: ReadableMap): RequestOptions {
+        val method = if (options.hasKey("method")) options.getString("method") ?: "GET" else "GET"
+        val timeout = if (options.hasKey("timeout")) options.getInt("timeout") else DEFAULT_TIMEOUT
+        val body = if (options.hasKey("body")) options.getString("body") ?: "" else ""
+        val insecure = if (options.hasKey("insecure")) options.getBoolean("insecure") else true
+        val alpn = if (options.hasKey("alpn")) options.getString("alpn") ?: "authenticated" else "authenticated"
+        val headersJson = if (options.hasKey("headers")) headersMapToJson(options.getMap("headers")) else "{}"
+        return RequestOptions(method, timeout, body, insecure, alpn, headersJson)
+    }
+
+    private fun headersMapToJson(headers: ReadableMap?): String {
+        val jsonObj = JSONObject()
+        if (headers == null) return jsonObj.toString()
+        val iterator = headers.keySetIterator()
+        while (iterator.hasNextKey()) {
+            val key = iterator.nextKey()
+            jsonObj.put(key, headers.getString(key))
+        }
+        return jsonObj.toString()
+    }
+
+    private fun dispatchPublicRequest(url: String, opts: RequestOptions, promise: Promise) {
+        val result = NativeQuicBridge.request(
+            url = url,
+            method = opts.method,
+            headersJson = opts.headersJson,
+            body = opts.body,
+            timeoutSecs = opts.timeout,
+            insecure = opts.insecure,
+            alpn = opts.alpn,
+        )
+        handleStringResponse(result, promise)
+    }
+
+    private fun dispatchAuthenticatedRequest(url: String, opts: RequestOptions, promise: Promise) {
+        val parsedUrl = parseQuicUrl(url)
+        if (parsedUrl == null) {
+            promise.reject("QUIC_ERROR", "Invalid URL", null)
+            return
+        }
+        val identityId = extractIdentityId(parsedUrl.path, opts.body, opts.headersJson)
+        if (identityId.isNullOrEmpty()) {
+            promise.reject("QUIC_ERROR", "Missing identity_id for authenticated request", null)
+            return
+        }
+        Log.d(TAG, "[🌐 Web4] Auth request identity_id=${maskIdentifier(identityId)} path=${parsedUrl.path}")
+        Log.d(TAG, "[PoUW] Enqueueing authenticated request for identity=${maskIdentifier(identityId)}")
+        enqueueAuthenticatedRequest(
+            identityId = identityId,
+            parsedUrl = parsedUrl,
+            method = opts.method,
+            headersJson = opts.headersJson,
+            body = opts.body,
+            promise = promise,
+        )
     }
 
     @ReactMethod
@@ -373,94 +383,99 @@ class NativeQuicModule(reactContext: ReactApplicationContext) :
             body = body,
             promise = promise
         )
+        if (!addToQueueAndShouldStart(identityId, request)) return
+        executor.execute { runHandshakeAndDrain(identityId) }
+    }
 
-        var shouldStart = false
+    /** Returns true if this caller owns the handshake slot and should start one. */
+    private fun addToQueueAndShouldStart(
+        identityId: String,
+        request: QuinnQueuedRequest,
+    ): Boolean {
         synchronized(connectionLock) {
             val queue = quinnRequestQueue.getOrPut(identityId) { mutableListOf() }
             queue.add(request)
-            if (!quinnHandshakeInProgress.contains(identityId)) {
-                quinnHandshakeInProgress.add(identityId)
-                shouldStart = true
-            }
+            if (quinnHandshakeInProgress.contains(identityId)) return false
+            quinnHandshakeInProgress.add(identityId)
+            return true
         }
+    }
 
-        if (!shouldStart) {
+    /** Perform the UHP handshake for this identity, cache the session id,
+     *  and then drain any queued authenticated requests through it. */
+    private fun runHandshakeAndDrain(identityId: String) {
+        val identity = IdentityStore.loadIdentity(reactApplicationContext, identityId)
+        if (identity == null) {
+            failQuinnQueue(identityId, "Identity not found for $identityId")
             return
         }
+        NativeQuicBridge.initUhpQuinn()
+        val handshake = performHandshake(identity)
+        identity.close()
 
-        executor.execute {
-            val identity = IdentityStore.loadIdentity(reactApplicationContext, identityId)
-            if (identity == null) {
-                failQuinnQueue(identityId, "Identity not found for $identityId")
-                return@execute
+        val ok = handshake?.get("ok") as? Boolean ?: false
+        if (!ok) {
+            val error = handshake?.get("error") as? String ?: "Handshake failed"
+            failQuinnQueue(identityId, error)
+            return
+        }
+        val handle = (handshake?.get("handle") as? Number)?.toLong() ?: 0L
+        cacheSessionPrefix(identityId, extractSessionPrefix(handshake))
+        Log.d(TAG, "[🌐 Web4] Handshake ok handle=$handle identity_id=${maskIdentifier(identityId)}")
+        drainQuinnQueue(identityId, handle)
+    }
+
+    /** Dispatch to the lib-client 3-leg path when enabled, otherwise the legacy path. */
+    private fun performHandshake(identity: Identity): Map<String, Any?>? {
+        val spkiPin = activeSpkiPinHex
+        if (NativeQuicBridge.useLibClientHandshake) {
+            // New path: keys stay in Rust.
+            // NOTE: Blocked on quinn-ffi ALPN-aware connect (zhtp-uhp/2).
+            return NativeQuicBridge.handshakeViaLibClient(
+                host = quinnControlPlaneHost,
+                port = quinnControlPlanePort,
+                serverName = quinnControlPlaneServerName,
+                spkiPinHex = spkiPin,
+                identityHandle = identity.getHandle(),
+            )
+        }
+        // Legacy path: extract keys via deprecated getters (briefly in JVM memory).
+        val handshakeJson = identity.toHandshakeJson() ?: ""
+        @Suppress("DEPRECATION")
+        val dilithiumSk = identity.getDilithiumSecretKey() ?: ByteArray(0)
+        @Suppress("DEPRECATION")
+        val kyberSk = identity.getKyberSecretKey() ?: ByteArray(0)
+        @Suppress("DEPRECATION")
+        val masterSeed = identity.getMasterSeed() ?: ByteArray(0)
+        return NativeQuicBridge.uhpQuicConnectAndHandshake(
+            host = quinnControlPlaneHost,
+            port = quinnControlPlanePort,
+            serverName = quinnControlPlaneServerName,
+            spkiPinHex = spkiPin,
+            identityJson = handshakeJson,
+            dilithiumSk = dilithiumSk,
+            kyberSk = kyberSk,
+            masterSeed = masterSeed,
+            chainId = 0,
+        )
+    }
+
+    /** Extract the first 8 bytes of the session id as a hex prefix, or null. */
+    private fun extractSessionPrefix(handshake: Map<String, Any?>?): String? {
+        val bytes = handshake?.get("sessionId") as? ByteArray ?: return null
+        if (bytes.size < 8) return null
+        return bytes.take(8).joinToString("") { b -> "%02x".format(b) }
+    }
+
+    /** Cache the session id prefix under both the raw and normalised identity keys. */
+    private fun cacheSessionPrefix(identityId: String, prefix: String?) {
+        if (prefix.isNullOrEmpty()) return
+        val normalized = normalizeIdentityId(identityId)
+        synchronized(connectionLock) {
+            quinnSessionIdPrefixByIdentity[identityId] = prefix
+            if (normalized != identityId) {
+                quinnSessionIdPrefixByIdentity[normalized] = prefix
             }
-
-            NativeQuicBridge.initUhpQuinn()
-            val spkiPin = activeSpkiPinHex
-
-            val handshake: Map<String, Any?>? = if (NativeQuicBridge.useLibClientHandshake) {
-                // New path: 3-leg UHP via lib-client HandshakeState (keys stay in Rust)
-                // NOTE: Blocked on quinn-ffi ALPN-aware connect (zhtp-uhp/2)
-                NativeQuicBridge.handshakeViaLibClient(
-                    host = quinnControlPlaneHost,
-                    port = quinnControlPlanePort,
-                    serverName = quinnControlPlaneServerName,
-                    spkiPinHex = spkiPin,
-                    identityHandle = identity.getHandle()
-                )
-            } else {
-                // Legacy path: extract keys via deprecated getters (briefly in JVM memory)
-                val handshakeJson = identity.toHandshakeJson() ?: ""
-                @Suppress("DEPRECATION")
-                val dilithiumSk = identity.getDilithiumSecretKey() ?: ByteArray(0)
-                @Suppress("DEPRECATION")
-                val kyberSk = identity.getKyberSecretKey() ?: ByteArray(0)
-                @Suppress("DEPRECATION")
-                val masterSeed = identity.getMasterSeed() ?: ByteArray(0)
-
-                NativeQuicBridge.uhpQuicConnectAndHandshake(
-                    host = quinnControlPlaneHost,
-                    port = quinnControlPlanePort,
-                    serverName = quinnControlPlaneServerName,
-                    spkiPinHex = spkiPin,
-                    identityJson = handshakeJson,
-                    dilithiumSk = dilithiumSk,
-                    kyberSk = kyberSk,
-                    masterSeed = masterSeed,
-                    chainId = 0
-                )
-            }
-
-            // Identity handle no longer needed after handshake setup
-            identity.close()
-
-            val ok = handshake?.get("ok") as? Boolean ?: false
-            if (!ok) {
-                val error = handshake?.get("error") as? String ?: "Handshake failed"
-                failQuinnQueue(identityId, error)
-                return@execute
-            }
-
-            val handle = (handshake?.get("handle") as? Number)?.toLong() ?: 0L
-            val sessionIdPrefix = run {
-                val bytes = handshake["sessionId"] as? ByteArray
-                if (bytes != null && bytes.size >= 8) {
-                    bytes.take(8).joinToString("") { b -> "%02x".format(b) }
-                } else {
-                    null
-                }
-            }
-            if (!sessionIdPrefix.isNullOrEmpty()) {
-                val normalized = normalizeIdentityId(identityId)
-                synchronized(connectionLock) {
-                    quinnSessionIdPrefixByIdentity[identityId] = sessionIdPrefix
-                    if (normalized != identityId) {
-                        quinnSessionIdPrefixByIdentity[normalized] = sessionIdPrefix
-                    }
-                }
-            }
-            Log.d(TAG, "[🌐 Web4] Handshake ok handle=$handle identity_id=${maskIdentifier(identityId)}")
-            drainQuinnQueue(identityId, handle)
         }
     }
 

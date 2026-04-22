@@ -26,6 +26,40 @@ import { useAuth, useAsyncData } from '../hooks';
 import { useTranslation } from '../i18n';
 import { colors, spacing, typography, borderRadius } from '../theme';
 
+/**
+ * Normalise a timestamp that might be in seconds, milliseconds, a numeric
+ * string, or an ISO-8601 string. Returns the epoch-millis value or null
+ * if the input doesn't parse. Kept as a plain helper so `formatCreatedDate`
+ * stays linear and under Sonar's cognitive-complexity threshold.
+ */
+const timestampToMillis = (raw: unknown): number | null => {
+  if (typeof raw === 'number') {
+    if (!Number.isFinite(raw) || raw <= 0) return null;
+    return raw < 1_000_000_000_000 ? raw * 1000 : raw;
+  }
+  if (typeof raw === 'string') {
+    const trimmed = raw.trim();
+    if (!trimmed) return null;
+    if (/^\d+$/.test(trimmed)) {
+      const numeric = Number(trimmed);
+      if (!Number.isFinite(numeric) || numeric <= 0) return null;
+      return numeric < 1_000_000_000_000 ? numeric * 1000 : numeric;
+    }
+    const parsed = Date.parse(trimmed);
+    return Number.isNaN(parsed) ? null : parsed;
+  }
+  return null;
+};
+
+/** Format a possibly-epoch-seconds/ms/ISO timestamp to a local date string, or null. */
+const formatCreatedDate = (raw: unknown): string | null => {
+  const ms = timestampToMillis(raw);
+  if (ms == null) return null;
+  const d = new Date(ms);
+  if (Number.isNaN(d.getTime()) || d.getUTCFullYear() <= 1970) return null;
+  return d.toLocaleDateString();
+};
+
 const ProfileScreen = ({ navigation }: any) => {
   const { t } = useTranslation();
   const { currentIdentity, signOut, isLoading } = useAuth();
@@ -230,34 +264,6 @@ const ProfileScreen = ({ navigation }: any) => {
   const votesCast = 0;
   const reputationScore = 0;
   const authLoading = isLoading || loggingOut;
-
-  const formatCreatedDate = (raw: unknown): string | null => {
-    if (raw === null || raw === undefined) return null;
-
-    let parsed: Date | null = null;
-
-    if (typeof raw === 'number' && Number.isFinite(raw)) {
-      if (raw <= 0) return null;
-      // Node timestamps are often seconds; JS Date expects milliseconds.
-      const ms = raw < 1_000_000_000_000 ? raw * 1000 : raw;
-      parsed = new Date(ms);
-    } else if (typeof raw === 'string') {
-      const trimmed = raw.trim();
-      if (!trimmed) return null;
-      if (/^\d+$/.test(trimmed)) {
-        const numeric = Number(trimmed);
-        if (!Number.isFinite(numeric) || numeric <= 0) return null;
-        const ms = numeric < 1_000_000_000_000 ? numeric * 1000 : numeric;
-        parsed = new Date(ms);
-      } else {
-        parsed = new Date(trimmed);
-      }
-    }
-
-    if (!parsed || Number.isNaN(parsed.getTime())) return null;
-    if (parsed.getUTCFullYear() <= 1970) return null;
-    return parsed.toLocaleDateString();
-  };
 
   const createdDate = formatCreatedDate(currentIdentity.createdAt);
 
