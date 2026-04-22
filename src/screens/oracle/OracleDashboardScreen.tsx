@@ -928,8 +928,8 @@ const StatusTab: React.FC<{
         </Column>
         {d.committee_members?.length > 0 && (
           <Column gap="xs" style={{ marginTop: spacing.sm }}>
-            {d.committee_members.map((member, i) => (
-              <View key={i} style={styles.memberRow}>
+            {d.committee_members.map(member => (
+              <View key={member} style={styles.memberRow}>
                 <Text
                   variant="caption"
                   style={styles.mono}
@@ -1042,8 +1042,8 @@ const ConfigTab: React.FC<{
         </Column>
         {d.committee_members?.length > 0 && (
           <Column gap="xs" style={{ marginTop: spacing.sm }}>
-            {d.committee_members.map((member, i) => (
-              <View key={i} style={styles.memberRow}>
+            {d.committee_members.map(member => (
+              <View key={member} style={styles.memberRow}>
                 <Text
                   variant="caption"
                   style={styles.mono}

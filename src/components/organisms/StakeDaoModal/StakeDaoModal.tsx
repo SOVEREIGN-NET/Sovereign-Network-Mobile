@@ -57,9 +57,9 @@ const hexToRgba = (hex: string, alpha: number): string => {
           .map(c => c + c)
           .join('')
       : cleaned;
-  const r = parseInt(full.substring(0, 2), 16);
-  const g = parseInt(full.substring(2, 4), 16);
-  const b = parseInt(full.substring(4, 6), 16);
+  const r = Number.parseInt(full.substring(0, 2), 16);
+  const g = Number.parseInt(full.substring(2, 4), 16);
+  const b = Number.parseInt(full.substring(4, 6), 16);
   return `rgba(${r}, ${g}, ${b}, ${alpha})`;
 };
 
@@ -85,8 +85,9 @@ export const StakeDaoModal = React.memo(
       const n = parseFloat(amount);
       return Number.isFinite(n) && n > 0 ? n : 0;
     }, [amount]);
-    const canSubmit = parsed > 0;
-    const lockBlocks = lockDays * BLOCKS_PER_DAY;
+    // canSubmit / lockBlocks / handleSubmit live on when the submit button
+    // is re-enabled — left out for now since the button is a "Coming soon"
+    // placeholder. Reintroduce once stake submission is wired up.
     const selectedOption =
       LOCK_OPTIONS.find(o => o.days === lockDays) ?? LOCK_OPTIONS[0];
     const apy = selectedOption.apy;
@@ -98,12 +99,6 @@ export const StakeDaoModal = React.memo(
       if (n < 1) return n.toFixed(3);
       if (n < 1000) return n.toFixed(2);
       return `${(n / 1000).toFixed(n % 1000 === 0 ? 0 : 1)}k`;
-    };
-
-    const handleSubmit = () => {
-      if (!dao || !canSubmit) return;
-      Keyboard.dismiss();
-      onSubmit(dao.id, parsed, lockBlocks);
     };
 
     const handleQuickAmount = (value: number) => {

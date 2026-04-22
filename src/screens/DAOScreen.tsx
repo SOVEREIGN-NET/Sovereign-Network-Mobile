@@ -6,7 +6,6 @@ import {
   Button,
   LoadingView,
   Column,
-  StatBox,
   ScreenLayout,
   HeaderBar,
   SideDrawer,

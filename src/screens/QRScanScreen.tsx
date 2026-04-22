@@ -171,31 +171,34 @@ const QRScanScreen = ({ navigation }: any) => {
  * that haven't run `pod install` / `gradle sync` still render the rest
  * of the app; they fall through to `unsupported` via the module loader.
  */
-const GrantedView: React.FC<{
+// Resolve the vision-camera module once at module load — keeps the Hook
+// call inside `GrantedView` unconditional, as the Rules of Hooks require.
+// Builds that haven't run `pod install` / `gradle sync` have the module
+// missing; we render the unsupported fallback without touching hooks.
+let VisionCamera: {
+  Camera: any;
+  useCameraDevice: (pos: 'back' | 'front') => unknown;
+  useCodeScanner: (cfg: unknown) => unknown;
+} | null = null;
+try {
+  // eslint-disable-next-line @typescript-eslint/no-var-requires
+  VisionCamera = require('react-native-vision-camera');
+} catch {
+  VisionCamera = null;
+}
+
+/**
+ * Sub-component that unconditionally calls vision-camera hooks.
+ * Only rendered when `VisionCamera` resolved at module load, so the
+ * hooks order is stable across every render of this component.
+ */
+const CameraView: React.FC<{
   onScanned: (value: string) => void;
   onCancel: () => void;
 }> = ({ onScanned, onCancel }) => {
   const { t } = useTranslation();
-  let Camera: any;
-  let useCameraDevice: any;
-  let useCodeScanner: any;
-  try {
-    // eslint-disable-next-line @typescript-eslint/no-var-requires
-    const mod = require('react-native-vision-camera');
-    Camera = mod.Camera;
-    useCameraDevice = mod.useCameraDevice;
-    useCodeScanner = mod.useCodeScanner;
-  } catch {
-    return (
-      <DeadEndView
-        onCancel={onCancel}
-        title={t.qrScan.unsupported.title}
-        body={t.qrScan.unsupported.failed}
-        backLabel={t.qrScan.goBack}
-      />
-    );
-  }
-
+  // Non-null assertion is safe: only reachable when VisionCamera loaded.
+  const { Camera, useCameraDevice, useCodeScanner } = VisionCamera!;
   const device = useCameraDevice('back');
   const codeScanner = useCodeScanner({
     codeTypes: ['qr'],
@@ -248,6 +251,30 @@ const GrantedView: React.FC<{
       </View>
     </View>
   );
+};
+
+/**
+ * `granted` branch entry point. If the vision-camera module failed to
+ * load (missing pod/gradle sync), renders a dead-end fallback without
+ * mounting the camera sub-tree — keeps the hooks in `CameraView`
+ * unconditional.
+ */
+const GrantedView: React.FC<{
+  onScanned: (value: string) => void;
+  onCancel: () => void;
+}> = ({ onScanned, onCancel }) => {
+  const { t } = useTranslation();
+  if (!VisionCamera) {
+    return (
+      <DeadEndView
+        onCancel={onCancel}
+        title={t.qrScan.unsupported.title}
+        body={t.qrScan.unsupported.failed}
+        backLabel={t.qrScan.goBack}
+      />
+    );
+  }
+  return <CameraView onScanned={onScanned} onCancel={onCancel} />;
 };
 
 /**

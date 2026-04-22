@@ -70,7 +70,7 @@ const IdentityDetailScreen: React.FC<any> = ({ navigation, route }) => {
           </Card>
         )}
 
-        {data && data.status === 'identity_not_found' && (
+        {data?.status === 'identity_not_found' && (
           <Card>
             <Text variant="body" style={{ color: colors.text_secondary }}>{data.message || 'Identity not found.'}</Text>
           </Card>

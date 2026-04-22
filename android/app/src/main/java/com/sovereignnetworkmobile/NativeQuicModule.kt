@@ -241,7 +241,7 @@ class NativeQuicModule(reactContext: ReactApplicationContext) :
 
     @ReactMethod
     fun getCurrentSessionIdPrefix(identityId: String, promise: Promise) {
-        val normalized = normalizeIdentityId(identityId) ?: identityId
+        val normalized = normalizeIdentityId(identityId)
         val value = synchronized(connectionLock) {
             quinnSessionIdPrefixByIdentity[normalized] ?: quinnSessionIdPrefixByIdentity[identityId]
         }
@@ -443,7 +443,7 @@ class NativeQuicModule(reactContext: ReactApplicationContext) :
 
             val handle = (handshake?.get("handle") as? Number)?.toLong() ?: 0L
             val sessionIdPrefix = run {
-                val bytes = handshake?.get("sessionId") as? ByteArray
+                val bytes = handshake["sessionId"] as? ByteArray
                 if (bytes != null && bytes.size >= 8) {
                     bytes.take(8).joinToString("") { b -> "%02x".format(b) }
                 } else {

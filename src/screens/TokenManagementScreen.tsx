@@ -137,7 +137,7 @@ const TokenManagementScreen = ({ navigation }: any) => {
   // Raw atoms with locale commas (no decimal scaling).
   const formatRawAtoms = (atoms: string) => {
     if (!/^\d+$/.test(atoms)) return atoms;
-    return atoms.replace(/\B(?=(\d{3})+(?!\d))/g, ',');
+    return atoms.replaceAll(/\B(?=(\d{3})+(?!\d))/g, ',');
   };
 
   if (loading) {

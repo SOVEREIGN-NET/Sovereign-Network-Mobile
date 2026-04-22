@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useCallback } from 'react';
-import { View, ScrollView, TouchableOpacity, Modal, TextInput, Alert, KeyboardAvoidingView, Platform } from 'react-native';
+import { View, ScrollView, TouchableOpacity, Modal, TextInput, KeyboardAvoidingView, Platform } from 'react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useFocusEffect } from '@react-navigation/native';
 import {
@@ -18,7 +18,7 @@ import { useAddressBook } from '../hooks/useAddressBook';
 import { useTranslation } from '../i18n';
 import { colors, spacing, typography, borderRadius } from '../theme';
 import tokenService from '../services/TokenService';
-import { TokenTransferRequest, SovTransferRequest } from '../types/token';
+import { SovTransferRequest } from '../types/token';
 import { humanToAtomic, atomsToNumber } from '../utils/tokenUnits';
 import { WELFARE_DAOS } from '../constants';
 
@@ -431,10 +431,11 @@ const SendTokensScreen = ({ navigation, route }: any) => {
         'Recipient must be DID (did:zhtp:...) or hex key id/pubkey';
     }
 
-    if (!transferForm.amount.trim()) {
+    const trimmedAmount = transferForm.amount.trim();
+    if (trimmedAmount.length === 0) {
       newErrors.amount = 'Amount is required';
     } else {
-      const amount = Number.parseFloat(transferForm.amount);
+      const amount = Number.parseFloat(trimmedAmount);
       if (Number.isNaN(amount) || amount <= 0) {
         newErrors.amount = 'Amount must be greater than 0';
       } else if (selectedToken?.type === 'sov' && selectedFromWallet) {

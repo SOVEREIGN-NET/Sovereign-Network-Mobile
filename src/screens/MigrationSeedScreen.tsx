@@ -225,7 +225,7 @@ const MigrationSeedScreen = ({ navigation, route }: MigrationSeedScreenProps) =>
                         if (parts.length <= 1) {
                           setSeedWords(prev => {
                             const next = [...prev];
-                            next[index] = lower.replace(/\s+/g, '');
+                            next[index] = lower.replaceAll(/\s+/g, '');
                             return next;
                           });
                           return;

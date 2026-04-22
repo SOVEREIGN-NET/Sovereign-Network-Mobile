@@ -106,24 +106,21 @@ const RecoverIdentityScreen = (props: RecoverIdentityScreenProps) => {
   const handleValidateSeed = () => {
     setLocalError(null);
 
-    switch (recoveryMethod) {
-      case 'seed': {
-        const normalized = seedWords.map(word => word.trim().toLowerCase()).filter(Boolean);
-        if (normalized.length === 0) {
-          setLocalError(t.auth.recoverIdentity.validation.seedRequired);
-          return;
-        }
-        if (normalized.length !== 24) {
-          setLocalError(t.auth.recoverIdentity.validation.seedInvalid);
-          return;
-        }
-        setValidatedSeedData(normalized.join(' '));
-        setRecoveryPhase('password');
-        break;
-      }
-      default:
-        setLocalError(t.auth.recoverIdentity.validation.invalidMethod);
+    if (recoveryMethod !== 'seed') {
+      setLocalError(t.auth.recoverIdentity.validation.invalidMethod);
+      return;
     }
+    const normalized = seedWords.map(word => word.trim().toLowerCase()).filter(Boolean);
+    if (normalized.length === 0) {
+      setLocalError(t.auth.recoverIdentity.validation.seedRequired);
+      return;
+    }
+    if (normalized.length !== 24) {
+      setLocalError(t.auth.recoverIdentity.validation.seedInvalid);
+      return;
+    }
+    setValidatedSeedData(normalized.join(' '));
+    setRecoveryPhase('password');
   };
 
   // Phase 2: Set password and finalize recovery

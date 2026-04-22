@@ -224,8 +224,8 @@ const SimChart: React.FC<{ history: { block: number; price: number }[] }> = ({ h
               <Stop offset="1" stopColor={colors.primary} stopOpacity="0" />
             </LinearGradient>
           </Defs>
-          {yLabels.map((l, i) => (
-            <React.Fragment key={i}>
+          {yLabels.map(l => (
+            <React.Fragment key={`y-${l.val}`}>
               <SvgLine x1={pad.l} y1={l.y} x2={w - pad.r} y2={l.y}
                 stroke={colors.border} strokeWidth="0.5" />
               <SvgText x={w - pad.r + 3} y={l.y + 3} fontSize="8"
@@ -346,7 +346,7 @@ const SimulatorTab: React.FC = () => {
   }, [gradThreshold, getSovUsd, cb]);
 
   const executeBuy = useCallback(() => {
-    const gross = parseFloat(buyStr);
+    const gross = Number.parseFloat(buyStr);
     if (!gross || gross <= 0) return;
     setBuyStr('');
 
@@ -381,7 +381,7 @@ const SimulatorTab: React.FC = () => {
   }, [buyStr, reserveRatio, maxSupply, cb, checkGraduation]);
 
   const executeSell = useCallback(() => {
-    const cbeIn = parseFloat(sellStr);
+    const cbeIn = Number.parseFloat(sellStr);
     if (!cbeIn || cbeIn <= 0) return;
     setSellStr('');
 
@@ -427,7 +427,7 @@ const SimulatorTab: React.FC = () => {
   }, [sellStr, sellEnabled, burnMode, burnBeta, cb]);
 
   const executeSwap = useCallback(() => {
-    const amt = parseFloat(swapStr);
+    const amt = Number.parseFloat(swapStr);
     if (!amt || amt <= 0) return;
     setSwapStr('');
 
@@ -475,7 +475,7 @@ const SimulatorTab: React.FC = () => {
 
   // Buy/sell quotes
   const buyQuote = (() => {
-    const g = parseFloat(buyStr);
+    const g = Number.parseFloat(buyStr);
     if (!g || g <= 0 || sim.graduated) return '';
     const m = curveMint(reserveRatio * g, sim.circulatingSupply, maxSupply, cb());
     const avg = m > 0 ? g / m : 0;
@@ -483,7 +483,7 @@ const SimulatorTab: React.FC = () => {
   })();
 
   const sellQuote = (() => {
-    const c = parseFloat(sellStr);
+    const c = Number.parseFloat(sellStr);
     if (!c || c <= 0 || c > sim.circulatingSupply || sim.graduated) return '';
     const r = integrateCurve(sim.circulatingSupply - c, sim.circulatingSupply, cb());
     return `≈ ${fmtN(r, 4)} SOV redemption`;
@@ -696,7 +696,7 @@ const SimulatorTab: React.FC = () => {
                   <TextInput
                     style={ss.paramInput}
                     value={String(gradThreshold)}
-                    onChangeText={t => setGradThreshold(parseFloat(t) || gradThreshold)}
+                    onChangeText={t => setGradThreshold(Number.parseFloat(t) || gradThreshold)}
                     keyboardType="decimal-pad"
                   />
                 </ParamRow>
@@ -750,7 +750,7 @@ const SimulatorTab: React.FC = () => {
                     <TextInput
                       style={ss.paramInput}
                       value={String(extCbeUsd)}
-                      onChangeText={t => setExtCbeUsd(parseFloat(t) || extCbeUsd)}
+                      onChangeText={t => setExtCbeUsd(Number.parseFloat(t) || extCbeUsd)}
                       keyboardType="decimal-pad"
                     />
                   </ParamRow>
@@ -776,17 +776,17 @@ const SimulatorTab: React.FC = () => {
               <Column gap="sm" style={{ marginTop: spacing.sm }}>
                 <ParamRow label="Max CBE Supply">
                   <TextInput style={ss.paramInput} value={String(maxSupply)}
-                    onChangeText={t => setMaxSupply(parseFloat(t) || maxSupply)}
+                    onChangeText={t => setMaxSupply(Number.parseFloat(t) || maxSupply)}
                     keyboardType="decimal-pad" />
                 </ParamRow>
                 <ParamRow label="Initial Price (SOV/CBE)">
                   <TextInput style={ss.paramInput} value={String(initPrice)}
-                    onChangeText={t => setInitPrice(parseFloat(t) || initPrice)}
+                    onChangeText={t => setInitPrice(Number.parseFloat(t) || initPrice)}
                     keyboardType="decimal-pad" />
                 </ParamRow>
                 <ParamRow label="SRV Genesis (USD/SOV)">
                   <TextInput style={ss.paramInput} value={String(srvGenesis)}
-                    onChangeText={t => setSrvGenesis(parseFloat(t) || srvGenesis)}
+                    onChangeText={t => setSrvGenesis(Number.parseFloat(t) || srvGenesis)}
                     keyboardType="decimal-pad" />
                 </ParamRow>
 

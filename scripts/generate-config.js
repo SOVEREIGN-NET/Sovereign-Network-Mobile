@@ -12,7 +12,7 @@
 
 const fs = require('fs');
 const path = require('path');
-const { execFileSync } = require('child_process');
+const { execFileSync } = require('node:child_process');
 
 const rootDir = path.join(__dirname, '..');
 const envPath = path.join(rootDir, '.env');
@@ -59,7 +59,7 @@ function parseNodeUrl(url) {
     // Fallback to manual parsing for simple URLs
     const match = url.match(/^https?:\/\/([^:]+):?(\d+)?/);
     if (match) {
-      return { host: match[1], port: parseInt(match[2], 10) || 9334 };
+      return { host: match[1], port: Number.parseInt(match[2], 10) || 9334 };
     }
     return { host: 'g1.thesovereignnetwork.org', port: 9334 };
   }
@@ -73,7 +73,7 @@ function parseNodeRegistry(registryStr) {
     const parts = entry.trim().split(':');
     if (parts.length < 2) return null;
     // parts: [host, port, pin_hex (optional)]
-    return { host: parts[0], port: parseInt(parts[1], 10), pin: parts[2] || '' };
+    return { host: parts[0], port: Number.parseInt(parts[1], 10), pin: parts[2] || '' };
   }).filter(Boolean);
 }
 
@@ -154,9 +154,9 @@ const certificatePin = controlNodeEntry?.pin || '';
 // ZDNS bootstrap config — A-record of `directory.sov` on the ZDNS server
 // seeds the validator list. Overridable via .env for staging/custom topologies.
 const zdnsHost = envConfig.ZDNS_HOST || '91.98.113.188';
-const zdnsPort = parseInt(envConfig.ZDNS_PORT || '53', 10);
+const zdnsPort = Number.parseInt(envConfig.ZDNS_PORT || '53', 10);
 const zdnsDirectoryName = envConfig.ZDNS_DIRECTORY_NAME || 'directory.sov';
-const quicPort = parseInt(envConfig.QUIC_PORT || '9334', 10);
+const quicPort = Number.parseInt(envConfig.QUIC_PORT || '9334', 10);
 
 // 1. Generate JSON config for React Native
 const generatedConfig = {

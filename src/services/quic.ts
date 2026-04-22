@@ -529,7 +529,7 @@ export function parseQuicUrl(
     const parsed = new URL(normalized);
     return {
       host: parsed.hostname,
-      port: parsed.port ? parseInt(parsed.port, 10) : 443,
+      port: parsed.port ? Number.parseInt(parsed.port, 10) : 443,
       path: parsed.pathname + parsed.search,
     };
   } catch {

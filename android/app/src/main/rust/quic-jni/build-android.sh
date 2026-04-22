@@ -21,25 +21,25 @@ cd "$SCRIPT_DIR"
 # Android NDK path
 NDK_HOME="${ANDROID_NDK_HOME:-$HOME/Library/Android/sdk/ndk/27.1.12297006}"
 HOST_TAG="${ANDROID_NDK_HOST_TAG:-}"
-if [ -z "$HOST_TAG" ]; then
+if [[ -z "$HOST_TAG" ]]; then
     ARCH="$(uname -m)"
-    if [ "$ARCH" = "arm64" ]; then
+    if [[ "$ARCH" = "arm64" ]]; then
         HOST_TAG="darwin-arm64"
     else
         HOST_TAG="darwin-x86_64"
     fi
 fi
 TOOLCHAIN="$NDK_HOME/toolchains/llvm/prebuilt/$HOST_TAG"
-if [ ! -d "$TOOLCHAIN" ]; then
-    if [ -d "$NDK_HOME/toolchains/llvm/prebuilt/darwin-x86_64" ]; then
+if [[ ! -d "$TOOLCHAIN" ]]; then
+    if [[ -d "$NDK_HOME/toolchains/llvm/prebuilt/darwin-x86_64" ]]; then
         HOST_TAG="darwin-x86_64"
-    elif [ -d "$NDK_HOME/toolchains/llvm/prebuilt/darwin-arm64" ]; then
+    elif [[ -d "$NDK_HOME/toolchains/llvm/prebuilt/darwin-arm64" ]]; then
         HOST_TAG="darwin-arm64"
     fi
     TOOLCHAIN="$NDK_HOME/toolchains/llvm/prebuilt/$HOST_TAG"
 fi
 
-if [ ! -d "$TOOLCHAIN" ]; then
+if [[ ! -d "$TOOLCHAIN" ]]; then
     echo "Error: NDK toolchain not found at $TOOLCHAIN"
     echo "Set ANDROID_NDK_HOME or NDK_HOME environment variable"
     exit 1
@@ -60,13 +60,13 @@ echo "   NDK: $NDK_HOME"
 echo "   Output: $OUTPUT_DIR"
 echo ""
 
-if [ -n "${ANDROID_ABIS:-}" ]; then
+if [[ -n "${ANDROID_ABIS:-}" ]]; then
     IFS=',' read -r -a ABI_LIST <<< "$ANDROID_ABIS"
     FILTERED_TARGETS=()
     for target_info in "${TARGETS[@]}"; do
         IFS=':' read -r rust_target android_abi clang_prefix api_level <<< "$target_info"
         for abi in "${ABI_LIST[@]}"; do
-            if [ "$android_abi" = "$abi" ]; then
+            if [[ "$android_abi" = "$abi" ]]; then
                 FILTERED_TARGETS+=("$target_info")
             fi
         done

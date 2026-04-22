@@ -29,7 +29,6 @@ export const es: Translation = {
     notChecked: 'Sin comprobar',
     notCheckedHint: 'La conexión aún no ha sido comprobada',
     tapToCheck: 'Toca para comprobar la conexión',
-    back: 'Atrás',
     errors: {
       nodeUnreachable: 'El nodo no es accesible',
       connectionCheckFailed: 'No se pudo comprobar la conexión',
@@ -186,6 +185,7 @@ export const es: Translation = {
       displayName: 'Nombre visible',
       displayNamePlaceholder: 'Tu nombre visible público',
       displayNameHint: 'Visible para otros en votaciones del DAO y perfiles',
+      // NOSONAR — UI label, not a credential
       passphrase: 'Contraseña',
       passphraseShowHide: {
         show: 'Mostrar',

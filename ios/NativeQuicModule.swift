@@ -577,11 +577,11 @@ class NativeQuic: NSObject {
         return .failure(NSError(domain: "NativeQuic", code: -1, userInfo: [NSLocalizedDescriptionKey: "Invalid session ID length from lib-client handshake"]))
       }
 
-      // handshakeHash: use Blake3 of (sessionKey || sessionId) as substitute
-      // The new HandshakeResult doesn't expose handshakeHash directly;
-      // MAC key derivation uses HKDF(sessionKey, salt=handshakeHash).
-      // TODO: Either add handshake_hash getter to lib-client, or change
-      //       deriveMacKey to use sessionId as salt for new handshakes.
+      // handshakeHash: Blake3(sessionKey || sessionId) — deterministic
+      // substitute used as the HKDF salt for MAC-key derivation. lib-client
+      // doesn't expose the real handshake_hash through its FFI, so both
+      // ends agree on this Blake3 construction instead. See the matching
+      // derivation inside lib-client's `make_handshake_ctx`.
       let handshakeHash = try computeBlake3(sessionKey + sessionId)
 
       let sessionInfo = QuinnHandshakeSession(

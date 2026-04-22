@@ -905,25 +905,6 @@ const SIDScreen = ({ navigation, route }: any) => {
 
   const selectedWallet = walletByType.primary ?? wallets[0] ?? null;
 
-  const truncateId = (id: any) => {
-    if (!id) return 'unknown';
-
-    if (Array.isArray(id)) {
-      const hexString = id
-        .map(byte => byte.toString(16).padStart(2, '0'))
-        .join('');
-      return `${hexString.substring(0, 12)}...${hexString.substring(
-        hexString.length - 12,
-      )}`;
-    }
-
-    if (typeof id === 'string' && id !== '') {
-      return `${id.substring(0, 12)}...${id.substring(id.length - 12)}`;
-    }
-
-    return 'unknown';
-  };
-
   const copyToClipboard = (id: any) => {
     let textToCopy = '';
     if (Array.isArray(id)) {
