@@ -416,41 +416,49 @@ const SendTokensScreen = ({ navigation, route }: any) => {
     return trimmed.length === 64 && isHex(trimmed);
   };
 
-  // Validate transfer form
+  // Validate transfer form — broken into a recipient check and an amount
+  // check so each stays under Sonar's cognitive-complexity threshold.
+  const validateRecipient = (): string | undefined => {
+    const raw = transferForm.recipient.trim();
+    if (raw.length === 0) return 'Recipient is required';
+    if (selectedToken?.type === 'sov') {
+      if (!isValidSovRecipient(transferForm.recipient)) {
+        return 'Recipient wallet ID must be 64 hex characters';
+      }
+      return undefined;
+    }
+    if (!isValidRecipient(transferForm.recipient)) {
+      return 'Recipient must be DID (did:zhtp:...) or hex key id/pubkey';
+    }
+    return undefined;
+  };
+
+  const validateAmount = (): string | undefined => {
+    const trimmed = transferForm.amount.trim();
+    if (trimmed.length === 0) return 'Amount is required';
+    const amount = Number.parseFloat(trimmed);
+    if (Number.isNaN(amount) || amount <= 0) {
+      return 'Amount must be greater than 0';
+    }
+    if (selectedToken?.type === 'sov' && selectedFromWallet) {
+      const sourceWallet = wallets?.find(w => w.id === selectedFromWallet);
+      if (sourceWallet && amount > sourceWallet.available_balance) {
+        return `Insufficient balance (${sourceWallet.available_balance.toFixed(2)})`;
+      }
+      return undefined;
+    }
+    if (selectedToken && amount > selectedToken.balance) {
+      return `Insufficient balance (${selectedToken.balance})`;
+    }
+    return undefined;
+  };
+
   const validateTransfer = (): boolean => {
     const newErrors: TransferFormErrors = {};
-
-    if (!transferForm.recipient.trim()) {
-      newErrors.recipient = 'Recipient is required';
-    } else if (selectedToken?.type === 'sov') {
-      if (!isValidSovRecipient(transferForm.recipient)) {
-        newErrors.recipient = 'Recipient wallet ID must be 64 hex characters';
-      }
-    } else if (!isValidRecipient(transferForm.recipient)) {
-      newErrors.recipient =
-        'Recipient must be DID (did:zhtp:...) or hex key id/pubkey';
-    }
-
-    const trimmedAmount = transferForm.amount.trim();
-    if (trimmedAmount.length === 0) {
-      newErrors.amount = 'Amount is required';
-    } else {
-      const amount = Number.parseFloat(trimmedAmount);
-      if (Number.isNaN(amount) || amount <= 0) {
-        newErrors.amount = 'Amount must be greater than 0';
-      } else if (selectedToken?.type === 'sov' && selectedFromWallet) {
-        // SOV: validate against per-wallet balance
-        const sourceWallet = wallets?.find(w => w.id === selectedFromWallet);
-        if (sourceWallet && amount > sourceWallet.available_balance) {
-          newErrors.amount = `Insufficient balance (${sourceWallet.available_balance.toFixed(
-            2,
-          )})`;
-        }
-      } else if (selectedToken && amount > selectedToken.balance) {
-        newErrors.amount = `Insufficient balance (${selectedToken.balance})`;
-      }
-    }
-
+    const recipientErr = validateRecipient();
+    if (recipientErr) newErrors.recipient = recipientErr;
+    const amountErr = validateAmount();
+    if (amountErr) newErrors.amount = amountErr;
     setErrors(newErrors);
     return Object.keys(newErrors).length === 0;
   };
