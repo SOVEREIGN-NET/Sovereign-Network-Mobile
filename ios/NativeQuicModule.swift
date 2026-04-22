@@ -221,6 +221,10 @@ class NativeQuic: NSObject {
 
   @objc
   func getCurrentSessionIdPrefix(_ identityId: String, resolve: @escaping RCTPromiseResolveBlock, reject: @escaping RCTPromiseRejectBlock) {
+    // `reject` is part of the React Native bridge contract (see .m extern);
+    // we never fail this lookup — missing session just resolves `null` —
+    // but the parameter must stay for the signature to match.
+    _ = reject
     let normalized = normalizeIdentityId(identityId)
     connectionLock.lock()
     let value = quinnSessionIdPrefixByIdentity[normalized] ?? quinnSessionIdPrefixByIdentity[identityId]

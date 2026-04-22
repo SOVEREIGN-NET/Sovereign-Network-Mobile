@@ -4,7 +4,7 @@
  */
 
 import React, { useRef, useState } from 'react';
-import { View, TextInput, Pressable } from 'react-native';
+import { View, TextInput } from 'react-native';
 import { NativeStackScreenProps } from '@react-navigation/native-stack';
 import {
   Card,

@@ -43,21 +43,21 @@ const MONO_FONT = Platform.OS === 'ios' ? 'Menlo' : 'monospace';
 
 // Safe number formatter — never crashes on undefined/null/NaN
 const fmt = (v: unknown, decimals = 4, prefix = '$'): string => {
-  const n = typeof v === 'number' ? v : parseFloat(v as any);
-  if (!isFinite(n)) return '—';
+  const n = typeof v === 'number' ? v : Number.parseFloat(v as any);
+  if (!Number.isFinite(n)) return '—';
   return `${prefix}${n.toFixed(decimals)}`;
 };
 
 const fmtChange = (v: unknown, decimals = 4): string => {
-  const n = typeof v === 'number' ? v : parseFloat(v as any);
-  if (!isFinite(n)) return '—';
+  const n = typeof v === 'number' ? v : Number.parseFloat(v as any);
+  if (!Number.isFinite(n)) return '—';
   const sign = n >= 0 ? '+' : '';
   return `${sign}${n.toFixed(decimals)}`;
 };
 
 const fmtPct = (v: unknown): string => {
-  const n = typeof v === 'number' ? v : parseFloat(v as any);
-  if (!isFinite(n)) return '—';
+  const n = typeof v === 'number' ? v : Number.parseFloat(v as any);
+  if (!Number.isFinite(n)) return '—';
   const sign = n >= 0 ? '+' : '';
   return `${sign}${n.toFixed(2)}%`;
 };
@@ -349,9 +349,9 @@ const BondingCurveChart: React.FC<{
         </Defs>
 
         {/* Band dividers */}
-        {bandLines.map((x, i) => (
+        {bandLines.map(x => (
           <Line
-            key={i}
+            key={`band-${x}`}
             x1={x} y1={CURVE_PAD.top}
             x2={x} y2={CURVE_PAD.top + PLOT_H}
             stroke={colors.text_secondary}
@@ -727,7 +727,7 @@ const VariationTab: React.FC<{ pair: OraclePair }> = ({ pair }) => {
       : data.pair === 'SOV/USD'
       ? data.percent_change
       : data.percent_change_since_base;
-  const pct = typeof pctRaw === 'number' && isFinite(pctRaw) ? pctRaw : 0;
+  const pct = typeof pctRaw === 'number' && Number.isFinite(pctRaw) ? pctRaw : 0;
   const changeIsPositive = pct >= 0;
 
   const showInitialLoading = loading && data == null;

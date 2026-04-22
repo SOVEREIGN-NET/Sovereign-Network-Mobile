@@ -65,7 +65,7 @@ const WalletDetailScreen: React.FC<any> = ({ navigation, route }) => {
           </Card>
         )}
 
-        {data && data.wallets.length === 0 && (
+        {data?.wallets.length === 0 && (
           <Card>
             <Text variant="body" style={{ color: colors.text_secondary }}>No wallets found for this identity.</Text>
           </Card>

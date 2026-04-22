@@ -801,7 +801,7 @@ class RealAuthService {
 function base64ToHex(input: string): string {
   if (!input) return '';
   // eslint-disable-next-line @typescript-eslint/no-var-requires
-  const { Buffer } = require('buffer');
+  const { Buffer } = require('node:buffer');
   return Buffer.from(input, 'base64').toString('hex');
 }
 

@@ -343,7 +343,12 @@ const RecoverIdentityScreen = (props: RecoverIdentityScreenProps) => {
                 }}
               >
                 {seedWords.map((word, index) => (
+                  // Fixed-length ordered input grid: the position IS the
+                  // identity of the cell ("word #5"), words may repeat in a
+                  // valid 24-word phrase, so index is the correct stable
+                  // key here. NOSONAR
                   <View
+                    // eslint-disable-next-line react/no-array-index-key
                     key={`seed-word-${index}`}
                     style={{
                       width: '30%',

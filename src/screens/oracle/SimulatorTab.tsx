@@ -26,7 +26,7 @@ import { colors, spacing, borderRadius, typography , createThemeReactiveStyles }
 // ── Helpers ───────────────────────────────────────────────────────────────────
 
 const fmtN = (n: number, d?: number): string => {
-  if (!isFinite(n)) return '0';
+  if (!Number.isFinite(n)) return '0';
   if (Math.abs(n) >= 1e9) return (n / 1e9).toFixed(d ?? 2) + 'B';
   if (Math.abs(n) >= 1e6) return (n / 1e6).toFixed(d ?? 2) + 'M';
   if (Math.abs(n) >= 1e3) return (n / 1e3).toFixed(d ?? 2) + 'K';
@@ -293,7 +293,7 @@ const SimulatorTab: React.FC = () => {
   const [reserveRatio, setReserveRatio] = useState(0.20);
   const [gradThreshold, setGradThreshold] = useState(269000);
   const [burnMode, setBurnMode] = useState<'full' | 'partial'>('full');
-  const [burnBeta, setBurnBeta] = useState(1.0);
+  const [burnBeta, setBurnBeta] = useState(1);
   const [sellEnabled, setSellEnabled] = useState(true);
   const [epochDuration, setEpochDuration] = useState(10);
   const [oracleMode, setOracleMode] = useState<'genesis' | 'derived'>('genesis');
@@ -303,7 +303,7 @@ const SimulatorTab: React.FC = () => {
   // Constants
   const [maxSupply, setMaxSupply] = useState(100_000_000_000);
   const [initPrice, setInitPrice] = useState(0.0003133457);
-  const [srvGenesis, setSrvGenesis] = useState(1.0);
+  const [srvGenesis, setSrvGenesis] = useState(1);
 
   // UI
   const [govExpanded, setGovExpanded] = useState(false);
@@ -413,7 +413,7 @@ const SimulatorTab: React.FC = () => {
         const log = appendLog(prev, 'info', `Sell aborted: insufficient backing`);
         return { ...prev, log };
       }
-      const beta = burnMode === 'full' ? 1.0 : burnBeta;
+      const beta = burnMode === 'full' ? 1 : burnBeta;
       const burned = Math.floor(cbeIn * beta);
       const next: SimState = {
         ...prev,
@@ -675,8 +675,11 @@ const SimulatorTab: React.FC = () => {
             {sim.log.length === 0 ? (
               <Text variant="caption" style={{ color: colors.text_secondary }}>No transactions yet</Text>
             ) : (
-              sim.log.slice(0, 8).map((entry, i) => (
-                <View key={i} style={ss.logRow}>
+              sim.log.slice(0, 8).map(entry => (
+                <View
+                  key={`log-${entry.block}-${entry.type}-${entry.msg}`}
+                  style={ss.logRow}
+                >
                   <Text variant="caption" style={ss.logBlock}>#{entry.block}</Text>
                   <Text variant="caption" style={[ss.logMsg, { color: logColors[entry.type] ?? colors.text_secondary }]} numberOfLines={2}>
                     {entry.msg}

@@ -62,7 +62,7 @@ class DaoService {
     if (!Number.isFinite(lockBlocks) || lockBlocks <= 0) {
       throw new Error('lockBlocks must be > 0');
     }
-    if (!stakerWalletId || stakerWalletId.length !== 64) {
+    if (stakerWalletId?.length !== 64) {
       throw new Error('stakerWalletId must be a 64-char hex string (32 bytes)');
     }
 

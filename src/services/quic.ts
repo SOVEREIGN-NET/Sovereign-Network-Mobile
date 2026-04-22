@@ -124,7 +124,7 @@ function toDid(value: string): string {
 }
 
 function redactDidInPath(path: string): string {
-  return path.replace(
+  return path.replaceAll(
     /(did%3Azhtp%3A|did:zhtp:)[A-Za-z0-9%._:-]+/gi,
     (_, prefix: string) => `${prefix}<redacted>`,
   );
