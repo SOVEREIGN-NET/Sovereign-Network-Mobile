@@ -22,4 +22,16 @@ RCT_EXTERN_METHOD(getCurrentSessionIdPrefix:(NSString *)identityId
 RCT_EXTERN_METHOD(cancelAll:(RCTPromiseResolveBlock)resolve
                   reject:(RCTPromiseRejectBlock)reject)
 
+RCT_EXTERN_METHOD(setActiveValidator:(NSString *)host
+                  port:(NSInteger)port
+                  pinHex:(NSString *)pinHex
+                  resolve:(RCTPromiseResolveBlock)resolve
+                  reject:(RCTPromiseRejectBlock)reject)
+
+RCT_EXTERN_METHOD(resolveDirectory:(NSString *)zdnsHost
+                  port:(NSInteger)port
+                  name:(NSString *)name
+                  resolve:(RCTPromiseResolveBlock)resolve
+                  reject:(RCTPromiseRejectBlock)reject)
+
 @end

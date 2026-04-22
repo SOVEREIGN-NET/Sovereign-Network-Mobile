@@ -17,8 +17,6 @@ export const ErrorAlert = ({ message, icon = '❌' }: ErrorAlertProps) => {
         backgroundColor: colors.error,
         padding: spacing.md,
         borderRadius: borderRadius.md,
-        borderLeftWidth: 4,
-        borderLeftColor: colors.error_dark,
       }}
     >
       <Text style={{ color: colors.white }}>

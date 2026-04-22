@@ -133,8 +133,6 @@ export const Select: React.FC<SelectProps> = ({
                       paddingVertical: spacing.sm,
                       paddingHorizontal: spacing.lg,
                       backgroundColor: isSelected ? colors.primary + '20' : 'transparent',
-                      borderLeftWidth: isSelected ? 3 : 0,
-                      borderLeftColor: isSelected ? colors.primary : 'transparent',
                       minHeight: 48,
                       justifyContent: 'center',
                       opacity: isDisabled ? 0.5 : 1,

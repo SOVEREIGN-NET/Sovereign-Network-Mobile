@@ -2,7 +2,7 @@ import React, { useState } from 'react';
 import { View, ScrollView, StyleSheet, Pressable, ActivityIndicator, Clipboard, Platform } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Text, Card, Column } from '../../components';
-import { colors, spacing, borderRadius, typography } from '../../theme';
+import { colors, spacing, borderRadius, typography , createThemeReactiveStyles } from '../../theme';
 import { useAsyncData } from '../../hooks';
 import { fetchIdentity, IdentityResponse } from '../../services/ExplorerService';
 
@@ -70,7 +70,7 @@ const IdentityDetailScreen: React.FC<any> = ({ navigation, route }) => {
           </Card>
         )}
 
-        {data && data.status === 'identity_not_found' && (
+        {data?.status === 'identity_not_found' && (
           <Card>
             <Text variant="body" style={{ color: colors.text_secondary }}>{data.message || 'Identity not found.'}</Text>
           </Card>
@@ -125,7 +125,9 @@ const DetailRow: React.FC<{ label: string; value?: string; children?: React.Reac
   </View>
 );
 
-const styles = StyleSheet.create({
+// Module-scope StyleSheet.create snapshots theme colours at boot.
+// Proxy wrapper below rebuilds on theme swap. See BlockDetailScreen.
+const makeStyles = () => StyleSheet.create({
   container: { flex: 1, backgroundColor: colors.bg_darkest },
   header: {
     flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between',
@@ -145,4 +147,5 @@ const styles = StyleSheet.create({
   mono: { fontFamily: MONO_FONT, fontSize: typography.size.sm, color: colors.text_primary },
 });
 
+const styles = createThemeReactiveStyles(makeStyles);
 export default IdentityDetailScreen;

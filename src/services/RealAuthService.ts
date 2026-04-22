@@ -14,8 +14,9 @@ import { NativeModules, Platform } from 'react-native';
 import { nativeIdentityProvisioning } from './NativeIdentityProvisioning';
 import { walletKeychainService } from './WalletKeychainService';
 import SecureIdentityStorage from './SecureIdentityStorage';
-import { DEFAULT_SOV_NODE_URL, DEFAULT_NODE_HOST, DEFAULT_NODE_PORT } from '../config';
+import { DEFAULT_SOV_NODE_URL } from '../config';
 import { isQuicSupported, testQuicConnection, quicRequestRaw, publicQuicRequest } from './quic';
+import { getActiveTarget } from './NetworkBootstrap';
 import IdentityCleanup from './IdentityCleanup';
 import SeedVaultService from './SeedVaultService';
 import { maskIdentifier } from '../utils/maskIdentifier';
@@ -42,6 +43,13 @@ export interface CreateIdentityData {
 export interface MigrationResult {
   identity: Identity;
   newSeedPhrase: string[];
+}
+
+/** Strip the `did:zhtp:` prefix from a DID, returning just the identity id,
+ * or `undefined` if the input is missing/empty. */
+function stripDidPrefix(did: string | undefined): string | undefined {
+  if (!did) return undefined;
+  return did.startsWith('did:zhtp:') ? did.substring('did:zhtp:'.length) : did;
 }
 
 function withTimeout<T>(promise: Promise<T>, ms: number, label: string): Promise<T> {
@@ -306,7 +314,8 @@ class RealAuthService {
       console.log(`[RealAuthService] QUIC supported: ${supported}`);
       if (!supported) return false;
 
-      const result = await testQuicConnection(DEFAULT_NODE_HOST, DEFAULT_NODE_PORT);
+      const target = getActiveTarget();
+      const result = await testQuicConnection(target.host, target.port);
       const connected = !!result.success;
       console.log('[RealAuthService]', connected ? 'CONNECTED' : 'DISCONNECTED');
       return connected;
@@ -336,6 +345,90 @@ class RealAuthService {
   }
 
   /**
+   * POST the seed to `/api/v1/identity/recover` and return the server
+   * response in a decoded shape. Tolerates network errors and bodies that
+   * aren't valid JSON — callers still get `{ payload: {}, responseOk: false,
+   * responseStatus: 0 }` and can decide how to proceed.
+   */
+  private async callServerSeedRecover(phrase: string): Promise<{
+    payload: Record<string, unknown>;
+    responseOk: boolean;
+    responseStatus: number;
+  }> {
+    let payload: Record<string, unknown> = {};
+    let responseOk = false;
+    let responseStatus = 0;
+    try {
+      const response = await quicRequestRaw('/api/v1/identity/recover', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ recovery_phrase: phrase }),
+      });
+      responseStatus = response.status;
+      responseOk = response.ok;
+      try {
+        payload = JSON.parse(response.body) ?? {};
+      } catch {
+        if (response.body) payload = { message: response.body };
+      }
+    } catch (networkError) {
+      console.warn(
+        '[RealAuthService] Seed recovery network error, falling back to local restore:',
+        networkError,
+      );
+    }
+    return { payload, responseOk, responseStatus };
+  }
+
+  /**
+   * Decide whether the seed-recover response is a "not found" (migration
+   * required) case. 404 is the canonical signal, but the server may also
+   * embed "not found" in a message/error field.
+   */
+  private static isRecoverNotFound(
+    payload: Record<string, unknown>,
+    status: number,
+  ): boolean {
+    if (status === 404) return true;
+    const m = String(payload?.message || '').toLowerCase();
+    const e = String(payload?.error || '').toLowerCase();
+    return m.includes('not found') || e.includes('not found');
+  }
+
+  /**
+   * Take the raw server response and either stash the session token, throw
+   * MIGRATION_REQUIRED, or throw a generic error. Returns silently when
+   * there's no server interaction to react to (network error path).
+   */
+  private async reactToRecoverResponse(
+    payload: Record<string, unknown>,
+    responseOk: boolean,
+    responseStatus: number,
+  ): Promise<void> {
+    if (responseOk && payload?.session_token) {
+      try {
+        await SecureIdentityStorage.setSessionToken(
+          payload.session_token as string,
+        );
+      } catch (tokenError) {
+        console.warn('[RealAuthService] Failed to store session token:', tokenError);
+      }
+      return;
+    }
+    if (!responseStatus || responseOk) return;
+    if (RealAuthService.isRecoverNotFound(payload, responseStatus)) {
+      console.warn(
+        '[RealAuthService] Seed recovery not found on server, continuing with local restore',
+      );
+      this.lastSeedRecoveryNotFound = true;
+      throw new Error('MIGRATION_REQUIRED');
+    }
+    const message =
+      (payload?.message as string) || `HTTP ${responseStatus}: Recovery failed`;
+    throw new Error(message);
+  }
+
+  /**
    * Recover identity with seed phrase
    */
   async recoverWithSeed(seedPhrase: string): Promise<Identity> {
@@ -348,66 +441,21 @@ class RealAuthService {
         .trim()
         .split(/\s+/)
         .filter(Boolean);
-
       if (normalized.length !== 24) {
         throw new Error('Recovery phrase must be 24 words');
       }
-
       const phrase = normalized.join(' ');
-      let payload: Record<string, unknown> = {};
-      let responseOk = false;
-      let responseStatus = 0;
 
-      try {
-        const response = await quicRequestRaw(
-          '/api/v1/identity/recover',
-          {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ recovery_phrase: phrase }),
-          },
-        );
-        responseStatus = response.status;
-        responseOk = response.ok;
-        try {
-          payload = JSON.parse(response.body) ?? {};
-        } catch {
-          if (response.body) payload = { message: response.body };
-        }
-      } catch (networkError) {
-        console.warn('[RealAuthService] Seed recovery network error, falling back to local restore:', networkError);
-      }
-
-      const notFound =
-        responseStatus === 404 ||
-        String(payload?.message || '').toLowerCase().includes('not found') ||
-        String(payload?.error || '').toLowerCase().includes('not found');
-
-      if (responseOk && payload?.session_token) {
-        try {
-          await SecureIdentityStorage.setSessionToken(payload.session_token as string);
-        } catch (tokenError) {
-          console.warn('[RealAuthService] Failed to store session token:', tokenError);
-        }
-      } else if (responseStatus && !responseOk && !notFound) {
-        const message = (payload?.message as string) || `HTTP ${responseStatus}: Recovery failed`;
-        throw new Error(message);
-      } else if (responseStatus && !responseOk && notFound) {
-        console.warn('[RealAuthService] Seed recovery not found on server, continuing with local restore');
-        this.lastSeedRecoveryNotFound = true;
-        throw new Error('MIGRATION_REQUIRED');
-      }
+      const { payload, responseOk, responseStatus } =
+        await this.callServerSeedRecover(phrase);
+      await this.reactToRecoverResponse(payload, responseOk, responseStatus);
 
       const restored = await nativeIdentityProvisioning.restoreIdentityFromPhrase(phrase);
 
       const serverIdentityId = responseOk ? (payload?.identity as Record<string, unknown>)?.identity_id as string | undefined : undefined;
       const didFromServer = responseOk ? (payload?.identity as Record<string, unknown>)?.did as string | undefined : undefined;
       const identityDid = restored?.did || didFromServer;
-      const identityId = identityDid
-        ? identityDid.startsWith('did:zhtp:')
-          ? identityDid.substring('did:zhtp:'.length)
-          : identityDid
-        : serverIdentityId;
+      const identityId = stripDidPrefix(identityDid) ?? serverIdentityId;
       if (!identityId) {
         throw new Error('Recovery failed: missing identity id');
       }
@@ -753,7 +801,7 @@ class RealAuthService {
 function base64ToHex(input: string): string {
   if (!input) return '';
   // eslint-disable-next-line @typescript-eslint/no-var-requires
-  const { Buffer } = require('buffer');
+  const { Buffer } = require('node:buffer');
   return Buffer.from(input, 'base64').toString('hex');
 }
 

@@ -2,7 +2,7 @@ import React, { useState } from 'react';
 import { View, ScrollView, StyleSheet, Pressable, ActivityIndicator, Clipboard, Platform } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Text, Card, Row, Column } from '../../components';
-import { colors, spacing, borderRadius, typography } from '../../theme';
+import { colors, spacing, borderRadius, typography , createThemeReactiveStyles } from '../../theme';
 import { useAsyncData } from '../../hooks';
 import { fetchBlock, BlockDetailResponse } from '../../services/ExplorerService';
 
@@ -97,7 +97,11 @@ const DetailRow: React.FC<{ label: string; value?: string; children?: React.Reac
   </View>
 );
 
-const styles = StyleSheet.create({
+// Module-scope StyleSheet.create snapshots theme colours at app boot,
+// which kept Explorer screens dark after a theme swap. Build the
+// sheet at render time and wrap it in a Proxy below so every
+// `styles.X` access rebuilds on theme change.
+const makeStyles = () => StyleSheet.create({
   container: { flex: 1, backgroundColor: colors.bg_darkest },
   header: {
     flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between',
@@ -117,4 +121,7 @@ const styles = StyleSheet.create({
   mono: { fontFamily: MONO_FONT, fontSize: typography.size.sm, color: colors.text_primary },
 });
 
+// Proxy wrapper: rebuild the stylesheet whenever the shared `colors`
+// object has been mutated by `applyTheme`. `colors.bg_darkest` is the
+const styles = createThemeReactiveStyles(makeStyles);
 export default BlockDetailScreen;

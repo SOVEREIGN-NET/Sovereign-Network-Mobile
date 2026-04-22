@@ -6,10 +6,15 @@ import com.facebook.react.bridge.ReactContextBaseJavaModule
 import com.facebook.react.bridge.ReactMethod
 import com.facebook.react.bridge.Promise
 import com.facebook.react.bridge.ReadableMap
+import com.facebook.react.bridge.WritableNativeArray
 import com.facebook.react.bridge.WritableNativeMap
 import org.json.JSONObject
+import java.net.DatagramPacket
+import java.net.DatagramSocket
+import java.net.InetAddress
 import java.util.concurrent.Executor
 import java.util.concurrent.Executors
+import kotlin.random.Random
 
 /**
  * Native QUIC Module for Android
@@ -24,15 +29,22 @@ class NativeQuicModule(reactContext: ReactApplicationContext) :
         private const val TAG = "[🌐 Web4]"
         private const val DEFAULT_TIMEOUT = 30
         private const val ALPN_PROTOCOL = "zhtp-public/1"
-        // These values are loaded from GeneratedConfig.kt which is generated from .env file
-        // GeneratedConfig.kt is the single source of truth - updated at build time
-        private const val QUINN_CONTROL_PLANE_HOST = com.sovereignnetworkmobile.config.GeneratedConfig.QUINN_CONTROL_PLANE_HOST
-        private const val QUINN_CONTROL_PLANE_PORT = com.sovereignnetworkmobile.config.GeneratedConfig.QUINN_CONTROL_PLANE_PORT
-        // Empty serverName → use host as SNI (Rust rejects empty string)
-        private val QUINN_CONTROL_PLANE_SERVER_NAME: String =
-            com.sovereignnetworkmobile.config.GeneratedConfig.QUINN_CONTROL_PLANE_SERVER_NAME
-                .ifEmpty { QUINN_CONTROL_PLANE_HOST }
     }
+
+    // Active validator target — initialized from GeneratedConfig (bootstrap),
+    // can be swapped at runtime via `setActiveValidator` once the directory
+    // has been fetched and a better validator is selected.
+    private var quinnControlPlaneHost: String =
+        com.sovereignnetworkmobile.config.GeneratedConfig.QUINN_CONTROL_PLANE_HOST
+    private var quinnControlPlanePort: Int =
+        com.sovereignnetworkmobile.config.GeneratedConfig.QUINN_CONTROL_PLANE_PORT
+    private var quinnControlPlaneServerName: String =
+        com.sovereignnetworkmobile.config.GeneratedConfig.QUINN_CONTROL_PLANE_SERVER_NAME
+            .ifEmpty { quinnControlPlaneHost }
+    // Active SPKI pin (hex). Replaced alongside host when a directory-selected
+    // validator comes in.
+    private var activeSpkiPinHex: String =
+        com.sovereignnetworkmobile.config.GeneratedConfig.spkiPinFor(quinnControlPlaneHost)
 
     private val executor: Executor = Executors.newCachedThreadPool()
     private var isInitialized = false
@@ -157,69 +169,12 @@ class NativeQuicModule(reactContext: ReactApplicationContext) :
         executor.execute {
             try {
                 ensureInitialized()
-
-                val method = if (options.hasKey("method")) options.getString("method") else "GET"
-                val timeout = if (options.hasKey("timeout")) options.getInt("timeout") else DEFAULT_TIMEOUT
-                val body = if (options.hasKey("body")) options.getString("body") else ""
-                val insecure = if (options.hasKey("insecure")) options.getBoolean("insecure") else true
-                val alpn = if (options.hasKey("alpn")) options.getString("alpn") else "authenticated"
-
-                // Convert headers to JSON
-                val headersJson = if (options.hasKey("headers")) {
-                    val headers = options.getMap("headers")
-                    val jsonObj = JSONObject()
-                    headers?.let {
-                        val iterator = it.keySetIterator()
-                        while (iterator.hasNextKey()) {
-                            val key = iterator.nextKey()
-                            jsonObj.put(key, it.getString(key))
-                        }
-                    }
-                    jsonObj.toString()
+                val opts = parseRequestOptions(options)
+                if (opts.alpn == "public") {
+                    dispatchPublicRequest(url, opts, promise)
                 } else {
-                    "{}"
+                    dispatchAuthenticatedRequest(url, opts, promise)
                 }
-
-                val alpnMode = alpn ?: "authenticated"
-
-                if (alpnMode == "public") {
-                    val result = NativeQuicBridge.request(
-                        url = url,
-                        method = method ?: "GET",
-                        headersJson = headersJson,
-                        body = body ?: "",
-                        timeoutSecs = timeout,
-                        insecure = insecure,
-                        alpn = alpnMode
-                    )
-                    handleStringResponse(result, promise)
-                    return@execute
-                }
-
-                val parsedUrl = parseQuicUrl(url)
-                if (parsedUrl == null) {
-                    promise.reject("QUIC_ERROR", "Invalid URL", null)
-                    return@execute
-                }
-
-                val identityId = extractIdentityId(parsedUrl.path, body, headersJson)
-                if (identityId.isNullOrEmpty()) {
-                    promise.reject("QUIC_ERROR", "Missing identity_id for authenticated request", null)
-                    return@execute
-                }
-
-                Log.d(TAG, "[🌐 Web4] Auth request identity_id=${maskIdentifier(identityId)} path=${parsedUrl.path}")
-                Log.d(TAG, "[PoUW] Enqueueing authenticated request for identity=${maskIdentifier(identityId)}")
-                enqueueAuthenticatedRequest(
-                    identityId = identityId,
-                    parsedUrl = parsedUrl,
-                    method = method ?: "GET",
-                    headersJson = headersJson,
-                    body = body ?: "",
-                    promise = promise
-                )
-                return@execute
-
             } catch (e: Exception) {
                 Log.e(TAG, "[🌐 Web4] Request error", e)
                 promise.reject("QUIC_ERROR", "Request failed: ${e.message}", e)
@@ -227,9 +182,76 @@ class NativeQuicModule(reactContext: ReactApplicationContext) :
         }
     }
 
+    /** Normalised bundle of the fields `request()` pulls off its `options` map. */
+    private data class RequestOptions(
+        val method: String,
+        val timeout: Int,
+        val body: String,
+        val insecure: Boolean,
+        val alpn: String,
+        val headersJson: String,
+    )
+
+    private fun parseRequestOptions(options: ReadableMap): RequestOptions {
+        val method = if (options.hasKey("method")) options.getString("method") ?: "GET" else "GET"
+        val timeout = if (options.hasKey("timeout")) options.getInt("timeout") else DEFAULT_TIMEOUT
+        val body = if (options.hasKey("body")) options.getString("body") ?: "" else ""
+        val insecure = if (options.hasKey("insecure")) options.getBoolean("insecure") else true
+        val alpn = if (options.hasKey("alpn")) options.getString("alpn") ?: "authenticated" else "authenticated"
+        val headersJson = if (options.hasKey("headers")) headersMapToJson(options.getMap("headers")) else "{}"
+        return RequestOptions(method, timeout, body, insecure, alpn, headersJson)
+    }
+
+    private fun headersMapToJson(headers: ReadableMap?): String {
+        val jsonObj = JSONObject()
+        if (headers == null) return jsonObj.toString()
+        val iterator = headers.keySetIterator()
+        while (iterator.hasNextKey()) {
+            val key = iterator.nextKey()
+            jsonObj.put(key, headers.getString(key))
+        }
+        return jsonObj.toString()
+    }
+
+    private fun dispatchPublicRequest(url: String, opts: RequestOptions, promise: Promise) {
+        val result = NativeQuicBridge.request(
+            url = url,
+            method = opts.method,
+            headersJson = opts.headersJson,
+            body = opts.body,
+            timeoutSecs = opts.timeout,
+            insecure = opts.insecure,
+            alpn = opts.alpn,
+        )
+        handleStringResponse(result, promise)
+    }
+
+    private fun dispatchAuthenticatedRequest(url: String, opts: RequestOptions, promise: Promise) {
+        val parsedUrl = parseQuicUrl(url)
+        if (parsedUrl == null) {
+            promise.reject("QUIC_ERROR", "Invalid URL", null)
+            return
+        }
+        val identityId = extractIdentityId(parsedUrl.path, opts.body, opts.headersJson)
+        if (identityId.isNullOrEmpty()) {
+            promise.reject("QUIC_ERROR", "Missing identity_id for authenticated request", null)
+            return
+        }
+        Log.d(TAG, "[🌐 Web4] Auth request identity_id=${maskIdentifier(identityId)} path=${parsedUrl.path}")
+        Log.d(TAG, "[PoUW] Enqueueing authenticated request for identity=${maskIdentifier(identityId)}")
+        enqueueAuthenticatedRequest(
+            identityId = identityId,
+            parsedUrl = parsedUrl,
+            method = opts.method,
+            headersJson = opts.headersJson,
+            body = opts.body,
+            promise = promise,
+        )
+    }
+
     @ReactMethod
     fun getCurrentSessionIdPrefix(identityId: String, promise: Promise) {
-        val normalized = normalizeIdentityId(identityId) ?: identityId
+        val normalized = normalizeIdentityId(identityId)
         val value = synchronized(connectionLock) {
             quinnSessionIdPrefixByIdentity[normalized] ?: quinnSessionIdPrefixByIdentity[identityId]
         }
@@ -267,6 +289,85 @@ class NativeQuicModule(reactContext: ReactApplicationContext) :
         }
     }
 
+    /**
+     * Resolve DNS A records for `name` against an explicit server over UDP.
+     * Used for ZDNS discovery: `resolveDirectory("91.98.113.188", 53, "directory.sov")`
+     * returns `["77.42.37.161", "77.42.74.80", "178.105.9.247"]`.
+     *
+     * No system resolver override — builds the DNS packet inline and parses
+     * the A-record answer section with `DatagramSocket`.
+     */
+    @ReactMethod
+    fun resolveDirectory(zdnsHost: String, port: Int, name: String, promise: Promise) {
+        if (zdnsHost.isEmpty() || port <= 0 || port >= 65536 || name.isEmpty()) {
+            promise.reject("INVALID_PARAMS", "zdnsHost, port, name required")
+            return
+        }
+        executor.execute {
+            try {
+                val query = DnsUdp.buildQuery(name)
+                val socket = DatagramSocket()
+                socket.soTimeout = 3000
+                val addr = InetAddress.getByName(zdnsHost)
+                socket.send(DatagramPacket(query, query.size, addr, port))
+
+                val buf = ByteArray(1500)
+                val resp = DatagramPacket(buf, buf.size)
+                socket.receive(resp)
+                socket.close()
+
+                val ips = DnsUdp.parseAnswers(resp.data, resp.length)
+                val result = WritableNativeArray()
+                ips.forEach { result.pushString(it) }
+                promise.resolve(result)
+            } catch (e: Exception) {
+                Log.w(TAG, "[🌐 Web4] resolveDirectory failed: ${e.message}")
+                promise.reject("DNS_ERROR", e.message ?: "DNS query failed", e)
+            }
+        }
+    }
+
+    /**
+     * Swap the active validator (control-plane endpoint + SPKI pin) at runtime.
+     * Called by the TS bootstrap after `GET /api/v1/network/directory` resolves
+     * a better validator than the one we connected to. Drops all cached handshake
+     * state so the next request rehandshakes against the new target.
+     */
+    @ReactMethod
+    fun setActiveValidator(host: String, port: Int, pinHex: String, promise: Promise) {
+        if (host.isEmpty()) {
+            promise.reject("INVALID_PARAMS", "host is required")
+            return
+        }
+        if (port <= 0 || port >= 65536) {
+            promise.reject("INVALID_PARAMS", "port must be 1..65535")
+            return
+        }
+        if (pinHex.isNotEmpty() && pinHex.length != 64) {
+            promise.reject("INVALID_PARAMS", "pinHex must be 64 hex chars (or empty)")
+            return
+        }
+
+        val oldTarget = "$quinnControlPlaneHost:$quinnControlPlanePort"
+        synchronized(connectionLock) {
+            quinnControlPlaneHost = host
+            quinnControlPlanePort = port
+            quinnControlPlaneServerName = host // use new host as SNI
+            activeSpkiPinHex = pinHex
+            // Drop cached session state — old session is bound to the old host.
+            quinnRequestQueue.clear()
+            quinnHandshakeInProgress.clear()
+            quinnSessionIdPrefixByIdentity.clear()
+        }
+        Log.d(TAG, "[🌐 Web4] 🔀 Active validator switched: $oldTarget → $host:$port")
+
+        val result = WritableNativeMap()
+        result.putString("host", host)
+        result.putInt("port", port)
+        result.putString("pinHex", pinHex)
+        promise.resolve(result)
+    }
+
     private fun enqueueAuthenticatedRequest(
         identityId: String,
         parsedUrl: ParsedUrl,
@@ -282,94 +383,99 @@ class NativeQuicModule(reactContext: ReactApplicationContext) :
             body = body,
             promise = promise
         )
+        if (!addToQueueAndShouldStart(identityId, request)) return
+        executor.execute { runHandshakeAndDrain(identityId) }
+    }
 
-        var shouldStart = false
+    /** Returns true if this caller owns the handshake slot and should start one. */
+    private fun addToQueueAndShouldStart(
+        identityId: String,
+        request: QuinnQueuedRequest,
+    ): Boolean {
         synchronized(connectionLock) {
             val queue = quinnRequestQueue.getOrPut(identityId) { mutableListOf() }
             queue.add(request)
-            if (!quinnHandshakeInProgress.contains(identityId)) {
-                quinnHandshakeInProgress.add(identityId)
-                shouldStart = true
-            }
+            if (quinnHandshakeInProgress.contains(identityId)) return false
+            quinnHandshakeInProgress.add(identityId)
+            return true
         }
+    }
 
-        if (!shouldStart) {
+    /** Perform the UHP handshake for this identity, cache the session id,
+     *  and then drain any queued authenticated requests through it. */
+    private fun runHandshakeAndDrain(identityId: String) {
+        val identity = IdentityStore.loadIdentity(reactApplicationContext, identityId)
+        if (identity == null) {
+            failQuinnQueue(identityId, "Identity not found for $identityId")
             return
         }
+        NativeQuicBridge.initUhpQuinn()
+        val handshake = performHandshake(identity)
+        identity.close()
 
-        executor.execute {
-            val identity = IdentityStore.loadIdentity(reactApplicationContext, identityId)
-            if (identity == null) {
-                failQuinnQueue(identityId, "Identity not found for $identityId")
-                return@execute
+        val ok = handshake?.get("ok") as? Boolean ?: false
+        if (!ok) {
+            val error = handshake?.get("error") as? String ?: "Handshake failed"
+            failQuinnQueue(identityId, error)
+            return
+        }
+        val handle = (handshake?.get("handle") as? Number)?.toLong() ?: 0L
+        cacheSessionPrefix(identityId, extractSessionPrefix(handshake))
+        Log.d(TAG, "[🌐 Web4] Handshake ok handle=$handle identity_id=${maskIdentifier(identityId)}")
+        drainQuinnQueue(identityId, handle)
+    }
+
+    /** Dispatch to the lib-client 3-leg path when enabled, otherwise the legacy path. */
+    private fun performHandshake(identity: Identity): Map<String, Any?>? {
+        val spkiPin = activeSpkiPinHex
+        if (NativeQuicBridge.useLibClientHandshake) {
+            // New path: keys stay in Rust.
+            // NOTE: Blocked on quinn-ffi ALPN-aware connect (zhtp-uhp/2).
+            return NativeQuicBridge.handshakeViaLibClient(
+                host = quinnControlPlaneHost,
+                port = quinnControlPlanePort,
+                serverName = quinnControlPlaneServerName,
+                spkiPinHex = spkiPin,
+                identityHandle = identity.getHandle(),
+            )
+        }
+        // Legacy path: extract keys via deprecated getters (briefly in JVM memory).
+        val handshakeJson = identity.toHandshakeJson() ?: ""
+        @Suppress("DEPRECATION")
+        val dilithiumSk = identity.getDilithiumSecretKey() ?: ByteArray(0)
+        @Suppress("DEPRECATION")
+        val kyberSk = identity.getKyberSecretKey() ?: ByteArray(0)
+        @Suppress("DEPRECATION")
+        val masterSeed = identity.getMasterSeed() ?: ByteArray(0)
+        return NativeQuicBridge.uhpQuicConnectAndHandshake(
+            host = quinnControlPlaneHost,
+            port = quinnControlPlanePort,
+            serverName = quinnControlPlaneServerName,
+            spkiPinHex = spkiPin,
+            identityJson = handshakeJson,
+            dilithiumSk = dilithiumSk,
+            kyberSk = kyberSk,
+            masterSeed = masterSeed,
+            chainId = 0,
+        )
+    }
+
+    /** Extract the first 8 bytes of the session id as a hex prefix, or null. */
+    private fun extractSessionPrefix(handshake: Map<String, Any?>?): String? {
+        val bytes = handshake?.get("sessionId") as? ByteArray ?: return null
+        if (bytes.size < 8) return null
+        return bytes.take(8).joinToString("") { b -> "%02x".format(b) }
+    }
+
+    /** Cache the session id prefix under both the raw and normalised identity keys. */
+    private fun cacheSessionPrefix(identityId: String, prefix: String?) {
+        if (prefix.isNullOrEmpty()) return
+        val normalized = normalizeIdentityId(identityId)
+        synchronized(connectionLock) {
+            quinnSessionIdPrefixByIdentity[identityId] = prefix
+            if (normalized != identityId) {
+                quinnSessionIdPrefixByIdentity[normalized] = prefix
             }
-
-            NativeQuicBridge.initUhpQuinn()
-            val spkiPin = com.sovereignnetworkmobile.config.GeneratedConfig.spkiPinFor(QUINN_CONTROL_PLANE_HOST)
-
-            val handshake: Map<String, Any?>? = if (NativeQuicBridge.useLibClientHandshake) {
-                // New path: 3-leg UHP via lib-client HandshakeState (keys stay in Rust)
-                // NOTE: Blocked on quinn-ffi ALPN-aware connect (zhtp-uhp/2)
-                NativeQuicBridge.handshakeViaLibClient(
-                    host = QUINN_CONTROL_PLANE_HOST,
-                    port = QUINN_CONTROL_PLANE_PORT,
-                    serverName = QUINN_CONTROL_PLANE_SERVER_NAME,
-                    spkiPinHex = spkiPin,
-                    identityHandle = identity.getHandle()
-                )
-            } else {
-                // Legacy path: extract keys via deprecated getters (briefly in JVM memory)
-                val handshakeJson = identity.toHandshakeJson() ?: ""
-                @Suppress("DEPRECATION")
-                val dilithiumSk = identity.getDilithiumSecretKey() ?: ByteArray(0)
-                @Suppress("DEPRECATION")
-                val kyberSk = identity.getKyberSecretKey() ?: ByteArray(0)
-                @Suppress("DEPRECATION")
-                val masterSeed = identity.getMasterSeed() ?: ByteArray(0)
-
-                NativeQuicBridge.uhpQuicConnectAndHandshake(
-                    host = QUINN_CONTROL_PLANE_HOST,
-                    port = QUINN_CONTROL_PLANE_PORT,
-                    serverName = QUINN_CONTROL_PLANE_SERVER_NAME,
-                    spkiPinHex = spkiPin,
-                    identityJson = handshakeJson,
-                    dilithiumSk = dilithiumSk,
-                    kyberSk = kyberSk,
-                    masterSeed = masterSeed,
-                    chainId = 0
-                )
-            }
-
-            // Identity handle no longer needed after handshake setup
-            identity.close()
-
-            val ok = handshake?.get("ok") as? Boolean ?: false
-            if (!ok) {
-                val error = handshake?.get("error") as? String ?: "Handshake failed"
-                failQuinnQueue(identityId, error)
-                return@execute
-            }
-
-            val handle = (handshake?.get("handle") as? Number)?.toLong() ?: 0L
-            val sessionIdPrefix = run {
-                val bytes = handshake?.get("sessionId") as? ByteArray
-                if (bytes != null && bytes.size >= 8) {
-                    bytes.take(8).joinToString("") { b -> "%02x".format(b) }
-                } else {
-                    null
-                }
-            }
-            if (!sessionIdPrefix.isNullOrEmpty()) {
-                val normalized = normalizeIdentityId(identityId)
-                synchronized(connectionLock) {
-                    quinnSessionIdPrefixByIdentity[identityId] = sessionIdPrefix
-                    if (normalized != identityId) {
-                        quinnSessionIdPrefixByIdentity[normalized] = sessionIdPrefix
-                    }
-                }
-            }
-            Log.d(TAG, "[🌐 Web4] Handshake ok handle=$handle identity_id=${maskIdentifier(identityId)}")
-            drainQuinnQueue(identityId, handle)
         }
     }
 
@@ -535,5 +641,79 @@ class NativeQuicModule(reactContext: ReactApplicationContext) :
         val core = trimmed.replace(Regex("^did:[^:]*:"), "")
         if (core.length <= 8) return core
         return core.substring(0, 4) + "…" + core.substring(core.length - 4)
+    }
+}
+
+/**
+ * Minimal RFC 1035 DNS-over-UDP: build A-record query, parse A-record answers.
+ * Just enough for ZDNS discovery — handles compression pointers in the answer
+ * section (server may emit them).
+ */
+private object DnsUdp {
+    fun buildQuery(name: String): ByteArray {
+        val out = java.io.ByteArrayOutputStream(64)
+        val id = Random.nextInt(0xFFFF)
+        out.write((id shr 8) and 0xFF)
+        out.write(id and 0xFF)
+        out.write(byteArrayOf(0x01, 0x00)) // flags: RD=1
+        out.write(byteArrayOf(0x00, 0x01)) // QDCOUNT=1
+        out.write(byteArrayOf(0x00, 0x00, 0x00, 0x00, 0x00, 0x00)) // AN/NS/AR=0
+        for (label in name.split('.')) {
+            val bytes = label.toByteArray(Charsets.UTF_8)
+            require(bytes.size <= 63) { "label too long: $label" }
+            out.write(bytes.size)
+            out.write(bytes)
+        }
+        out.write(0x00) // terminator
+        out.write(byteArrayOf(0x00, 0x01)) // QTYPE=A
+        out.write(byteArrayOf(0x00, 0x01)) // QCLASS=IN
+        return out.toByteArray()
+    }
+
+    fun parseAnswers(data: ByteArray, length: Int): List<String> {
+        if (length < 12) return emptyList()
+        val ancount = ((data[6].toInt() and 0xFF) shl 8) or (data[7].toInt() and 0xFF)
+        if (ancount == 0) return emptyList()
+
+        var idx = 12
+        // Skip QNAME
+        while (idx < length) {
+            val len = data[idx].toInt() and 0xFF
+            if (len == 0) { idx += 1; break }
+            if ((len and 0xC0) == 0xC0) { idx += 2; break }
+            idx += 1 + len
+        }
+        idx += 4 // QTYPE + QCLASS
+
+        val ips = mutableListOf<String>()
+        var i = 0
+        while (i < ancount && idx + 10 <= length) {
+            // Skip name (compressed pointer or length-prefixed labels)
+            if ((data[idx].toInt() and 0xC0) == 0xC0) {
+                idx += 2
+            } else {
+                while (idx < length) {
+                    val len = data[idx].toInt() and 0xFF
+                    if (len == 0) { idx += 1; break }
+                    if ((len and 0xC0) == 0xC0) { idx += 2; break }
+                    idx += 1 + len
+                }
+            }
+            if (idx + 10 > length) break
+            val rtype = ((data[idx].toInt() and 0xFF) shl 8) or (data[idx + 1].toInt() and 0xFF)
+            val rdlen = ((data[idx + 8].toInt() and 0xFF) shl 8) or (data[idx + 9].toInt() and 0xFF)
+            idx += 10
+            if (idx + rdlen > length) break
+            if (rtype == 1 && rdlen == 4) {
+                val a = data[idx].toInt() and 0xFF
+                val b = data[idx + 1].toInt() and 0xFF
+                val c = data[idx + 2].toInt() and 0xFF
+                val d = data[idx + 3].toInt() and 0xFF
+                ips.add("$a.$b.$c.$d")
+            }
+            idx += rdlen
+            i++
+        }
+        return ips
     }
 }

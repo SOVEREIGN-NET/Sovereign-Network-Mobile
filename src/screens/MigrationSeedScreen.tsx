@@ -4,7 +4,7 @@
  */
 
 import React, { useRef, useState } from 'react';
-import { View, TextInput, Pressable } from 'react-native';
+import { View, TextInput } from 'react-native';
 import { NativeStackScreenProps } from '@react-navigation/native-stack';
 import {
   Card,
@@ -124,13 +124,7 @@ const MigrationSeedScreen = ({ navigation, route }: MigrationSeedScreenProps) =>
       <Column gap="xl">
         {displayError && <ErrorAlert message={displayError} icon="❌" />}
 
-        <Card
-          style={{
-            backgroundColor: colors.bg_darker,
-            borderLeftWidth: 4,
-            borderLeftColor: colors.primary,
-          }}
-        >
+        <Card style={{ backgroundColor: colors.bg_darker }}>
           <Column gap="xs">
             <Text style={{ fontSize: typography.size.sm, fontWeight: typography.weight.semibold, color: colors.text_primary }}>
               Migration Step {step} of 5
@@ -141,13 +135,7 @@ const MigrationSeedScreen = ({ navigation, route }: MigrationSeedScreenProps) =>
           </Column>
         </Card>
 
-        <Card
-          style={{
-            backgroundColor: colors.bg_darker,
-            borderLeftWidth: 4,
-            borderLeftColor: colors.warning,
-          }}
-        >
+        <Card style={{ backgroundColor: colors.bg_darker }}>
           <Column gap="xs">
             <Text style={{ fontSize: typography.size.sm, fontWeight: typography.weight.semibold, color: colors.warning_dark }}>
               Migration Seed Disclaimer
@@ -237,7 +225,7 @@ const MigrationSeedScreen = ({ navigation, route }: MigrationSeedScreenProps) =>
                         if (parts.length <= 1) {
                           setSeedWords(prev => {
                             const next = [...prev];
-                            next[index] = lower.replace(/\s+/g, '');
+                            next[index] = lower.replaceAll(/\s+/g, '');
                             return next;
                           });
                           return;

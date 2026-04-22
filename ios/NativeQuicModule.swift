@@ -1,6 +1,7 @@
 import Foundation
 import React
 import Dispatch
+import Network
 
 /**
  * Native QUIC Module for iOS
@@ -63,13 +64,19 @@ class NativeQuic: NSObject {
   // These values are loaded from GeneratedConfig.swift which is generated from .env file
   // GeneratedConfig.swift is the single source of truth - updated at build time
   private let defaultTimeout: TimeInterval = 30.0
-  private let quinnControlPlaneHost = GeneratedConfig.quinnControlPlaneHost
-  private let quinnControlPlanePort = GeneratedConfig.quinnControlPlanePort
+  // Active validator target — initialized from GeneratedConfig (bootstrap),
+  // can be swapped at runtime via `setActiveValidator` once the directory
+  // has been fetched and a better validator is selected.
+  private var quinnControlPlaneHost = GeneratedConfig.quinnControlPlaneHost
+  private var quinnControlPlanePort = GeneratedConfig.quinnControlPlanePort
   // Empty serverName → use host as SNI (Rust rejects empty string)
-  private let quinnControlPlaneServerName: String = {
+  private var quinnControlPlaneServerName: String = {
     let s = GeneratedConfig.quinnControlPlaneServerName
     return s.isEmpty ? GeneratedConfig.quinnControlPlaneHost : s
   }()
+  // Active SPKI pin (hex). Starts from GeneratedConfig; replaced alongside
+  // host when a directory-selected validator comes in.
+  private var activeSpkiPinHex: String = GeneratedConfig.quinnSpkiPinHex
   private let alpnPublic = "zhtp-public/1"
   private let alpnAuthenticated = "zhtp-uhp/2"
 
@@ -117,7 +124,7 @@ class NativeQuic: NSObject {
 
     let serverName = quinnControlPlaneServerName.isEmpty ? host : quinnControlPlaneServerName
     var handle: UInt64 = 0
-    let pinHex = GeneratedConfig.quinnSpkiPinHex
+    let pinHex = activeSpkiPinHex
 
     let rc: Int32
     if pinHex.isEmpty {
@@ -214,6 +221,10 @@ class NativeQuic: NSObject {
 
   @objc
   func getCurrentSessionIdPrefix(_ identityId: String, resolve: @escaping RCTPromiseResolveBlock, reject: @escaping RCTPromiseRejectBlock) {
+    // `reject` is part of the React Native bridge contract (see .m extern);
+    // we never fail this lookup — missing session just resolves `null` —
+    // but the parameter must stay for the signature to match.
+    _ = reject
     let normalized = normalizeIdentityId(identityId)
     connectionLock.lock()
     let value = quinnSessionIdPrefixByIdentity[normalized] ?? quinnSessionIdPrefixByIdentity[identityId]
@@ -241,7 +252,7 @@ class NativeQuic: NSObject {
     }
 
     let spkiPin: Data
-    let pinHex = GeneratedConfig.quinnSpkiPinHex
+    let pinHex = activeSpkiPinHex
     if pinHex.isEmpty {
       spkiPin = Data() // system CA trust — empty means no pinning
     } else {
@@ -570,11 +581,11 @@ class NativeQuic: NSObject {
         return .failure(NSError(domain: "NativeQuic", code: -1, userInfo: [NSLocalizedDescriptionKey: "Invalid session ID length from lib-client handshake"]))
       }
 
-      // handshakeHash: use Blake3 of (sessionKey || sessionId) as substitute
-      // The new HandshakeResult doesn't expose handshakeHash directly;
-      // MAC key derivation uses HKDF(sessionKey, salt=handshakeHash).
-      // TODO: Either add handshake_hash getter to lib-client, or change
-      //       deriveMacKey to use sessionId as salt for new handshakes.
+      // handshakeHash: Blake3(sessionKey || sessionId) — deterministic
+      // substitute used as the HKDF salt for MAC-key derivation. lib-client
+      // doesn't expose the real handshake_hash through its FFI, so both
+      // ends agree on this Blake3 construction instead. See the matching
+      // derivation inside lib-client's `make_handshake_ctx`.
       let handshakeHash = try computeBlake3(sessionKey + sessionId)
 
       let sessionInfo = QuinnHandshakeSession(
@@ -824,7 +835,7 @@ class NativeQuic: NSObject {
 
     let serverName = resolveServerName(host: parsedUrl.host, headers: headers)
     var handle: UInt64 = 0
-    let pinHex = GeneratedConfig.quinnSpkiPinHex
+    let pinHex = activeSpkiPinHex
 
     let connectRc: Int32
     if pinHex.isEmpty {
@@ -952,6 +963,148 @@ class NativeQuic: NSObject {
     connectionLock.unlock()
 
     resolve(true)
+  }
+
+  /**
+   * Resolve DNS A records for `name` against an explicit server over UDP.
+   * Used for ZDNS discovery: `resolveDirectory("91.98.113.188", 53, "directory.sov")`
+   * returns `["77.42.37.161", "77.42.74.80", "178.105.9.247"]`.
+   *
+   * No system resolver override, no third-party dep — builds the DNS query
+   * packet inline and parses the A-record answer section.
+   */
+  @objc
+  func resolveDirectory(
+    _ zdnsHost: String,
+    port: Int,
+    name: String,
+    resolve: @escaping RCTPromiseResolveBlock,
+    reject: @escaping RCTPromiseRejectBlock
+  ) {
+    guard !zdnsHost.isEmpty, port > 0, port < 65536, !name.isEmpty else {
+      reject("INVALID_PARAMS", "zdnsHost, port, name required", nil)
+      return
+    }
+    guard let query = DnsUdp.buildQuery(name: name) else {
+      reject("DNS_ERROR", "Failed to build DNS query for \(name)", nil)
+      return
+    }
+
+    let queue = DispatchQueue(label: "zhtp.dns.resolve", qos: .userInitiated)
+    let endpoint = NWEndpoint.hostPort(
+      host: NWEndpoint.Host(zdnsHost),
+      port: NWEndpoint.Port(integerLiteral: UInt16(port))
+    )
+    let conn = NWConnection(to: endpoint, using: .udp)
+    var settled = false
+    let settleOnce: (Result<[String], Error>) -> Void = { outcome in
+      queue.async {
+        if settled { return }
+        settled = true
+        conn.cancel()
+        switch outcome {
+        case .success(let ips): resolve(ips)
+        case .failure(let err): reject("DNS_ERROR", err.localizedDescription, err)
+        }
+      }
+    }
+
+    conn.stateUpdateHandler = { state in
+      switch state {
+      case .ready:
+        conn.send(content: query, completion: .contentProcessed { err in
+          if let err = err {
+            settleOnce(.failure(err))
+            return
+          }
+          conn.receiveMessage { data, _, _, recvErr in
+            if let recvErr = recvErr {
+              settleOnce(.failure(recvErr))
+              return
+            }
+            guard let data = data else {
+              settleOnce(.failure(NSError(
+                domain: "DNS", code: -1,
+                userInfo: [NSLocalizedDescriptionKey: "Empty DNS response"]
+              )))
+              return
+            }
+            let ips = DnsUdp.parseAnswers(data)
+            settleOnce(.success(ips))
+          }
+        })
+      case .failed(let err):
+        settleOnce(.failure(err))
+      case .cancelled:
+        break
+      default:
+        break
+      }
+    }
+    conn.start(queue: queue)
+
+    // 3-second timeout
+    queue.asyncAfter(deadline: .now() + 3.0) {
+      if !settled {
+        settleOnce(.failure(NSError(
+          domain: "DNS", code: -1,
+          userInfo: [NSLocalizedDescriptionKey: "DNS query timed out"]
+        )))
+      }
+    }
+  }
+
+  /**
+   * Swap the active validator (control-plane endpoint + SPKI pin) at runtime.
+   * Called by the TS bootstrap after `GET /api/v1/network/directory` resolves
+   * a better validator than the one we connected to. Drops all cached handshake
+   * state so the next request rehandshakes against the new target.
+   *
+   * - Parameters:
+   *   - host: new validator host (IP or hostname)
+   *   - port: new validator port
+   *   - pinHex: 64-char hex SPKI pin (SHA-256 of SubjectPublicKeyInfo)
+   */
+  @objc
+  func setActiveValidator(
+    _ host: String,
+    port: Int,
+    pinHex: String,
+    resolve: @escaping RCTPromiseResolveBlock,
+    reject: @escaping RCTPromiseRejectBlock
+  ) {
+    guard !host.isEmpty else {
+      reject("INVALID_PARAMS", "host is required", nil)
+      return
+    }
+    guard port > 0, port < 65536 else {
+      reject("INVALID_PARAMS", "port must be 1..65535", nil)
+      return
+    }
+    // Allow empty pinHex (system CA trust) OR a 64-char hex string.
+    if !pinHex.isEmpty && pinHex.count != 64 {
+      reject("INVALID_PARAMS", "pinHex must be 64 hex chars (or empty)", nil)
+      return
+    }
+
+    connectionLock.lock()
+    let oldTarget = "\(quinnControlPlaneHost):\(quinnControlPlanePort)"
+    quinnControlPlaneHost = host
+    quinnControlPlanePort = UInt16(port)
+    quinnControlPlaneServerName = host // use new host as SNI
+    activeSpkiPinHex = pinHex
+    // Drop cached session state — old session ticket is bound to the old host.
+    quinnRequestQueue.removeAll()
+    quinnHandshakeInProgress.removeAll()
+    quinnSessionIdPrefixByIdentity.removeAll()
+    connectionLock.unlock()
+
+    print("[NativeQuic] 🔀 Active validator switched: \(oldTarget) → \(host):\(port)")
+    resolve([
+      "host": host,
+      "port": port,
+      "pinHex": pinHex,
+    ])
   }
 
   // MARK: - Private Helpers
@@ -1110,5 +1263,75 @@ class NativeQuic: NSObject {
       "DEFAULT_TIMEOUT": defaultTimeout,
       "MIN_IOS_VERSION": 15.0
     ]
+  }
+}
+
+/// Minimal RFC 1035 DNS-over-UDP: build A-record query, parse A-record answers.
+/// Just enough for ZDNS discovery — no support for compression pointers in the
+/// question section (we never emit them), but DOES handle them in answers.
+private enum DnsUdp {
+  static func buildQuery(name: String) -> Data? {
+    var data = Data(capacity: 64)
+    let id = UInt16.random(in: 0..<UInt16.max)
+    data.append(UInt8(id >> 8))
+    data.append(UInt8(id & 0xFF))
+    data.append(contentsOf: [0x01, 0x00]) // flags: RD=1
+    data.append(contentsOf: [0x00, 0x01]) // QDCOUNT=1
+    data.append(contentsOf: [0x00, 0x00, 0x00, 0x00, 0x00, 0x00]) // AN/NS/AR=0
+    for label in name.split(separator: ".") {
+      let bytes = Array(label.utf8)
+      if bytes.count > 63 { return nil }
+      data.append(UInt8(bytes.count))
+      data.append(contentsOf: bytes)
+    }
+    data.append(0x00) // terminator
+    data.append(contentsOf: [0x00, 0x01]) // QTYPE=A
+    data.append(contentsOf: [0x00, 0x01]) // QCLASS=IN
+    return data
+  }
+
+  static func parseAnswers(_ data: Data) -> [String] {
+    guard data.count > 12 else { return [] }
+    let bytes = [UInt8](data)
+    let ancount = (Int(bytes[6]) << 8) | Int(bytes[7])
+    if ancount == 0 { return [] }
+
+    // Skip question section
+    var idx = 12
+    // Skip QNAME (length-prefixed labels, terminated by 0 byte)
+    while idx < bytes.count {
+      let len = Int(bytes[idx])
+      if len == 0 { idx += 1; break }
+      if (len & 0xC0) == 0xC0 { idx += 2; break } // pointer
+      idx += 1 + len
+    }
+    idx += 4 // QTYPE + QCLASS
+
+    var ips: [String] = []
+    for _ in 0..<ancount {
+      // Skip name (could be compressed pointer)
+      if idx >= bytes.count { break }
+      if (bytes[idx] & 0xC0) == 0xC0 {
+        idx += 2
+      } else {
+        while idx < bytes.count {
+          let len = Int(bytes[idx])
+          if len == 0 { idx += 1; break }
+          if (len & 0xC0) == 0xC0 { idx += 2; break }
+          idx += 1 + len
+        }
+      }
+      guard idx + 10 <= bytes.count else { break }
+      let rtype = (Int(bytes[idx]) << 8) | Int(bytes[idx + 1])
+      let rdlen = (Int(bytes[idx + 8]) << 8) | Int(bytes[idx + 9])
+      idx += 10
+      guard idx + rdlen <= bytes.count else { break }
+      if rtype == 1 && rdlen == 4 {
+        let a = bytes[idx], b = bytes[idx + 1], c = bytes[idx + 2], d = bytes[idx + 3]
+        ips.append("\(a).\(b).\(c).\(d)")
+      }
+      idx += rdlen
+    }
+    return ips
   }
 }

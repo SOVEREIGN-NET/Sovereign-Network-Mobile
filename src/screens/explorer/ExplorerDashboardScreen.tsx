@@ -10,7 +10,7 @@ import {
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Text, Card, Row, Column, Badge } from '../../components';
-import { colors, spacing, borderRadius, typography } from '../../theme';
+import { colors, spacing, borderRadius, typography , createThemeReactiveStyles } from '../../theme';
 import { useAsyncData } from '../../hooks';
 import {
   fetchStats,
@@ -185,7 +185,10 @@ const StatRow: React.FC<{ label: string; value: string }> = ({ label, value }) =
   </Row>
 );
 
-const styles = StyleSheet.create({
+// Module-scope StyleSheet.create snapshots theme colours at app boot,
+// which kept Explorer screens dark after a theme swap. Proxy wrapper
+// below rebuilds the sheet whenever `colors.bg_darkest` changes.
+const makeStyles = () => StyleSheet.create({
   container: {
     flex: 1,
     backgroundColor: colors.bg_darkest,
@@ -248,4 +251,5 @@ const styles = StyleSheet.create({
   },
 });
 
+const styles = createThemeReactiveStyles(makeStyles);
 export default ExplorerDashboardScreen;

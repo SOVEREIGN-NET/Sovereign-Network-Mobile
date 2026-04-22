@@ -436,7 +436,8 @@ class NativeIdentityProvisioningBridge {
 
   /**
    * Sign a DAO stake transaction — locks SOV into a sector welfare DAO wallet.
-   * Amount is in nSOV (atoms). Nonce must be fetched against (SOV token_id, staker wallet).
+   * Amount is an 18-decimal u128 atoms decimal string. Nonce must be fetched
+   * against (SOV token_id, staker wallet).
    */
   async signDaoStakeTransaction(params: {
     sectorDaoKeyId: string;

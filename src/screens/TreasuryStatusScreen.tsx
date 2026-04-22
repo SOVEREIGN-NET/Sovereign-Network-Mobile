@@ -307,8 +307,6 @@ const TreasuryStatusScreen = ({ navigation }: any) => {
                 backgroundColor: colors.bg_darker,
                 padding: spacing.md,
                 borderRadius: borderRadius.base,
-                borderLeftWidth: 4,
-                borderLeftColor: colors.info,
               }}
             >
               <Text

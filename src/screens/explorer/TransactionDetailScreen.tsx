@@ -2,7 +2,7 @@ import React, { useState } from 'react';
 import { View, ScrollView, StyleSheet, Pressable, ActivityIndicator, Clipboard, Platform } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Text, Card, Column, Row, Badge } from '../../components';
-import { colors, spacing, borderRadius, typography } from '../../theme';
+import { colors, spacing, borderRadius, typography , createThemeReactiveStyles } from '../../theme';
 import { useAsyncData } from '../../hooks';
 import { fetchTransaction, TransactionDetailResponse } from '../../services/ExplorerService';
 import type { WalletTransaction } from '../../services/AppService';
@@ -95,6 +95,46 @@ const DetailRow: React.FC<{ label: string; children: React.ReactNode }> = ({ lab
 const DetailText: React.FC<{ value: string; dim?: boolean }> = ({ value, dim }) => (
   <Text style={[styles.detailValue, dim && { color: colors.text_secondary }]}>{value}</Text>
 );
+
+type TxDirection = 'in' | 'out' | 'neutral';
+
+/** Classify a tx by its type string into incoming / outgoing / neutral. */
+const resolveTxDirection = (type: string | undefined): TxDirection => {
+  const lower = (type || '').toLowerCase();
+  if (/in$|receive|credit|mint|reward/.test(lower)) return 'in';
+  if (/out$|send|debit|burn|fee|transfer$/.test(lower)) return 'out';
+  return 'neutral';
+};
+
+const DIRECTION_ICON: Record<TxDirection, string> = {
+  in: '↓',
+  out: '↑',
+  neutral: '⇄',
+};
+const DIRECTION_TITLE: Record<TxDirection, string> = {
+  in: 'Received',
+  out: 'Sent',
+  neutral: 'Transaction',
+};
+const DIRECTION_AMOUNT_SIGN: Record<TxDirection, string> = {
+  in: '+',
+  out: '−',
+  neutral: '',
+};
+
+/** Amount-value color — green for incoming, primary for outgoing, plain otherwise. */
+const resolveAmountColor = (direction: TxDirection): string => {
+  if (direction === 'in') return colors.success;
+  if (direction === 'out') return colors.primary;
+  return colors.text_primary;
+};
+
+/** Status dot color — warning for pending, success for confirmed, grey otherwise. */
+const resolveStatusDotColor = (status: string | undefined | null): string => {
+  if (status === 'pending') return colors.warning;
+  if (status === 'confirmed') return colors.success;
+  return colors.text_tertiary;
+};
 
 const TransactionDetailScreen: React.FC<any> = ({ navigation, route }) => {
   const { hash, activityTx } = route.params as {
@@ -200,39 +240,14 @@ const TransactionDetailScreen: React.FC<any> = ({ navigation, route }) => {
         )}
 
         {merged && (() => {
-          // Direction: incoming / outgoing / neutral — drives icon, title,
-          // amount sign, and color. Inferred from tx_type keywords.
-          const typeLower = (merged.type || '').toLowerCase();
-          const direction: 'in' | 'out' | 'neutral' =
-            /in$|receive|credit|mint|reward/.test(typeLower)
-              ? 'in'
-              : /out$|send|debit|burn|fee|transfer$/.test(typeLower)
-              ? 'out'
-              : 'neutral';
-          const directionIcon =
-            direction === 'in' ? '↓' : direction === 'out' ? '↑' : '⇄';
-          const directionTitle =
-            direction === 'in'
-              ? 'Received'
-              : direction === 'out'
-              ? 'Sent'
-              : 'Transaction';
-          const amountSign =
-            direction === 'in' ? '+' : direction === 'out' ? '−' : '';
-          const amountColor =
-            direction === 'in'
-              ? colors.success
-              : direction === 'out'
-              ? colors.primary
-              : colors.text_primary;
-          const isPending = statusLabel === 'pending';
-          const statusDotColor = isPending
-            ? colors.warning
-            : statusLabel === 'confirmed'
-            ? colors.success
-            : colors.text_tertiary;
+          const direction = resolveTxDirection(merged.type);
+          const directionIcon = DIRECTION_ICON[direction];
+          const directionTitle = DIRECTION_TITLE[direction];
+          const amountSign = DIRECTION_AMOUNT_SIGN[direction];
+          const amountColor = resolveAmountColor(direction);
+          const statusDotColor = resolveStatusDotColor(statusLabel);
           const typeSubtitle = merged.type
-            ? merged.type.replace(/_/g, ' ')
+            ? merged.type.replaceAll(/_/g, ' ')
             : '';
           return (
           <>
@@ -406,7 +421,7 @@ const TransactionDetailScreen: React.FC<any> = ({ navigation, route }) => {
   );
 };
 
-const styles = StyleSheet.create({
+const makeStyles = () => StyleSheet.create({
   container: { flex: 1, backgroundColor: colors.bg_darkest },
   header: {
     flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between',
@@ -442,4 +457,5 @@ const styles = StyleSheet.create({
   },
 });
 
+const styles = createThemeReactiveStyles(makeStyles);
 export default TransactionDetailScreen;

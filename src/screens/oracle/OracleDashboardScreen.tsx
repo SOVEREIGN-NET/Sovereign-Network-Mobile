@@ -12,7 +12,7 @@ import {
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Text, Card, Row, Column, Badge, RefreshRing } from '../../components';
 import Svg, { Path, Circle, Line, Defs, LinearGradient, Stop } from 'react-native-svg';
-import { colors, spacing, borderRadius, typography } from '../../theme';
+import { colors, spacing, borderRadius, typography , createThemeReactiveStyles } from '../../theme';
 import { useOracleData } from '../../hooks/useOracleData';
 import type { UseOracleDataResult } from '../../hooks/useOracleData';
 import {
@@ -43,21 +43,21 @@ const MONO_FONT = Platform.OS === 'ios' ? 'Menlo' : 'monospace';
 
 // Safe number formatter — never crashes on undefined/null/NaN
 const fmt = (v: unknown, decimals = 4, prefix = '$'): string => {
-  const n = typeof v === 'number' ? v : parseFloat(v as any);
-  if (!isFinite(n)) return '—';
+  const n = typeof v === 'number' ? v : Number.parseFloat(v as any);
+  if (!Number.isFinite(n)) return '—';
   return `${prefix}${n.toFixed(decimals)}`;
 };
 
 const fmtChange = (v: unknown, decimals = 4): string => {
-  const n = typeof v === 'number' ? v : parseFloat(v as any);
-  if (!isFinite(n)) return '—';
+  const n = typeof v === 'number' ? v : Number.parseFloat(v as any);
+  if (!Number.isFinite(n)) return '—';
   const sign = n >= 0 ? '+' : '';
   return `${sign}${n.toFixed(decimals)}`;
 };
 
 const fmtPct = (v: unknown): string => {
-  const n = typeof v === 'number' ? v : parseFloat(v as any);
-  if (!isFinite(n)) return '—';
+  const n = typeof v === 'number' ? v : Number.parseFloat(v as any);
+  if (!Number.isFinite(n)) return '—';
   const sign = n >= 0 ? '+' : '';
   return `${sign}${n.toFixed(2)}%`;
 };
@@ -349,9 +349,9 @@ const BondingCurveChart: React.FC<{
         </Defs>
 
         {/* Band dividers */}
-        {bandLines.map((x, i) => (
+        {bandLines.map(x => (
           <Line
-            key={i}
+            key={`band-${x}`}
             x1={x} y1={CURVE_PAD.top}
             x2={x} y2={CURVE_PAD.top + PLOT_H}
             stroke={colors.text_secondary}
@@ -632,7 +632,7 @@ const PriceTab: React.FC<{ pair: OraclePair }> = ({ pair }) => {
                     ? formatAtomicPriceDisplay(data.price_atomic, scale, '$')
                     : fmt(data.price, dec);
                 const len = priceStr.length;
-                const fontSize = len <= 8 ? 48 : len <= 12 ? 36 : len <= 16 ? 28 : 22;
+                const fontSize = resolvePriceFontSize(len);
                 return (
                   <Text style={[styles.priceValue, { fontSize }]}>
                     {priceStr}
@@ -727,7 +727,7 @@ const VariationTab: React.FC<{ pair: OraclePair }> = ({ pair }) => {
       : data.pair === 'SOV/USD'
       ? data.percent_change
       : data.percent_change_since_base;
-  const pct = typeof pctRaw === 'number' && isFinite(pctRaw) ? pctRaw : 0;
+  const pct = typeof pctRaw === 'number' && Number.isFinite(pctRaw) ? pctRaw : 0;
   const changeIsPositive = pct >= 0;
 
   const showInitialLoading = loading && data == null;
@@ -928,8 +928,8 @@ const StatusTab: React.FC<{
         </Column>
         {d.committee_members?.length > 0 && (
           <Column gap="xs" style={{ marginTop: spacing.sm }}>
-            {d.committee_members.map((member, i) => (
-              <View key={i} style={styles.memberRow}>
+            {d.committee_members.map(member => (
+              <View key={member} style={styles.memberRow}>
                 <Text
                   variant="caption"
                   style={styles.mono}
@@ -1042,8 +1042,8 @@ const ConfigTab: React.FC<{
         </Column>
         {d.committee_members?.length > 0 && (
           <Column gap="xs" style={{ marginTop: spacing.sm }}>
-            {d.committee_members.map((member, i) => (
-              <View key={i} style={styles.memberRow}>
+            {d.committee_members.map(member => (
+              <View key={member} style={styles.memberRow}>
                 <Text
                   variant="caption"
                   style={styles.mono}
@@ -1141,6 +1141,14 @@ const ConfigTab: React.FC<{
 
 // --- Main screen ---
 
+/** Price display font size — scales down as the formatted string grows. */
+const resolvePriceFontSize = (len: number): number => {
+  if (len <= 8) return 48;
+  if (len <= 12) return 36;
+  if (len <= 16) return 28;
+  return 22;
+};
+
 const OracleDashboardScreen: React.FC<any> = ({ navigation }) => {
   const [pair, setPair] = useState<OraclePair>('SOV/USD');
   const [activeTab, setActiveTab] = useState<Tab>('price');
@@ -1211,7 +1219,12 @@ const OracleDashboardScreen: React.FC<any> = ({ navigation }) => {
   );
 };
 
-const styles = StyleSheet.create({
+// Build at render time so theme-dependent colours track `applyTheme`.
+// A plain `styles = StyleSheet.create(...)` at module scope would
+// snapshot the charcoal palette at app boot and stay dark forever
+// after a theme swap — which is exactly what kept the Oracle tabs
+// looking dark in light mode.
+const makeStyles = () => StyleSheet.create({
   container: {
     flex: 1,
     backgroundColor: colors.bg_darkest,
@@ -1321,4 +1334,14 @@ const styles = StyleSheet.create({
   },
 });
 
+/**
+ * `styles` is a proxy that rebuilds the stylesheet every time any of
+ * its keys is read. Lets the rest of this file keep using
+ * `styles.container`, `styles.tabBar`, etc. without touching every
+ * inner component to thread a `makeStyles()` call through. A small
+ * per-render cache prevents rebuilding once per property access on
+ * the same render pass; the cache is reset when `colors.bg_darkest`
+ * changes (i.e. a theme swap has mutated the shared palette).
+ */
+const styles = createThemeReactiveStyles(makeStyles);
 export default OracleDashboardScreen;

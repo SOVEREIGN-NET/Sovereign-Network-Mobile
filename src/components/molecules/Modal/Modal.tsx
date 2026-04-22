@@ -23,7 +23,8 @@ export interface ModalProps {
   closeOnBackdropPress?: boolean;
 }
 
-const styles = StyleSheet.create({
+// Build at render time so theme-dependent colours track `applyTheme`.
+const makeStyles = () => StyleSheet.create({
   container: {
     flex: 1,
     backgroundColor: 'rgba(0, 0, 0, 0.5)',
@@ -88,6 +89,7 @@ export const Modal = React.memo(
     style,
     closeOnBackdropPress = true,
   }: ModalProps) => {
+    const styles = makeStyles();
     const getActionButtonStyle = (variant: string = 'secondary') => {
       switch (variant) {
         case 'primary':

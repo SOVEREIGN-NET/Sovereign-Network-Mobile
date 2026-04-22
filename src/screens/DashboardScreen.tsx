@@ -22,6 +22,7 @@ import {
   Column,
   DrawerItem,
   HeaderBar,
+  PouwRewardsCard,
   Row,
   ScreenLayout,
   SideDrawer,
@@ -50,6 +51,12 @@ const NOTICE_STYLE: Record<
   error:   { bg: '#3D1515', border: '#7B2020', text: '#FF6B6B', icon: '⚠' },
   warning: { bg: '#3D2E00', border: '#7B5C00', text: '#FFB800', icon: '⚡' },
   info:    { bg: '#0D2D45', border: '#0E4B7A', text: '#4FC3F7', icon: 'ℹ' },
+};
+
+/** Oracle arrow color: neutral while loading, green when healthy, red otherwise. */
+const resolveOracleHealthColor = (healthy: boolean | null | undefined): string => {
+  if (healthy == null) return colors.text_secondary;
+  return healthy ? '#2ecc71' : colors.error;
 };
 
 const DashboardScreen: React.FC<any> = ({ navigation }) => {
@@ -359,13 +366,17 @@ const DashboardScreen: React.FC<any> = ({ navigation }) => {
               </Column>
               <Text style={{
                 fontSize: 18,
-                color: oracleHealthy == null
-                  ? colors.text_secondary
-                  : oracleHealthy ? '#2ecc71' : colors.error,
+                color: resolveOracleHealthColor(oracleHealthy),
               }}>→</Text>
             </Row>
           </Card>
         </Pressable>
+
+        {/* PoUW Rewards — interactive visualization of the network's
+            Proof-of-Useful-Work reward distribution. Data comes from
+            the public `/api/v1/pouw/status` endpoint on the same 60s
+            polling cadence as the oracle prices. */}
+        <PouwRewardsCard />
 
         <Card>
           <Row

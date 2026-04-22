@@ -10,51 +10,71 @@ export const gradientAccents = {
   gradient_end: '#00d4ff',      // Cyan
 } as const;
 
-// Color palette for light/dark theme variants
+/**
+ * Warm-cream light theme.
+ *
+ * Deliberately NOT pure-white: pure #FFF is glaring on OLED screens
+ * and photographs as blown-out. An opaque, slightly warm off-white
+ * reads like paper — softer on the eyes and consistent with the
+ * charcoal palette's warm undertone.
+ *
+ * All text colours are dark enough to pass WCAG AA on the cream
+ * surface family (≥ 4.5:1 for body copy). Semantic colours are shifted
+ * darker than their charcoal-theme counterparts to preserve contrast
+ * on the light surfaces.
+ */
 const lightThemeColors = {
-  // Primary Brand Colors
-  primary: '#00d4ff',
-  primary_dark: '#00a8cc',
-  primary_light: '#33e0ff',
+  // Primary Brand Colors — cyan shifted darker so it reads as an
+  // interactive colour on light surfaces instead of washing out.
+  primary: '#006d8c',
+  primary_dark: '#004d63',
+  primary_light: '#0091b8',
 
-  // Backgrounds
-  bg_darkest: '#0f0f1e',      // Main app background
-  bg_dark: '#1a1a2e',         // Cards, modals
-  bg_darker: '#16213e',       // Darker cards, nested elements
-  bg_medium: '#16213e',       // Buttons, active states
-  bg_light: '#2a2a3e',        // Borders, dividers, disabled states
-  bg_lighter: '#3a3a4e',      // Hover states
-  surface: '#1a1a2e',         // Surface/card backgrounds
+  // Backgrounds — warm cream family. `bg_darkest` is the app root;
+  // `bg_dark` / `bg_darker` step down for card + nested surfaces so
+  // the visual hierarchy still reads on a light scheme.
+  bg_darkest: '#F4EFE6',      // Main app background (warm cream)
+  bg_dark: '#EDE8DF',         // Cards, modals
+  bg_darker: '#E6E0D5',       // Nested cards, buttons, darker cells
+  bg_medium: '#EDE8DF',       // Button backgrounds, active states
+  bg_light: '#D8D2C5',        // Dividers, disabled states
+  bg_lighter: '#DED7CA',      // Hover / pressed states
+  surface: '#EDE8DF',         // Canonical card surface
 
-  // Text Colors
-  text_primary: '#ffffff',    // Primary text
-  text_secondary: '#cccccc',  // Secondary text, descriptions
-  text_tertiary: '#888888',   // Disabled text, hints
-  text_placeholder: '#666666',
+  // Text Colors — dark neutrals, never pure black to match the warm
+  // surface tone.
+  text_primary: '#1a1916',    // Primary copy (≈ 14.8:1 on bg_darkest)
+  text_secondary: '#4a4843',  // Secondary copy
+  text_tertiary: '#7a7770',   // Hints, metadata
+  text_placeholder: '#9a9790',
 
-  // Semantic Colors
-  success: '#51cf66',         // Success states
-  success_dark: '#37b24d',
-  error: '#ff6b6b',           // Error states
-  error_dark: '#fa5252',
-  warning: '#ffd43b',         // Warning states
-  warning_dark: '#f9ca24',
-  info: '#00d4ff',            // Info (same as primary)
-  info_dark: '#0099cc',
+  // Semantic Colors — darkened so they remain legible on cream without
+  // turning into mud. Names kept identical to the charcoal theme so
+  // component code doesn't care which palette is active.
+  success: '#1f7a34',
+  success_dark: '#145c23',
+  error: '#b3261e',
+  error_dark: '#8c1a14',
+  warning: '#b86200',
+  warning_dark: '#8a4800',
+  info: '#006d8c',
+  info_dark: '#004d63',
 
-  // Bright Semantic (for status indicators)
-  alert_success: '#00ff00',
-  alert_error: '#ff4444',
-  alert_warning: '#ffaa00',
+  // Bright Semantic (for status indicators) — same intent as the
+  // charcoal variant, still legible as solid colours.
+  alert_success: '#1f7a34',
+  alert_error: '#b3261e',
+  alert_warning: '#b86200',
 
   // Utility
   black: '#000000',
   white: '#ffffff',
   transparent: 'transparent',
 
-  // Borders - Very subtle, almost invisible
-  border: 'rgba(0, 212, 255, 0.08)',      // Ultra subtle primary border
-  border_light: 'rgba(255, 255, 255, 0.06)', // Very subtle light border
+  // Borders — a subtle dark hairline reads better than a washed-out
+  // primary tint on a light surface.
+  border: 'rgba(0, 0, 0, 0.10)',
+  border_light: 'rgba(0, 0, 0, 0.06)',
 } as const;
 
 // Dark grey theme with gradient accents
@@ -115,8 +135,40 @@ export const themeColorMap: Record<ThemeType, Record<string, string>> = {
 // Helper function to get colors for a specific theme
 export const getThemeColors = (theme: ThemeType) => themeColorMap[theme] as typeof charcoalGreyThemeColors;
 
-// Default to charcoal grey theme
-export const colors = charcoalGreyThemeColors;
+/**
+ * Live-mutable colour palette shared across the app.
+ *
+ * Most screens currently do `import { colors } from '../theme'` rather
+ * than going through `useTheme()`. Changing the *reference* held by
+ * those imports would require a full app restart, so instead we keep
+ * a single mutable object and rewrite its properties in place
+ * whenever the active theme changes. Consumers that re-render after
+ * the mutation (triggered by `ThemeProvider` bumping its remount key)
+ * pick up the new values automatically.
+ *
+ * New code should prefer `useTheme().colors`, which subscribes
+ * directly to the current theme and doesn't rely on the mutation
+ * trick. `colors` is retained to keep the 100+ existing static
+ * imports working without a mass refactor.
+ */
+const writableColors: { [K in keyof typeof charcoalGreyThemeColors]: string } = {
+  ...charcoalGreyThemeColors,
+};
+export const colors = writableColors as typeof charcoalGreyThemeColors;
+
+/**
+ * Rewrites the shared `colors` object in place to reflect the
+ * requested theme. Only touches own keys already present on the
+ * target palette — never drops a key, so any component reading a
+ * colour it expects to exist keeps getting *some* value even if a
+ * future palette omits it.
+ */
+export function applyTheme(theme: ThemeType): void {
+  const source = theme === 'light' ? lightThemeColors : charcoalGreyThemeColors;
+  for (const key of Object.keys(source) as Array<keyof typeof source>) {
+    (writableColors as Record<string, string>)[key as string] = source[key];
+  }
+}
 
 export const spacing = {
   // Spacing scale - More generous for better aesthetics

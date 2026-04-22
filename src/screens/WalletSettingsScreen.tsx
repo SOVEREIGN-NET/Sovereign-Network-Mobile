@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { Alert, Clipboard, Platform, View } from 'react-native';
+import { Alert, Clipboard, Platform, Pressable, View } from 'react-native';
 import {
   Card,
   Text,
@@ -11,18 +11,57 @@ import {
   ScreenLayout,
 } from '../components';
 import { useAuth } from '../hooks';
-import { useTranslation } from '../i18n';
+import {
+  useTranslation,
+  setLanguage as setI18nLanguage,
+  type LanguageCode,
+} from '../i18n';
+import { useTheme } from '../context/ThemeContext';
+import type { ThemeType } from '../theme/tokens';
 import { colors, spacing, typography, borderRadius } from '../theme';
 import { BUILD_INFO } from '../config';
 import { parseBrowserAuthLink } from '../services/BrowserAuthService';
 
+/**
+ * Locales offered in the switcher. Keep in sync with `LanguageCode`
+ * in `src/i18n/i18n.ts` — when a new translation file ships, add it
+ * here and the pill row picks it up automatically.
+ */
+type PickableLanguage = LanguageCode;
+const PICKABLE_LANGUAGES: PickableLanguage[] = ['en', 'es'];
+
+/** Same pill-row pattern as the language switcher — kept parallel so
+ *  both settings read as obviously-toggles at a glance. */
+const PICKABLE_THEMES: ThemeType[] = ['charcoal', 'light'];
+
+/** Platform-aware monospace font for hash / address readouts. */
+const MONO_FONT = Platform.OS === 'ios' ? 'Menlo' : 'monospace';
+
 const WalletSettingsScreen = ({ navigation }: any) => {
-  const { t } = useTranslation();
+  // `language` drives the "which pill is active" highlight; `t` is
+  // the live translation object. `useTranslation` subscribes to the
+  // central i18n listener set, so tapping a pill that calls
+  // `setI18nLanguage` causes this component (and every other
+  // translated screen) to re-render with the new strings.
+  const { t, language: currentLanguage } = useTranslation();
+  const { theme: currentTheme, setTheme } = useTheme();
   const { currentIdentity, isLoading } = useAuth();
 
   /** Inline paste field for the `zhtp://auth?…` deep link / raw hex. */
   const [browserAuthInput, setBrowserAuthInput] = useState('');
   const [browserAuthError, setBrowserAuthError] = useState<string | null>(null);
+
+  /**
+   * Apply a language selection. Goes through the central
+   * `setI18nLanguage`, which persists to AsyncStorage and fires the
+   * listener set — every `useTranslation` consumer re-renders.
+   */
+  const applyLanguage = (lang: PickableLanguage) => {
+    setI18nLanguage(lang);
+  };
+
+  const activeLanguageLabel =
+    t.settings.languages[currentLanguage] ?? t.settings.languages.en;
 
   const onOpenBrowserAuth = async () => {
     setBrowserAuthError(null);
@@ -31,20 +70,18 @@ const WalletSettingsScreen = ({ navigation }: any) => {
     // the user doesn't have to paste manually.
     const candidate = raw.length > 0 ? raw : (await Clipboard.getString()).trim();
     if (!candidate) {
-      setBrowserAuthError('Paste the auth link from your browser first.');
+      setBrowserAuthError(t.walletSettings.browserAuth.errors.emptyClipboard);
       return;
     }
     try {
       const parsed = parseBrowserAuthLink(candidate);
       if (!parsed) {
-        setBrowserAuthError(
-          'That doesn\u2019t look like a ZHTP auth link. Expected `zhtp://auth?challenge=…`.',
-        );
+        setBrowserAuthError(t.walletSettings.browserAuth.errors.invalidLink);
         return;
       }
       navigation.navigate('BrowserAuth', { url: candidate });
     } catch (err: any) {
-      setBrowserAuthError(err?.message ?? 'Invalid auth link');
+      setBrowserAuthError(err?.message ?? t.walletSettings.browserAuth.errors.invalid);
     }
   };
 
@@ -55,6 +92,150 @@ const WalletSettingsScreen = ({ navigation }: any) => {
   return (
     <ScreenLayout paddingTop={spacing.md}>
       <Column gap="lg">
+        {/* Language switcher — colocated with the user's other
+            per-identity preferences. Always-visible segmented pill
+            row (no dropdown) so the user can read and change locale
+            in one tap without navigating anywhere. */}
+        <Card>
+          <Text
+            style={{
+              fontSize: typography.size.sm,
+              fontWeight: typography.weight.semibold,
+              color: colors.text_primary,
+              marginBottom: spacing.sm,
+            }}
+          >
+            {t.settings.language.title}
+          </Text>
+          <Text
+            style={{
+              fontSize: typography.size.xs,
+              color: colors.text_secondary,
+              marginBottom: spacing.md,
+            }}
+          >
+            {activeLanguageLabel}
+          </Text>
+
+          <View
+            style={{
+              flexDirection: 'row',
+              backgroundColor: colors.bg_darker,
+              borderRadius: borderRadius.full,
+              borderWidth: 1,
+              borderColor: colors.border,
+              padding: 3,
+            }}
+          >
+            {PICKABLE_LANGUAGES.map(lang => {
+              const isActive = currentLanguage === lang;
+              return (
+                <Pressable
+                  key={lang}
+                  onPress={() => applyLanguage(lang)}
+                  style={{
+                    flex: 1,
+                    paddingVertical: spacing.xs + 2,
+                    paddingHorizontal: spacing.xs,
+                    borderRadius: borderRadius.full,
+                    backgroundColor: isActive
+                      ? colors.primary
+                      : 'transparent',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                  }}
+                >
+                  <Text
+                    numberOfLines={1}
+                    style={{
+                      fontSize: typography.size.xs,
+                      fontWeight: isActive ? '700' : '500',
+                      color: isActive
+                        ? colors.bg_darkest
+                        : colors.text_primary,
+                    }}
+                  >
+                    {t.settings.languages[lang]}
+                  </Text>
+                </Pressable>
+              );
+            })}
+          </View>
+        </Card>
+
+        {/* Appearance — pill-row twin of the language switcher. The
+            toggle mutates the shared `colors` palette in place via
+            `ThemeProvider.setTheme`, and the provider re-keys its
+            subtree so screens using the static `import { colors }`
+            pattern re-render with the new palette. Persists across
+            launches via AsyncStorage / NativeStorage. */}
+        <Card>
+          <Text
+            style={{
+              fontSize: typography.size.sm,
+              fontWeight: typography.weight.semibold,
+              color: colors.text_primary,
+              marginBottom: spacing.sm,
+            }}
+          >
+            {t.settings.theme.title}
+          </Text>
+          <Text
+            style={{
+              fontSize: typography.size.xs,
+              color: colors.text_secondary,
+              marginBottom: spacing.md,
+            }}
+          >
+            {t.settings.theme.subtitle}
+          </Text>
+
+          <View
+            style={{
+              flexDirection: 'row',
+              backgroundColor: colors.bg_darker,
+              borderRadius: borderRadius.full,
+              borderWidth: 1,
+              borderColor: colors.border,
+              padding: 3,
+            }}
+          >
+            {PICKABLE_THEMES.map(themeOption => {
+              const isActive = currentTheme === themeOption;
+              return (
+                <Pressable
+                  key={themeOption}
+                  onPress={() => setTheme(themeOption)}
+                  style={{
+                    flex: 1,
+                    paddingVertical: spacing.xs + 2,
+                    paddingHorizontal: spacing.xs,
+                    borderRadius: borderRadius.full,
+                    backgroundColor: isActive
+                      ? colors.primary
+                      : 'transparent',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                  }}
+                >
+                  <Text
+                    numberOfLines={1}
+                    style={{
+                      fontSize: typography.size.xs,
+                      fontWeight: isActive ? '700' : '500',
+                      color: isActive
+                        ? colors.bg_darkest
+                        : colors.text_primary,
+                    }}
+                  >
+                    {t.settings.theme[themeOption]}
+                  </Text>
+                </Pressable>
+              );
+            })}
+          </View>
+        </Card>
+
         {/* Export / Recovery */}
         <Card>
           <Text
@@ -90,7 +271,7 @@ const WalletSettingsScreen = ({ navigation }: any) => {
               marginBottom: spacing.xs,
             }}
           >
-            Browser sign-in
+            {t.walletSettings.browserAuth.title}
           </Text>
           <Text
             style={{
@@ -99,11 +280,7 @@ const WalletSettingsScreen = ({ navigation }: any) => {
               marginBottom: spacing.md,
             }}
           >
-            Use this app to authenticate a browser session on another
-            device. Scan the QR code shown by the browser, or paste the
-            `zhtp://auth` link below. No new connection is opened —
-            the challenge is signed and submitted via your connected
-            node.
+            {t.walletSettings.browserAuth.description}
           </Text>
 
           <Column gap="sm">
@@ -115,7 +292,7 @@ const WalletSettingsScreen = ({ navigation }: any) => {
               variant="primary"
               onPress={() => navigation.navigate('QRScan')}
             >
-              Scan QR code
+              {t.walletSettings.browserAuth.scanButton}
             </Button>
 
             {/* Fallback: paste the link (or leave empty to read
@@ -127,7 +304,7 @@ const WalletSettingsScreen = ({ navigation }: any) => {
                 setBrowserAuthInput(text);
                 if (browserAuthError) setBrowserAuthError(null);
               }}
-              placeholder="zhtp://auth?challenge=…"
+              placeholder={t.walletSettings.browserAuth.pastePlaceholder}
               autoCapitalize="none"
               autoCorrect={false}
             />
@@ -142,7 +319,7 @@ const WalletSettingsScreen = ({ navigation }: any) => {
               </Text>
             )}
             <Button variant="secondary" onPress={onOpenBrowserAuth}>
-              Use pasted link
+              {t.walletSettings.browserAuth.useLinkButton}
             </Button>
             <Text
               style={{
@@ -151,7 +328,7 @@ const WalletSettingsScreen = ({ navigation }: any) => {
                 textAlign: 'center',
               }}
             >
-              Tip: leave the field empty and tap &quot;Use pasted link&quot; to read your clipboard.
+              {t.walletSettings.browserAuth.clipboardTip}
             </Text>
           </Column>
         </Card>
@@ -166,7 +343,7 @@ const WalletSettingsScreen = ({ navigation }: any) => {
               marginBottom: spacing.md,
             }}
           >
-            Build Info
+            {t.walletSettings.buildInfo.title}
           </Text>
 
           <View
@@ -180,11 +357,15 @@ const WalletSettingsScreen = ({ navigation }: any) => {
           >
             <Column gap="sm">
               <BuildInfoRow
-                label="Platform"
-                value={Platform.OS === 'ios' ? 'iOS' : 'Android'}
+                label={t.walletSettings.buildInfo.platform}
+                value={
+                  Platform.OS === 'ios'
+                    ? t.walletSettings.buildInfo.ios
+                    : t.walletSettings.buildInfo.android
+                }
               />
               <BuildInfoRow
-                label="Version"
+                label={t.walletSettings.buildInfo.version}
                 value={
                   Platform.OS === 'ios'
                     ? BUILD_INFO.ios.version
@@ -192,7 +373,7 @@ const WalletSettingsScreen = ({ navigation }: any) => {
                 }
               />
               <BuildInfoRow
-                label="Build"
+                label={t.walletSettings.buildInfo.build}
                 value={
                   Platform.OS === 'ios'
                     ? BUILD_INFO.ios.build
@@ -200,13 +381,17 @@ const WalletSettingsScreen = ({ navigation }: any) => {
                 }
               />
               <BuildInfoRow
-                label="Commit"
+                label={t.walletSettings.buildInfo.commit}
                 value={`${BUILD_INFO.gitCommit}${BUILD_INFO.gitDirty ? '-dirty' : ''}`}
                 mono
               />
-              <BuildInfoRow label="Branch" value={BUILD_INFO.gitBranch} mono />
               <BuildInfoRow
-                label="Generated"
+                label={t.walletSettings.buildInfo.branch}
+                value={BUILD_INFO.gitBranch}
+                mono
+              />
+              <BuildInfoRow
+                label={t.walletSettings.buildInfo.generated}
                 value={BUILD_INFO.generatedAt}
                 mono
               />
@@ -241,7 +426,7 @@ const BuildInfoRow = ({
         fontSize: typography.size.xs,
         color: colors.text_primary,
         fontWeight: typography.weight.semibold,
-        fontFamily: mono ? (Platform.OS === 'ios' ? 'Menlo' : 'monospace') : undefined,
+        fontFamily: mono ? MONO_FONT : undefined,
         flexShrink: 1,
         textAlign: 'right',
         marginLeft: spacing.md,

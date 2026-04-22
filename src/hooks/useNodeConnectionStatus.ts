@@ -10,7 +10,7 @@
 import { useState, useEffect, useCallback, useRef } from 'react';
 import { AppState, AppStateStatus } from 'react-native';
 import { isQuicSupported, testQuicConnection } from '../services/quic';
-import { DEFAULT_NODE_HOST, DEFAULT_NODE_PORT } from '../config';
+import { getActiveTarget } from '../services/NetworkBootstrap';
 import { refreshFeeConfig } from '../services/FeeConfigService';
 
 const POLL_INTERVAL_MS = 120_000; // 120 seconds
@@ -56,8 +56,9 @@ async function _check() {
 
     _status = 'checking';
     _notify();
-    if (__DEV__) console.log('[NodeStatus] Testing connection to', DEFAULT_NODE_HOST, DEFAULT_NODE_PORT);
-    const result = await testQuicConnection(DEFAULT_NODE_HOST, DEFAULT_NODE_PORT);
+    const target = getActiveTarget();
+    if (__DEV__) console.log('[NodeStatus] Testing connection to', target.host, target.port);
+    const result = await testQuicConnection(target.host, target.port);
     if (__DEV__) console.log('[NodeStatus] testQuicConnection result:', JSON.stringify(result));
 
     if (result.success) {

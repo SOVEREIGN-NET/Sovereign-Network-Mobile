@@ -10,7 +10,7 @@ import {
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Text, Card } from '../../components';
-import { colors, spacing, borderRadius, typography } from '../../theme';
+import { colors, spacing, borderRadius, typography , createThemeReactiveStyles } from '../../theme';
 import { useAsyncData } from '../../hooks';
 import { searchBlockchain, SearchResponse } from '../../services/ExplorerService';
 
@@ -151,7 +151,7 @@ const SearchScreen: React.FC<any> = ({ navigation, route }) => {
   );
 };
 
-const styles = StyleSheet.create({
+const makeStyles = () => StyleSheet.create({
   container: { flex: 1, backgroundColor: colors.bg_darkest },
   header: {
     flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between',
@@ -180,4 +180,5 @@ const styles = StyleSheet.create({
   mono: { fontFamily: MONO_FONT, fontSize: typography.size.sm, color: colors.text_primary },
 });
 
+const styles = createThemeReactiveStyles(makeStyles);
 export default SearchScreen;

@@ -18,7 +18,8 @@ export interface ListItemProps {
   style?: ViewStyle;
 }
 
-const styles = StyleSheet.create({
+// Build at render time so theme-dependent colours track `applyTheme`.
+const makeStyles = () => StyleSheet.create({
   container: {
     backgroundColor: colors.bg_dark,
     borderRadius: borderRadius.lg,
@@ -66,6 +67,7 @@ export const ListItem = React.memo(
     divider = true,
     style,
   }: ListItemProps) => {
+    const styles = makeStyles();
     const content = (
       <>
         {icon && <RNText style={styles.icon}>{icon}</RNText>}

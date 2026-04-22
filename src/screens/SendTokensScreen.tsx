@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useCallback } from 'react';
-import { View, ScrollView, TouchableOpacity, Modal, TextInput, Alert, KeyboardAvoidingView, Platform } from 'react-native';
+import { View, ScrollView, TouchableOpacity, Modal, TextInput, KeyboardAvoidingView, Platform } from 'react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useFocusEffect } from '@react-navigation/native';
 import {
@@ -18,8 +18,17 @@ import { useAddressBook } from '../hooks/useAddressBook';
 import { useTranslation } from '../i18n';
 import { colors, spacing, typography, borderRadius } from '../theme';
 import tokenService from '../services/TokenService';
-import { TokenTransferRequest, SovTransferRequest } from '../types/token';
+import { SovTransferRequest } from '../types/token';
 import { humanToAtomic, atomsToNumber } from '../utils/tokenUnits';
+import { WELFARE_DAOS } from '../constants';
+
+// Welfare tokens ($FOOD, $HEAL, $EDU, $HOME, $ENRG) are staking receipts —
+// they're yield from DAO stakes, not peer-to-peer transferable assets. Hide
+// them from the Send screen so users don't attempt to send what the node
+// won't accept.
+const WELFARE_TOKEN_IDS: ReadonlySet<string> = new Set(
+  WELFARE_DAOS.map(d => d.tokenId),
+);
 
 const SOV_DECIMALS = 18;
 import { CHAIN_ID } from '../config';
@@ -191,6 +200,11 @@ const SendTokensScreen = ({ navigation, route }: any) => {
           allBalances.forEach(token => {
             const symbol = String(token.symbol || '').toUpperCase();
 
+            // Welfare DAO tokens are staking yield, not transferable — hide.
+            if (token.token_id && WELFARE_TOKEN_IDS.has(token.token_id)) {
+              return;
+            }
+
             // Skip tokens the node didn't tag with decimals — can't safely
             // format or transfer without knowing the unit.
             if (token.decimals == null || !Number.isFinite(token.decimals)) {
@@ -283,6 +297,8 @@ const SendTokensScreen = ({ navigation, route }: any) => {
 
         // Fetch token info for each tracked token
         for (const tokenId of trackedTokenIds) {
+          // Welfare tokens are staking yield — never expose in Send picker.
+          if (WELFARE_TOKEN_IDS.has(tokenId)) continue;
           if (!tokenMap.has(tokenId)) {
             // Token not in balance list, try to get info and add with 0 balance
             try {
@@ -320,6 +336,8 @@ const SendTokensScreen = ({ navigation, route }: any) => {
       try {
         const registry = await getTokenRegistry();
         for (const item of registry) {
+          // Welfare tokens are staking yield — never expose in Send picker.
+          if (WELFARE_TOKEN_IDS.has(item.token_id)) continue;
           if (tokenMap.has(item.token_id)) continue;
           const symbol = (item.symbol || '').toUpperCase();
           // SOV is always rendered from the wallet-list aggregate, not the
@@ -398,40 +416,49 @@ const SendTokensScreen = ({ navigation, route }: any) => {
     return trimmed.length === 64 && isHex(trimmed);
   };
 
-  // Validate transfer form
+  // Validate transfer form — broken into a recipient check and an amount
+  // check so each stays under Sonar's cognitive-complexity threshold.
+  const validateRecipient = (): string | undefined => {
+    const raw = transferForm.recipient.trim();
+    if (raw.length === 0) return 'Recipient is required';
+    if (selectedToken?.type === 'sov') {
+      if (!isValidSovRecipient(transferForm.recipient)) {
+        return 'Recipient wallet ID must be 64 hex characters';
+      }
+      return undefined;
+    }
+    if (!isValidRecipient(transferForm.recipient)) {
+      return 'Recipient must be DID (did:zhtp:...) or hex key id/pubkey';
+    }
+    return undefined;
+  };
+
+  const validateAmount = (): string | undefined => {
+    const trimmed = transferForm.amount.trim();
+    if (trimmed.length === 0) return 'Amount is required';
+    const amount = Number.parseFloat(trimmed);
+    if (Number.isNaN(amount) || amount <= 0) {
+      return 'Amount must be greater than 0';
+    }
+    if (selectedToken?.type === 'sov' && selectedFromWallet) {
+      const sourceWallet = wallets?.find(w => w.id === selectedFromWallet);
+      if (sourceWallet && amount > sourceWallet.available_balance) {
+        return `Insufficient balance (${sourceWallet.available_balance.toFixed(2)})`;
+      }
+      return undefined;
+    }
+    if (selectedToken && amount > selectedToken.balance) {
+      return `Insufficient balance (${selectedToken.balance})`;
+    }
+    return undefined;
+  };
+
   const validateTransfer = (): boolean => {
     const newErrors: TransferFormErrors = {};
-
-    if (!transferForm.recipient.trim()) {
-      newErrors.recipient = 'Recipient is required';
-    } else if (selectedToken?.type === 'sov') {
-      if (!isValidSovRecipient(transferForm.recipient)) {
-        newErrors.recipient = 'Recipient wallet ID must be 64 hex characters';
-      }
-    } else if (!isValidRecipient(transferForm.recipient)) {
-      newErrors.recipient =
-        'Recipient must be DID (did:zhtp:...) or hex key id/pubkey';
-    }
-
-    if (!transferForm.amount.trim()) {
-      newErrors.amount = 'Amount is required';
-    } else {
-      const amount = Number.parseFloat(transferForm.amount);
-      if (Number.isNaN(amount) || amount <= 0) {
-        newErrors.amount = 'Amount must be greater than 0';
-      } else if (selectedToken?.type === 'sov' && selectedFromWallet) {
-        // SOV: validate against per-wallet balance
-        const sourceWallet = wallets?.find(w => w.id === selectedFromWallet);
-        if (sourceWallet && amount > sourceWallet.available_balance) {
-          newErrors.amount = `Insufficient balance (${sourceWallet.available_balance.toFixed(
-            2,
-          )})`;
-        }
-      } else if (selectedToken && amount > selectedToken.balance) {
-        newErrors.amount = `Insufficient balance (${selectedToken.balance})`;
-      }
-    }
-
+    const recipientErr = validateRecipient();
+    if (recipientErr) newErrors.recipient = recipientErr;
+    const amountErr = validateAmount();
+    if (amountErr) newErrors.amount = amountErr;
     setErrors(newErrors);
     return Object.keys(newErrors).length === 0;
   };

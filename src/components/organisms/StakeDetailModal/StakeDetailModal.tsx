@@ -181,10 +181,7 @@ export const StakeDetailModal = React.memo(
                   <View
                     style={[
                       styles.amountBlock,
-                      {
-                        borderLeftColor: accent,
-                        backgroundColor: hexToRgba(accent, 0.06),
-                      },
+                      { backgroundColor: hexToRgba(accent, 0.06) },
                     ]}
                   >
                     <Text
@@ -442,7 +439,6 @@ const styles = StyleSheet.create({
     paddingRight: spacing.xl,
   },
   amountBlock: {
-    borderLeftWidth: 2,
     paddingVertical: spacing.md,
     paddingHorizontal: spacing.md,
     borderRadius: borderRadius.sm,

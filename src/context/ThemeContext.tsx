@@ -4,10 +4,10 @@
  */
 
 import React, { createContext, useState, useCallback, useEffect, useMemo } from 'react';
-import { Platform } from 'react-native';
+import { Platform, View } from 'react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { NativeStorage } from '../services/NativeStorage';
-import { ThemeType, getThemeColors } from '../theme/tokens';
+import { ThemeType, applyTheme, getThemeColors } from '../theme/tokens';
 
 // Use native storage on Android, AsyncStorage on iOS
 const storage = Platform.OS === 'android' ? NativeStorage : AsyncStorage;
@@ -34,12 +34,21 @@ export const ThemeProvider: React.FC<ThemeProviderProps> = ({ children }) => {
   const [theme, setThemeState] = useState<ThemeType>('charcoal');
   const [isLoading, setIsLoading] = useState(true);
 
+  // Apply the initial theme synchronously so static `import { colors }`
+  // consumers read the right palette on their first render. AsyncStorage
+  // reads asynchronously below — if it returns a different choice we
+  // mutate and bump the remount key to propagate.
+  useEffect(() => {
+    applyTheme(theme);
+  }, [theme]);
+
   // Load saved theme preference on app start
   useEffect(() => {
     const loadThemePreference = async () => {
       try {
         const savedTheme = await storage.getItem(THEME_STORAGE_KEY);
         if (savedTheme && (savedTheme === 'light' || savedTheme === 'charcoal')) {
+          applyTheme(savedTheme as ThemeType);
           setThemeState(savedTheme as ThemeType);
         }
       } catch (error) {
@@ -55,13 +64,21 @@ export const ThemeProvider: React.FC<ThemeProviderProps> = ({ children }) => {
   // Function to change theme and persist preference
   const setTheme = useCallback(
     async (newTheme: ThemeType) => {
+      const previous = theme;
       try {
+        // Mutate the shared `colors` object FIRST, then update state —
+        // this ordering guarantees children re-rendered by the state
+        // change read the new palette (not the old one they were
+        // rendered with last).
+        applyTheme(newTheme);
         setThemeState(newTheme);
         await storage.setItem(THEME_STORAGE_KEY, newTheme);
       } catch (error) {
         console.warn('Failed to save theme preference:', error);
-        // Revert state on error
-        setThemeState(theme);
+        // Revert state AND palette on error so both sources of truth
+        // stay consistent.
+        applyTheme(previous);
+        setThemeState(previous);
       }
     },
     [theme],
@@ -84,7 +101,18 @@ export const ThemeProvider: React.FC<ThemeProviderProps> = ({ children }) => {
     return null;
   }
 
-  return <ThemeContext.Provider value={value}>{children}</ThemeContext.Provider>;
+  // Key the subtree by the current theme so the whole tree remounts
+  // when the user toggles. That's what forces screens doing the static
+  // `import { colors }` to re-read the (now mutated) module-level
+  // `colors` object. Wrapping in a View keeps the theme switch
+  // invisible to consumers that weren't keyed already.
+  return (
+    <ThemeContext.Provider value={value}>
+      <View key={theme} style={{ flex: 1 }}>
+        {children}
+      </View>
+    </ThemeContext.Provider>
+  );
 };
 
 /**

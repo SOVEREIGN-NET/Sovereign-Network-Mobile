@@ -12,7 +12,8 @@ export interface ProgressBarProps {
   style?: ViewStyle;
 }
 
-const styles = StyleSheet.create({
+// Build at render time so theme-dependent colours track `applyTheme`.
+const makeStyles = () => StyleSheet.create({
   container: {
     marginVertical: spacing.sm,
   },
@@ -54,6 +55,7 @@ export const ProgressBar = React.memo(
     showPercentage = true,
     style,
   }: ProgressBarProps) => {
+    const styles = makeStyles();
     // Clamp percentage between 0 and 100
     const clampedPercentage = Math.min(Math.max(percentage, 0), 100);
 

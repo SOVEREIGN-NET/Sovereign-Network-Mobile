@@ -11,6 +11,7 @@ import {
   Text,
 } from '../components';
 import { useAuth } from '../hooks';
+import { useTranslation } from '../i18n';
 import { colors, spacing, typography, borderRadius } from '../theme';
 import {
   BrowserAuthError,
@@ -45,6 +46,7 @@ const MONO_FONT = Platform.OS === 'ios' ? 'Menlo' : 'monospace';
 const BrowserAuthScreen = ({ navigation }: any) => {
   const route = useRoute();
   const params = (route.params as RouteParams | undefined) ?? {};
+  const { t } = useTranslation();
 
   const { currentIdentity, isLoading } = useAuth();
 
@@ -61,14 +63,14 @@ const BrowserAuthScreen = ({ navigation }: any) => {
       setParseError(null);
       return parsed;
     } catch (err: any) {
-      setParseError(err?.message ?? 'Invalid authentication link');
+      setParseError(err?.message ?? t.browserAuth.invalidLink.title);
       return null;
     }
     // Only re-run on the raw input — state setters are stable.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [params.url]);
 
-  const nodeLabel = challenge?.node ?? params.node ?? 'connected node';
+  const nodeLabel = challenge?.node ?? params.node ?? t.browserAuth.defaultNode;
 
   const did = currentIdentity?.did ?? '';
   const didSuffix = useMemo(() => {
@@ -84,15 +86,30 @@ const BrowserAuthScreen = ({ navigation }: any) => {
       const out = await submitBrowserAuth(challenge.challengeHex, did);
       setResult(out);
     } catch (err: any) {
+      // BrowserAuthError carries a stable `code` — translate via i18n
+      // so the user sees a localized message regardless of how the
+      // service chose to phrase the English default.
       if (err instanceof BrowserAuthError) {
-        setError(err.message);
+        switch (err.code) {
+          case 'invalid_signature':
+            setError(t.browserAuth.errors.invalidSignature);
+            break;
+          case 'did_not_registered':
+            setError(t.browserAuth.errors.notRegistered);
+            break;
+          case 'challenge_expired':
+            setError(t.browserAuth.errors.challengeExpired);
+            break;
+          default:
+            setError(err.message ?? t.browserAuth.errors.generic);
+        }
       } else {
-        setError(err?.message ?? 'Authentication failed');
+        setError(err?.message ?? t.browserAuth.errors.generic);
       }
     } finally {
       setSubmitting(false);
     }
-  }, [challenge, did]);
+  }, [challenge, did, t]);
 
   const onCancel = useCallback(() => {
     navigation.goBack();
@@ -101,8 +118,11 @@ const BrowserAuthScreen = ({ navigation }: any) => {
   const onCopySession = useCallback(() => {
     if (!result?.sessionId) return;
     Clipboard.setString(result.sessionId);
-    Alert.alert('Copied', 'Session id copied to clipboard');
-  }, [result?.sessionId]);
+    Alert.alert(
+      t.browserAuth.copySession,
+      t.browserAuth.copySessionMessage,
+    );
+  }, [result?.sessionId, t]);
 
   // If the screen was opened while the app was already in the background
   // and the user then hits cancel, clear the challenge so a stale URL
@@ -130,15 +150,15 @@ const BrowserAuthScreen = ({ navigation }: any) => {
                 color: colors.error,
               }}
             >
-              Invalid authentication link
+              {t.browserAuth.invalidLink.title}
             </Text>
             <Text
               style={{ color: colors.text_secondary, fontSize: typography.size.sm }}
             >
-              {parseError ?? 'The link did not contain a valid challenge.'}
+              {parseError ?? t.browserAuth.invalidLink.fallback}
             </Text>
             <Button variant="secondary" onPress={onCancel}>
-              Close
+              {t.browserAuth.close}
             </Button>
           </Column>
         </Card>
@@ -159,18 +179,23 @@ const BrowserAuthScreen = ({ navigation }: any) => {
                 color: colors.success,
               }}
             >
-              Browser authenticated
+              {t.browserAuth.success.title}
             </Text>
             <Text style={{ color: colors.text_secondary, fontSize: typography.size.sm }}>
-              Return to your browser — the page should load momentarily.
+              {t.browserAuth.success.message}
             </Text>
-            <InfoRow label="Session id" value={result.sessionId} mono onPress={onCopySession} />
             <InfoRow
-              label="Signed at"
+              label={t.browserAuth.success.sessionId}
+              value={result.sessionId}
+              mono
+              onPress={onCopySession}
+            />
+            <InfoRow
+              label={t.browserAuth.success.signedAt}
               value={new Date(result.timestamp * 1000).toLocaleString()}
             />
             <Button variant="primary" onPress={onCancel}>
-              Done
+              {t.browserAuth.done}
             </Button>
           </Column>
         </Card>
@@ -181,7 +206,7 @@ const BrowserAuthScreen = ({ navigation }: any) => {
   const truncatedChallenge = `${challenge.challengeHex.slice(0, 10)}…${challenge.challengeHex.slice(-8)}`;
   const truncatedDid = didSuffix
     ? `did:zhtp:${didSuffix.slice(0, 10)}…${didSuffix.slice(-8)}`
-    : '(unknown identity)';
+    : t.browserAuth.unknownDid;
 
   return (
     <ScreenLayout paddingTop={spacing.md}>
@@ -195,21 +220,18 @@ const BrowserAuthScreen = ({ navigation }: any) => {
                 color: colors.text_primary,
               }}
             >
-              Authenticate browser session
+              {t.browserAuth.title}
             </Text>
             <Text
               style={{ color: colors.text_secondary, fontSize: typography.size.sm }}
             >
-              A browser is requesting proof that you control this
-              identity. Review the details below before authorising —
-              the signature will be submitted via your connected ZHTP
-              node and used to unlock the browser session.
+              {t.browserAuth.description}
             </Text>
 
             <View style={details}>
-              <InfoRow label="Challenge" value={truncatedChallenge} mono />
-              <InfoRow label="Your DID" value={truncatedDid} mono />
-              <InfoRow label="Target node" value={nodeLabel} />
+              <InfoRow label={t.browserAuth.challengeLabel} value={truncatedChallenge} mono />
+              <InfoRow label={t.browserAuth.didLabel} value={truncatedDid} mono />
+              <InfoRow label={t.browserAuth.nodeLabel} value={nodeLabel} />
             </View>
 
             {error && (
@@ -232,14 +254,14 @@ const BrowserAuthScreen = ({ navigation }: any) => {
                 onPress={onAuthenticate}
                 disabled={submitting}
               >
-                {submitting ? 'Authenticating…' : 'Authenticate'}
+                {submitting ? t.browserAuth.authenticating : t.browserAuth.authenticate}
               </Button>
               <Button
                 variant="secondary"
                 onPress={onCancel}
                 disabled={submitting}
               >
-                Cancel
+                {t.browserAuth.cancel}
               </Button>
             </Column>
           </Column>
@@ -252,7 +274,9 @@ const BrowserAuthScreen = ({ navigation }: any) => {
             textAlign: 'center',
           }}
         >
-          Received via {params.url?.startsWith('zhtp://') ? 'deep link' : 'manual entry'}
+          {params.url?.startsWith('zhtp://')
+            ? t.browserAuth.receivedVia.deepLink
+            : t.browserAuth.receivedVia.manualEntry}
         </Text>
       </Column>
     </ScreenLayout>

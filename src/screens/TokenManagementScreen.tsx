@@ -1,10 +1,6 @@
 /**
  * Token Management Screen
-<<<<<<< HEAD
  * Full token info for each tracked token. Delete is a secondary action.
-=======
- * Manage tracked tokens - view status and remove token IDs that no longer exist
->>>>>>> origin/main
  */
 
 import React, { useState, useEffect, useCallback } from 'react';
@@ -141,7 +137,7 @@ const TokenManagementScreen = ({ navigation }: any) => {
   // Raw atoms with locale commas (no decimal scaling).
   const formatRawAtoms = (atoms: string) => {
     if (!/^\d+$/.test(atoms)) return atoms;
-    return atoms.replace(/\B(?=(\d{3})+(?!\d))/g, ',');
+    return atoms.replaceAll(/\B(?=(\d{3})+(?!\d))/g, ',');
   };
 
   if (loading) {
@@ -180,7 +176,7 @@ const TokenManagementScreen = ({ navigation }: any) => {
           </View>
         ) : (
           tokens.map(({ tokenId, info, error }) => (
-            <View key={tokenId} style={{ backgroundColor: colors.bg_lighter, borderRadius: borderRadius.lg, padding: spacing.md, marginBottom: spacing.md, borderLeftWidth: 3, borderLeftColor: info ? colors.primary : colors.error }}>
+            <View key={tokenId} style={{ backgroundColor: colors.bg_lighter, borderRadius: borderRadius.lg, padding: spacing.md, marginBottom: spacing.md }}>
 
               {/* Token header */}
               <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: spacing.md }}>

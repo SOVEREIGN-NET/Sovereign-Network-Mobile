@@ -13,6 +13,9 @@
 import { NativeModules, Platform } from 'react-native';
 import { DEFAULT_NODE_HOST, DEFAULT_NODE_PORT, QUIC_CONFIG } from '../config';
 import SecureIdentityStorage from './SecureIdentityStorage';
+// Gate the transport on ZDNS bootstrap — ensures the first request dials
+// the DNS-selected validator, not the hardcoded fallback.
+import { bootstrapReady } from './NetworkBootstrap';
 import type {
   QuicRequestOptions,
   QuicRawResponse,
@@ -121,7 +124,7 @@ function toDid(value: string): string {
 }
 
 function redactDidInPath(path: string): string {
-  return path.replace(
+  return path.replaceAll(
     /(did%3Azhtp%3A|did:zhtp:)[A-Za-z0-9%._:-]+/gi,
     (_, prefix: string) => `${prefix}<redacted>`,
   );
@@ -194,6 +197,63 @@ async function resetAuthSession(): Promise<void> {
   await new Promise<void>(resolve => setTimeout(() => resolve(), 100));
 }
 
+/**
+ * Run a single UHP-authenticated (or public) QUIC request with bounded
+ * retries for session-desync symptoms. Extracted so `rawRequest` stays
+ * under Sonar's cognitive-complexity threshold — the retry logic itself
+ * is identical to the inline version it replaces.
+ *
+ * Retries on:
+ *   - thrown errors whose message matches `matchesSessionDesync`
+ *   - 401 responses with "Invalid counter"-style bodies
+ * Both cases reset the UHP session via `resetAuthSession` before the
+ * next attempt. Public (`zhtp-public/1`) requests never retry.
+ */
+async function runWithSessionRecovery(
+  url: string,
+  requestOptions: QuicRequestOptions,
+  alpn: 'public' | 'authenticated',
+  maxAttempts: number,
+): Promise<QuicRawResponse> {
+  for (let i = 1; i <= maxAttempts; i++) {
+    let current: QuicRawResponse;
+    try {
+      current = await NativeQuic.request(url, requestOptions);
+    } catch (err: unknown) {
+      const msg = err instanceof Error ? err.message : String(err);
+      const retryable = alpn === 'authenticated' && matchesSessionDesync(msg);
+      if (!retryable || i === maxAttempts) throw err;
+      if (__DEV__) {
+        console.warn(
+          `[quic] session desync detected (attempt ${i}/${maxAttempts}), re-handshaking:`,
+          msg,
+        );
+      }
+      await resetAuthSession();
+      continue;
+    }
+
+    const shouldRetry401 =
+      alpn === 'authenticated' &&
+      current.status === 401 &&
+      matchesSessionDesync(current.body) &&
+      i < maxAttempts;
+    if (shouldRetry401) {
+      if (__DEV__) {
+        console.warn(
+          `[quic] 401 counter-replay detected (attempt ${i}/${maxAttempts}), re-handshaking`,
+        );
+      }
+      await resetAuthSession();
+      continue;
+    }
+
+    return current;
+  }
+  // Unreachable: the loop body either returns, continues, or throws.
+  throw new Error('QUIC request exhausted retry attempts');
+}
+
 async function rawRequest(
   path: string,
   options: RequestOptions & { alpnOverride?: 'public' | 'authenticated' } = {},
@@ -201,6 +261,10 @@ async function rawRequest(
   if (!NativeQuic) {
     throw new Error('NativeQuic module not available');
   }
+
+  // Wait for ZDNS bootstrap (resolves quickly or times out — never hangs).
+  // This is why the very first request no longer dials the hardcoded target.
+  await bootstrapReady;
 
   const method: HttpMethod = options.method ?? 'GET';
   const headers: Record<string, string> = { ...options.headers };
@@ -243,60 +307,15 @@ async function rawRequest(
   // server). Stale server-side session caches can take more than one fresh
   // handshake to clear, so a single retry is not always enough.
   const MAX_ATTEMPTS = 3;
-  const attempt = async (): Promise<QuicRawResponse> => {
-    for (let i = 1; i <= MAX_ATTEMPTS; i++) {
-      let current: QuicRawResponse;
-      try {
-        current = await NativeQuic.request(url, requestOptions);
-      } catch (err: unknown) {
-        const msg = err instanceof Error ? err.message : String(err);
-        const retryable =
-          alpn === 'authenticated' && matchesSessionDesync(msg);
-        if (!retryable || i === MAX_ATTEMPTS) throw err;
-        if (__DEV__) {
-          console.warn(
-            `[quic] session desync detected (attempt ${i}/${MAX_ATTEMPTS}), re-handshaking:`,
-            msg,
-          );
-        }
-        await resetAuthSession();
-        continue;
-      }
-
-      // 401 counter-replay ⇒ server sees a stale session for us; drop ours
-      // and try again.
-      if (
-        alpn === 'authenticated' &&
-        current.status === 401 &&
-        matchesSessionDesync(current.body) &&
-        i < MAX_ATTEMPTS
-      ) {
-        if (__DEV__) {
-          console.warn(
-            `[quic] 401 counter-replay detected (attempt ${i}/${MAX_ATTEMPTS}), re-handshaking`,
-          );
-        }
-        await resetAuthSession();
-        continue;
-      }
-
-      return current;
-    }
-    // Unreachable: loop either returns or throws.
-    throw new Error('QUIC request exhausted retry attempts');
-  };
-
-  const response = await attempt();
+  const response = await runWithSessionRecovery(
+    url,
+    requestOptions,
+    alpn,
+    MAX_ATTEMPTS,
+  );
 
   if (alpn === 'authenticated') {
-    const sid = (response as any)?.sessionIdPrefix;
-    if (typeof sid === 'string' && /^[0-9a-fA-F]{16}$/.test(sid)) {
-      latestAuthSessionIdPrefix = sid.toLowerCase();
-    }
-  }
-
-  if (alpn === 'authenticated') {
-    const sid = (response as any)?.sessionIdPrefix;
+    const sid = (response as { sessionIdPrefix?: unknown })?.sessionIdPrefix;
     if (typeof sid === 'string' && /^[0-9a-fA-F]{16}$/.test(sid)) {
       latestAuthSessionIdPrefix = sid.toLowerCase();
     }
@@ -457,6 +476,9 @@ export async function testQuicConnection(
   port: number,
 ): Promise<QuicConnectionTestResult> {
   if (!NativeQuic) throw new Error('NativeQuic module not available');
+  // Gate on ZDNS bootstrap too — the test probe should reflect the active
+  // validator, not the hardcoded default.
+  await bootstrapReady;
   return await NativeQuic.testConnection(host, port);
 }
 
@@ -519,7 +541,7 @@ export function parseQuicUrl(
     const parsed = new URL(normalized);
     return {
       host: parsed.hostname,
-      port: parsed.port ? parseInt(parsed.port, 10) : 443,
+      port: parsed.port ? Number.parseInt(parsed.port, 10) : 443,
       path: parsed.pathname + parsed.search,
     };
   } catch {

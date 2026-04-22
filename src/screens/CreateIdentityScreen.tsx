@@ -23,6 +23,17 @@ import { RootStackParamList } from '../types/navigation';
 
 type CreateIdentityScreenProps = NativeStackScreenProps<RootStackParamList, 'CreateIdentity'>;
 
+/** Username-availability copy: translates each probe state to a user string. */
+const resolveUsernameStatusLabel = (
+  status: 'checking' | 'available' | 'taken' | 'invalid' | 'idle',
+  t: ReturnType<typeof useTranslation>['t'],
+): string => {
+  if (status === 'checking') return t.auth.createIdentity.usernameChecking;
+  if (status === 'available') return t.auth.createIdentity.usernameAvailable;
+  if (status === 'taken') return t.auth.createIdentity.usernameTaken;
+  return t.auth.createIdentity.validation.usernameInvalid;
+};
+
 const CreateIdentityScreen = ({ navigation }: CreateIdentityScreenProps) => {
   const { t } = useTranslation();
   const { createIdentity, checkUsernameAvailability } = useAuth();
@@ -207,7 +218,13 @@ const CreateIdentityScreen = ({ navigation }: CreateIdentityScreenProps) => {
   }
 
   return (
-    <ScreenLayout paddingTop={spacing.xl}>
+    <ScreenLayout
+      paddingTop={spacing.xl}
+      safeAreaEdges={['top', 'bottom']}
+      onBack={() => navigation.goBack()}
+      backLabel={t.app.back ?? 'Back'}
+      keyboardAvoiding
+    >
       <Column gap="xl">
         {/* Node Connection Status */}
         <Card>
@@ -362,13 +379,7 @@ const CreateIdentityScreen = ({ navigation }: CreateIdentityScreenProps) => {
                 marginTop: spacing.xs,
               }}
             >
-              {usernameStatus === 'checking'
-                ? t.auth.createIdentity.usernameChecking
-                : usernameStatus === 'available'
-                ? t.auth.createIdentity.usernameAvailable
-                : usernameStatus === 'taken'
-                ? t.auth.createIdentity.usernameTaken
-                : t.auth.createIdentity.validation.usernameInvalid}
+              {resolveUsernameStatusLabel(usernameStatus, t)}
             </Text>
           )}
           {fieldErrors.username && (

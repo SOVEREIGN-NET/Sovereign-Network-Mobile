@@ -1,13 +1,20 @@
 /**
- * English (en) translations
- * Base language for the application
+ * English (en) translations — base language for the application.
+ *
+ * NOTE: This object is intentionally NOT `as const`. Using `as const`
+ * would narrow every string to its literal type, making
+ * `Translation = typeof en` a type that only accepts other objects
+ * with the exact same English strings — so registering any non-English
+ * translation would fail to type-check. By letting TS widen the strings
+ * to `string`, we get a structural `Translation` shape that all
+ * languages (es, fr, …) can conform to.
  */
-
 export const en = {
   // App
   app: {
     title: 'SOV Web4',
     loading: 'Loading...',
+    back: 'Back',
     error: 'Error: Auth context not available',
     nodeStatus: 'Node Status',
     retryConnection: 'Retry Connection',
@@ -753,14 +760,24 @@ export const en = {
         large: 'Large',
       },
     },
+    // Language labels — flag emojis intentionally omitted. Rendering
+    // country flags for language names conflates language with nation
+    // (Spanish ≠ Spain, English ≠ US) and the emoji shapes break on
+    // some Android devices. The plain name is enough.
     languages: {
-      en: '🇺🇸 English',
-      es: '🇪🇸 Español',
-      fr: '🇫🇷 Français',
-      de: '🇩🇪 Deutsch',
+      en: 'English',
+      es: 'Español',
+      fr: 'Français',
+      de: 'Deutsch',
     },
     language: {
       title: 'Language',
+    },
+    theme: {
+      title: 'Appearance',
+      subtitle: 'Choose the palette for the app',
+      charcoal: 'Charcoal',
+      light: 'Light',
     },
     privacy: {
       title: 'Privacy & Notifications',
@@ -876,6 +893,245 @@ export const en = {
     },
   },
 
+  // SID tab (main wallet / identity screen)
+  sidScreen: {
+    welcomeBack: 'Welcome back, {name}!',
+    menu: 'Menu',
+    guest: {
+      signInTitle: 'Sign in to access your wallet',
+      signInBody: 'Create an identity to manage your wallets, domains, and more',
+      signIn: 'Sign In',
+      createAccount: 'Create Account',
+    },
+    walletOptionsSheet: {
+      title: 'Wallet Options',
+      subtitle: 'Manage your identity, domains, and settings',
+      accessibilityLabel: 'Wallet options',
+      cancel: 'Cancel',
+      rows: {
+        domainsTitle: 'Domains',
+        domainsSubtitle: 'Register and manage your .zhtp domains',
+        profileTitle: 'Profile',
+        profileSubtitle: 'View and edit your identity profile',
+        settingsTitle: 'Wallet Settings',
+        settingsSubtitle: 'Security, keys, and preferences',
+      },
+    },
+    tokens: {
+      loading: 'Loading tokens...',
+      empty: 'No tokens available',
+      syncing: 'Syncing...',
+      comingSoon: 'Coming soon',
+    },
+    copy: {
+      title: 'Copied',
+      walletId: 'Wallet ID copied to clipboard',
+    },
+  },
+
+  // PoUW (Proof of Useful Work) rewards card on the Dashboard.
+  pouwCard: {
+    title: 'PoUW Rewards',
+    subtitle: 'Live reward distribution',
+    tabs: {
+      overview: 'Overview',
+      stats: 'Stats',
+      multipliers: 'Multipliers',
+    },
+    loading: 'Loading PoUW status…',
+    unavailable: 'PoUW status unavailable',
+    staleBadge: 'Stale',
+    liveBadge: 'Live',
+    exhaustedBadge: 'Exhausted',
+    epoch: {
+      label: 'Epoch',
+      remaining: '{value} remaining',
+      rollingOver: 'rolling over…',
+    },
+    totals: {
+      distributed: 'Distributed',
+      earners: 'Unique earners',
+      distributedUnit: 'SOV',
+    },
+    budget: {
+      label: 'Lifetime budget',
+      utilizationOf: '{used} of {total} SOV',
+    },
+    stats: {
+      paid: 'Paid',
+      pending: 'Pending',
+      failed: 'Failed',
+      suspicious: 'Suspicious DIDs',
+      calculated: 'Calculated',
+      activeNodes: 'Active nodes',
+      /** Displayed below the big "active_nodes" number to contextualise
+       *  it against the protocol-target `expected_active_nodes`. */
+      activeNodesTargetHint: 'of {expected} expected',
+
+      // --- Narrative Stats tab (story-based layout) -------------------
+      //
+      // The Stats tab is composed as three linked sections instead of a
+      // grid of disconnected numbers:
+      //   1. pipelineTitle — what happened to the rewards calculated so
+      //      far (paid / pending / failed), shown as a stacked bar.
+      //   2. participationTitle — how much of the expected node set is
+      //      producing work this epoch, shown as a progress bar.
+      //   3. integrityTitle — trust signal: are any DIDs flagged for
+      //      suspicious activity, shown as a colored status row.
+      pipeline: {
+        title: 'Reward pipeline',
+        empty: 'No rewards calculated yet',
+        legendPaid: '{count} paid',
+        legendPending: '{count} pending',
+        legendFailed: '{count} failed',
+        summary: '{pct}% paid · {paid} of {total}',
+      },
+      participation: {
+        title: 'Network participation',
+        summary: '{active} active · target {expected}',
+        percentLabel: '{pct}%',
+      },
+      integrity: {
+        title: 'Integrity',
+        statusClean: 'Clean',
+        statusFlagged: 'Flagged',
+        clean: 'No suspicious activity detected',
+        flagged: '{count} DIDs flagged by anomaly detection',
+      },
+    },
+    multipliers: {
+      hash: 'Hash',
+      merkle: 'Merkle',
+      signature: 'Signature',
+      web4_manifest_route: 'Web4 route',
+      web4_content_served: 'Web4 content',
+      unit: 'Base unit',
+    },
+    eligibility: {
+      minAge: 'Min. identity age',
+      hours: '{value}h',
+    },
+    time: {
+      hoursShort: '{value}h',
+      minutesShort: '{value}m',
+      secondsShort: '{value}s',
+    },
+  },
+
+  // Wallet Settings screen (SID tab → Settings → Wallet Settings)
+  walletSettings: {
+    buildInfo: {
+      title: 'Build Info',
+      platform: 'Platform',
+      version: 'Version',
+      build: 'Build',
+      commit: 'Commit',
+      branch: 'Branch',
+      generated: 'Generated',
+      ios: 'iOS',
+      android: 'Android',
+    },
+    browserAuth: {
+      title: 'Browser sign-in',
+      description:
+        'Use this app to authenticate a browser session on another device. Scan the QR code shown by the browser, or paste the zhtp://auth link below. No new connection is opened — the challenge is signed and submitted via your connected node.',
+      scanButton: 'Scan QR code',
+      pastePlaceholder: 'zhtp://auth?challenge=…',
+      useLinkButton: 'Use pasted link',
+      clipboardTip: 'Tip: leave the field empty and tap "Use pasted link" to read your clipboard.',
+      errors: {
+        emptyClipboard: 'Paste the auth link from your browser first.',
+        invalidLink:
+          'That doesn\u2019t look like a ZHTP auth link. Expected `zhtp://auth?challenge=…`.',
+        invalid: 'Invalid auth link',
+      },
+    },
+  },
+
+  // Browser Authentication Bridge (confirmation + scanner)
+  browserAuth: {
+    title: 'Authenticate browser session',
+    description:
+      'A browser is requesting proof that you control this identity. Review the details below before authorising — the signature will be submitted via your connected ZHTP node and used to unlock the browser session.',
+    challengeLabel: 'Challenge',
+    didLabel: 'Your DID',
+    nodeLabel: 'Target node',
+    defaultNode: 'connected node',
+    authenticate: 'Authenticate',
+    authenticating: 'Authenticating…',
+    cancel: 'Cancel',
+    close: 'Close',
+    done: 'Done',
+    copySession: 'Copied',
+    copySessionMessage: 'Session id copied to clipboard',
+    unknownDid: '(unknown identity)',
+    invalidLink: {
+      title: 'Invalid authentication link',
+      fallback: 'The link did not contain a valid challenge.',
+    },
+    success: {
+      title: 'Browser authenticated',
+      message: 'Return to your browser — the page should load momentarily.',
+      sessionId: 'Session id',
+      signedAt: 'Signed at',
+    },
+    receivedVia: {
+      deepLink: 'Received via deep link',
+      manualEntry: 'Received via manual entry',
+    },
+    errors: {
+      invalidSignature:
+        'The node rejected the signature. Make sure the app is up to date and try again.',
+      notRegistered:
+        'This identity is not yet registered on-chain. Finish registration from the welcome screen and retry.',
+      challengeExpired:
+        'The challenge has expired. Generate a new QR / link from the browser and try again.',
+      generic: 'Authentication failed',
+    },
+  },
+
+  // QR code scanner (browser-auth flow)
+  qrScan: {
+    granted: {
+      prompt: 'Point the camera at the browser\u2019s QR code',
+      cancel: 'Cancel',
+    },
+    permission: {
+      title: 'Camera access required',
+      body: 'Scanning the browser QR code needs camera access. We use the camera only for this scan — no frames are stored or sent anywhere.',
+      allow: 'Allow camera',
+      requesting: 'Requesting…',
+      cancel: 'Cancel',
+    },
+    blocked: {
+      title: 'Camera is blocked',
+      body: 'Camera access was previously denied. Open your device Settings and allow camera access for this app, then come back and try again.',
+      openSettings: 'Open Settings',
+      manualHintAndroid:
+        'Go to Settings → Apps → Sovereign Network → Permissions → Camera and allow access.',
+      manualHintIos: 'Go to Settings → Sovereign Network → Camera and toggle it on.',
+      manualTitle: 'Open Settings manually',
+    },
+    restricted: {
+      title: 'Camera unavailable',
+      body: 'A system policy (for example parental controls or a mobile device management profile) prevents this app from using the camera. You can still paste the auth link manually from the previous screen.',
+    },
+    unsupported: {
+      title: 'Scanner unavailable',
+      body: 'The camera module is not available in this build. Use the paste option on the previous screen to enter the auth link instead.',
+      failed: 'The camera module failed to load. Use the paste option instead.',
+    },
+    noBackCamera: {
+      title: 'No back camera',
+      body: 'This device doesn\u2019t expose a rear camera to the app. Use the paste option instead.',
+    },
+    invalidQr: {
+      title: 'Invalid QR',
+      body: 'QR did not contain a valid zhtp://auth link.',
+    },
+    goBack: 'Go back',
+  },
+
   // Header Bar
   headerbar: {
     ble: 'Start BLE',
@@ -989,6 +1245,6 @@ export const en = {
       chat: { title: 'Chat', emoji: '💬' },
     },
   },
-} as const;
+};
 
 export type Translation = typeof en;

@@ -10,7 +10,8 @@ export interface StatBoxProps {
   style?: ViewStyle;
 }
 
-const styles = StyleSheet.create({
+// Build at render time so theme-dependent colours track `applyTheme`.
+const makeStyles = () => StyleSheet.create({
   container: {
     backgroundColor: colors.bg_dark,
     borderRadius: borderRadius.lg,
@@ -41,6 +42,7 @@ const styles = StyleSheet.create({
 
 export const StatBox = React.memo(
   ({ label, value, icon, color, style }: StatBoxProps) => {
+    const styles = makeStyles();
     return (
       <View style={[styles.container, color && { borderColor: color }, style]}>
         {icon && <Text style={styles.iconContainer}>{icon}</Text>}

@@ -1,9 +1,19 @@
 #!/bin/bash
 # Build Android native libraries (quic-jni wrapper + lib-client)
 # This builds the quic-jni JNI wrapper which uses lib-client from The-Sovereign-Network
-# Requires: Rust with Android targets, Android NDK
+# Requires: Rust nightly with Android targets, Android NDK
+#
+# lib-client (pulled in via path dep) pins its workspace to nightly in
+# `../../../../../../../The-Sovereign-Network/rust-toolchain.toml` because
+# transitive deps (e.g. plonky2_field via neural-mesh-compression) use
+# nightly-only features. When cargo compiles quic-jni from this directory
+# it would otherwise default to stable and fail with E0554 — so we force
+# the toolchain here.
 
 set -euo pipefail
+
+# Force nightly to match lib-client's workspace toolchain.
+export RUSTUP_TOOLCHAIN="${RUSTUP_TOOLCHAIN:-nightly}"
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 cd "$SCRIPT_DIR"
@@ -11,25 +21,25 @@ cd "$SCRIPT_DIR"
 # Android NDK path
 NDK_HOME="${ANDROID_NDK_HOME:-$HOME/Library/Android/sdk/ndk/27.1.12297006}"
 HOST_TAG="${ANDROID_NDK_HOST_TAG:-}"
-if [ -z "$HOST_TAG" ]; then
+if [[ -z "$HOST_TAG" ]]; then
     ARCH="$(uname -m)"
-    if [ "$ARCH" = "arm64" ]; then
+    if [[ "$ARCH" = "arm64" ]]; then
         HOST_TAG="darwin-arm64"
     else
         HOST_TAG="darwin-x86_64"
     fi
 fi
 TOOLCHAIN="$NDK_HOME/toolchains/llvm/prebuilt/$HOST_TAG"
-if [ ! -d "$TOOLCHAIN" ]; then
-    if [ -d "$NDK_HOME/toolchains/llvm/prebuilt/darwin-x86_64" ]; then
+if [[ ! -d "$TOOLCHAIN" ]]; then
+    if [[ -d "$NDK_HOME/toolchains/llvm/prebuilt/darwin-x86_64" ]]; then
         HOST_TAG="darwin-x86_64"
-    elif [ -d "$NDK_HOME/toolchains/llvm/prebuilt/darwin-arm64" ]; then
+    elif [[ -d "$NDK_HOME/toolchains/llvm/prebuilt/darwin-arm64" ]]; then
         HOST_TAG="darwin-arm64"
     fi
     TOOLCHAIN="$NDK_HOME/toolchains/llvm/prebuilt/$HOST_TAG"
 fi
 
-if [ ! -d "$TOOLCHAIN" ]; then
+if [[ ! -d "$TOOLCHAIN" ]]; then
     echo "Error: NDK toolchain not found at $TOOLCHAIN"
     echo "Set ANDROID_NDK_HOME or NDK_HOME environment variable"
     exit 1
@@ -50,13 +60,13 @@ echo "   NDK: $NDK_HOME"
 echo "   Output: $OUTPUT_DIR"
 echo ""
 
-if [ -n "${ANDROID_ABIS:-}" ]; then
+if [[ -n "${ANDROID_ABIS:-}" ]]; then
     IFS=',' read -r -a ABI_LIST <<< "$ANDROID_ABIS"
     FILTERED_TARGETS=()
     for target_info in "${TARGETS[@]}"; do
         IFS=':' read -r rust_target android_abi clang_prefix api_level <<< "$target_info"
         for abi in "${ABI_LIST[@]}"; do
-            if [ "$android_abi" = "$abi" ]; then
+            if [[ "$android_abi" = "$abi" ]]; then
                 FILTERED_TARGETS+=("$target_info")
             fi
         done

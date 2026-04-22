@@ -3,7 +3,7 @@
  * Display and confirm a single 24-word master seed phrase after identity creation
  */
 
-import React, { useState, useEffect } from 'react';
+import React, { useState } from 'react';
 import { View, ScrollView, Pressable } from 'react-native';
 import { StackActions } from '@react-navigation/native';
 import { NativeStackScreenProps } from '@react-navigation/native-stack';
@@ -35,15 +35,8 @@ const SeedPhraseScreen = ({ navigation, route }: SeedPhraseScreenProps) => {
   const [confirmedSaved, setConfirmedSaved] = useState(false);
   const [showPhrase, setShowPhrase] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
-  const [isSecureStorageSupported, setIsSecureStorageSupported] = useState(false);
   const [vaultState, setVaultState] = useState<'idle' | 'saving' | 'saved' | 'error'>('idle');
   const [vaultError, setVaultError] = useState<string | null>(null);
-
-  useEffect(() => {
-    SeedVaultService.isSecureStorageAvailable()
-      .then(setIsSecureStorageSupported)
-      .catch(() => setIsSecureStorageSupported(false));
-  }, []);
 
   if (!seedPhrases || !Array.isArray(seedPhrases) || seedPhrases.length === 0) {
     return (
@@ -65,12 +58,17 @@ const SeedPhraseScreen = ({ navigation, route }: SeedPhraseScreenProps) => {
   }
 
   const handleSecureSave = async () => {
-    if (!seedPhrases?.length || !isSecureStorageSupported) {
+    if (!seedPhrases?.length) {
       setVaultError(t.auth.seedPhrase.secureSave.unavailable);
       setVaultState('error');
       return;
     }
 
+    // Try the save unconditionally — the Keychain save uses
+    // BIOMETRY_ANY_OR_DEVICE_PASSCODE on iOS / CURRENT_SET_OR_DEVICE_PASSCODE
+    // on Android, both of which accept a passcode fallback when biometrics
+    // aren't enrolled. Don't pre-reject based on the biometry-only probe;
+    // let the real attempt report the true capability.
     setVaultState('saving');
     setVaultError(null);
     try {
@@ -180,26 +178,29 @@ const SeedPhraseScreen = ({ navigation, route }: SeedPhraseScreenProps) => {
                 onChange={setConfirmedSaved}
               />
 
-              {isSecureStorageSupported && (
-                <Card style={{ backgroundColor: colors.bg_light }}>
-                  <Column gap="xs">
-                    <Text style={{ color: colors.text_primary, fontSize: typography.size.sm }}>
-                      {t.auth.seedPhrase.secureSave.title}
-                    </Text>
-                    <Text style={{ color: colors.text_secondary, fontSize: typography.size.xs }}>
-                      {t.auth.seedPhrase.secureSave.description}
-                    </Text>
-                    <Button
-                      onPress={handleSecureSave}
-                      variant="secondary"
-                      loading={vaultState === 'saving'}
-                      disabled={vaultState === 'saving' || vaultState === 'saved'}
-                    >
-                      {t.auth.seedPhrase.secureSave.button}
-                    </Button>
-                  </Column>
-                </Card>
-              )}
+              {/* Seed → secure chain: user-triggered opt-in. Always shown on
+                  the initial flow so the choice to persist is visible and
+                  explicit. If the device doesn't support Keychain biometric
+                  or passcode gating, the save attempt surfaces its own error
+                  via the `vaultState` path below — no need to hide the CTA. */}
+              <Card style={{ backgroundColor: colors.bg_light }}>
+                <Column gap="xs">
+                  <Text style={{ color: colors.text_primary, fontSize: typography.size.sm }}>
+                    {t.auth.seedPhrase.secureSave.title}
+                  </Text>
+                  <Text style={{ color: colors.text_secondary, fontSize: typography.size.xs }}>
+                    {t.auth.seedPhrase.secureSave.description}
+                  </Text>
+                  <Button
+                    onPress={handleSecureSave}
+                    variant="secondary"
+                    loading={vaultState === 'saving'}
+                    disabled={vaultState === 'saving' || vaultState === 'saved'}
+                  >
+                    {t.auth.seedPhrase.secureSave.button}
+                  </Button>
+                </Column>
+              </Card>
 
               {vaultState === 'error' && vaultError && (
                 <ErrorAlert message={vaultError} icon="❌" />

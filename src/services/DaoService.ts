@@ -15,15 +15,19 @@ import { resolveTokenBySymbol } from '../hooks/useTokenRegistry';
 import { nativeIdentityProvisioning } from './NativeIdentityProvisioning';
 import { quicRequest } from './quic';
 import tokenService from './TokenService';
+import { humanToAtomic } from '../utils/tokenUnits';
 
-const NSOV_PER_SOV = 1_000_000_000;
+// SOV is an 18-decimal token post-migration (u128 atoms). Amounts flow as
+// decimal strings end-to-end so we never round through JS Number precision.
+const SOV_DECIMALS = 18;
 
 export interface DaoStakeTxResponse {
   status: string;
   tx_hash: string;
   staker: string;
   sector_dao_key_id: string;
-  amount: number;
+  // Server serializes u128 atoms as a string to survive JSON (u128 > 2^53).
+  amount: string;
   lock_blocks: number;
   message?: string;
 }
@@ -58,7 +62,7 @@ class DaoService {
     if (!Number.isFinite(lockBlocks) || lockBlocks <= 0) {
       throw new Error('lockBlocks must be > 0');
     }
-    if (!stakerWalletId || stakerWalletId.length !== 64) {
+    if (stakerWalletId?.length !== 64) {
       throw new Error('stakerWalletId must be a 64-char hex string (32 bytes)');
     }
 
@@ -76,17 +80,19 @@ class DaoService {
     );
     console.log('[DaoService] fresh nonce', nonce);
 
-    // 3. Human SOV → nSOV atoms (u64)
-    const amountNsov = Math.round(amountSov * NSOV_PER_SOV);
-    if (amountNsov <= 0) {
-      throw new Error('amountSov converts to zero nSOV');
+    // 3. Human SOV → u128 atoms as a decimal string (18 decimals).
+    //    Must stay a string through the whole bridge: 10 SOV = 1e19 atoms,
+    //    which overflows JS Number / NSNumber safe-integer range.
+    const amountAtoms = humanToAtomic(String(amountSov), SOV_DECIMALS);
+    if (!amountAtoms || amountAtoms === '0') {
+      throw new Error(`amountSov ${amountSov} converts to zero atoms`);
     }
 
-    // 4. Build + sign via native
+    // 4. Build + sign via native (FFI expects decimal u128 string).
     const signingResult =
       await nativeIdentityProvisioning.signDaoStakeTransaction({
         sectorDaoKeyId: dao.wallet,
-        amount: amountNsov,
+        amount: amountAtoms,
         nonce,
         lockBlocks,
       });

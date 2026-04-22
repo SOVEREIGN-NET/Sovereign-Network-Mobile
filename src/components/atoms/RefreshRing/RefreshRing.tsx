@@ -5,6 +5,14 @@ import Svg, { Circle } from 'react-native-svg';
 import { colors, typography } from '../../../theme';
 import { Text } from '../Text';
 
+// Reanimate the native SVG <Circle /> via Animated so we can drive its
+// `strokeDashoffset` from an Animated.Value. Without this, the arc can
+// only be updated by re-rendering with a new prop value each frame —
+// that's what the earlier 2Hz `forceTick` version was doing, and it
+// looked choppy. The animated component keeps the update on the JS
+// animation driver and produces a smooth ~60fps fill.
+const AnimatedSvgCircle = Animated.createAnimatedComponent(Circle);
+
 /**
  * Discrete auto-refresh indicator.
  *
@@ -34,10 +42,6 @@ export interface RefreshRingProps {
   label?: string;
 }
 
-const AnimatedCircle = Animated.createAnimatedComponent(Circle);
-
-const TICK_MS = 500;
-
 export const RefreshRing: React.FC<RefreshRingProps> = ({
   lastFetchedAt,
   nextRefetchAt,
@@ -47,15 +51,55 @@ export const RefreshRing: React.FC<RefreshRingProps> = ({
   size = 18,
   label,
 }) => {
-  const [, forceTick] = React.useReducer(x => x + 1, 0);
+  const strokeWidth = Math.max(2, Math.round(size * 0.12));
+  const r = (size - strokeWidth) / 2;
+  const cx = size / 2;
+  const cy = size / 2;
+  const circumference = 2 * Math.PI * r;
 
-  // Drive the progress calculation on a slow timer instead of per-frame —
-  // no need for 60fps here, 2Hz is more than enough for a 60s countdown
-  // and it keeps the screen cool.
+  const accent = stale ? '#f5a623' : colors.primary;
+  const track = `${colors.text_secondary}30`;
+
+  // Continuous progress 0..1 driven by Animated so the arc fills
+  // smoothly frame-by-frame instead of ticking on a setInterval.
+  // Whenever a new fetch lands we reset the value to the instant
+  // progress (computed from the new pair) and kick off a linear
+  // timing to 1 over the remaining time before the next refetch.
+  const progress = useRef(new Animated.Value(0)).current;
+
   useEffect(() => {
-    const id = setInterval(forceTick, TICK_MS);
-    return () => clearInterval(id);
-  }, []);
+    if (lastFetchedAt == null || nextRefetchAt == null) {
+      progress.stopAnimation();
+      progress.setValue(0);
+      return;
+    }
+    const total = nextRefetchAt - lastFetchedAt;
+    if (total <= 0) {
+      progress.setValue(1);
+      return;
+    }
+    const now = Date.now();
+    const elapsed = Math.max(0, Math.min(total, now - lastFetchedAt));
+    const start = elapsed / total;
+    const remaining = total - elapsed;
+
+    progress.stopAnimation();
+    progress.setValue(start);
+    if (remaining > 0) {
+      Animated.timing(progress, {
+        toValue: 1,
+        duration: remaining,
+        easing: Easing.linear,
+        // `strokeDashoffset` isn't a transform/opacity prop, so the
+        // native animation driver doesn't support it. JS driver is
+        // cheap enough here — one interpolation, one prop.
+        useNativeDriver: false,
+      }).start();
+    }
+    return () => {
+      progress.stopAnimation();
+    };
+  }, [lastFetchedAt, nextRefetchAt, progress]);
 
   // Pulse opacity while fetching — subtle, no rotating spinner.
   const pulse = useRef(new Animated.Value(0)).current;
@@ -85,16 +129,10 @@ export const RefreshRing: React.FC<RefreshRingProps> = ({
     return () => loop.stop();
   }, [loading, pulse]);
 
-  const progress = computeProgress(lastFetchedAt, nextRefetchAt);
-  const strokeWidth = Math.max(2, Math.round(size * 0.12));
-  const r = (size - strokeWidth) / 2;
-  const cx = size / 2;
-  const cy = size / 2;
-  const circumference = 2 * Math.PI * r;
-
-  const accent = stale ? '#f5a623' : colors.primary;
-  const track = `${colors.text_secondary}30`;
-
+  const animatedDashoffset = progress.interpolate({
+    inputRange: [0, 1],
+    outputRange: [circumference, 0],
+  });
   const ringOpacity = pulse.interpolate({
     inputRange: [0, 1],
     outputRange: [0.55, 1],
@@ -119,8 +157,11 @@ export const RefreshRing: React.FC<RefreshRingProps> = ({
             strokeWidth={strokeWidth}
             fill="transparent"
           />
-          {/* Progress arc — rotated so 0° is at the top */}
-          <AnimatedCircle
+          {/* Progress arc — rotated so 0° is at the top. The
+              `strokeDashoffset` + `opacity` are Animated values so
+              they interpolate on the JS driver at ~60fps instead of
+              snap-updating when parent renders. */}
+          <AnimatedSvgCircle
             cx={cx}
             cy={cy}
             r={r}
@@ -129,7 +170,7 @@ export const RefreshRing: React.FC<RefreshRingProps> = ({
             fill="transparent"
             strokeLinecap="round"
             strokeDasharray={`${circumference} ${circumference}`}
-            strokeDashoffset={circumference * (1 - progress)}
+            strokeDashoffset={animatedDashoffset as unknown as number}
             opacity={ringOpacity as unknown as number}
             transform={`rotate(-90 ${cx} ${cy})`}
           />
@@ -150,23 +191,6 @@ export const RefreshRing: React.FC<RefreshRingProps> = ({
     </Pressable>
   );
 };
-
-/**
- * 0 = just fetched, 1 = due now (or overdue — clamped). Robust to clock
- * skew: if any timestamp is missing we simply show an empty ring.
- */
-function computeProgress(
-  lastFetchedAt: number | null,
-  nextRefetchAt: number | null,
-): number {
-  if (lastFetchedAt == null || nextRefetchAt == null) return 0;
-  const total = nextRefetchAt - lastFetchedAt;
-  if (total <= 0) return 1;
-  const elapsed = Date.now() - lastFetchedAt;
-  if (elapsed <= 0) return 0;
-  if (elapsed >= total) return 1;
-  return elapsed / total;
-}
 
 const styles = StyleSheet.create({
   row: {
