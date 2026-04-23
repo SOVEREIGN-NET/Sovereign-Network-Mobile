@@ -3,12 +3,18 @@
  *
  * Flow at app start (before any QUIC request dispatches):
  *   1. App boots with hardcoded validator + pin (from GeneratedConfig / .env).
- *   2. Fetch `GET /api/v1/network/directory` over public QUIC — no auth
- *      needed, no UHP handshake, works with the hardcoded pin.
- *   3. Parse validators; pick the healthiest / highest-staked one.
- *   4. If it differs from the hardcoded target, call native
- *      `setActiveValidator(host, port, spki_pin)` with the pin from the
- *      directory response. UHP handshakes now use the real pin.
+ *   2. Try ZDNS to resolve the validator IP set; use the first IP for a
+ *      public-mode directory fetch. Fall back to the hardcoded target
+ *      if ZDNS is unreachable.
+ *   3. Parse `topology.validators`. Policy:
+ *        - if the bootstrap target is still the best pick → no-op.
+ *        - otherwise, we can't safely swap: the 2026-04-24 directory
+ *          contract removed per-validator `spki_pin` entries, so there
+ *          is no pin to hand to the native UHP handshake. We log a
+ *          "would switch" note and stay on the current validator, and
+ *          a future revision that either (a) adds pins back, or (b)
+ *          moves gateways behind publicly-trusted certs can flip this
+ *          branch to actually call `setActiveValidator`.
  *
  * The `bootstrapReady` promise resolves when this flow settles (success,
  * failure, or timeout). Every QUIC request in `quic.ts` awaits it, so
@@ -89,20 +95,8 @@ export function getActiveTarget(): { host: string; port: number } {
   return { ...activeTarget };
 }
 
-function splitEndpoint(endpoint: string): { host: string; port: number } | null {
-  const colonIdx = endpoint.lastIndexOf(':');
-  if (colonIdx <= 0) return null;
-  const host = endpoint.slice(0, colonIdx).trim();
-  const portStr = endpoint.slice(colonIdx + 1).trim();
-  const port = Number(portStr);
-  if (!host || !Number.isFinite(port) || port <= 0 || port >= 65536) return null;
-  return { host, port };
-}
-
 function matchesCurrentBootstrap(v: DirectoryValidator): boolean {
-  const split = splitEndpoint(v.endpoint);
-  if (!split) return false;
-  return split.host === DEFAULT_NODE_HOST && split.port === DEFAULT_NODE_PORT;
+  return v.host === DEFAULT_NODE_HOST && v.port === DEFAULT_NODE_PORT;
 }
 
 async function persistSelection(v: PersistedValidator): Promise<void> {
@@ -114,16 +108,13 @@ async function persistSelection(v: PersistedValidator): Promise<void> {
 }
 
 /**
- * Fetch the directory, pick the best validator, and call native to switch.
- * Returns the activated validator or null if we stayed on the bootstrap target.
- *
- * Flow:
- *   1. Ask ZDNS for `directory.sov` A records (IPs only, no pins).
- *   2. Dial the first ZDNS IP in public mode — no pin required — to fetch
- *      `/api/v1/network/directory`, which returns validators *with* pins.
- *   3. If ZDNS is unreachable, fall back to the hardcoded bootstrap target
- *      (still has its pin from `.env`) so the app doesn't break.
- *   4. Pick the best directory entry; swap to it with its real pin.
+ * Fetch the directory and decide whether to swap the active validator.
+ * Returns the activated validator or null if we stayed on the bootstrap
+ * target. The 2026-04-24 directory contract dropped per-validator
+ * `spki_pin`, so the swap branch here is intentionally conservative:
+ * we only have a pin for the node that *answered* us. Swapping to a
+ * different validator without a pin would break the pinned UHP
+ * handshake native requires, so in that case we log and stay put.
  */
 export async function refreshActiveValidator(): Promise<DirectoryValidator | null> {
   if (!nativeQuic?.setActiveValidator) {
@@ -151,7 +142,7 @@ export async function refreshActiveValidator(): Promise<DirectoryValidator | nul
 
   const ranked = networkDirectoryService.rankValidators(directory.validators);
   if (ranked.length === 0) {
-    console.warn('[NetworkBootstrap] directory has no healthy validators with pins');
+    console.warn('[NetworkBootstrap] directory returned no usable validators');
     return null;
   }
 
@@ -163,22 +154,38 @@ export async function refreshActiveValidator(): Promise<DirectoryValidator | nul
     return null;
   }
 
-  const split = splitEndpoint(best.endpoint);
-  if (!split) {
-    console.warn('[NetworkBootstrap] malformed endpoint:', best.endpoint);
+  // New directory shape: no per-validator SPKI pins. The only pin we
+  // have is `local_spki_pin` — the cert of whichever node answered
+  // this very call. If the top-ranked pick happens to be THAT node,
+  // we can swap onto it safely; otherwise we stay put and flag the
+  // situation. Callers reach validators via the existing hardcoded
+  // path until the contract either re-adds pins or the validator
+  // fleet is served over publicly-trusted certs.
+  const answeringPin = directory.local_spki_pin;
+  const answeringDid = directory.local_did;
+  const canSwapToBest =
+    !!answeringPin &&
+    answeringPin.length === 64 &&
+    best.did === answeringDid;
+
+  if (!canSwapToBest) {
+    console.log(
+      `[NetworkBootstrap] would switch to ${best.did.substring(0, 20)}… at ${best.host}:${best.port}, ` +
+        'but the new directory contract does not carry a per-validator SPKI pin — staying on bootstrap',
+    );
     return null;
   }
 
   try {
-    await nativeQuic.setActiveValidator(split.host, split.port, best.spki_pin);
-    activeTarget = { host: split.host, port: split.port };
+    await nativeQuic.setActiveValidator(best.host, best.port, answeringPin);
+    activeTarget = { host: best.host, port: best.port };
     console.log(
-      `[NetworkBootstrap] ✓ switched to ${best.did.substring(0, 20)}… at ${split.host}:${split.port}`,
+      `[NetworkBootstrap] ✓ switched to ${best.did.substring(0, 20)}… at ${best.host}:${best.port}`,
     );
     await persistSelection({
-      host: split.host,
-      port: split.port,
-      pinHex: best.spki_pin,
+      host: best.host,
+      port: best.port,
+      pinHex: answeringPin,
       did: best.did,
       chosenAt: Date.now(),
     });
