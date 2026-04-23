@@ -15,6 +15,7 @@ import React, { useMemo, useState } from 'react';
 import { View, ScrollView, Pressable, Platform } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Text, Card, Row, Column, Badge, RefreshRing } from '../../components';
+import { TopologyMap } from '../../components/organisms/TopologyMap';
 import {
   colors,
   spacing,
@@ -296,6 +297,16 @@ const NetworkTopologyScreen: React.FC<{ navigation: { goBack: () => void } }> = 
 
         {data ? (
           <>
+            {/* Constellation map — pulseKey = fetchedAt so the outward
+                ripple fires once per fresh data tick. */}
+            <TopologyMap
+              topo={data}
+              pulseKey={fetchedAt ?? 0}
+              selectedDid={expanded}
+              onSelect={did =>
+                setExpanded(prev => (prev === did ? null : did))
+              }
+            />
             <SummaryStrip topo={data} />
             <ThisNodeCard topo={data} />
 
