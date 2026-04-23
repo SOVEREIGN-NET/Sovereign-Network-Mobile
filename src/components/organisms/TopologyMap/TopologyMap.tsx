@@ -55,23 +55,47 @@ interface TopologyMapProps {
 /** Compact info card content for a selected node — builds from either
  *  a validator or gateway entry. Values are labels, not raw IPs. */
 interface SelectedInfo {
+  /** Display label — "Validator" / "Gateway" / "Self". */
   role: 'Validator' | 'Gateway' | 'Self';
+  /** Underlying kind — used for color lookups (gateways get a distinct palette). */
+  kind: 'validator' | 'gateway';
   did: string;
   status: string;
   stakeLabel: string;
   lines: { label: string; value: string }[];
 }
 
-const STATUS_COLOR: Record<string, string> = {
-  active: '#2ecc71',
-  stale: '#f5a623',
+/**
+ * Per-role, per-status color palette.
+ *
+ * Validators encode status with the familiar traffic-light greens/ambers
+ * /reds. Gateways use a blue family instead so the two roles are
+ * distinguishable at a glance even without the dashed-halo shape cue.
+ * Fault states (stale / jailed / slashed) stay warm-colored for both
+ * roles so "something is wrong here" reads the same way everywhere.
+ */
+const VALIDATOR_STATUS_COLOR: Record<string, string> = {
+  active: '#2ecc71',   // green
+  stale: '#f5a623',    // amber
+  inactive: '#f5a623', // amber
+  jailed: '#e74c3c',   // red
+  slashed: '#e74c3c',  // red
+};
+const GATEWAY_STATUS_COLOR: Record<string, string> = {
+  active: '#4da3ff',   // blue — signature gateway color
+  stale: '#f5a623',    // amber (shared fault palette)
   inactive: '#f5a623',
   jailed: '#e74c3c',
   slashed: '#e74c3c',
 };
 
-const resolveStatusColor = (status: string): string =>
-  STATUS_COLOR[status] ?? colors.text_tertiary;
+const resolveStatusColor = (
+  role: 'validator' | 'gateway',
+  status: string,
+): string => {
+  const table = role === 'gateway' ? GATEWAY_STATUS_COLOR : VALIDATOR_STATUS_COLOR;
+  return table[status] ?? colors.text_tertiary;
+};
 
 /** Map a stake value to a node radius in a bounded range. Square-root
  *  scaling keeps the biggest whale from dominating the whole map while
@@ -294,7 +318,7 @@ export const TopologyMap: React.FC<TopologyMapProps> = ({
               y1={cy}
               x2={p.x}
               y2={p.y}
-              stroke={resolveStatusColor(g.status)}
+              stroke={resolveStatusColor('gateway', g.status)}
               strokeOpacity={0.4}
               strokeWidth="1"
               strokeDasharray="2,5"
@@ -313,7 +337,7 @@ export const TopologyMap: React.FC<TopologyMapProps> = ({
               cx={p.x}
               cy={p.y}
               r={r}
-              color={resolveStatusColor(g.status)}
+              color={resolveStatusColor('gateway', g.status)}
               isSelf={g.did === selfDid}
               isSelected={g.did === selectedDid}
               role="gateway"
@@ -331,7 +355,7 @@ export const TopologyMap: React.FC<TopologyMapProps> = ({
               cx={p.x}
               cy={p.y}
               r={r}
-              color={resolveStatusColor(v.status)}
+              color={resolveStatusColor('validator', v.status)}
               isSelf={v.did === selfDid}
               isSelected={v.did === selectedDid}
               role="validator"
@@ -446,7 +470,10 @@ export const TopologyMap: React.FC<TopologyMapProps> = ({
                   width: 6,
                   height: 6,
                   borderRadius: 3,
-                  backgroundColor: resolveStatusColor(selectedInfo.status),
+                  backgroundColor: resolveStatusColor(
+                    selectedInfo.kind,
+                    selectedInfo.status,
+                  ),
                 }}
               />
               <Text
@@ -522,7 +549,8 @@ export const TopologyMap: React.FC<TopologyMapProps> = ({
             justifyContent: 'center',
           }}
         >
-          <Legend color="#2ecc71" label="active" />
+          <Legend color="#2ecc71" label="validator" />
+          <Legend color="#4da3ff" label="gateway" />
           <Legend color="#f5a623" label="stale" />
           <Legend color="#e74c3c" label="slashed" />
           <Legend
@@ -647,6 +675,7 @@ function buildSelectedInfo(
   if (v) {
     return {
       role: did === selfDid ? 'Self' : 'Validator',
+      kind: 'validator',
       did: v.did,
       status: v.status,
       stakeLabel: `${fmtStake(v.stake)} SOV (${v.stake.toLocaleString()})`,
@@ -662,6 +691,7 @@ function buildSelectedInfo(
   if (g) {
     return {
       role: did === selfDid ? 'Self' : 'Gateway',
+      kind: 'gateway',
       did: g.did,
       status: g.status,
       stakeLabel: `${fmtStake(g.stake)} SOV (${g.stake.toLocaleString()})`,
