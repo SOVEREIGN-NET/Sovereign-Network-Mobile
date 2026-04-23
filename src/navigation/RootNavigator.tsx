@@ -51,6 +51,7 @@ import BlockDetailScreen from '../screens/explorer/BlockDetailScreen';
 import TransactionDetailScreen from '../screens/explorer/TransactionDetailScreen';
 import IdentityDetailScreen from '../screens/explorer/IdentityDetailScreen';
 import WalletDetailScreen from '../screens/explorer/WalletDetailScreen';
+import NetworkTopologyScreen from '../screens/explorer/NetworkTopologyScreen';
 import SearchScreen from '../screens/explorer/SearchScreen';
 import PoUWScreen from '../screens/PoUWScreen';
 import SignInScreen from '../screens/SignInScreen';
@@ -124,6 +125,11 @@ const DashboardStack = () => {
       <Stack.Screen
         name="ExplorerSearch"
         component={SearchScreen}
+        options={{ headerShown: false }}
+      />
+      <Stack.Screen
+        name="NetworkTopology"
+        component={NetworkTopologyScreen}
         options={{ headerShown: false }}
       />
       <Stack.Screen

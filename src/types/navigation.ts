@@ -36,6 +36,7 @@ export type DashboardStackParamList = {
   WalletDetail: { ownerId: string };
   ExplorerSearch: { query?: string };
   OracleDashboard: undefined;
+  NetworkTopology: undefined;
 };
 
 export type IdentityStackParamList = {
