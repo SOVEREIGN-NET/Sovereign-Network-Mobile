@@ -52,6 +52,16 @@ interface TopologyMapProps {
   selectedDid?: string | null;
 }
 
+/** Compact info card content for a selected node — builds from either
+ *  a validator or gateway entry. Values are labels, not raw IPs. */
+interface SelectedInfo {
+  role: 'Validator' | 'Gateway' | 'Self';
+  did: string;
+  status: string;
+  stakeLabel: string;
+  lines: { label: string; value: string }[];
+}
+
 const STATUS_COLOR: Record<string, string> = {
   active: '#2ecc71',
   stale: '#f5a623',
@@ -181,6 +191,12 @@ export const TopologyMap: React.FC<TopologyMapProps> = ({
     inputRange: [0, 1],
     outputRange: [0.35, 0],
   });
+
+  // Resolve the selected DID to a typed info card payload once per render.
+  const selectedInfo = useMemo(
+    () => buildSelectedInfo(topo, selectedDid),
+    [topo, selectedDid],
+  );
 
   // --- Layout guard --------------------------------------------------------
   if (width === 0) {
@@ -380,27 +396,141 @@ export const TopologyMap: React.FC<TopologyMapProps> = ({
         })}
       </View>
 
-      {/* Legend strip */}
-      <View
-        style={{
-          position: 'absolute',
-          left: spacing.sm,
-          right: spacing.sm,
-          bottom: spacing.xs,
-          flexDirection: 'row',
-          flexWrap: 'wrap',
-          gap: spacing.sm,
-          justifyContent: 'center',
-        }}
-      >
-        <Legend color="#2ecc71" label="active" />
-        <Legend color="#f5a623" label="stale" />
-        <Legend color="#e74c3c" label="slashed" />
-        <Legend
-          color={colors.primary}
-          label={`${topo.topology.connected_peers} peers`}
-        />
-      </View>
+      {/* Info card — shown when a node is selected; replaces the legend
+          strip so there's no competition for the same footer space. */}
+      {selectedInfo ? (
+        <Pressable
+          onPress={() => onSelect?.(selectedInfo.did)}
+          style={{
+            position: 'absolute',
+            left: spacing.sm,
+            right: spacing.sm,
+            bottom: spacing.sm,
+            backgroundColor: colors.bg_dark,
+            borderRadius: 10,
+            borderWidth: 1,
+            borderColor: colors.border,
+            paddingHorizontal: spacing.md,
+            paddingVertical: spacing.sm,
+          }}
+          accessibilityRole="button"
+          accessibilityLabel="Close node info"
+        >
+          <View
+            style={{
+              flexDirection: 'row',
+              justifyContent: 'space-between',
+              alignItems: 'center',
+              marginBottom: 4,
+            }}
+          >
+            <Text
+              style={{
+                color: colors.text_tertiary,
+                fontSize: typography.size.xs,
+                textTransform: 'uppercase',
+                letterSpacing: 1,
+              }}
+            >
+              {selectedInfo.role}
+            </Text>
+            <View
+              style={{
+                flexDirection: 'row',
+                alignItems: 'center',
+                gap: 6,
+              }}
+            >
+              <View
+                style={{
+                  width: 6,
+                  height: 6,
+                  borderRadius: 3,
+                  backgroundColor: resolveStatusColor(selectedInfo.status),
+                }}
+              />
+              <Text
+                style={{
+                  color: colors.text_secondary,
+                  fontSize: typography.size.xs,
+                }}
+              >
+                {selectedInfo.status}
+              </Text>
+            </View>
+          </View>
+          <Text
+            style={{
+              color: colors.text_primary,
+              fontSize: typography.size.sm,
+              fontWeight: '600',
+              marginBottom: 4,
+            }}
+            numberOfLines={1}
+          >
+            …{shortTail(selectedInfo.did)}
+          </Text>
+          <Text
+            style={{
+              color: colors.primary,
+              fontSize: typography.size.sm,
+              fontWeight: '700',
+              marginBottom: 4,
+            }}
+          >
+            {selectedInfo.stakeLabel}
+          </Text>
+          {selectedInfo.lines.map(l => (
+            <View
+              key={l.label}
+              style={{
+                flexDirection: 'row',
+                justifyContent: 'space-between',
+                marginTop: 2,
+              }}
+            >
+              <Text
+                style={{
+                  color: colors.text_tertiary,
+                  fontSize: typography.size.xs,
+                }}
+              >
+                {l.label}
+              </Text>
+              <Text
+                style={{
+                  color: colors.text_primary,
+                  fontSize: typography.size.xs,
+                  fontWeight: '500',
+                }}
+              >
+                {l.value}
+              </Text>
+            </View>
+          ))}
+        </Pressable>
+      ) : (
+        <View
+          style={{
+            position: 'absolute',
+            left: spacing.sm,
+            right: spacing.sm,
+            bottom: spacing.xs,
+            flexDirection: 'row',
+            flexWrap: 'wrap',
+            gap: spacing.sm,
+            justifyContent: 'center',
+          }}
+        >
+          <Legend color="#2ecc71" label="active" />
+          <Legend color="#f5a623" label="stale" />
+          <Legend color="#e74c3c" label="slashed" />
+          <Legend
+            color={colors.primary}
+            label={`${topo.topology.connected_peers} peers`}
+          />
+        </View>
+      )}
     </View>
   );
 };
@@ -494,5 +624,53 @@ const Legend: React.FC<{ color: string; label: string }> = ({ color, label }) =>
 );
 
 const shortTail = (did: string): string => did.slice(-6);
+
+/** Round a stake value to a readable display. Pairs with the raw
+ *  number so the info card can show e.g. "1.2K SOV (1,234)". */
+const fmtStake = (stake: number): string => {
+  if (!Number.isFinite(stake) || stake <= 0) return '0';
+  if (stake >= 1_000_000_000) return `${(stake / 1_000_000_000).toFixed(2)}B`;
+  if (stake >= 1_000_000) return `${(stake / 1_000_000).toFixed(2)}M`;
+  if (stake >= 1_000) return `${(stake / 1_000).toFixed(1)}K`;
+  return stake.toString();
+};
+
+/** Build the info-card payload for a selected DID. Returns null if the
+ *  DID isn't in the current topology (stale selection). */
+function buildSelectedInfo(
+  topo: NetworkTopologyResponse,
+  did: string | null | undefined,
+): SelectedInfo | null {
+  if (!did) return null;
+  const selfDid = topo.this_node.did;
+  const v = topo.topology.validators.find(x => x.did === did);
+  if (v) {
+    return {
+      role: did === selfDid ? 'Self' : 'Validator',
+      did: v.did,
+      status: v.status,
+      stakeLabel: `${fmtStake(v.stake)} SOV (${v.stake.toLocaleString()})`,
+      lines: [
+        { label: 'Blocks validated', value: v.blocks_validated.toLocaleString() },
+        { label: 'Last activity', value: `block ${v.last_activity.toLocaleString()}` },
+        { label: 'Commission', value: `${v.commission_rate}%` },
+        { label: 'Admission', value: v.admission },
+      ],
+    };
+  }
+  const g = topo.topology.gateways.find(x => x.did === did);
+  if (g) {
+    return {
+      role: did === selfDid ? 'Self' : 'Gateway',
+      did: g.did,
+      status: g.status,
+      stakeLabel: `${fmtStake(g.stake)} SOV (${g.stake.toLocaleString()})`,
+      lines: [
+        { label: 'Commission', value: `${g.commission_rate}%` },
+      ],
+    };
+  }
+  return null;
+}
 
 export default TopologyMap;

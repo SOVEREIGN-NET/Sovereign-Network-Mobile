@@ -91,7 +91,7 @@ const ValidatorRow: React.FC<{
           />
         </Row>
         <Text variant="caption" style={styles.meta}>
-          {v.endpoint} · {fmtCompactSov(v.stake)} SOV · {v.blocks_validated.toLocaleString()} blocks
+          {fmtCompactSov(v.stake)} SOV · {v.blocks_validated.toLocaleString()} blocks · {v.commission_rate}% commission
         </Text>
       </Column>
       <Text style={styles.chevron}>{expanded ? '▾' : '▸'}</Text>
@@ -100,9 +100,7 @@ const ValidatorRow: React.FC<{
       <Column gap="xs" style={styles.rowDetails}>
         <DetailLine label="DID" value={v.did} mono />
         <DetailLine label="Role" value={v.role} />
-        <DetailLine label="IP" value={v.ip} mono />
-        <DetailLine label="QUIC port" value={String(v.quic_port)} />
-        <DetailLine label="Mesh port" value={String(v.mesh_port)} />
+        <DetailLine label="Status" value={v.status} />
         <DetailLine
           label="Stake"
           value={`${v.stake.toLocaleString()} SOV`}
@@ -145,7 +143,7 @@ const GatewayRow: React.FC<{
           />
         </Row>
         <Text variant="caption" style={styles.meta}>
-          {g.endpoint} · DNS :{g.zdns_port} · {fmtCompactSov(g.stake)} SOV
+          {fmtCompactSov(g.stake)} SOV · {g.commission_rate}% commission
         </Text>
       </Column>
       <Text style={styles.chevron}>{expanded ? '▾' : '▸'}</Text>
@@ -154,9 +152,7 @@ const GatewayRow: React.FC<{
       <Column gap="xs" style={styles.rowDetails}>
         <DetailLine label="DID" value={g.did} mono />
         <DetailLine label="Role" value={g.role} />
-        <DetailLine label="IP" value={g.ip} mono />
-        <DetailLine label="QUIC port" value={String(g.quic_port)} />
-        <DetailLine label="ZDNS port" value={String(g.zdns_port)} />
+        <DetailLine label="Status" value={g.status} />
         <DetailLine
           label="Stake"
           value={`${g.stake.toLocaleString()} SOV`}
