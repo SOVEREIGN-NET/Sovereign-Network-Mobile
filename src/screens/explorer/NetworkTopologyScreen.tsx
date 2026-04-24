@@ -16,6 +16,7 @@ import { View, ScrollView, Pressable, Platform } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Text, Card, Row, Column, Badge, RefreshRing } from '../../components';
 import { TopologyMap } from '../../components/organisms/TopologyMap';
+import { ZDNS_HOST } from '../../config';
 import {
   colors,
   spacing,
@@ -302,6 +303,7 @@ const NetworkTopologyScreen: React.FC<{ navigation: { goBack: () => void } }> = 
               onSelect={did =>
                 setExpanded(prev => (prev === did ? null : did))
               }
+              zdnsHost={ZDNS_HOST}
             />
             <SummaryStrip topo={data} />
             <ThisNodeCard topo={data} />

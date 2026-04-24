@@ -50,6 +50,10 @@ interface TopologyMapProps {
   pulseKey?: number | string;
   onSelect?: (did: string) => void;
   selectedDid?: string | null;
+  /** Host/IP of the ZDNS gateway the app dials for validator discovery.
+   *  If it matches a gateway in the topology the edge to that gateway
+   *  is rendered with the "live connection" highlight. */
+  zdnsHost?: string;
 }
 
 /** Compact info card content for a selected node — builds from either
@@ -116,12 +120,18 @@ const polarAt = (i: number, n: number, cx: number, cy: number, r: number) => {
   };
 };
 
+/** Color + stroke width for the "app is live-connected here" highlight. */
+const LIVE_EDGE_COLOR = '#00e5ff';
+const LIVE_EDGE_WIDTH = 2;
+const LIVE_EDGE_OPACITY = 0.95;
+
 export const TopologyMap: React.FC<TopologyMapProps> = ({
   topo,
   height = 320,
   pulseKey,
   onSelect,
   selectedDid,
+  zdnsHost,
 }) => {
   const [width, setWidth] = useState(0);
 
@@ -142,6 +152,26 @@ export const TopologyMap: React.FC<TopologyMapProps> = ({
 
   const validators = topo.topology.validators;
   const gateways = topo.topology.gateways;
+
+  // Gateway we dial for ZDNS bootstrap — matched by IP or endpoint host
+  // so either "91.98.113.188" or "gateway.thesovereignnetwork.org"
+  // resolves against the topology entry regardless of how the server
+  // expresses it.
+  const zdnsGatewayDid = useMemo(() => {
+    if (!zdnsHost) return null;
+    const needle = zdnsHost.trim().toLowerCase();
+    const match = gateways.find(g => {
+      const ip = (g.ip || '').toLowerCase();
+      const host = (g.endpoint || '').split(':')[0].toLowerCase();
+      return needle === ip || needle === host;
+    });
+    return match?.did ?? null;
+  }, [gateways, zdnsHost]);
+
+  // Active validator link: `this_node.did` points at whichever validator
+  // answered the directory request, so it IS in the validator array.
+  // That's the TLS endpoint our UHP handshake uses.
+  const activeValidatorDid = selfDid;
 
   // --- Animations ----------------------------------------------------------
 
@@ -289,9 +319,13 @@ export const TopologyMap: React.FC<TopologyMapProps> = ({
           opacity={rippleOpacity as unknown as number}
         />
 
-        {/* Edges — center → validator */}
+        {/* Edges — center → validator. The edge to `this_node.did` (the
+            validator we're actually talking to) is drawn with the
+            live-connection highlight so the user can see at a glance
+            where the app's QUIC link lands. */}
         {validators.map((v, i) => {
           const p = polarAt(i, validators.length, cx, cy, outerR);
+          const isLive = v.did === activeValidatorDid;
           return (
             <AnimatedLine
               key={`edge-v-${v.did}`}
@@ -299,18 +333,26 @@ export const TopologyMap: React.FC<TopologyMapProps> = ({
               y1={cy}
               x2={p.x}
               y2={p.y}
-              stroke={colors.primary}
-              strokeOpacity={v.status === 'active' ? 0.45 : 0.18}
-              strokeWidth="1"
-              strokeDasharray="3,6"
+              stroke={isLive ? LIVE_EDGE_COLOR : colors.primary}
+              strokeOpacity={
+                isLive
+                  ? LIVE_EDGE_OPACITY
+                  : v.status === 'active'
+                  ? 0.45
+                  : 0.18
+              }
+              strokeWidth={isLive ? LIVE_EDGE_WIDTH : 1}
+              strokeDasharray={isLive ? '5,3' : '3,6'}
               strokeDashoffset={dashOffset as unknown as number}
             />
           );
         })}
 
-        {/* Edges — center → gateway */}
+        {/* Edges — center → gateway. Same highlight if this gateway is
+            the ZDNS server we bootstrap through. */}
         {gateways.map((g, i) => {
           const p = polarAt(i, gateways.length, cx, cy, innerR);
+          const isLive = g.did === zdnsGatewayDid;
           return (
             <AnimatedLine
               key={`edge-g-${g.did}`}
@@ -318,10 +360,10 @@ export const TopologyMap: React.FC<TopologyMapProps> = ({
               y1={cy}
               x2={p.x}
               y2={p.y}
-              stroke={resolveStatusColor('gateway', g.status)}
-              strokeOpacity={0.4}
-              strokeWidth="1"
-              strokeDasharray="2,5"
+              stroke={isLive ? LIVE_EDGE_COLOR : resolveStatusColor('gateway', g.status)}
+              strokeOpacity={isLive ? LIVE_EDGE_OPACITY : 0.4}
+              strokeWidth={isLive ? LIVE_EDGE_WIDTH : 1}
+              strokeDasharray={isLive ? '5,3' : '2,5'}
               strokeDashoffset={dashOffset as unknown as number}
             />
           );
@@ -549,6 +591,7 @@ export const TopologyMap: React.FC<TopologyMapProps> = ({
             justifyContent: 'center',
           }}
         >
+          <Legend color={LIVE_EDGE_COLOR} label="live link" />
           <Legend color="#2ecc71" label="validator" />
           <Legend color="#4da3ff" label="gateway" />
           <Legend color="#f5a623" label="stale" />
