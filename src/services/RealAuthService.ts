@@ -800,8 +800,12 @@ class RealAuthService {
 
 function base64ToHex(input: string): string {
   if (!input) return '';
+  // React Native ships a browser-compatible `buffer` shim via Metro's
+  // resolver; the `node:buffer` specifier does NOT resolve in Metro
+  // (it's a Node-only scheme). Keep the plain `'buffer'` import here
+  // regardless of what Sonar suggests — the RN runtime has no `node:*`.
   // eslint-disable-next-line @typescript-eslint/no-var-requires
-  const { Buffer } = require('node:buffer');
+  const { Buffer } = require('buffer');
   return Buffer.from(input, 'base64').toString('hex');
 }
 

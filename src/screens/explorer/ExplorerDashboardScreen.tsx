@@ -81,6 +81,22 @@ const ExplorerDashboardScreen: React.FC<any> = ({ navigation }) => {
           </Pressable>
         </View>
 
+        {/* Network Topology entry — live view of validators + gateways. */}
+        <Pressable
+          onPress={() => navigation.navigate('NetworkTopology')}
+          style={styles.topologyTile}
+        >
+          <Row justify="space-between" align="center">
+            <Column gap="xs" style={{ flex: 1 }}>
+              <Text variant="h3">Network Topology</Text>
+              <Text variant="caption" style={{ color: colors.text_secondary }}>
+                Live validators, gateways, and peer counts
+              </Text>
+            </Column>
+            <Text variant="body" style={{ color: colors.text_secondary }}>›</Text>
+          </Row>
+        </Pressable>
+
         {/* Stats */}
         <Card>
           <Row justify="space-between" align="center" style={{ marginBottom: spacing.sm }}>
@@ -237,6 +253,13 @@ const makeStyles = () => StyleSheet.create({
     paddingHorizontal: spacing.sm,
     borderRadius: borderRadius.base,
     backgroundColor: colors.bg_darker,
+  },
+  topologyTile: {
+    padding: spacing.md,
+    borderRadius: borderRadius.lg,
+    backgroundColor: colors.bg_dark,
+    borderWidth: 1,
+    borderColor: colors.border,
   },
   statRow: {
     paddingVertical: spacing.xs,

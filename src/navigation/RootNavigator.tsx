@@ -47,10 +47,14 @@ import MyDomainsScreen from '../screens/MyDomainsScreen';
 import DomainDetailScreen from '../screens/DomainDetailScreen';
 import ExplorerDashboardScreen from '../screens/explorer/ExplorerDashboardScreen';
 import OracleDashboardScreen from '../screens/oracle/OracleDashboardScreen';
+import SovSwapHomeScreen from '../screens/sovswap/SovSwapHomeScreen';
+import SovSwapDaoDetailScreen from '../screens/sovswap/SovSwapDaoDetailScreen';
+import SovSwapMarketDetailScreen from '../screens/sovswap/SovSwapMarketDetailScreen';
 import BlockDetailScreen from '../screens/explorer/BlockDetailScreen';
 import TransactionDetailScreen from '../screens/explorer/TransactionDetailScreen';
 import IdentityDetailScreen from '../screens/explorer/IdentityDetailScreen';
 import WalletDetailScreen from '../screens/explorer/WalletDetailScreen';
+import NetworkTopologyScreen from '../screens/explorer/NetworkTopologyScreen';
 import SearchScreen from '../screens/explorer/SearchScreen';
 import PoUWScreen from '../screens/PoUWScreen';
 import SignInScreen from '../screens/SignInScreen';
@@ -127,8 +131,28 @@ const DashboardStack = () => {
         options={{ headerShown: false }}
       />
       <Stack.Screen
+        name="NetworkTopology"
+        component={NetworkTopologyScreen}
+        options={{ headerShown: false }}
+      />
+      <Stack.Screen
         name="OracleDashboard"
         component={OracleDashboardScreen}
+        options={{ headerShown: false }}
+      />
+      <Stack.Screen
+        name="SovSwapHome"
+        component={SovSwapHomeScreen as any}
+        options={{ headerShown: false }}
+      />
+      <Stack.Screen
+        name="SovSwapDaoDetail"
+        component={SovSwapDaoDetailScreen as any}
+        options={{ headerShown: false }}
+      />
+      <Stack.Screen
+        name="SovSwapMarketDetail"
+        component={SovSwapMarketDetailScreen as any}
         options={{ headerShown: false }}
       />
     </Stack.Navigator>
