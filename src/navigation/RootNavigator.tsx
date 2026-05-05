@@ -47,6 +47,9 @@ import MyDomainsScreen from '../screens/MyDomainsScreen';
 import DomainDetailScreen from '../screens/DomainDetailScreen';
 import ExplorerDashboardScreen from '../screens/explorer/ExplorerDashboardScreen';
 import OracleDashboardScreen from '../screens/oracle/OracleDashboardScreen';
+import SovSwapHomeScreen from '../screens/sovswap/SovSwapHomeScreen';
+import SovSwapDaoDetailScreen from '../screens/sovswap/SovSwapDaoDetailScreen';
+import SovSwapMarketDetailScreen from '../screens/sovswap/SovSwapMarketDetailScreen';
 import BlockDetailScreen from '../screens/explorer/BlockDetailScreen';
 import TransactionDetailScreen from '../screens/explorer/TransactionDetailScreen';
 import IdentityDetailScreen from '../screens/explorer/IdentityDetailScreen';
@@ -135,6 +138,21 @@ const DashboardStack = () => {
       <Stack.Screen
         name="OracleDashboard"
         component={OracleDashboardScreen}
+        options={{ headerShown: false }}
+      />
+      <Stack.Screen
+        name="SovSwapHome"
+        component={SovSwapHomeScreen as any}
+        options={{ headerShown: false }}
+      />
+      <Stack.Screen
+        name="SovSwapDaoDetail"
+        component={SovSwapDaoDetailScreen as any}
+        options={{ headerShown: false }}
+      />
+      <Stack.Screen
+        name="SovSwapMarketDetail"
+        component={SovSwapMarketDetailScreen as any}
         options={{ headerShown: false }}
       />
     </Stack.Navigator>

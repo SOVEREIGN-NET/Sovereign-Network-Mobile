@@ -37,6 +37,9 @@ export type DashboardStackParamList = {
   ExplorerSearch: { query?: string };
   OracleDashboard: undefined;
   NetworkTopology: undefined;
+  SovSwapHome: undefined;
+  SovSwapDaoDetail: { id: number };
+  SovSwapMarketDetail: { id: number };
 };
 
 export type IdentityStackParamList = {

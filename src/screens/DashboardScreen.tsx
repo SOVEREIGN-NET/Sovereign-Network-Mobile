@@ -271,7 +271,13 @@ const DashboardScreen: React.FC<any> = ({ navigation }) => {
               return (
                 <Pressable
                   key={dapp.id}
-                  onPress={() => openBrowser(dapp.url)}
+                  onPress={() => {
+                    if (dapp.id === 'sovswap') {
+                      navigation.navigate('SovSwapHome');
+                      return;
+                    }
+                    openBrowser(dapp.url);
+                  }}
                   style={{
                     flexDirection: 'row',
                     justifyContent: 'space-between',
