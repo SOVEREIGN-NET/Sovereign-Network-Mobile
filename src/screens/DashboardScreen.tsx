@@ -1,11 +1,8 @@
-import React, { useMemo, useState, useEffect } from 'react';
+import React, { useMemo, useState } from 'react';
 import { View, TextInput, Animated, Pressable } from 'react-native';
 import { useNetworkNotices } from '../hooks/useNetworkNotices';
-import { useAsyncData } from '../hooks/useAsyncData';
-import { fetchOracleStatus, OracleStatusResponse } from '../services/OracleService';
 import {
   useTrendingTokens,
-  formatTokenPrice,
   formatChange,
   TokenData,
 } from '../hooks/useTrendingTokens';
@@ -53,12 +50,6 @@ const NOTICE_STYLE: Record<
   info:    { bg: '#0D2D45', border: '#0E4B7A', text: '#4FC3F7', icon: 'ℹ' },
 };
 
-/** Oracle arrow color: neutral while loading, green when healthy, red otherwise. */
-const resolveOracleHealthColor = (healthy: boolean | null | undefined): string => {
-  if (healthy == null) return colors.text_secondary;
-  return healthy ? '#2ecc71' : colors.error;
-};
-
 const DashboardScreen: React.FC<any> = ({ navigation }) => {
   const { t } = useTranslation();
   const [drawerVisible, setDrawerVisible] = useState(false);
@@ -66,20 +57,6 @@ const DashboardScreen: React.FC<any> = ({ navigation }) => {
   const [urlInput, setUrlInput] = useState('zhtp://central.sov');
   const trendingTokensData = useTrendingTokens();
   const trendingDappsData = useTrendingDapps();
-  // Defer oracle fetch so it doesn't compete with mount rendering.
-  const [oracleReady, setOracleReady] = useState(false);
-  useEffect(() => { const t = setTimeout(() => setOracleReady(true), 600); return () => clearTimeout(t); }, []);
-  const { data: oracleStatus } = useAsyncData<OracleStatusResponse>(
-    () => fetchOracleStatus(),
-    [],
-    null,
-    !oracleReady,
-  );
-  const oracleHealthy = useMemo(() => {
-    if (!oracleStatus) return null; // unknown
-    const lf = oracleStatus.latest_finalized_price;
-    return lf != null && oracleStatus.current_epoch - lf.epoch_id <= 2;
-  }, [oracleStatus]);
 
   const drawerItems: DrawerItem[] = useMemo(() => {
     const items: DrawerItem[] = [
@@ -359,24 +336,10 @@ const DashboardScreen: React.FC<any> = ({ navigation }) => {
           </Card>
         </Pressable>
 
-        <Pressable onPress={() => navigation.navigate('OracleDashboard')}>
-          <Card>
-            <Row justify="space-between" align="center">
-              <Column gap="xs" style={{ flex: 1 }}>
-                <Text variant="body" style={{ fontWeight: '700' }}>
-                  Price Oracle
-                </Text>
-                <Text variant="caption" style={{ color: colors.text_secondary }}>
-                  SOV/USD · CBE/USD · Bonding curve
-                </Text>
-              </Column>
-              <Text style={{
-                fontSize: 18,
-                color: resolveOracleHealthColor(oracleHealthy),
-              }}>→</Text>
-            </Row>
-          </Card>
-        </Pressable>
+        {/* Oracle entry hidden — the OracleDashboard route still exists
+            in the stack, navigable from elsewhere. Restore by uncommenting
+            the Pressable + the `oracleReady` / `oracleStatus` /
+            `oracleHealthy` hooks above when the surface comes back. */}
 
         {/* PoUW Rewards — interactive visualization of the network's
             Proof-of-Useful-Work reward distribution. Data comes from
@@ -439,21 +402,9 @@ const DashboardScreen: React.FC<any> = ({ navigation }) => {
                       backgroundColor: flashBgColor,
                     }}
                   >
-                    <Text
-                      variant="body"
-                      style={{ fontWeight: '600', color: colors.text_primary }}
-                    >
-                      {/*
-                        `priceDisplay` is `formatAtomicPriceDisplay(priceAtomic,
-                        priceScale)` — exact BigInt division of the node's
-                        atomic pair. Same formatter and same source as the
-                        Oracle view, so the two surfaces render bit-identical
-                        strings for the same fetch. Falls back to the legacy
-                        float formatter only when the atomic pair wasn't
-                        provided by the response.
-                      */}
-                      {token.priceDisplay || formatTokenPrice(token.price)}
-                    </Text>
+                    {/* Absolute price hidden — only the trend arrow + %
+                        change remain so the row still flashes on update.
+                        Restore by re-adding the priceDisplay Text. */}
                     {token.showVariation && (
                       <Row gap="xs" align="center">
                         <Animated.View

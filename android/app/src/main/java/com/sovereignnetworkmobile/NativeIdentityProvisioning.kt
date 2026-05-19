@@ -927,6 +927,33 @@ class NativeIdentityProvisioning(reactContext: ReactApplicationContext) :
         }
     }
 
+    // ─── Kyber key publish / rotate ───
+
+    @ReactMethod
+    fun buildKyberKeyUpdate(timestamp: Double, promise: Promise) {
+        executor.execute {
+            try {
+                val identity = getLatestIdentity()
+                if (identity == null) {
+                    promise.reject("NO_IDENTITY", "No active identity for kyber key update")
+                    return@execute
+                }
+                // RN bridges numeric args as Double; convert to Long (u64 on the
+                // Rust side). Realistic timestamps fit comfortably in 53-bit
+                // float precision until ~year 287396, so the cast is lossless.
+                val body = identity.buildKyberKeyUpdate(timestamp.toLong())
+                if (body.isNullOrEmpty()) {
+                    promise.reject("BUILD_ERROR", "Failed to build kyber key update")
+                    return@execute
+                }
+                promise.resolve(WritableNativeMap().apply { putString("body", body) })
+            } catch (e: Exception) {
+                Log.e(TAG, "buildKyberKeyUpdate failed", e)
+                promise.reject("BUILD_ERROR", "Failed to build kyber key update: ${e.message}", e)
+            }
+        }
+    }
+
     // ─── Message signing ───
 
     @ReactMethod

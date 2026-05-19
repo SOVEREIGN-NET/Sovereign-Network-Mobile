@@ -1983,6 +1983,7 @@ dependencies = [
  "indexmap 2.13.0",
  "lib-access-control",
  "lib-consensus",
+ "lib-consensus-core",
  "lib-crypto",
  "lib-economy",
  "lib-fees",
@@ -2023,11 +2024,16 @@ dependencies = [
  "jni 0.21.1",
  "lib-blockchain",
  "lib-crypto",
+ "lib-identity",
  "lib-identity-core",
+ "lib-network",
+ "lib-protocols",
  "pqc_kyber",
  "pqcrypto-kyber",
  "pqcrypto-traits",
+ "quinn",
  "rand 0.8.5",
+ "rustls",
  "serde",
  "serde_bytes",
  "serde_json",
@@ -2035,6 +2041,7 @@ dependencies = [
  "sha3",
  "tar",
  "thiserror 1.0.69",
+ "tokio",
  "tracing",
  "uniffi",
 ]
@@ -2050,7 +2057,10 @@ dependencies = [
  "dashmap",
  "hex",
  "indexmap 1.9.3",
+ "lib-consensus-core",
+ "lib-consensus-net",
  "lib-crypto",
+ "lib-governance",
  "lib-identity",
  "lib-proofs",
  "lib-storage",
@@ -2059,6 +2069,36 @@ dependencies = [
  "scopeguard",
  "serde",
  "serde_json",
+ "thiserror 1.0.69",
+ "tokio",
+ "tracing",
+]
+
+[[package]]
+name = "lib-consensus-core"
+version = "0.1.0"
+dependencies = [
+ "async-trait",
+ "lib-crypto",
+ "lib-identity",
+ "lib-types",
+ "serde",
+ "thiserror 1.0.69",
+ "tracing",
+]
+
+[[package]]
+name = "lib-consensus-net"
+version = "0.1.0"
+dependencies = [
+ "anyhow",
+ "async-trait",
+ "bincode",
+ "lib-consensus-core",
+ "lib-crypto",
+ "lib-identity",
+ "lib-types",
+ "serde",
  "thiserror 1.0.69",
  "tokio",
  "tracing",
@@ -2091,6 +2131,7 @@ dependencies = [
  "anyhow",
  "chrono",
  "hex",
+ "lib-consensus-core",
  "lib-crypto",
  "lib-identity",
  "lib-proofs",
@@ -2109,6 +2150,25 @@ version = "0.1.0"
 dependencies = [
  "lib-types",
  "serde",
+]
+
+[[package]]
+name = "lib-governance"
+version = "0.1.0"
+dependencies = [
+ "anyhow",
+ "bincode",
+ "blake3",
+ "lib-access-control",
+ "lib-consensus-core",
+ "lib-crypto",
+ "lib-identity",
+ "lib-types",
+ "serde",
+ "serde_json",
+ "thiserror 1.0.69",
+ "tokio",
+ "tracing",
 ]
 
 [[package]]
@@ -2174,7 +2234,9 @@ dependencies = [
  "hmac",
  "hostname",
  "jni 0.21.1",
+ "lib-blockchain",
  "lib-consensus",
+ "lib-consensus-net",
  "lib-crypto",
  "lib-economy",
  "lib-identity",
@@ -2231,6 +2293,7 @@ dependencies = [
  "log",
  "merlin",
  "num_cpus",
+ "rand 0.8.5",
  "serde",
  "serde_json",
  "tracing",

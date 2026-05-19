@@ -1,5 +1,10 @@
 import React from 'react';
-import { Text as RNText, StyleSheet, TextStyle } from 'react-native';
+import {
+  Text as RNText,
+  StyleSheet,
+  type StyleProp,
+  type TextStyle,
+} from 'react-native';
 import { colors, typography } from '../../../theme';
 
 export type TextVariant = 'h1' | 'h2' | 'h3' | 'body' | 'caption' | 'small';
@@ -10,8 +15,15 @@ export interface TextProps {
   variant?: TextVariant;
   weight?: TextWeight;
   color?: string;
-  style?: TextStyle;
+  /**
+   * Accepts a single `TextStyle`, an array of styles (including falsy
+   * branches like `condition && { color }`), and any other shape the
+   * underlying RN Text accepts. Mirrors `RNText`'s own `style` typing.
+   */
+  style?: StyleProp<TextStyle>;
   numberOfLines?: number;
+  /** Forwarded to the underlying RN Text — controls truncation glyph. */
+  ellipsizeMode?: 'head' | 'middle' | 'tail' | 'clip';
 }
 
 const styles = StyleSheet.create({
@@ -57,6 +69,7 @@ export const Text = React.memo(
     color = colors.text_primary,
     style,
     numberOfLines,
+    ellipsizeMode,
   }: TextProps) => {
     const variantStyle = {
       h1: styles.h1,
@@ -78,6 +91,7 @@ export const Text = React.memo(
       <RNText
         style={[variantStyle, weightStyle, { color }, style]}
         numberOfLines={numberOfLines}
+        ellipsizeMode={ellipsizeMode}
       >
         {children}
       </RNText>

@@ -296,6 +296,9 @@ class RealAuthService {
       };
 
       await this.storeIdentity(identity);
+      // Kyber-pk publish fires from AuthContext after the auth caches
+      // (SecureIdentityStorage + handle store) are populated — calling
+      // it here races the cache write and 401s on auth.
       return identity;
     } catch (error: unknown) {
       const msg = error instanceof Error ? error.message : 'Failed to provision identity on device';
@@ -452,8 +455,20 @@ class RealAuthService {
 
       const restored = await nativeIdentityProvisioning.restoreIdentityFromPhrase(phrase);
 
-      const serverIdentityId = responseOk ? (payload?.identity as Record<string, unknown>)?.identity_id as string | undefined : undefined;
-      const didFromServer = responseOk ? (payload?.identity as Record<string, unknown>)?.did as string | undefined : undefined;
+      const serverIdentity = responseOk
+        ? (payload?.identity as Record<string, unknown> | undefined)
+        : undefined;
+      const serverIdentityId = serverIdentity?.identity_id as string | undefined;
+      const didFromServer = serverIdentity?.did as string | undefined;
+      // The server returns `display_name: Option<String>` with
+      // `skip_serializing_if = "Option::is_none"`. When present + non-
+      // empty, prefer it over the local stub — `restoreIdentityFromPhrase`
+      // can't recover a name that was set on-chain after registration.
+      const rawServerDisplayName = serverIdentity?.display_name;
+      const serverDisplayName =
+        typeof rawServerDisplayName === 'string' && rawServerDisplayName.length > 0
+          ? rawServerDisplayName
+          : undefined;
       const identityDid = restored?.did || didFromServer;
       const identityId = stripDidPrefix(identityDid) ?? serverIdentityId;
       if (!identityId) {
@@ -477,7 +492,11 @@ class RealAuthService {
 
       const identity: Identity = {
         did: identityDid,
-        displayName: restored.displayName || 'Recovered Identity',
+        // Order: server-truth → local restore → fallback string. The
+        // chain stores the username the user set at registration time;
+        // we trust that over the local stub which has no name source.
+        displayName:
+          serverDisplayName || restored.displayName || 'Recovered Identity',
         identityId,
         identityType: restored.identityType || 'human',
         deviceId: restored.deviceId,
@@ -486,6 +505,10 @@ class RealAuthService {
       };
 
       await this.storeIdentity(identity);
+      // Kyber-pk publish fires from AuthContext.recoverIdentity after
+      // the auth caches are populated — calling it here races the
+      // SecureIdentityStorage cache write and the auth-injected QUIC
+      // request fails with "Missing identity for authenticated request".
       return identity;
     } catch (error: unknown) {
       console.error('[RealAuthService] recoverWithSeed failed:', error);
@@ -795,6 +818,76 @@ class RealAuthService {
     } catch (error) {
       console.warn('[RealAuthService] Failed to store identity seeds:', error);
     }
+  }
+}
+
+/**
+ * Hydrate the on-chain identity record for a DID. Reads the live
+ * `display_name` (and `username`, if set) from the chain's identity
+ * registry — the only post-recovery / post-signin source of truth for
+ * the user's chosen name. Both fields are optional in the response;
+ * absent means the chain has no value (returned as `undefined`).
+ *
+ * Auth: takes the current key session via `quicRequest`'s default
+ * authenticated path. Use after `setIdentity` so the session token is
+ * cached and the auth-injected QUIC call doesn't bounce.
+ */
+export interface IdentityRecord {
+  did: string;
+  identity_id: string;
+  display_name?: string;
+  username?: string;
+  identity_type?: string;
+  created_at?: number;
+}
+
+/**
+ * Claim a username for the authenticated identity. Server unifies
+ * `display_name` with the claimed username and writes a credential
+ * with an empty password hash (password sign-in stays disabled).
+ *
+ * Auth: authenticated QUIC session — the caller's DID is taken from
+ * the session, not the body. Must be a key-authenticated session
+ * (password-only sessions are rejected 403).
+ *
+ * Returns the canonical username on success. Throws with a structured
+ * error (`status`, `body`) on rejection so the UI can distinguish
+ * `409 already taken` from `409 already has a username` etc.
+ *
+ * One-shot: the username is immutable once claimed.
+ */
+export interface ClaimUsernameResponse {
+  status: string;
+  username: string;
+  did: string;
+  message?: string;
+}
+
+export async function claimUsername(
+  username: string,
+): Promise<ClaimUsernameResponse> {
+  const { quicRequest } = require('./quic') as typeof import('./quic');
+  return await quicRequest<ClaimUsernameResponse>(
+    '/api/v1/identity/claim-username',
+    {
+      method: 'POST',
+      body: JSON.stringify({ username }),
+      headers: { 'Content-Type': 'application/json' },
+    },
+  );
+}
+
+export async function fetchIdentityRecord(did: string): Promise<IdentityRecord | null> {
+  if (!did) return null;
+  // Server accepts both forms — pass through verbatim. Hex-only input
+  // also works, but if we have the full prefixed DID we use it.
+  try {
+    const { quicRequest } = require('./quic') as typeof import('./quic');
+    const path = `/api/v1/identity/get/${encodeURIComponent(did)}`;
+    return await quicRequest<IdentityRecord>(path, { method: 'GET' });
+  } catch (e) {
+    console.warn('[RealAuthService] fetchIdentityRecord failed:', e);
+    return null;
   }
 }
 

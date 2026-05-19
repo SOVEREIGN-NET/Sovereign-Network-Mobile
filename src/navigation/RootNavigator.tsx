@@ -50,6 +50,11 @@ import OracleDashboardScreen from '../screens/oracle/OracleDashboardScreen';
 import SovSwapHomeScreen from '../screens/sovswap/SovSwapHomeScreen';
 import SovSwapDaoDetailScreen from '../screens/sovswap/SovSwapDaoDetailScreen';
 import SovSwapMarketDetailScreen from '../screens/sovswap/SovSwapMarketDetailScreen';
+import {
+  MessagesScreen,
+  ChatScreen,
+  NewChatScreen,
+} from '../screens/messaging';
 import BlockDetailScreen from '../screens/explorer/BlockDetailScreen';
 import TransactionDetailScreen from '../screens/explorer/TransactionDetailScreen';
 import IdentityDetailScreen from '../screens/explorer/IdentityDetailScreen';
@@ -451,6 +456,28 @@ const DAOStack = () => {
   );
 };
 
+const MessagesStack = () => {
+  return (
+    <Stack.Navigator screenOptions={{ headerShown: false }}>
+      <Stack.Screen
+        name="MessagesMain"
+        component={MessagesScreen as any}
+        options={{ headerShown: false }}
+      />
+      <Stack.Screen
+        name="Chat"
+        component={ChatScreen as any}
+        options={{ headerShown: false }}
+      />
+      <Stack.Screen
+        name="NewChat"
+        component={NewChatScreen as any}
+        options={{ headerShown: false, presentation: 'modal' }}
+      />
+    </Stack.Navigator>
+  );
+};
+
 // Tab Icon Components - Simple geometric icons using Views
 const HomeIcon = ({ color }: { color: string }) => (
   <View
@@ -534,6 +561,44 @@ const VoteIcon = ({ color }: { color: string }) => (
         backgroundColor: color,
         position: 'absolute',
         bottom: 2,
+      }}
+    />
+  </View>
+);
+
+// Speech-bubble glyph for the messaging tab. Drawn with two Views so
+// it stays crisp at any pixel density without an extra icon library.
+const ChatIcon = ({ color }: { color: string }) => (
+  <View
+    style={{
+      width: 24,
+      height: 24,
+      justifyContent: 'center',
+      alignItems: 'center',
+    }}
+  >
+    <View
+      style={{
+        width: 18,
+        height: 14,
+        borderWidth: 1.5,
+        borderColor: color,
+        borderRadius: 4,
+      }}
+    />
+    <View
+      style={{
+        width: 0,
+        height: 0,
+        borderLeftWidth: 4,
+        borderRightWidth: 4,
+        borderTopWidth: 4,
+        borderLeftColor: 'transparent',
+        borderRightColor: 'transparent',
+        borderTopColor: color,
+        position: 'absolute',
+        bottom: 2,
+        left: 7,
       }}
     />
   </View>
@@ -709,6 +774,17 @@ const MainTabs = () => {
             title: 'DAO',
             tabBarLabel: 'DAO',
             tabBarIcon: VoteIcon,
+          } as any
+        }
+      />
+      <Tab.Screen
+        name="MessagesTab"
+        component={MessagesStack}
+        options={
+          {
+            title: 'Bubl',
+            tabBarLabel: 'Bubl',
+            tabBarIcon: ChatIcon,
           } as any
         }
       />

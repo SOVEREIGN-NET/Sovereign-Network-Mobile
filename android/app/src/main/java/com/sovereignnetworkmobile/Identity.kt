@@ -24,6 +24,14 @@ class Identity private constructor(
 
     private var closed = false
 
+    /**
+     * Module-private accessor for the raw Rust handle. Used by
+     * sibling classes in this package (currently `Messaging`) that
+     * need to pass the IdentityHandle into JNI calls so secret keys
+     * stay in Rust. Not part of the public API — never expose to JS.
+     */
+    internal fun nativeHandle(): Long = handle
+
     companion object {
         private const val TAG = "Identity"
 
@@ -106,6 +114,9 @@ class Identity private constructor(
         @JvmStatic private external fun nativeSignMessage(handle: Long, message: ByteArray): ByteArray?
         @JvmStatic private external fun nativeSignPoUWReceiptJson(handle: Long, receiptJson: String): ByteArray?
         @JvmStatic private external fun nativeSignRegistrationProof(handle: Long, timestamp: Long): ByteArray?
+
+        // ─── JNI: Kyber key publish / rotate ───
+        @JvmStatic private external fun nativeBuildKyberKeyUpdate(handle: Long, timestamp: Long): String?
 
         // ─── JNI: Token transactions (returns hex-encoded signed tx) ───
         // All amounts are decimal u128 atoms STRINGS. u64/Long is not wide
@@ -211,6 +222,14 @@ class Identity private constructor(
 
     /** Sign registration proof for timestamp. Returns detached signature. */
     fun signRegistrationProof(timestamp: Long): ByteArray? = nativeSignRegistrationProof(handle, timestamp)
+
+    /**
+     * Build the signed JSON request body for `POST /api/v1/identity/update-kyber-key`.
+     * Rust assembles + signs internally — Dilithium sk never leaves the IdentityHandle.
+     * Returns null on failure (no Kyber key, signing error).
+     */
+    fun buildKyberKeyUpdate(timestamp: Long): String? =
+        nativeBuildKyberKeyUpdate(handle, timestamp)
 
     // ─── Token transactions ───
     //
