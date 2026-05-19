@@ -412,6 +412,56 @@ pub extern "system" fn Java_com_sovereignnetworkmobile_Identity_nativeSignMessag
     }
 }
 
+/// Build the signed JSON request body for `POST /api/v1/identity/update-kyber-key`.
+/// Mirrors the iOS C FFI `zhtp_identity_build_kyber_key_update`. DID is derived
+/// from `Blake3(public_key)` so it matches the server's lookup. Empty string
+/// returned on failure (e.g. identity has no Kyber key).
+#[no_mangle]
+pub extern "system" fn Java_com_sovereignnetworkmobile_Identity_nativeBuildKyberKeyUpdate<
+    'local,
+>(
+    mut env: JNIEnv<'local>,
+    _class: JClass<'local>,
+    handle: jlong,
+    timestamp: jlong,
+) -> JString<'local> {
+    if handle == 0 {
+        return JString::default();
+    }
+    let identity = unsafe { handle_ref(handle) };
+    if identity.kyber_public_key.is_empty() {
+        return JString::default();
+    }
+
+    let did = format!(
+        "did:zhtp:{}",
+        hex::encode(zhtp_client::crypto::Blake3::hash(&identity.public_key))
+    );
+    let kyber_pk_hex = hex::encode(&identity.kyber_public_key);
+    let message = format!(
+        "UPDATE_KYBER_KEY:{}:{}:{}",
+        did, kyber_pk_hex, timestamp as u64
+    );
+
+    let signature = match sign_message(identity, message.as_bytes()) {
+        Ok(sig) => sig,
+        Err(e) => {
+            log::error!("[Identity JNI] buildKyberKeyUpdate sign failed: {}", e);
+            return JString::default();
+        }
+    };
+
+    let body = serde_json::json!({
+        "did": did,
+        "kyber_public_key_hex": kyber_pk_hex,
+        "timestamp": timestamp as u64,
+        "signature_hex": hex::encode(&signature),
+    });
+
+    env.new_string(body.to_string())
+        .unwrap_or_else(|_| JString::default())
+}
+
 #[no_mangle]
 pub extern "system" fn Java_com_sovereignnetworkmobile_Identity_nativeSignPoUWReceiptJson<'local>(
     mut env: JNIEnv<'local>,

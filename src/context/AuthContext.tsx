@@ -4,7 +4,7 @@
  */
 
 import React, { createContext, useState, useCallback, useEffect, useMemo, useRef } from 'react';
-import { Platform, NativeModules } from 'react-native';
+import { AppState, type AppStateStatus, Platform, NativeModules } from 'react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { NativeStorage } from '../services/NativeStorage';
 import SecureIdentityStorage from '../services/SecureIdentityStorage';
@@ -16,7 +16,24 @@ import type { CreateIdentityData } from '../services/RealAuthService';
 import { walletKeychainService } from '../services/WalletKeychainService';
 import { nativeIdentityProvisioning } from '../services/NativeIdentityProvisioning';
 import IdentityCleanup from '../services/IdentityCleanup';
+import {
+  claimUsername as claimUsernameOnChain,
+  fetchIdentityRecord,
+} from '../services/RealAuthService';
+import { publishKyberKeyBestEffort } from '../services/KyberKeyService';
+import {
+  ingestEnvelopes,
+  receivePending,
+  setSelfDid as setMessagingSelfDid,
+  startInboundSubscription,
+  stopInboundSubscription,
+} from '../services/MessagingService';
+import {
+  bindIdentity as bindQuicIdentity,
+} from '../services/QuicSessionManager';
+import { isNativeQuicSessionAvailable } from '../services/NativeQuicSession';
 import { maskIdentifier } from '../utils/maskIdentifier';
+import { isValidDid } from '../utils/didValidator';
 
 // Always import RealAuthService, use it when node is available
 import RealAuthServiceModule from '../services/RealAuthService';
@@ -141,6 +158,13 @@ export interface AuthContextType {
   getBiometryType: () => Promise<string | null>;
   // Wallet seed management (server-generated, stored securely in Keychain)
   getMasterSeedPhrase: () => Promise<string | null>;
+  // Username claim — one-shot, surfaced via `needsUsernameClaim`.
+  // `claimUsername` POSTs `/api/v1/identity/claim-username` and, on
+  // success, mirrors the new username + display_name into the local
+  // identity. Throws QuicError on validation / conflict errors so the
+  // modal can surface them.
+  needsUsernameClaim: boolean;
+  claimUsername: (username: string) => Promise<void>;
 }
 
 export const AuthContext = createContext<AuthContextType | undefined>(undefined);
@@ -153,6 +177,54 @@ interface AuthProviderProps {
  * Auth Provider Component
  * Wraps the app and provides auth state and methods to all children
  */
+/**
+ * Pull `display_name` (and `username`) from the on-chain identity
+ * registry and merge into the cached identity. Called after the auth
+ * flow has bound the QUIC session — `fetchIdentityRecord` is an
+ * authenticated call. Persists the merged identity so the next launch
+ * starts from the right name; returns the merged identity for the
+ * caller to push into React state.
+ *
+ * Best-effort: a network failure or absent `display_name` leaves the
+ * identity untouched. Never throws.
+ */
+async function hydrateIdentityFromChain(identity: Identity): Promise<Identity> {
+  if (!identity?.did) return identity;
+  const record = await fetchIdentityRecord(identity.did);
+  if (!record) return identity;
+
+  const next: Identity = { ...identity };
+  let dirty = false;
+
+  if (
+    typeof record.display_name === 'string' &&
+    record.display_name.length > 0 &&
+    record.display_name !== identity.displayName
+  ) {
+    next.displayName = record.display_name;
+    dirty = true;
+  }
+
+  // Mirror the chain's `username` so the modal can detect a missing
+  // claim. `username` is set once via `/api/v1/identity/claim-username`
+  // and immutable; chain-empty means the user still needs to claim.
+  if (record.username !== identity.username) {
+    next.username = record.username;
+    dirty = true;
+  }
+
+  if (!dirty) return identity;
+
+  try {
+    await SecureIdentityStorage.setIdentity(next, { requireBiometric: false });
+  } catch (e) {
+    console.warn('[AuthContext] Failed to persist hydrated identity:', e);
+    // Return the in-memory updated identity anyway — UI shows the
+    // right name even if persistence failed.
+  }
+  return next;
+}
+
 export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
   const [currentIdentity, setCurrentIdentity] = useState<Identity | null>(null);
   const [isLoading, setIsLoading] = useState(false);
@@ -202,6 +274,31 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
         const identity = await SecureIdentityStorage.getIdentityIfAvailable(true);
 
         if (identity) {
+          // Reject a malformed DID before it taints every downstream
+          // URL builder (wallet/list/{did}, token/balances/{did}, etc).
+          // Older versions of this app wrote display-form strings
+          // (e.g. `did:zhtp:abc...def`) into Keychain during failed
+          // recover paths; any such entry blows the server's hex
+          // parser with "Odd number of digits". Forced-clean lets
+          // the user re-recover from a clean slate.
+          const didCheck = isValidDid(identity.did);
+          if (!didCheck.valid) {
+            console.warn(
+              '[AuthContext.bootstrap] Stored identity has invalid DID:',
+              didCheck.error,
+              '— wiping and forcing sign-in',
+            );
+            try {
+              await SecureIdentityStorage.clearIdentity();
+            } catch (e) {
+              console.warn(
+                '[AuthContext.bootstrap] clearIdentity failed:',
+                e,
+              );
+            }
+            setCurrentIdentity(null);
+            return;
+          }
           if (__DEV__) {
             console.log('✅ Restored identity from secure storage:', identity.displayName);
           }
@@ -220,6 +317,36 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
               console.warn('[AuthContext.bootstrap] Handle store restore failed:', err);
             }
           }
+
+          // Refresh display_name from the chain on every cold start.
+          // Cached identity in Keychain can be days/weeks old — the
+          // user's on-chain name may have been corrected (e.g. they
+          // re-registered or migrated) since the last cache write.
+          // Best-effort, fire-and-forget so the bootstrap finishes
+          // promptly even if the hydration call hangs on slow QUIC.
+          (async () => {
+            try {
+              const hydrated = await hydrateIdentityFromChain(identity);
+              if (hydrated !== identity) {
+                setCurrentIdentity(hydrated);
+              }
+            } catch (e) {
+              console.warn('[AuthContext.bootstrap] Hydration failed:', e);
+            }
+          })();
+
+          // TODO(messaging-chain-stall): remove once the chain
+          // reliably commits IdentityUpdate transactions. Right now
+          // the chain on g1 is stalled, so a single publish during
+          // recovery sits in mempool and never persists to
+          // identity_registry. Re-firing on every cold-start keeps
+          // the server's in-memory state warm enough that
+          // /msg/session/init can resolve our kyber_pk between
+          // sessions. Costs one auth'd POST per launch — drop this
+          // call (and the matching one in signIn below) once the
+          // chain advances past height 898 and the original publish
+          // commits.
+          void publishKyberKeyBestEffort('rotate');
         }
       } catch (err) {
         console.error('Failed to restore cached identity:', err);
@@ -292,6 +419,24 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
           // Non-fatal - continue anyway
         }
       }
+
+      // Refresh display_name from the on-chain identity record. Has
+      // to fire after handle store + setIdentity so the auth-injected
+      // QUIC call is properly bound. Updates state + persists if the
+      // chain has a different (or non-empty) name.
+      const hydrated = await hydrateIdentityFromChain(identity);
+      if (hydrated !== identity) {
+        setCurrentIdentity(hydrated);
+        identity = hydrated;
+      }
+
+      // TODO(messaging-chain-stall): see matching comment in the
+      // bootstrap effect above. Republish kyber_pk on every sign-in
+      // to keep messaging working while the chain is stalled at
+      // height 898 and the original publish from recovery sits in
+      // mempool. Remove once the chain advances and the registry
+      // entry persists across sessions.
+      void publishKyberKeyBestEffort('rotate');
 
       return identity;
     } catch (err: any) {
@@ -430,6 +575,24 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
         }
       }
 
+      // Publish the freshly-derived Kyber pk on-chain. Has to fire
+      // here (not inside RealAuthService.recoverWithSeed) because the
+      // /update-kyber-key call is auth'd — the identity_id cache it
+      // depends on isn't populated until SecureIdentityStorage.setIdentity
+      // above has resolved AND the handle store has the matching
+      // Identity. Best-effort: failure logs a warning and doesn't
+      // block the recovery flow.
+      void publishKyberKeyBestEffort('recover');
+
+      // Pull the on-chain display_name. Recovery from seed restores
+      // crypto only — the username lives in the chain registry, so
+      // we fetch it explicitly and update + persist if it differs.
+      const hydrated = await hydrateIdentityFromChain(identity);
+      if (hydrated !== identity) {
+        setCurrentIdentity(hydrated);
+        identity = hydrated;
+      }
+
       return identity;
     } catch (err: any) {
       const message = err.message || 'Identity recovery failed';
@@ -494,6 +657,24 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
             // Non-fatal - continue anyway
           }
         }
+
+      // Publish the Kyber pk on-chain — this hook covers the
+      // create-identity path (post-seed-confirmation, which lands here
+      // via the seed-phrase confirmation screen). Sign-in calls
+      // SecureIdentityStorage.setIdentity directly and skips this
+      // function, so it won't fire on every login. Best-effort.
+      void publishKyberKeyBestEffort('register');
+
+      // Hydrate display_name from the chain. For freshly-registered
+      // identities the chain row has the name we just sent in the
+      // create flow, so this is usually a no-op — but it covers the
+      // case where the registration race set a different on-chain
+      // name (e.g. the user's previous identity_registry record from
+      // a prior install was preserved).
+      const hydrated = await hydrateIdentityFromChain(identity);
+      if (hydrated !== identity) {
+        setCurrentIdentity(hydrated);
+      }
     } catch (err: any) {
       const message = err.message || 'Failed to set identity';
       setError(message);
@@ -811,6 +992,125 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
     }
   }, [currentIdentity?.identityId]);
 
+  // ─── Messaging plumbing ──────────────────────────────────────────────
+  //
+  // The messaging service keeps a "live self DID" used by every
+  // REST call (session/init, send). It also hydrates the
+  // encrypted-at-rest store keyed by that DID. Wiring it here means
+  // the inbox is ready by the time the user opens the Bubl tab,
+  // and a sign-out properly tears the store down.
+  useEffect(() => {
+    setMessagingSelfDid(currentIdentity?.did ?? null);
+    bindQuicIdentity(currentIdentity?.did ?? null);
+  }, [currentIdentity?.did]);
+
+  // Server-push inbound stream — one long-lived `/msg/inbound`
+  // subscription rides the persistent QUIC session, replacing the
+  // legacy 5 s `/msg/receive` poll. Server pushes envelope frames
+  // the moment they're routable, so messages arrive without
+  // polling latency and without burning a PQC handshake per tick.
+  //
+  // Lifecycle: open once when the identity is set. We deliberately
+  // do NOT close on background transitions — the server's
+  // `register_subscriber` overwrites prior subscribers, so a
+  // close-on-background / reopen-on-foreground cycle would race
+  // the new openInbound against the OS resuming us and produce a
+  // dead stream half the time. The QUIC connection survives short
+  // backgrounds; if iOS / Android actually tears it down, the
+  // reader thread will emit `QuicInboundClosed` and the
+  // MessagingService onClosed callback resets state so the next
+  // `startInboundSubscription` call reopens. The bridge layer in
+  // `MessagingService` coalesces concurrent calls.
+  //
+  // On foreground we still kick a one-shot `/msg/receive` drain
+  // in case something landed in the deposit store while we were
+  // away (the inbound stream couldn't deliver, server fell back
+  // to deposit). The drain is idempotent — `ingestEnvelopes`
+  // de-dupes by `(timestamp, sequence)` per sender.
+  useEffect(() => {
+    const did = currentIdentity?.did;
+    if (!did) return;
+
+    let cancelled = false;
+    const drainAndSubscribe = () => {
+      if (cancelled) return;
+      void (async () => {
+        try {
+          const r = await receivePending();
+          if (r.count > 0) {
+            console.log(
+              '[AuthContext] one-shot deposit drain got',
+              r.count,
+              'envelopes',
+            );
+            await ingestEnvelopes(r.messages);
+          }
+        } catch (e) {
+          console.warn('[AuthContext] deposit drain failed:', e);
+        }
+        if (!cancelled && isNativeQuicSessionAvailable) {
+          void startInboundSubscription();
+        }
+      })();
+    };
+
+    drainAndSubscribe();
+    const sub = AppState.addEventListener('change', (next: AppStateStatus) => {
+      // On foreground, drain anything queued in the deposit store
+      // while we were away. The push stream stays open through
+      // the background — don't try to close/reopen it here, the
+      // race that produces empties out.
+      if (next === 'active') drainAndSubscribe();
+    });
+
+    return () => {
+      cancelled = true;
+      stopInboundSubscription();
+      sub.remove();
+    };
+  }, [currentIdentity?.did]);
+
+  // ─── Username claim ─────────────────────────────────────────────────
+  //
+  // Show the claim modal only when the user has NEITHER a chain
+  // `username` NOR any `displayName` set. Existing users who picked
+  // a display name through the legacy create-identity flow still
+  // have a usable on-screen name even without a `username` —
+  // forcing them through the modal would block them from their app.
+  // The modal is reserved for genuinely-unnamed identities (e.g.
+  // freshly-recovered with no chain display_name).
+  const hasUsername =
+    currentIdentity?.username != null && currentIdentity.username !== '';
+  const hasDisplayName =
+    currentIdentity?.displayName != null && currentIdentity.displayName !== '';
+  const needsUsernameClaim =
+    currentIdentity !== null && !hasUsername && !hasDisplayName;
+
+  const claimUsername = useCallback(
+    async (username: string): Promise<void> => {
+      const id = currentIdentity;
+      if (!id) throw new Error('No signed-in identity');
+      const result = await claimUsernameOnChain(username);
+      // Server response is canonical for the claimed username AND
+      // updates display_name. Mirror both locally.
+      const next: Identity = {
+        ...id,
+        username: result.username,
+        displayName: result.username,
+      };
+      try {
+        await SecureIdentityStorage.setIdentity(next, { requireBiometric: false });
+      } catch (e) {
+        console.warn(
+          '[AuthContext] Failed to persist identity after username claim:',
+          e,
+        );
+      }
+      setCurrentIdentity(next);
+    },
+    [currentIdentity],
+  );
+
   const value = useMemo<AuthContextType>(() => ({
     currentIdentity,
     isAuthenticated: currentIdentity !== null,
@@ -836,6 +1136,8 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
     isBiometricAvailable,
     getBiometryType,
     getMasterSeedPhrase,
+    needsUsernameClaim,
+    claimUsername,
   }), [
     currentIdentity,
     isLoading,
@@ -860,6 +1162,8 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
     isBiometricAvailable,
     getBiometryType,
     getMasterSeedPhrase,
+    needsUsernameClaim,
+    claimUsername,
   ]);
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;

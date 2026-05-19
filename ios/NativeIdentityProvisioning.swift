@@ -1756,6 +1756,32 @@ class NativeIdentityProvisioning: NSObject, UIDocumentPickerDelegate {
         self.signDomainRequest("domain_transfer", params: params, resolve: resolve, reject: reject)
     }
 
+    // MARK: - Kyber key publish / rotate
+
+    /// Build the signed JSON body for `POST /api/v1/identity/update-kyber-key`.
+    /// Rust assembles + signs internally — Dilithium sk never crosses FFI to Swift.
+    @objc
+    func buildKyberKeyUpdate(
+        _ timestamp: NSNumber,
+        resolve: @escaping RCTPromiseResolveBlock,
+        reject: @escaping RCTPromiseRejectBlock
+    ) {
+        queue.async { [weak self] in
+            _ = self
+            guard let identityAny = IdentityHandleStore.shared.getLatestIdentity(),
+                  let identity = identityAny as? Identity else {
+                reject("NO_IDENTITY", "No active identity for kyber key update", nil)
+                return
+            }
+            do {
+                let body = try identity.buildKyberKeyUpdate(timestamp: timestamp.uint64Value)
+                resolve(["body": body])
+            } catch {
+                reject("BUILD_ERROR", "Failed to build kyber key update: \(error)", nil)
+            }
+        }
+    }
+
     // MARK: - Generic Message Signing (Dilithium)
 
     /// Sign an arbitrary message and return hex signature

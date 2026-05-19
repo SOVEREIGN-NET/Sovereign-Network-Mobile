@@ -136,6 +136,11 @@ private func cRestoreIdentityFromPhrase(_ phrase: UnsafePointer<CChar>, _ device
 @_silgen_name("zhtp_client_identity_free")
 private func cIdentityFree(_ handle: UnsafeMutableRawPointer)
 
+// Build the signed JSON request body for `POST /api/v1/identity/update-kyber-key`.
+// Keeps Dilithium sk in Rust; returns null on failure. Caller frees with `cStringFree`.
+@_silgen_name("zhtp_identity_build_kyber_key_update")
+private func cBuildKyberKeyUpdate(_ handle: UnsafeMutableRawPointer, _ timestamp: UInt64) -> UnsafeMutablePointer<CChar>?
+
 // MARK: - C FFI Declarations: Memory management
 
 // Free string allocated by Rust
@@ -376,6 +381,18 @@ public class Identity {
         }
 
         return Array(UnsafeBufferPointer(start: data.assumingMemoryBound(to: UInt8.self), count: buf.len))
+    }
+
+    /// Build a signed JSON request body for `POST /api/v1/identity/update-kyber-key`.
+    /// Rust extracts DID + Kyber pk + Dilithium sk from the IdentityHandle and
+    /// signs `UPDATE_KYBER_KEY:{did}:{kyber_pk_hex}:{timestamp}` internally —
+    /// the secret key never crosses to Swift.
+    public func buildKyberKeyUpdate(timestamp: UInt64) throws -> String {
+        guard let ptr = cBuildKyberKeyUpdate(handle, timestamp) else {
+            throw ClientError.signingError("Failed to build kyber key update")
+        }
+        defer { cStringFree(ptr) }
+        return String(cString: ptr)
     }
 
     deinit {

@@ -555,6 +555,31 @@ class NativeIdentityProvisioningBridge {
   }
 
   /**
+   * Build the signed JSON body for `POST /api/v1/identity/update-kyber-key`.
+   * Rust assembles the canonical message + signature internally — Dilithium
+   * sk never crosses the bridge. Returns the JSON string ready to POST.
+   */
+  async buildKyberKeyUpdate(timestampSec: number): Promise<string> {
+    if (!this.nativeModule) {
+      throw new Error(
+        'NativeIdentityProvisioning not available on this platform',
+      );
+    }
+    if (!this.nativeModule.buildKyberKeyUpdate) {
+      throw new Error(
+        'NativeIdentityProvisioning.buildKyberKeyUpdate not available — rebuild the app',
+      );
+    }
+    const result = await this.nativeModule.buildKyberKeyUpdate(timestampSec);
+    if (!result?.body) {
+      throw new Error(
+        'NativeIdentityProvisioning.buildKyberKeyUpdate returned no body',
+      );
+    }
+    return result.body;
+  }
+
+  /**
    * Sign an arbitrary message with Dilithium keypair
    * Returns hex-encoded signature
    */

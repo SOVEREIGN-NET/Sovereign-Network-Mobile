@@ -16,6 +16,14 @@ import SecureIdentityStorage from './SecureIdentityStorage';
 // Gate the transport on ZDNS bootstrap — ensures the first request dials
 // the DNS-selected validator, not the hardcoded fallback.
 import { bootstrapReady } from './NetworkBootstrap';
+import {
+  dropSession as dropQuicSession,
+  getSession as getQuicSession,
+} from './QuicSessionManager';
+import {
+  isNativeQuicSessionAvailable,
+  NativeQuicSession,
+} from './NativeQuicSession';
 import type {
   QuicRequestOptions,
   QuicRawResponse,
@@ -185,6 +193,10 @@ function matchesSessionDesync(text: string | undefined): boolean {
  * request performs a fresh handshake. Best-effort: ignore native errors.
  */
 async function resetAuthSession(): Promise<void> {
+  // Drop both transports — the persistent session (used when the new
+  // FFI is available) and the legacy one-shot pool — so the retry
+  // re-handshakes from scratch.
+  dropQuicSession();
   if (!NativeQuic?.cancelAll) return;
   try {
     await NativeQuic.cancelAll();
@@ -195,6 +207,96 @@ async function resetAuthSession(): Promise<void> {
   // Small gap so any in-flight native drain finishes closing its handle
   // before we queue the retry onto a fresh handshake.
   await new Promise<void>(resolve => setTimeout(() => resolve(), 100));
+}
+
+/**
+ * Convert a body string to base64 for the persistent-session bridge.
+ * The legacy `NativeQuic.request` takes raw UTF-8 in `options.body`;
+ * the new bridge takes base64 so binary payloads survive the JS
+ * channel. Everything we send is JSON for now so a UTF-8 → base64
+ * step is correct; binary callers will pre-base64 their body and we
+ * pass it through.
+ */
+function utf8ToBase64(s: string): string {
+  // RN polyfills `btoa`, but it expects binary string input. JSON
+  // text is ASCII enough in practice; for safety, encode through
+  // a UTF-8 byte conversion first.
+  let binary = '';
+  // unescape(encodeURIComponent(x)) is the standard hack to coerce
+  // arbitrary UTF-8 into a binary string for btoa.
+  const utf8 = unescape(encodeURIComponent(s));
+  for (let i = 0; i < utf8.length; i++) binary += utf8.charAt(i);
+  const g = globalThis as unknown as {
+    btoa?: (s: string) => string;
+    Buffer?: { from: (s: string, e: string) => { toString: (e: string) => string } };
+  };
+  if (typeof g.btoa === 'function') return g.btoa(binary);
+  return g.Buffer!.from(binary, 'binary').toString('base64');
+}
+
+/**
+ * Send one request over the persistent QUIC session. Returns the
+ * response in the same `QuicRawResponse` shape as the legacy path so
+ * the rest of the stack doesn't care which transport was used.
+ */
+// Serialization tail for persistent-session RPCs.
+//
+// Every authenticated request multiplexes over ONE UHP session. The
+// session carries a monotonic sequence counter and the server's
+// replay protection rejects out-of-order sequences. When a screen
+// fires several authenticated calls at once (the wallet screen
+// fans out wallet/list + token/balances + transactions + token/list
+// simultaneously), those RPCs race for sequence numbers — the
+// server sees them out of order and resets the streams, surfacing
+// as opaque `rpcFailed` nulls from the FFI.
+//
+// Chaining each RPC onto the previous one's completion guarantees
+// in-order sequence allocation. The legacy one-shot transport was
+// already effectively serialized (one connection, one request), so
+// this is not a regression — it restores the ordering the UHP
+// counter assumes.
+let rpcTail: Promise<unknown> = Promise.resolve();
+
+async function runOverPersistentSession(
+  path: string,
+  opts: QuicRequestOptions,
+): Promise<QuicRawResponse> {
+  const run = async (): Promise<QuicRawResponse> => {
+    const sessionId = await getQuicSession();
+    // Pass empty strings instead of null — RN's iOS bridge logs
+    // "JSON value '<null>' of type NSNull cannot be converted to
+    // NSString" otherwise. Empty string is safe: the FFI's
+    // headers_json is underscored (ignored), and an empty body is
+    // valid for GET / DELETE.
+    const bodyB64 = opts.body != null ? utf8ToBase64(opts.body) : '';
+    const headersJson =
+      opts.headers && Object.keys(opts.headers).length > 0
+        ? JSON.stringify(opts.headers)
+        : '';
+    const r = await NativeQuicSession.rpc(
+      sessionId,
+      opts.method ?? 'GET',
+      path,
+      headersJson,
+      bodyB64,
+    );
+    return {
+      status: r.status,
+      statusText: r.statusText,
+      headers: r.headers,
+      body: r.body,
+      ok: r.ok,
+    } as QuicRawResponse;
+  };
+
+  // Append to the tail; a prior failure must not wedge the queue,
+  // so the tail swallows errors (callers still see their own).
+  const result = rpcTail.then(run, run);
+  rpcTail = result.then(
+    () => undefined,
+    () => undefined,
+  );
+  return result;
 }
 
 /**
@@ -215,17 +317,39 @@ async function runWithSessionRecovery(
   alpn: 'public' | 'authenticated',
   maxAttempts: number,
 ): Promise<QuicRawResponse> {
+  // Authenticated requests go through the persistent QUIC session
+  // when the new FFI is wired: one PQC handshake at sign-in, all
+  // subsequent RPCs multiplex over the same connection. Public
+  // requests + platforms without the bridge (Android until its
+  // build ships) fall back to the legacy one-shot
+  // `NativeQuic.request`.
+  const usePersistent =
+    alpn === 'authenticated' && isNativeQuicSessionAvailable;
+  const parsed = parseQuicUrl(url);
+  const pathOnly = parsed ? parsed.path : url;
+
   for (let i = 1; i <= maxAttempts; i++) {
     let current: QuicRawResponse;
     try {
-      current = await NativeQuic.request(url, requestOptions);
+      current = usePersistent
+        ? await runOverPersistentSession(pathOnly, requestOptions)
+        : await NativeQuic.request(url, requestOptions);
     } catch (err: unknown) {
       const msg = err instanceof Error ? err.message : String(err);
-      const retryable = alpn === 'authenticated' && matchesSessionDesync(msg);
+      // A throw from the persistent-session path is opaque — the FFI
+      // collapses every failure (dead connection, stream reset,
+      // serialization error) into `rpcFailed`. Treat any such throw
+      // as a session-desync: drop the session and re-handshake on
+      // the next attempt. The legacy one-shot path keeps the
+      // narrower `matchesSessionDesync` gate since its errors are
+      // descriptive.
+      const retryable =
+        alpn === 'authenticated' &&
+        (usePersistent || matchesSessionDesync(msg));
       if (!retryable || i === maxAttempts) throw err;
       if (__DEV__) {
         console.warn(
-          `[quic] session desync detected (attempt ${i}/${maxAttempts}), re-handshaking:`,
+          `[quic] auth request failed (attempt ${i}/${maxAttempts}), re-handshaking:`,
           msg,
         );
       }
@@ -283,7 +407,15 @@ async function rawRequest(
     if (!identityId) {
       throw new Error('Missing identity for authenticated request');
     }
-    headers['X-Zhtp-Identity'] = identityId;
+    // SecureIdentityStorage.getIdentityId() returns the cached
+    // `did:zhtp:<hex>` form (it's literally the persisted DID). A
+    // few server handlers (wallet/token routes specifically) read
+    // `X-Zhtp-Identity` as raw hex and `hex::decode` chokes on the
+    // `did:zhtp:` prefix or its `:` separators, surfacing as
+    // 500 "Invalid hex for identity_id: Odd number of digits". The
+    // canonical form for the header is bare hex — strip the prefix
+    // here so every handler gets the same shape.
+    headers['X-Zhtp-Identity'] = normalizeIdentityId(identityId);
     body = populateIdentityFields(body, path, method, identityId);
   }
 

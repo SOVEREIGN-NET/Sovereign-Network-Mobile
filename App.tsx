@@ -16,6 +16,7 @@ import {
 import RootNavigator from './src/navigation/RootNavigator';
 import { colors } from './src/theme';
 import { Text } from './src/components'; // NavigationContainer is handled by each navigator
+import UsernameClaimModal from './src/components/organisms/UsernameClaimModal/UsernameClaimModal';
 import { hydrateLanguageFromStorage, useTranslation } from './src/i18n';
 import { config } from './src/config';
 import { installLogGuard } from './src/utils/logging';
@@ -119,7 +120,12 @@ function AppContent() {
   // Show appropriate navigator based on auth state
   // Always show RootNavigator - individual screens handle auth state
   // This allows guests to browse public content (trending apps, explorer, DAO)
-  return <RootNavigator />;
+  return (
+    <>
+      <RootNavigator />
+      <UsernameClaimModal />
+    </>
+  );
 }
 
 /**

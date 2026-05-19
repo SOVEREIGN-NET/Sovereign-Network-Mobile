@@ -400,12 +400,19 @@ const BalanceCarousel = ({
       >
         {cards.map(card => {
           const isSov = (card.symbol || '').toUpperCase() === 'SOV';
+          const isCbe = (card.symbol || '').toUpperCase() === 'CBE';
           // For SOV, prefer the wallet-list aggregate so multi-wallet users see
           // their full balance. Other tokens use the per-wallet amount from the
           // balances endpoint (pre-formatted string; null when decimals missing).
           const displayBalance: string = isSov
             ? totalSovBalance.toLocaleString('en-US', { maximumFractionDigits: 2 })
             : card.balance ?? '—';
+          // CBE's chain-registered name is "Cooperative Banking Equity" — drop
+          // the "equity" word in the on-card label per product call. Strip
+          // safely (word boundary, case-insensitive, collapse double spaces).
+          const cardName = isCbe && card.name
+            ? card.name.replace(/\bequity\b/gi, '').replace(/\s+/g, ' ').trim()
+            : card.name;
           return (
             <View
               key={card.token_id}
@@ -506,8 +513,8 @@ const BalanceCarousel = ({
                       }}
                     >
                       {isSov ? sovCurrencyLabel : card.symbol}
-                      {card.name && card.name !== card.symbol
-                        ? ` · ${card.name}`
+                      {cardName && cardName !== card.symbol
+                        ? ` · ${cardName}`
                         : ''}
                     </Text>
                     {isSov && walletsLoading && (

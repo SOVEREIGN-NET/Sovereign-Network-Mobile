@@ -22,6 +22,7 @@ export type RootStackParamList = {
 export type TabParamList = {
   DashboardTab: undefined;
   DAOTab: undefined;
+  MessagesTab: undefined;
   SIDTab: undefined;
 };
 
@@ -67,6 +68,12 @@ export type DAOStackParamList = {
   ProposalDetail: undefined;
   CreateProposal: undefined;
   TreasuryStatus: undefined;
+};
+
+export type MessagesStackParamList = {
+  MessagesMain: undefined;
+  Chat: { did: string };
+  NewChat: undefined;
 };
 
 // Tab screen props
