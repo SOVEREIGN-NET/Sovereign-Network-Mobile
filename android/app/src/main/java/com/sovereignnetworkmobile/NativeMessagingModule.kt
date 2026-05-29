@@ -444,6 +444,25 @@ class NativeMessagingModule(reactContext: ReactApplicationContext) :
     }
 
     @ReactMethod
+    fun envelopeOpenVerifiedWithSession(
+        sessionId: String, envelopeB64: String, peerDilithiumPkB64: String,
+        promise: Promise,
+    ) {
+        val session = getSession(sessionId)
+            ?: return promise.reject("NO_SESSION", "session $sessionId not found")
+        val env = decode(envelopeB64)
+            ?: return promise.reject("INVALID_ARG", "envelopeB64 not base64")
+        val pk = decode(peerDilithiumPkB64)
+            ?: return promise.reject("INVALID_ARG", "peerDilithiumPkB64 not base64")
+        val body = session.openVerifiedWithSession(env, pk)
+        if (body.isEmpty()) {
+            promise.reject("CRYPTO", "openVerifiedWithSession failed")
+        } else {
+            promise.resolve(String(body, Charsets.UTF_8))
+        }
+    }
+
+    @ReactMethod
     fun envelopeDescribe(envelopeB64: String, promise: Promise) {
         val env = decode(envelopeB64)
             ?: return promise.reject("INVALID_ARG", "envelopeB64 not base64")

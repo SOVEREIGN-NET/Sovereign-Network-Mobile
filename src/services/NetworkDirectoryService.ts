@@ -154,7 +154,13 @@ class NetworkDirectoryService {
       );
       return view;
     } catch (err) {
-      console.warn('[NetworkDirectory] fetch failed:', err);
+      // Expected on every cold start until the directory endpoint is
+      // reachable — the public ALPN path falls back to system CA, which
+      // doesn't trust dev / self-signed validator certs ("UnknownIssuer"),
+      // and the caller already handles `null` by falling back to the
+      // hardcoded default validator. Logged at info level so it doesn't
+      // surface as a scary red warning on launch.
+      console.log('[NetworkDirectory] fetch failed (using default):', err);
       return null;
     }
   }

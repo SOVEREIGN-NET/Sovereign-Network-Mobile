@@ -665,4 +665,41 @@ class NativeMessaging: NSObject {
             reject(NativeMessaging.errCrypto, "openVerifiedText: \(error)", error)
         }
     }
+
+    /// Stateful receive-side decrypt. Verifies the sender's signature +
+    /// DID binding and opens the body against the session's receive
+    /// ratchet, advancing it in place so the next call decrypts the
+    /// following sequence. Resolves the UTF-8 text.
+    @objc
+    func envelopeOpenVerifiedWithSession(
+        _ sessionId: String,
+        envelopeB64: String,
+        peerDilithiumPkB64: String,
+        resolve: @escaping RCTPromiseResolveBlock,
+        reject: @escaping RCTPromiseRejectBlock
+    ) {
+        guard let session = self.session(for: sessionId, reject) else { return }
+        guard let env = decodeBase64(envelopeB64),
+              let pk = decodeBase64(peerDilithiumPkB64) else {
+            reject(NativeMessaging.errInvalidArg, "expected base64 inputs", nil)
+            return
+        }
+        do {
+            let body = try session.openVerifiedWithSession(
+                envelope: env,
+                peerDilithiumPk: pk
+            )
+            guard let text = String(data: body, encoding: .utf8) else {
+                reject(NativeMessaging.errEncoding, "body is not UTF-8", nil)
+                return
+            }
+            resolve(text)
+        } catch {
+            reject(
+                NativeMessaging.errCrypto,
+                "openVerifiedWithSession: \(error)",
+                error,
+            )
+        }
+    }
 }

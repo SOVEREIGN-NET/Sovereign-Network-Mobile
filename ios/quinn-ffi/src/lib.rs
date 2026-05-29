@@ -463,6 +463,36 @@ fn make_client_config_with_alpn(spki_pin: [u8; 32], alpn: &[u8]) -> ClientConfig
     cfg
 }
 
+/// Standard chain-validating ClientConfig for the public ALPN. Used when
+/// no SPKI pin is supplied — trust is anchored in webpki-roots and the
+/// usual hostname/SAN check against `server_name` applies. This is the
+/// right model for gateways behind publicly-trusted certs (Let's Encrypt
+/// etc.) where the leaf cert rotates on its own schedule and a fixed
+/// SPKI pin would expire with every renewal.
+fn make_public_client_config(alpn: &[u8]) -> ClientConfig {
+    let mut roots = rustls::RootCertStore::empty();
+    roots.extend(webpki_roots::TLS_SERVER_ROOTS.iter().cloned());
+
+    let provider = Arc::new(rustls::crypto::ring::default_provider());
+    let mut tls = rustls::ClientConfig::builder_with_provider(provider)
+        .with_protocol_versions(&[&rustls::version::TLS13])
+        .expect("TLS versions")
+        .with_root_certificates(roots)
+        .with_no_client_auth();
+
+    tls.alpn_protocols = vec![alpn.to_vec()];
+
+    let mut transport = TransportConfig::default();
+    transport.max_idle_timeout(Some(Duration::from_secs(60).try_into().unwrap()));
+    transport.keep_alive_interval(Some(Duration::from_secs(15)));
+
+    let mut cfg = ClientConfig::new(Arc::new(
+        quinn::crypto::rustls::QuicClientConfig::try_from(tls).unwrap(),
+    ));
+    cfg.transport_config(Arc::new(transport));
+    cfg
+}
+
 async fn quic_connect(
     host: &str,
     port: u16,
@@ -953,11 +983,21 @@ pub extern "C" fn uhp_quic_connect_public(
         return -1;
     }
 
-    let spki_pin = match parse_spki_pin(spki_pin_32) {
-        Ok(val) => val,
-        Err(err) => {
-            set_last_error(err);
-            return -1;
+    // Pin is now optional on the public path. If the caller supplies one,
+    // we keep the SpkiPinVerifier (legacy self-signed dev/testnet flow).
+    // If they pass null, fall back to standard chain validation against
+    // webpki-roots — the right model for gateways behind public CAs
+    // (Let's Encrypt etc.) where the leaf SPKI rotates on its own
+    // schedule.
+    let spki_pin = if spki_pin_32.is_null() {
+        None
+    } else {
+        match parse_spki_pin(spki_pin_32) {
+            Ok(val) => Some(val),
+            Err(err) => {
+                set_last_error(err);
+                return -1;
+            }
         }
     };
 
@@ -965,7 +1005,10 @@ pub extern "C" fn uhp_quic_connect_public(
     let server_name = unsafe { CStr::from_ptr(server_name) }.to_string_lossy().to_string();
 
     let result = block_on_with_runtime(async {
-        let cfg = make_client_config_with_alpn(spki_pin, ALPN_PUBLIC);
+        let cfg = match spki_pin {
+            Some(pin) => make_client_config_with_alpn(pin, ALPN_PUBLIC),
+            None => make_public_client_config(ALPN_PUBLIC),
+        };
         let (endpoint, conn) = quic_connect_with_endpoint(&host, port, &server_name, cfg).await?;
         Ok::<QuinnClient, anyhow::Error>(QuinnClient {
             _endpoint: endpoint,

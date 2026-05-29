@@ -26,6 +26,7 @@ mod zhtp_auth_request;
 use zhtp_request::send_zhtp_request;
 mod identity_bridge;
 mod identity_jni;
+mod lobby_auth_jni;
 mod messaging_jni;
 mod quic_session_jni;
 mod uhp_quinn;

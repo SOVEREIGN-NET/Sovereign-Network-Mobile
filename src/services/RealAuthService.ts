@@ -15,7 +15,7 @@ import { nativeIdentityProvisioning } from './NativeIdentityProvisioning';
 import { walletKeychainService } from './WalletKeychainService';
 import SecureIdentityStorage from './SecureIdentityStorage';
 import { DEFAULT_SOV_NODE_URL } from '../config';
-import { isQuicSupported, testQuicConnection, quicRequestRaw, publicQuicRequest } from './quic';
+import { isQuicSupported, testQuicHealthCheck, quicRequestRaw, publicQuicRequest } from './quic';
 import { getActiveTarget } from './NetworkBootstrap';
 import IdentityCleanup from './IdentityCleanup';
 import SeedVaultService from './SeedVaultService';
@@ -318,7 +318,9 @@ class RealAuthService {
       if (!supported) return false;
 
       const target = getActiveTarget();
-      const result = await testQuicConnection(target.host, target.port);
+      // Health-check path — avoids the iOS panic in
+      // `uhp_quic_connect_public` (see useNodeConnectionStatus).
+      const result = await testQuicHealthCheck(target.host, target.port);
       const connected = !!result.success;
       console.log('[RealAuthService]', connected ? 'CONNECTED' : 'DISCONNECTED');
       return connected;

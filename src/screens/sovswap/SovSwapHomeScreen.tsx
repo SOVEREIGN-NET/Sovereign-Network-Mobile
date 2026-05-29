@@ -70,6 +70,13 @@ export const SovSwapHomeScreen: React.FC<SovSwapHomeScreenProps> = ({
         <View style={styles.backBtn} />
       </View>
 
+      {/* Demo notice — editorial "specimen issue" strip */}
+      <View style={styles.demoBanner}>
+        <Text style={styles.demoText}>
+          ◆ Demo issue — sample data, not a live exchange ◆
+        </Text>
+      </View>
+
       {/* Tab strip */}
       <SovTabMasthead
         labels={TAB_LABELS}
@@ -125,6 +132,23 @@ const styles = createSovSwapStyles(() => StyleSheet.create({
   mastheadTitle: {
     ...sovswapType.masthead,
     fontSize: 22,
+  },
+  demoBanner: {
+    alignItems: 'center',
+    paddingHorizontal: sovswapSpacing.lg,
+    paddingVertical: sovswapSpacing.sm,
+    // Light orange — a soft "notice" tone, deliberately not the rust
+    // semantic accent so it doesn't read as an error.
+    backgroundColor: '#FBE6CE',
+    borderTopWidth: 1,
+    borderBottomWidth: 1,
+    borderColor: '#E0A267',
+  },
+  demoText: {
+    ...sovswapType.smallCaps,
+    color: '#C2701E',
+    fontSize: 10,
+    textAlign: 'center',
   },
   content: {
     flex: 1,

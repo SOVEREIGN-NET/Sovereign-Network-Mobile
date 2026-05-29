@@ -1,9 +1,11 @@
 /**
  * SignInScreen
- * Screen for signing in with existing ZK-DID identity
+ * Sign in with username + password (OPAQUE login). On success, when the
+ * wallet key is on this device the user goes straight in; when it is
+ * not (a new device) the flow continues to seed-phrase recovery.
  */
 
-import React, { useState, useEffect } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import {
   View,
   Pressable,
@@ -14,7 +16,6 @@ import {
 import LinearGradient from 'react-native-linear-gradient';
 import MaskedView from '@react-native-masked-view/masked-view';
 import { NativeStackScreenProps } from '@react-navigation/native-stack';
-import { CommonActions } from '@react-navigation/native';
 import {
   Card,
   Text,
@@ -30,103 +31,127 @@ import {
 import { useAuth, useNodeConnection } from '../hooks';
 import { useTranslation } from '../i18n';
 import { colors, spacing, typography } from '../theme';
-import SecureIdentityStorage from '../services/SecureIdentityStorage';
+import { LobbyAuthError } from '../types/lobby';
 import { RootStackParamList } from '../types/navigation';
 
 type SignInScreenProps = NativeStackScreenProps<RootStackParamList, 'SignIn'>;
 
-/** Validate DID format: "did:zhtp:" followed by exactly 64 lowercase hex chars. */
-function isValidDid(did: string): boolean {
-  return /^did:zhtp:[0-9a-f]{64}$/.test(did);
-}
-
 const SignInScreen = ({ navigation }: SignInScreenProps) => {
   const { t } = useTranslation();
-  const { signIn, isLoading, error, setCurrentIdentity } = useAuth();
+  const { passwordSignIn, upgradeLegacyAccount, isLoading, error } = useAuth();
   const { isConnected, hasChecked } = useNodeConnection(true);
 
-  const [did, setDid] = useState('');
-  const [passphrase, setPassphrase] = useState('');
+  const [username, setUsername] = useState('');
+  const [password, setPassword] = useState('');
   const [showPassword, setShowPassword] = useState(false);
   const [localError, setLocalError] = useState<string | null>(null);
+  const [submitting, setSubmitting] = useState(false);
+  const [upgradeNeeded, setUpgradeNeeded] = useState(false);
 
-  // Pre-fill DID from native identity store (EncryptedSharedPreferences → Rust serde
-  // roundtrip — immune to react-native-keychain AES-CBC silent corruption).
+  // Lockout / throttle countdown driven by the server's retry hint.
+  const [lockUntil, setLockUntil] = useState<number | null>(null);
+  const [lockRemaining, setLockRemaining] = useState(0);
+  const tick = useRef<ReturnType<typeof setInterval> | null>(null);
+
   useEffect(() => {
-    const prefillDid = async () => {
-      try {
-        // 1. Direct native path: IdentityStore.getCurrentIdentityId → loadIdentity → Rust deser → DID
-        if (NativeModules.NativeIdentityProvisioning) {
-          const nativeDid: string | null =
-            await NativeModules.NativeIdentityProvisioning.getCurrentIdentityDid();
-          if (nativeDid && isValidDid(nativeDid)) {
-            if (__DEV__) console.log('[SignIn] Pre-fill DID from native store');
-            setDid(nativeDid);
-            return;
-          }
-        }
-        // 2. Fallback: react-native-keychain (may be corrupted by AES-CBC)
-        const creds = await SecureIdentityStorage.getLoginCredentials();
-        if (creds?.did && isValidDid(creds.did)) {
-          if (__DEV__) console.log('[SignIn] Pre-fill DID from keychain');
-          setDid(creds.did);
-        } else if (creds?.did) {
-          console.warn(
-            '[SignIn] Keychain DID failed validation — not pre-filling',
-          );
-        }
-      } catch {
-        // Pre-fill is best-effort
+    if (lockUntil == null) {
+      setLockRemaining(0);
+      return;
+    }
+    const update = () => {
+      const remaining = Math.max(0, Math.ceil((lockUntil - Date.now()) / 1000));
+      setLockRemaining(remaining);
+      if (remaining === 0) {
+        setLockUntil(null);
+        if (tick.current) clearInterval(tick.current);
       }
     };
-    prefillDid();
-  }, []);
+    update();
+    tick.current = setInterval(update, 1000);
+    return () => {
+      if (tick.current) clearInterval(tick.current);
+    };
+  }, [lockUntil]);
 
-  const handleSignIn = async () => {
-    setLocalError(null);
+  const normalized = username.trim().toLowerCase();
+  const locked = lockRemaining > 0;
+  const busy = submitting || isLoading;
 
-    // Validation
-    if (!did.trim()) {
-      setLocalError(t.auth.signIn.validation.didRequired);
-      return;
-    }
-
-    // Validate DID format — catches AES-CBC silent corruption from react-native-keychain
-    if (did.trim().startsWith('did:zhtp:') && !isValidDid(did.trim())) {
-      setLocalError(
-        'DID appears corrupted (non-hex characters detected). Please recover your identity.',
-      );
-      return;
-    }
-
-    if (!passphrase) {
-      setLocalError(t.auth.signIn.validation.passphraseRequired);
-      return;
-    }
-
-    try {
-      // signIn expects identity_id and password
-      await signIn(did.trim(), passphrase);
-      // Reset form on success
-      setDid('');
-      setPassphrase('');
-      // Navigate back - since SignIn is presented as modal, goBack will return to the main tabs
+  /** Route to the right place once the OPAQUE login has succeeded. */
+  const afterAuth = (identity: unknown) => {
+    setUsername('');
+    setPassword('');
+    if (identity) {
+      // Wallet key is on this device — signed in. Return to the app.
       navigation.goBack();
-    } catch (err: any) {
-      setLocalError(err.message || t.auth.signIn.errors.signInFailed);
+    } else {
+      // Authenticated but keyless — restore the wallet from the seed.
+      navigation.navigate('RecoverIdentity');
     }
   };
 
-  // SECURITY: Dev bypass removed for security reasons
-  // To test development flows, use the mock identity service in AuthContext instead
+  /** Map an auth failure to local UI state (error text, lockout, upgrade). */
+  const handleAuthError = (err: unknown) => {
+    if (err instanceof LobbyAuthError) {
+      setLocalError(err.message);
+      if (err.kind === 'upgrade_required') {
+        setUpgradeNeeded(true);
+      } else if (
+        (err.kind === 'locked' || err.kind === 'ip_throttled') &&
+        err.retryAfterSeconds
+      ) {
+        setLockUntil(Date.now() + err.retryAfterSeconds * 1000);
+      }
+    } else {
+      setLocalError(
+        err instanceof Error ? err.message : t.auth.signIn.errors.signInFailed,
+      );
+    }
+  };
 
-  const isSignInDisabled = isLoading;
+  const handleSignIn = async () => {
+    setLocalError(null);
+    setUpgradeNeeded(false);
+    if (!normalized) {
+      setLocalError('Enter your username.');
+      return;
+    }
+    if (!password) {
+      setLocalError(t.auth.signIn.validation.passphraseRequired);
+      return;
+    }
+    setSubmitting(true);
+    try {
+      const identity = await passwordSignIn(normalized, password);
+      afterAuth(identity);
+    } catch (err) {
+      handleAuthError(err);
+    } finally {
+      setSubmitting(false);
+    }
+  };
+
+  const handleUpgrade = async () => {
+    setLocalError(null);
+    setSubmitting(true);
+    try {
+      const identity = await upgradeLegacyAccount(normalized, password);
+      afterAuth(identity);
+    } catch (err) {
+      handleAuthError(err);
+    } finally {
+      setSubmitting(false);
+    }
+  };
 
   const displayError = localError || error;
 
-  if (isLoading) {
+  if (busy) {
     return <LoadingView />;
   }
+
+  let signInLabel = t.auth.signIn.button;
+  if (locked) signInLabel = `Try again in ${lockRemaining}s`;
 
   return (
     <ScreenLayout
@@ -156,7 +181,6 @@ const SignInScreen = ({ navigation }: SignInScreenProps) => {
             {t.auth.signIn.welcome.heading}
           </Text>
 
-          {/* Gradient Text for Sovereign Network */}
           <MaskedView
             style={{ marginBottom: spacing.lg, alignSelf: 'center' }}
             maskElement={
@@ -197,7 +221,7 @@ const SignInScreen = ({ navigation }: SignInScreenProps) => {
           </Text>
         </View>
 
-        {/* Node Connection Status - Tap to retry, Long press for full protocol check */}
+        {/* Node Connection Status */}
         <View>
           <Card>
             <Row
@@ -242,23 +266,46 @@ const SignInScreen = ({ navigation }: SignInScreenProps) => {
         {/* Error Message */}
         {displayError && <ErrorAlert message={displayError} icon="❌" />}
 
+        {/* Legacy account upgrade prompt */}
+        {upgradeNeeded && (
+          <Card>
+            <Column gap="sm">
+              <Text variant="body" style={{ color: colors.text_secondary }}>
+                Your account uses an older sign-in method. Confirm your
+                password to complete a one-time security upgrade.
+              </Text>
+              <Pressable onPress={() => void handleUpgrade().catch(() => {})}>
+                <Text
+                  style={{
+                    color: colors.primary,
+                    fontWeight: typography.weight.semibold,
+                  }}
+                >
+                  Upgrade my account →
+                </Text>
+              </Pressable>
+            </Column>
+          </Card>
+        )}
+
         {/* Form Card */}
         <Card>
           <Column gap="xs">
-            {/* DID Input */}
             <FormField
-              label={t.auth.signIn.didLabel}
-              placeholder="Enter DID or Identity ID..."
-              value={did}
-              onChangeText={setDid}
-              editable={!isLoading}
-              helperText="Your DID (did:zhtp:...) or hex Identity ID from creation"
+              label="Username"
+              placeholder="Your username"
+              value={username}
+              onChangeText={setUsername}
+              editable={!busy}
+              autoCapitalize="none"
+              autoCorrect={false}
+              spellCheck={false}
+              helperText="The username you chose when you created your account"
               textContentType="username"
               autoComplete="username"
               importantForAutofill="yes"
             />
 
-            {/* Passphrase Input */}
             <View>
               <Row
                 style={{
@@ -292,12 +339,13 @@ const SignInScreen = ({ navigation }: SignInScreenProps) => {
               <FormField
                 label=""
                 placeholder="Enter your password..."
-                value={passphrase}
-                onChangeText={setPassphrase}
+                value={password}
+                onChangeText={setPassword}
                 secureTextEntry={!showPassword}
-                editable={!isLoading}
-                helperText="The password you set when creating your identity"
+                editable={!busy}
                 containerStyle={{ marginBottom: 0 }}
+                autoCapitalize="none"
+                autoCorrect={false}
                 textContentType="password"
                 autoComplete="password"
                 importantForAutofill="yes"
@@ -310,26 +358,24 @@ const SignInScreen = ({ navigation }: SignInScreenProps) => {
         <ActionFooter
           actions={[
             {
-              label: isLoading
-                ? t.auth.signIn.buttonLoading
-                : t.auth.signIn.button,
+              label: submitting ? t.auth.signIn.buttonLoading : signInLabel,
               onPress: () => {
                 handleSignIn().catch(() => {});
               },
-              disabled: isSignInDisabled,
-              loading: isLoading,
+              disabled: busy || locked,
+              loading: submitting,
             },
             {
               label: t.auth.signIn.createNew,
               onPress: () => navigation.navigate('CreateIdentity'),
               variant: 'secondary',
-              disabled: isLoading,
+              disabled: busy,
             },
             {
               label: t.auth.signIn.recover,
               onPress: () => navigation.navigate('RecoverIdentity'),
               variant: 'secondary',
-              disabled: isLoading,
+              disabled: busy,
             },
             ...(__DEV__
               ? [

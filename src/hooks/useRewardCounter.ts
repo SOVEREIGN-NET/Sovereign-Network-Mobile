@@ -104,17 +104,19 @@ export const useRewardCounter = (): RewardCounterData => {
       } else if (status === 401 || status === 403) {
         // Check whether this is a maturation response (identity too new)
         const info = extractMaturationSecs(err);
-        if (__DEV__) {
-          console.log('[useRewardCounter] 401 body:', JSON.stringify((err as any)?.body));
-        }
         if (info) {
           const remainingSecs = info.requiredSecs - info.ageSecs;
           setMaturesAt(Math.floor(Date.now() / 1000) + remainingSecs);
           setRewards(ZERO_REWARDS(currentIdentity.did));
           setError(null); // not an error — expected during maturation
         } else {
-          setError(msg);
-          console.warn('[useRewardCounter] Error fetching rewards:', msg);
+          // Any other auth failure — identity not on chain, "cannot
+          // access", session not yet valid — just means the counter
+          // can't read rewards right now. Show zero; never surface it
+          // as a header error, it's backend/chain state the user
+          // can't act on.
+          setRewards(ZERO_REWARDS(currentIdentity.did));
+          setError(null);
         }
       } else {
         setError(msg);

@@ -35,7 +35,7 @@ export const en = {
 
   // Dashboard Screen
   dashboard: {
-    loadingMessage: 'Loading SOV Dashboard...',
+    loadingMessage: 'Loading SOVN Dashboard...',
     networkStatus: {
       title: 'Network Status',
       label: 'Status:',

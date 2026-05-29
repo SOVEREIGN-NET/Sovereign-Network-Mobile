@@ -124,28 +124,16 @@ class NativeQuic: NSObject {
 
     let serverName = quinnControlPlaneServerName.isEmpty ? host : quinnControlPlaneServerName
     var handle: UInt64 = 0
-    let pinHex = activeSpkiPinHex
 
-    let rc: Int32
-    if pinHex.isEmpty {
-      // System CA trust — no SPKI pin
-      rc = host.withCString { hostPtr in
-        serverName.withCString { serverNamePtr in
-          uhp_quic_connect_public(hostPtr, UInt16(port), serverNamePtr, nil, &handle)
-        }
-      }
-    } else {
-      guard let spkiPin = dataFromHex(pinHex), spkiPin.count == 32 else {
-        reject("QUIC_ERROR", "Invalid SPKI pin configuration", nil)
-        return
-      }
-      rc = host.withCString { hostPtr in
-        serverName.withCString { serverNamePtr in
-          spkiPin.withUnsafeBytes { spkiBuf -> Int32 in
-            guard let spkiPtr = spkiBuf.baseAddress?.assumingMemoryBound(to: UInt8.self) else { return -1 }
-            return uhp_quic_connect_public(hostPtr, UInt16(port), serverNamePtr, spkiPtr, &handle)
-          }
-        }
+    // Public ALPN: always go through webpki-roots chain validation
+    // (nil pin → quinn-ffi uses `make_public_client_config`). The
+    // gateways now ship Let's Encrypt certs that rotate ~every 60
+    // days, so an SPKI pin would expire with each renewal. The active
+    // pin from GeneratedConfig still applies to the UHP-handshake
+    // path; only the public probe / directory path uses chain trust.
+    let rc: Int32 = host.withCString { hostPtr in
+      serverName.withCString { serverNamePtr in
+        uhp_quic_connect_public(hostPtr, UInt16(port), serverNamePtr, nil, &handle)
       }
     }
 
@@ -835,27 +823,14 @@ class NativeQuic: NSObject {
 
     let serverName = resolveServerName(host: parsedUrl.host, headers: headers)
     var handle: UInt64 = 0
-    let pinHex = activeSpkiPinHex
 
-    let connectRc: Int32
-    if pinHex.isEmpty {
-      // System CA trust — no SPKI pin
-      connectRc = parsedUrl.host.withCString { hostPtr in
-        serverName.withCString { serverNamePtr in
-          uhp_quic_connect_public(hostPtr, UInt16(parsedUrl.port), serverNamePtr, nil, &handle)
-        }
-      }
-    } else {
-      guard let spkiPin = dataFromHex(pinHex), spkiPin.count == 32 else {
-        throw NSError(domain: "NativeQuic", code: -1, userInfo: [NSLocalizedDescriptionKey: "Invalid SPKI pin configuration"])
-      }
-      connectRc = parsedUrl.host.withCString { hostPtr in
-        serverName.withCString { serverNamePtr in
-          spkiPin.withUnsafeBytes { spkiBuf -> Int32 in
-            guard let spkiPtr = spkiBuf.baseAddress?.assumingMemoryBound(to: UInt8.self) else { return -1 }
-            return uhp_quic_connect_public(hostPtr, UInt16(parsedUrl.port), serverNamePtr, spkiPtr, &handle)
-          }
-        }
+    // Public ALPN: always use webpki-roots chain validation. See note
+    // in `testConnection` — the gateways serve LE certs whose SPKI
+    // rotates with each renewal, so the pin from GeneratedConfig is
+    // worthless here. The pin still applies to the UHP-handshake path.
+    let connectRc: Int32 = parsedUrl.host.withCString { hostPtr in
+      serverName.withCString { serverNamePtr in
+        uhp_quic_connect_public(hostPtr, UInt16(parsedUrl.port), serverNamePtr, nil, &handle)
       }
     }
 

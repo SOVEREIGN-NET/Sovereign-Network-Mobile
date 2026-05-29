@@ -20,3 +20,9 @@ export { PouwRewardsCard } from './PouwRewardsCard';
 
 export { GuestEntryCard } from './GuestEntryCard';
 export type { GuestEntryCardProps } from './GuestEntryCard';
+
+export { BublMiniWallet, BublTokenGlyph } from './BublMiniWallet';
+export type { BublMiniWalletProps } from './BublMiniWallet';
+
+export { ReleaseNotifyCard } from './ReleaseNotifyCard';
+export type { ReleaseNotifyCardProps } from './ReleaseNotifyCard';

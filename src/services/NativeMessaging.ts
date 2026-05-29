@@ -163,6 +163,16 @@ interface NativeMessagingShape {
     peerDilithiumPkB64: string,
   ): Promise<string>; // UTF-8 text
 
+  // Stateful receive-side decrypt. Verifies the sender's signature and
+  // opens the body against the session's receive ratchet, advancing it
+  // in place — the next call decrypts the following sequence. The
+  // receive-side counterpart of `sealTextSigned`.
+  envelopeOpenVerifiedWithSession(
+    sessionId: string,
+    envelopeB64: string,
+    peerDilithiumPkB64: string,
+  ): Promise<string>; // UTF-8 text
+
   // Envelope-shaped accept (receive path) — JS hands the whole bincode
   // KeyExchange / KeyRatchet envelope; Rust extracts the Kyber
   // ciphertext + checks content_type + DID routing internally.
@@ -280,6 +290,16 @@ export const NativeMessaging = {
     ensure().envelopeOpenVerifiedText(
       envelopeB64,
       chainKeyB64,
+      peerDilithiumPkB64,
+    ),
+  envelopeOpenVerifiedWithSession: (
+    sessionId: string,
+    envelopeB64: string,
+    peerDilithiumPkB64: string,
+  ) =>
+    ensure().envelopeOpenVerifiedWithSession(
+      sessionId,
+      envelopeB64,
       peerDilithiumPkB64,
     ),
 

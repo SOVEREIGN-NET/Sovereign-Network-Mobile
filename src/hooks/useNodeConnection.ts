@@ -5,7 +5,7 @@
 
 import { useState, useCallback, useEffect } from 'react';
 import RealAuthService from '../services/RealAuthService';
-import { isQuicSupported, testQuicConnection } from '../services/quic';
+import { isQuicSupported, testQuicHealthCheck } from '../services/quic';
 import { getActiveTarget } from '../services/NetworkBootstrap';
 import { useTranslation } from '../i18n';
 
@@ -97,7 +97,11 @@ export function useNodeConnection(
       }
 
       const target = getActiveTarget();
-      const result = await testQuicConnection(target.host, target.port);
+      // See note in useNodeConnectionStatus: the bare-transport probe
+      // (uhp_quic_connect_public) panics in lib-client on iOS. Use the
+      // health-check path (NativeQuic.request → /api/v1/protocol/health)
+      // — same connectivity signal, no crash.
+      const result = await testQuicHealthCheck(target.host, target.port);
       const connected = !!result.success;
       console.log(`[👆 SignIn:checkConnection] Result: ${connected ? 'CONNECTED' : 'DISCONNECTED'}`);
 

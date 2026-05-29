@@ -54,6 +54,7 @@ import {
   MessagesScreen,
   ChatScreen,
   NewChatScreen,
+  BublRewardsScreen,
 } from '../screens/messaging';
 import BlockDetailScreen from '../screens/explorer/BlockDetailScreen';
 import TransactionDetailScreen from '../screens/explorer/TransactionDetailScreen';
@@ -69,7 +70,12 @@ import RecoverIdentityScreen from '../screens/RecoverIdentityScreen';
 import MigrationSeedScreen from '../screens/MigrationSeedScreen';
 import BuyCryptoScreen from '../screens/BuyCryptoScreen';
 
-const Stack = createNativeStackNavigator<RootStackParamList>();
+// One stack navigator for the whole tree. The top-level routes live in
+// RootStackParamList, but the nested per-tab stacks register many
+// screens outside it (DashboardMain, SendTokens, Chat, …), so the
+// navigator stays untyped — mirroring AuthNavigator.tsx. Each screen's
+// props remain typed via NativeStackScreenProps in the screen files.
+const Stack = createNativeStackNavigator();
 const Tab = createBottomTabNavigator();
 
 const DashboardStack = () => {
@@ -474,6 +480,11 @@ const MessagesStack = () => {
         component={NewChatScreen as any}
         options={{ headerShown: false, presentation: 'modal' }}
       />
+      <Stack.Screen
+        name="BublRewards"
+        component={BublRewardsScreen as any}
+        options={{ headerShown: false }}
+      />
     </Stack.Navigator>
   );
 };
@@ -670,7 +681,9 @@ const RootNavigator = () => {
         // the nav tree, stash the URL on next tick.
         const tryNavigate = () => {
           if (navigationRef.current?.isReady()) {
-            navigationRef.current.navigate('BrowserAuth' as never, { url } as never);
+            // BrowserAuth lives in a nested tab stack — navigate through
+            // the container ref, which resolves nested route names.
+            (navigationRef.current as any).navigate('BrowserAuth', { url });
           } else {
             setTimeout(tryNavigate, 50);
           }

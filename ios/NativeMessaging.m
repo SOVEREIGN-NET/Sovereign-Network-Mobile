@@ -146,6 +146,12 @@ RCT_EXTERN_METHOD(envelopeOpenVerifiedText:(NSString *)envelopeB64
                   resolve:(RCTPromiseResolveBlock)resolve
                   reject:(RCTPromiseRejectBlock)reject)
 
+RCT_EXTERN_METHOD(envelopeOpenVerifiedWithSession:(NSString *)sessionId
+                  envelopeB64:(NSString *)envelopeB64
+                  peerDilithiumPkB64:(NSString *)peerDilithiumPkB64
+                  resolve:(RCTPromiseResolveBlock)resolve
+                  reject:(RCTPromiseRejectBlock)reject)
+
 RCT_EXTERN_METHOD(acceptEnvelopeWithIdentity:(NSString *)localDid
                   remoteDid:(NSString *)remoteDid
                   envelopeB64:(NSString *)envelopeB64

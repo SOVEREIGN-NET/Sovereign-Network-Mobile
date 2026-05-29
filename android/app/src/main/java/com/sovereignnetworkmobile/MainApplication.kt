@@ -23,6 +23,7 @@ class MainApplication : Application(), ReactApplication {
           add(NativeIdentityProvisioningPackage())
           add(NativeMessagingPackage())
           add(NativeQuicSessionPackage())
+          add(NativeLobbyAuthPackage())
           add(PoUWPackage())
           add(Web4Package())
         },

@@ -51,6 +51,27 @@ target 'SovereignNetworkMobile' do
       end
     end
 
+    # fmt + recent Clang (Xcode 16+): fmt's `base.h` enables consteval
+    # paths for any Apple build version >= 14, but the version pinned by
+    # RN 0.82 trips the tightened C++ consteval rules — every
+    # `fmt::format_to(FMT_STRING(...))` in `format-inl.h` errors with
+    # "Call to consteval function is not a constant expression".
+    #
+    # `-D FMT_USE_CONSTEVAL=0` doesn't survive because `base.h`
+    # unconditionally `#define`s it inside the detection cascade. So
+    # patch the header directly: force the two `#define FMT_USE_CONSTEVAL 1`
+    # lines to 0. Idempotent — re-running pod install just no-ops.
+    fmt_base_h = File.join(Pod::Config.instance.installation_root, 'Pods/fmt/include/fmt/base.h')
+    if File.exist?(fmt_base_h)
+      content = File.read(fmt_base_h)
+      # Block form avoids Ruby's `\10` backref-vs-literal ambiguity.
+      patched = content.gsub(/^(#  define FMT_USE_CONSTEVAL )1$/) { "#{$1}0  // patched by Podfile" }
+      if patched != content
+        File.write(fmt_base_h, patched)
+        puts "[PATCH] Disabled FMT_USE_CONSTEVAL in Pods/fmt/include/fmt/base.h"
+      end
+    end
+
     # Patch React Native TextInput to disable Safari password autofill
     # Prevents crash in _SFPasswordViewController when password fields are present
     react_native_path = react_native_abs_path

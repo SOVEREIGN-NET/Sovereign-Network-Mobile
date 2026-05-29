@@ -34,18 +34,42 @@ final class QuicSessionStore {
 
 /// Per-inbound-stream state. Owns the underlying stream and the
 /// reader thread that drains it.
+///
+/// The reader thread closes the stream itself on exit (after its
+/// blocking `cQuicSessionInboundRead` returns or sees cancellation),
+/// then signals the shared `exited` semaphore. External callers
+/// must NOT call `stream.close()` while the reader could be
+/// mid-read — doing so frees state under a blocked FFI call and
+/// crashes the process.
 final class InboundStreamRunner {
     let stream: QuicInboundStream
     let thread: Thread
+    let sessionId: String
+    let exited: DispatchSemaphore
 
-    init(stream: QuicInboundStream, thread: Thread) {
+    init(
+        stream: QuicInboundStream,
+        thread: Thread,
+        sessionId: String,
+        exited: DispatchSemaphore
+    ) {
         self.stream = stream
         self.thread = thread
+        self.sessionId = sessionId
+        self.exited = exited
     }
 
-    func cancel() {
+    /// Signal cancellation. Returns immediately; the reader thread
+    /// notices on its next read-timeout boundary (≤1 s), closes the
+    /// stream, and signals `exited`.
+    func requestCancel() {
         thread.cancel()
-        stream.close()
+    }
+
+    /// Block until the reader thread has fully exited, or `timeout`
+    /// elapses. Safe to call from any non-reader thread.
+    func waitForExit(timeout: TimeInterval) {
+        _ = exited.wait(timeout: .now() + timeout)
     }
 }
 
@@ -73,6 +97,15 @@ final class QuicInboundStore {
             return r
         }
     }
+
+    /// Snapshot of all runners currently bound to `sessionId`.
+    /// Used by `closeSession` to cancel-and-wait the readers
+    /// belonging to a session before freeing it.
+    func allForSession(_ sessionId: String) -> [InboundStreamRunner] {
+        queue.sync {
+            streams.values.filter { $0.sessionId == sessionId }
+        }
+    }
 }
 
 @objc(NativeQuicSession)
@@ -88,12 +121,20 @@ class NativeQuicSession: RCTEventEmitter {
 
     // ── Lifecycle ────────────────────────────────────────────────
 
-    // RCTEventEmitter does its own bookkeeping for active listeners. We
-    // don't need to gate emission — the bridge silently drops events
-    // when no listener is attached.
+    // Under RN 0.82 New Architecture, `sendEventWithName:body:` asserts
+    // when `_callableJSModules` is nil — which happens after the bridge
+    // is invalidated (reload, teardown). Our reader threads can outlive
+    // that moment, so every emission goes through `emit(...)` which
+    // gates on `hasJsListeners` (cleared by RN's `stopObserving`) and
+    // the bridge's validity.
     private var hasJsListeners = false
     override func startObserving() { hasJsListeners = true }
     override func stopObserving() { hasJsListeners = false }
+
+    private func emit(_ name: String, body: [String: Any]) {
+        guard hasJsListeners, bridge?.isValid == true else { return }
+        sendEvent(withName: name, body: body)
+    }
 
     // ── openSession ──────────────────────────────────────────────
     //
@@ -209,7 +250,18 @@ class NativeQuicSession: RCTEventEmitter {
 
     @objc
     func closeSession(_ sessionId: String) {
-        QuicSessionStore.shared.remove(sessionId)
+        // Any inbound readers attached to this session are blocked in
+        // `cQuicSessionInboundRead` (1 s polling timeout). Freeing
+        // the session while a read is in flight crashes the process,
+        // so cancel-and-join the readers first. Dispatch off the
+        // bridge thread — the wait can take up to ~2.5 s if a reader
+        // is mid-blocking-call.
+        DispatchQueue.global(qos: .utility).async {
+            let runners = QuicInboundStore.shared.allForSession(sessionId)
+            for r in runners { r.requestCancel() }
+            for r in runners { r.waitForExit(timeout: 2.5) }
+            QuicSessionStore.shared.remove(sessionId)
+        }
     }
 
     // ── rpc ──────────────────────────────────────────────────────
@@ -293,7 +345,19 @@ class NativeQuicSession: RCTEventEmitter {
         // events even if the JS caller hasn't received the resolve
         // yet (race-free).
         var streamId: String = ""
+        // Shared with the runner so `closeSession` can wait for the
+        // reader to actually exit before freeing the session.
+        let exited = DispatchSemaphore(value: 0)
         let reader = Thread { [weak self] in
+            // Whatever exit path we take, close the stream ourselves
+            // (the only safe place — concurrent close from another
+            // thread while we're in `cQuicSessionInboundRead` is a
+            // UAF) and notify any waiter.
+            defer {
+                stream.close()
+                exited.signal()
+                _ = QuicInboundStore.shared.remove(streamId)
+            }
             guard let self else { return }
             while !Thread.current.isCancelled {
                 do {
@@ -305,19 +369,19 @@ class NativeQuicSession: RCTEventEmitter {
                     }
                     if Thread.current.isCancelled { return }
                     let b64 = frame.base64EncodedString()
-                    self.sendEvent(
-                        withName: "QuicInboundFrame",
+                    self.emit(
+                        "QuicInboundFrame",
                         body: ["streamId": streamId, "frameB64": b64]
                     )
                 } catch QuicSessionError.streamClosed {
-                    self.sendEvent(
-                        withName: "QuicInboundClosed",
+                    self.emit(
+                        "QuicInboundClosed",
                         body: ["streamId": streamId]
                     )
                     return
                 } catch {
-                    self.sendEvent(
-                        withName: "QuicInboundError",
+                    self.emit(
+                        "QuicInboundError",
                         body: [
                             "streamId": streamId,
                             "error": "\(error)"
@@ -330,7 +394,12 @@ class NativeQuicSession: RCTEventEmitter {
         reader.stackSize = 1 * 1024 * 1024
         reader.qualityOfService = .utility
 
-        let runner = InboundStreamRunner(stream: stream, thread: reader)
+        let runner = InboundStreamRunner(
+            stream: stream,
+            thread: reader,
+            sessionId: sessionId,
+            exited: exited
+        )
         streamId = QuicInboundStore.shared.add(runner)
         reader.start()
         resolve(streamId)
@@ -338,8 +407,12 @@ class NativeQuicSession: RCTEventEmitter {
 
     @objc
     func closeInbound(_ streamId: String) {
-        if let runner = QuicInboundStore.shared.remove(streamId) {
-            runner.cancel()
+        // Only signal cancellation. The reader thread closes its
+        // own stream when its blocking read returns and signals
+        // exited — calling `cQuicSessionInboundClose` from here
+        // would race the read and free state under the FFI.
+        if let runner = QuicInboundStore.shared.get(streamId) {
+            runner.requestCancel()
         }
     }
 }

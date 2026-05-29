@@ -165,9 +165,17 @@ const avatarStyles = StyleSheet.create({
 /**
  * Render a wall-clock-relative timestamp tight enough to fit in a
  * conversation row. Falls back to a date for anything older than a week.
+ *
+ * `nowSec` overrides the reference "now" — pass a server-provided
+ * timestamp (e.g. the rewards API's `status.now`) so relative times
+ * stay correct even when the device clock is skewed. Defaults to the
+ * device clock.
  */
-export function formatRelativeTime(timestampSec: number): string {
-  const nowMs = Date.now();
+export function formatRelativeTime(
+  timestampSec: number,
+  nowSec?: number,
+): string {
+  const nowMs = nowSec != null ? nowSec * 1000 : Date.now();
   const ms = timestampSec * 1000;
   const diff = nowMs - ms;
   if (diff < 60_000) return 'now';
@@ -355,6 +363,31 @@ export function formatBubbleTime(timestampSec: number): string {
   return new Date(timestampSec * 1000).toLocaleTimeString(undefined, {
     hour: 'numeric',
     minute: '2-digit',
+  });
+}
+
+/**
+ * Day label for the chat date separators, WhatsApp-style: "Today" /
+ * "Yesterday" for the last two days, the weekday name within the past
+ * week, then a full date (year dropped when it's the current year).
+ */
+export function formatDateSeparator(timestampSec: number): string {
+  const d = new Date(timestampSec * 1000);
+  const now = new Date();
+  const startOfDay = (x: Date): number =>
+    new Date(x.getFullYear(), x.getMonth(), x.getDate()).getTime();
+  const diffDays = Math.round(
+    (startOfDay(now) - startOfDay(d)) / 86_400_000,
+  );
+  if (diffDays <= 0) return 'Today';
+  if (diffDays === 1) return 'Yesterday';
+  if (diffDays < 7) {
+    return d.toLocaleDateString(undefined, { weekday: 'long' });
+  }
+  return d.toLocaleDateString(undefined, {
+    month: 'long',
+    day: 'numeric',
+    year: d.getFullYear() === now.getFullYear() ? undefined : 'numeric',
   });
 }
 

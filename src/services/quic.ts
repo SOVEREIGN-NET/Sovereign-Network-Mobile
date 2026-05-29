@@ -168,6 +168,14 @@ interface RequestOptions {
   body?: string;
   headers?: Record<string, string>;
   timeout?: number;
+  /**
+   * Override the target node. Defaults to `DEFAULT_NODE_HOST` /
+   * `DEFAULT_NODE_PORT`. Used to pin the rewards endpoints to g1 (they
+   * 503 on every other validator by design) regardless of where
+   * general API traffic is routed — see `RewardsService`.
+   */
+  host?: string;
+  port?: number;
 }
 
 /**
@@ -364,7 +372,13 @@ async function runWithSessionRecovery(
       i < maxAttempts;
     if (shouldRetry401) {
       if (__DEV__) {
-        console.warn(
+        // Counter-replay 401s are part of the normal UHP recovery loop —
+        // a stale server-side session is replaced by a fresh handshake
+        // and the request retries transparently. Logged at info level
+        // so a routine retry doesn't surface as a red warning; if all
+        // attempts ultimately fail, the caller's error logging takes
+        // over.
+        console.log(
           `[quic] 401 counter-replay detected (attempt ${i}/${maxAttempts}), re-handshaking`,
         );
       }
@@ -419,7 +433,9 @@ async function rawRequest(
     body = populateIdentityFields(body, path, method, identityId);
   }
 
-  const url = `quic://${DEFAULT_NODE_HOST}:${DEFAULT_NODE_PORT}${path}`;
+  const url = `quic://${options.host ?? DEFAULT_NODE_HOST}:${
+    options.port ?? DEFAULT_NODE_PORT
+  }${path}`;
 
   const requestOptions: QuicRequestOptions = {
     method,
@@ -528,8 +544,12 @@ export async function quicRequest<T>(
       body = response.body;
     }
     if (__DEV__) {
-      // Log 5xx as errors; 4xx are expected client errors (auth, not found, etc.)
-      if (response.status >= 500) {
+      // 5xx logged as errors — except 503 Service Unavailable, which is
+      // an expected "not here / not ready" state rather than a fault:
+      // the rewards endpoints answer 503 on every non-rewards node and
+      // before the rewards module is deployed at all. 4xx are likewise
+      // expected client outcomes (auth, not-found), so both log quietly.
+      if (response.status >= 500 && response.status !== 503) {
         console.error('[quic] error body:', response.body);
       } else {
         console.log('[quic] error body:', response.body);
@@ -564,7 +584,9 @@ export async function publicQuicRequest<T>(
       body = response.body;
     }
     if (__DEV__) {
-      if (response.status >= 500) {
+      // 503 is an expected "not ready" state, not a fault — log it
+      // quietly like a 4xx (see the same note in quicRequest).
+      if (response.status >= 500 && response.status !== 503) {
         console.error('[quic] error body:', response.body);
       } else {
         console.log('[quic] error body:', response.body);

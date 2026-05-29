@@ -196,7 +196,13 @@ class NativeQuicModule(reactContext: ReactApplicationContext) :
         val method = if (options.hasKey("method")) options.getString("method") ?: "GET" else "GET"
         val timeout = if (options.hasKey("timeout")) options.getInt("timeout") else DEFAULT_TIMEOUT
         val body = if (options.hasKey("body")) options.getString("body") ?: "" else ""
-        val insecure = if (options.hasKey("insecure")) options.getBoolean("insecure") else true
+        // Default to SECURE chain validation (webpki-roots). The old
+        // default was `true` which routed every JS-issued QUIC request
+        // through `create_insecure_client_config` — i.e. NO TLS
+        // validation at all — and that's the wrong default for public
+        // gateways behind Let's Encrypt certs. Dev/local callers can
+        // still opt in explicitly via `options.insecure = true`.
+        val insecure = if (options.hasKey("insecure")) options.getBoolean("insecure") else false
         val alpn = if (options.hasKey("alpn")) options.getString("alpn") ?: "authenticated" else "authenticated"
         val headersJson = if (options.hasKey("headers")) headersMapToJson(options.getMap("headers")) else "{}"
         return RequestOptions(method, timeout, body, insecure, alpn, headersJson)

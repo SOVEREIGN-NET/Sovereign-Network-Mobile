@@ -40,7 +40,7 @@ export const es: Translation = {
 
   // Dashboard Screen
   dashboard: {
-    loadingMessage: 'Cargando panel SOV...',
+    loadingMessage: 'Cargando panel SOVN...',
     networkStatus: {
       title: 'Estado de la red',
       label: 'Estado:',

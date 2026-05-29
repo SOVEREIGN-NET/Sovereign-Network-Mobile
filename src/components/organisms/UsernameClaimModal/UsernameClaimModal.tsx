@@ -33,39 +33,7 @@ import {
 } from 'react-native';
 import { useAuth } from '../../../hooks/useAuth';
 import { borderRadius, colors, spacing, typography } from '../../../theme';
-
-/** Mirror of the server's `validate_username` rules. Surfacing the
- *  same error message client-side avoids a round-trip for obvious
- *  validation failures. Keep this list in sync with lib-identity's
- *  username validator. */
-const RESERVED_USERNAMES = new Set([
-  'admin',
-  'root',
-  'system',
-  'node',
-  'validator',
-  'council',
-  'treasury',
-  'null',
-  'undefined',
-  'test',
-  'zhtp',
-  'sovereign',
-]);
-
-function validateUsername(input: string): string | null {
-  const u = input.trim();
-  if (u.length < 3) return 'At least 3 characters.';
-  if (u.length > 32) return 'Maximum 32 characters.';
-  if (!/^[a-z0-9_]+$/.test(u)) {
-    return 'Only lowercase letters, digits, and underscore.';
-  }
-  if (u.startsWith('_') || u.endsWith('_')) {
-    return 'Cannot start or end with underscore.';
-  }
-  if (RESERVED_USERNAMES.has(u)) return 'That name is reserved.';
-  return null;
-}
+import { validateUsername } from '../../../utils/credentials';
 
 type Availability =
   | { state: 'idle' }

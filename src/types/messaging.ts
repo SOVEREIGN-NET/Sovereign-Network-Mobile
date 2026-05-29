@@ -24,6 +24,12 @@ export enum MessageContentType {
   KeyExchange = 'key_exchange',
   KeyRatchet = 'key_ratchet',
   ReadReceipt = 'read_receipt',
+  /**
+   * Local-only placeholder for an inbound envelope that arrived but
+   * could not be decrypted — the peer's KeyExchange was missed so the
+   * session keys never reached this device. Never sent on the wire.
+   */
+  Undecryptable = 'undecryptable',
 }
 
 /**
