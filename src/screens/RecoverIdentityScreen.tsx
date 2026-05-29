@@ -17,6 +17,7 @@ import {
   ErrorAlert,
   SelectableOptionCard,
   ActionFooter,
+  FormField,
   PasswordField,
 } from '../components';
 import { useAuth } from '../hooks';
@@ -24,7 +25,6 @@ import { useTranslation } from '../i18n';
 import { colors, spacing, typography, borderRadius } from '../theme';
 import { RootStackParamList } from '../types/navigation';
 import RealAuthService from '../services/RealAuthService';
-import SecureIdentityStorage from '../services/SecureIdentityStorage';
 import SeedVaultService from '../services/SeedVaultService';
 
 type RecoverIdentityScreenProps = NativeStackScreenProps<RootStackParamList, 'RecoverIdentity'>;
@@ -34,7 +34,15 @@ type RecoveryMethod = 'seed';
 const RecoverIdentityScreen = (props: RecoverIdentityScreenProps) => {
   const _props = props;
   const { t } = useTranslation();
-  const { recoverIdentity, getMasterSeedPhrase, isLoading, error, migrationRequired } = useAuth();
+  const {
+    recoverIdentity,
+    passwordSignIn,
+    lobbySession,
+    getMasterSeedPhrase,
+    isLoading,
+    error,
+    migrationRequired,
+  } = useAuth();
 
   const [recoveryMethod, setRecoveryMethod] = useState<RecoveryMethod>('seed');
   const [seedWords, setSeedWords] = useState<string[]>(Array(24).fill(''));
@@ -44,11 +52,12 @@ const RecoverIdentityScreen = (props: RecoverIdentityScreenProps) => {
   const [showMigration, setShowMigration] = useState(false);
   const [showMigrationBanner, setShowMigrationBanner] = useState(false);
 
-  // Password step: shown after seed is validated, before calling recoverIdentity
+  // Credentials step: shown after the seed is validated. Skipped when an
+  // OPAQUE session already exists (e.g. arriving from the sign-in screen).
   const [recoveryPhase, setRecoveryPhase] = useState<'seed' | 'password'>('seed');
   const [validatedSeedData, setValidatedSeedData] = useState<string | null>(null);
-  const [newPassword, setNewPassword] = useState('');
-  const [confirmNewPassword, setConfirmNewPassword] = useState('');
+  const [username, setUsername] = useState('');
+  const [signinPassword, setSigninPassword] = useState('');
   // Opt-in save-to-secure-chain state for the recovered seed. User taps the
   // button on the password card to persist; we don't auto-save.
   const [vaultState, setVaultState] = useState<'idle' | 'saving' | 'saved' | 'error'>('idle');
@@ -102,65 +111,20 @@ const RecoverIdentityScreen = (props: RecoverIdentityScreenProps) => {
     }
   };
 
-  // Phase 1: Validate seed and move to password step
-  const handleValidateSeed = () => {
+  // Restore the wallet keys from a validated seed and enter the app.
+  const runRecovery = async (seed: string) => {
     setLocalError(null);
-
-    if (recoveryMethod !== 'seed') {
-      setLocalError(t.auth.recoverIdentity.validation.invalidMethod);
-      return;
-    }
-    const normalized = seedWords.map(word => word.trim().toLowerCase()).filter(Boolean);
-    if (normalized.length === 0) {
-      setLocalError(t.auth.recoverIdentity.validation.seedRequired);
-      return;
-    }
-    if (normalized.length !== 24) {
-      setLocalError(t.auth.recoverIdentity.validation.seedInvalid);
-      return;
-    }
-    setValidatedSeedData(normalized.join(' '));
-    setRecoveryPhase('password');
-  };
-
-  // Phase 2: Set password and finalize recovery
-  const handleRecover = async () => {
-    setLocalError(null);
-
-    if (!validatedSeedData) {
-      setLocalError('Seed phrase not validated');
-      return;
-    }
-
-    // Validate password
-    if (newPassword.length < 8) {
-      setLocalError('Password must be at least 8 characters');
-      return;
-    }
-    if (newPassword !== confirmNewPassword) {
-      setLocalError('Passwords do not match');
-      return;
-    }
-
     try {
-      const identity = await recoverIdentity(recoveryMethod, validatedSeedData);
+      const identity = await recoverIdentity(recoveryMethod, seed);
 
-      if (recoveryMethod === 'seed' && RealAuthService.getLastSeedRecoveryNotFound()) {
+      if (
+        recoveryMethod === 'seed' &&
+        RealAuthService.getLastSeedRecoveryNotFound()
+      ) {
         setShowMigrationBanner(true);
         setShowMigration(true);
         return;
       }
-
-      // Save login credentials for local sign-in + OS autofill
-      if (identity?.did) {
-        await SecureIdentityStorage.saveLoginCredentials(identity.did, newPassword);
-      }
-
-      // Note: SeedVaultService.saveSeedPhrase() is intentionally NOT called here.
-      // The seed is already stored without biometric via walletKeychainService
-      // inside RealAuthService.storeIdentity(), which getMasterSeedPhrase()
-      // checks first. Calling saveSeedPhrase() would trigger a biometric prompt
-      // on Android even on write, which is unexpected UX during recovery.
 
       // Navigate to SIDTab (wallet) and show welcome banner with display name.
       _props.navigation.reset({
@@ -198,6 +162,58 @@ const RecoverIdentityScreen = (props: RecoverIdentityScreenProps) => {
         setShowMigrationBanner(true);
       }
     }
+  };
+
+  // Phase 1: validate the seed. When an OPAQUE session already exists
+  // (arriving from the sign-in screen's keyless branch) recover straight
+  // away; otherwise collect the username + password first.
+  const handleValidateSeed = () => {
+    setLocalError(null);
+
+    if (recoveryMethod !== 'seed') {
+      setLocalError(t.auth.recoverIdentity.validation.invalidMethod);
+      return;
+    }
+    const normalized = seedWords
+      .map(word => word.trim().toLowerCase())
+      .filter(Boolean);
+    if (normalized.length === 0) {
+      setLocalError(t.auth.recoverIdentity.validation.seedRequired);
+      return;
+    }
+    if (normalized.length !== 24) {
+      setLocalError(t.auth.recoverIdentity.validation.seedInvalid);
+      return;
+    }
+    const seed = normalized.join(' ');
+    setValidatedSeedData(seed);
+    if (lobbySession) {
+      void runRecovery(seed);
+    } else {
+      setRecoveryPhase('password');
+    }
+  };
+
+  // Phase 2: authenticate with username + password (OPAQUE), then recover.
+  const handleRecover = async () => {
+    setLocalError(null);
+
+    if (!validatedSeedData) {
+      setLocalError('Seed phrase not validated');
+      return;
+    }
+    const u = username.trim().toLowerCase();
+    if (!u || !signinPassword) {
+      setLocalError('Enter your username and password.');
+      return;
+    }
+    try {
+      await passwordSignIn(u, signinPassword);
+    } catch (err: any) {
+      setLocalError(err?.message || 'Sign-in failed');
+      return;
+    }
+    await runRecovery(validatedSeedData);
   };
 
   const displayError = localError || error;
@@ -301,7 +317,7 @@ const RecoverIdentityScreen = (props: RecoverIdentityScreenProps) => {
                   fontSize: typography.size.xs,
                 }}
               >
-                Set a local password below to finish restoring your identity.
+                Sign in below to finish restoring your identity.
               </Text>
             </Column>
           </Card>
@@ -459,33 +475,33 @@ const RecoverIdentityScreen = (props: RecoverIdentityScreenProps) => {
                   color: colors.text_primary,
                 }}
               >
-                Set Local Password
+                Sign in to finish recovery
               </Text>
               <Text style={{ fontSize: typography.size.xs, color: colors.text_secondary }}>
-                This password is stored locally on your device for sign-in. It is never sent to any server.
+                Enter the username and password for the account you are
+                recovering. The password is verified online via OPAQUE — it
+                is never sent to any server.
               </Text>
-              <PasswordField
-                label="Password"
-                placeholder="At least 8 characters"
-                value={newPassword}
-                onChangeText={setNewPassword}
+              <FormField
+                label="Username"
+                placeholder="Your username"
+                value={username}
+                onChangeText={setUsername}
                 editable={!isLoading}
-                textContentType="newPassword"
-                autoComplete="password-new"
-                importantForAutofill="yes"
                 autoCapitalize="none"
                 autoCorrect={false}
                 spellCheck={false}
+                textContentType="username"
+                autoComplete="username"
               />
               <PasswordField
-                label="Confirm Password"
-                placeholder="Re-enter your password"
-                value={confirmNewPassword}
-                onChangeText={setConfirmNewPassword}
+                label="Password"
+                placeholder="Your password"
+                value={signinPassword}
+                onChangeText={setSigninPassword}
                 editable={!isLoading}
-                textContentType="newPassword"
-                autoComplete="password-new"
-                importantForAutofill="no"
+                textContentType="password"
+                autoComplete="password"
                 autoCapitalize="none"
                 autoCorrect={false}
                 spellCheck={false}
@@ -553,7 +569,7 @@ const RecoverIdentityScreen = (props: RecoverIdentityScreenProps) => {
           actions={[
             ...(recoveryPhase === 'seed' ? [
               {
-                label: isLoading ? t.auth.recoverIdentity.buttonLoading : 'Next: Set Password',
+                label: isLoading ? t.auth.recoverIdentity.buttonLoading : 'Continue',
                 onPress: handleValidateSeed,
                 disabled: isLoading,
                 loading: isLoading,

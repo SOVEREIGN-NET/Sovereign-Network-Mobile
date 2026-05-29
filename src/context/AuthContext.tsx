@@ -32,6 +32,23 @@ import {
   bindIdentity as bindQuicIdentity,
 } from '../services/QuicSessionManager';
 import { isNativeQuicSessionAvailable } from '../services/NativeQuicSession';
+import { resubscribeIfOptedIn } from '../services/NotificationsService';
+import {
+  fireDailyCheckin,
+  fireWelcomeClaim,
+} from '../services/RewardsService';
+import {
+  opaqueLogin,
+  opaqueRegisterBegin,
+  opaqueRegisterCancel,
+  opaqueRegisterComplete,
+} from '../services/LobbyAuthService';
+import {
+  clearLobbySession,
+  loadLobbySession,
+  saveLobbySession,
+} from '../services/LobbySessionStore';
+import type { LobbySession } from '../types/lobby';
 import { maskIdentifier } from '../utils/maskIdentifier';
 import { isValidDid } from '../utils/didValidator';
 
@@ -165,6 +182,40 @@ export interface AuthContextType {
   // modal can surface them.
   needsUsernameClaim: boolean;
   claimUsername: (username: string) => Promise<void>;
+  // ─── OPAQUE username/password auth ─────────────────────────────────
+  // The OPAQUE credential is the mandatory online login. The wallet
+  // (DID + Dilithium key) is created alongside it at registration and
+  // restored from the seed phrase on a new device.
+  /** The active OPAQUE password session, or null when signed out. */
+  lobbySession: LobbySession | null;
+  /**
+   * Full registration: OPAQUE register (username/password) + wallet
+   * creation + login. Returns the identity + seed words for the backup
+   * screen, which finishes by calling `setCurrentIdentity`.
+   */
+  registerAccount: (
+    displayName: string,
+    password: string,
+    identityType: string,
+  ) => Promise<{ identity: Identity; seedPhrases: string[] }>;
+  /**
+   * Sign in with username + password (OPAQUE login). Returns the wallet
+   * identity when its key is on this device (and sets it as current);
+   * returns null when the key is absent — the caller routes to
+   * `RecoverIdentity` to restore it from the seed phrase.
+   */
+  passwordSignIn: (
+    username: string,
+    password: string,
+  ) => Promise<Identity | null>;
+  /**
+   * Migrate a legacy (argon2id) account: re-register its OPAQUE
+   * credential against the existing on-device wallet, then sign in.
+   */
+  upgradeLegacyAccount: (
+    username: string,
+    password: string,
+  ) => Promise<Identity | null>;
 }
 
 export const AuthContext = createContext<AuthContextType | undefined>(undefined);
@@ -227,6 +278,7 @@ async function hydrateIdentityFromChain(identity: Identity): Promise<Identity> {
 
 export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
   const [currentIdentity, setCurrentIdentity] = useState<Identity | null>(null);
+  const [lobbySession, setLobbySession] = useState<LobbySession | null>(null);
   const [isLoading, setIsLoading] = useState(false);
   const [isBootstrapping, setIsBootstrapping] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -267,6 +319,20 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
           await IdentityCleanup.cleanAllIdentities();
           setCurrentIdentity(null);
           return;
+        }
+
+        // Restore the OPAQUE password session so a signed-in user stays
+        // signed in across launches.
+        try {
+          const lobby = await loadLobbySession();
+          if (lobby) {
+            setLobbySession(lobby);
+            if (__DEV__) {
+              console.log('[AuthContext.bootstrap] OPAQUE session restored');
+            }
+          }
+        } catch (e) {
+          console.warn('[AuthContext.bootstrap] session restore failed:', e);
         }
 
         // Try to restore cached identity without biometric prompt on startup
@@ -817,6 +883,9 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
       // Clear from secure storage (Keychain and AsyncStorage)
       await SecureIdentityStorage.clearIdentity();
       setCurrentIdentity(null);
+      // Also end the OPAQUE password session.
+      await clearLobbySession();
+      setLobbySession(null);
     } catch (err: any) {
       const message = err.message || 'Sign out failed';
       setError(message);
@@ -1004,6 +1073,38 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
     bindQuicIdentity(currentIdentity?.did ?? null);
   }, [currentIdentity?.did]);
 
+  // Defensive re-subscribe to release announcements. The notifications
+  // subscriber list is per-validator and not replicated, so a member
+  // who opted in on the Bubl tab can quietly fall off the list after a
+  // validator failover or a launch that lands on a different node.
+  // Firing here — once per identity activation, i.e. effectively once
+  // per launch — silently re-asserts the subscription if (and only if)
+  // this device previously opted in with the active DID. Idempotent,
+  // best-effort, never throws.
+  useEffect(() => {
+    void resubscribeIfOptedIn(currentIdentity?.did ?? null);
+  }, [currentIdentity?.did]);
+
+  // BUBL rewards — auto-fire the lifecycle claims. `welcome` runs once
+  // per launch on identity activation (the service backs off and
+  // retries, since a just-created identity may not be on-chain yet);
+  // `daily_checkin` runs on activation and on every foreground, with
+  // the service collapsing repeats within a UTC day. Both are
+  // best-effort and never throw — the rewards node is the authority.
+  useEffect(() => {
+    const did = currentIdentity?.did;
+    if (!did) return;
+    void fireWelcomeClaim(did);
+    void fireDailyCheckin(did);
+    const sub = AppState.addEventListener(
+      'change',
+      (next: AppStateStatus) => {
+        if (next === 'active') void fireDailyCheckin(did);
+      },
+    );
+    return () => sub.remove();
+  }, [currentIdentity?.did]);
+
   // Server-push inbound stream — one long-lived `/msg/inbound`
   // subscription rides the persistent QUIC session, replacing the
   // legacy 5 s `/msg/receive` poll. Server pushes envelope frames
@@ -1032,7 +1133,7 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
     if (!did) return;
 
     let cancelled = false;
-    const drainAndSubscribe = () => {
+    const drainAndSubscribe = (forceCycle: boolean) => {
       if (cancelled) return;
       void (async () => {
         try {
@@ -1049,18 +1150,25 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
           console.warn('[AuthContext] deposit drain failed:', e);
         }
         if (!cancelled && isNativeQuicSessionAvailable) {
-          void startInboundSubscription();
+          // Foreground: force-cycle the inbound stream. iOS commonly
+          // suspends the QUIC socket while we're backgrounded; without
+          // a forced re-open the JS-side `inboundStreamId !== null`
+          // check would bail and we'd keep delivering to a dead stream
+          // server-side, losing any message that arrived while the
+          // chat was on screen during background.
+          void startInboundSubscription(forceCycle);
         }
       })();
     };
 
-    drainAndSubscribe();
+    drainAndSubscribe(false);
     const sub = AppState.addEventListener('change', (next: AppStateStatus) => {
-      // On foreground, drain anything queued in the deposit store
-      // while we were away. The push stream stays open through
-      // the background — don't try to close/reopen it here, the
-      // race that produces empties out.
-      if (next === 'active') drainAndSubscribe();
+      // On foreground we drain the deposit store AND force-cycle the
+      // push stream so we're not stuck on a phantom subscriber the OS
+      // tore down during suspension. The brief no-subscriber window
+      // between the cycle and the new register is covered by the
+      // drain above — anything that lands then sits in deposit.
+      if (next === 'active') drainAndSubscribe(true);
     });
 
     return () => {
@@ -1111,6 +1219,245 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
     [currentIdentity],
   );
 
+  // ─── OPAQUE username/password auth ───────────────────────────────────
+
+  /** Persist + activate a freshly established OPAQUE session. */
+  const adoptLobbySession = useCallback(async (session: LobbySession) => {
+    await saveLobbySession(session);
+    setLobbySession(session);
+  }, []);
+
+  /**
+   * Load the wallet identity for `did` from this device's native
+   * stores. Returns null when the key is not present (a new device) —
+   * the caller then restores it from the seed phrase.
+   */
+  const loadLocalWallet = useCallback(
+    async (did: string, username: string): Promise<Identity | null> => {
+      const local = await nativeIdentityProvisioning
+        .getLocalIdentity(did)
+        .catch(() => null);
+      if (
+        !local ||
+        local.status !== 'found' ||
+        !local.identity_id ||
+        !local.did
+      ) {
+        return null;
+      }
+      return {
+        identityId: local.identity_id,
+        did: local.did,
+        displayName: username,
+        identityType: (local.identity_type ||
+          'human') as Identity['identityType'],
+        deviceId: local.device_id,
+        createdAt: local.created_at,
+      };
+    },
+    [],
+  );
+
+  const registerAccount = useCallback(
+    async (
+      displayName: string,
+      password: string,
+      identityType: string,
+    ): Promise<{ identity: Identity; seedPhrases: string[] }> => {
+      setError(null);
+      setIsLoading(true);
+      const username = displayName
+        .trim()
+        .toLowerCase()
+        .replaceAll(/\s+/g, '_');
+      // Reserve the username + run the OPAQUE first leg before creating
+      // a wallet — a taken name fails here, leaving nothing behind.
+      const handle = await opaqueRegisterBegin({ username, password });
+      // Track the wallet so we can roll it back fully if OPAQUE
+      // register/finish or login fails. Without this, a failure
+      // mid-registration leaves the native wallet + Keychain
+      // identity behind, and the next launch's bootstrap restores
+      // a "signed in" account with no server-side credential.
+      let createdIdentity: Identity | null = null;
+      try {
+        const identity = await createIdentity({
+          display_name: displayName.trim(),
+          password,
+          identity_type: identityType,
+        });
+        createdIdentity = identity;
+        // register/finish rides the authenticated ALPN, so the wallet
+        // identity must be in SecureIdentityStorage (DID cache) before
+        // it runs. `createIdentity` populates only the native stores.
+        await SecureIdentityStorage.setIdentity(identity, {
+          requireBiometric: false,
+        });
+        // Wire the QUIC session manager to the freshly-created
+        // identity. We can't set `currentIdentity` yet — the user
+        // still needs to confirm the seed phrase, and setting it
+        // here would short-circuit the navigation to SeedPhrase.
+        // But register/finish is an authenticated call, so without
+        // this explicit bind it errors with "no identity bound".
+        // `setCurrentIdentity` later will see the same DID and
+        // re-bind is a no-op.
+        bindQuicIdentity(identity.did);
+        // Make sure the lib-client Identity handle is in the
+        // platform handle store — UHP signing on the authenticated
+        // request needs it. `createIdentity` usually leaves the
+        // handle live, but restore is idempotent and cheap.
+        if (
+          identity.identityId &&
+          NativeModules.NativeIdentityProvisioning
+        ) {
+          try {
+            await NativeModules.NativeIdentityProvisioning.restoreIdentityToHandleStore(
+              identity.identityId,
+            );
+          } catch (e) {
+            console.warn(
+              '[AuthContext.registerAccount] handle store restore failed:',
+              e,
+            );
+          }
+        }
+        await opaqueRegisterComplete(handle, password, identity.did);
+        const session = await opaqueLogin({ username, password });
+        await adoptLobbySession(session);
+        // Persist the username on-chain too, so the claim modal never
+        // fires for a freshly-registered account. Best-effort.
+        try {
+          await claimUsernameOnChain(username);
+        } catch (e) {
+          console.warn(
+            '[AuthContext] claim-username after register failed:',
+            e,
+          );
+        }
+        const seedPhrases = (identity.masterSeedPhrase ?? '')
+          .trim()
+          .split(/\s+/)
+          .filter(Boolean);
+        return { identity, seedPhrases };
+      } catch (err: any) {
+        await opaqueRegisterCancel(handle).catch(() => {});
+        // Roll the wallet back too if `createIdentity` already ran.
+        // Otherwise the native wallet + Keychain identity survive
+        // the failure and the next bootstrap restores a half-
+        // registered account (no OPAQUE credential on the server).
+        if (createdIdentity) {
+          bindQuicIdentity(null);
+          await SecureIdentityStorage.clearIdentity().catch(() => {});
+          await SecureIdentityStorage.clearLoginCredentials().catch(
+            () => {},
+          );
+          if (createdIdentity.identityId) {
+            await IdentityCleanup.cleanSpecificIdentity(
+              createdIdentity.identityId,
+            ).catch((cleanupErr) => {
+              console.warn(
+                '[AuthContext.registerAccount] rollback cleanup failed:',
+                cleanupErr,
+              );
+            });
+          }
+        }
+        setError(err?.message || 'Registration failed');
+        throw err;
+      } finally {
+        setIsLoading(false);
+      }
+    },
+    [createIdentity, adoptLobbySession],
+  );
+
+  const passwordSignIn = useCallback(
+    async (
+      username: string,
+      password: string,
+    ): Promise<Identity | null> => {
+      setError(null);
+      setIsLoading(true);
+      try {
+        const normalized = username.trim().toLowerCase();
+        const session = await opaqueLogin({
+          username: normalized,
+          password,
+        });
+        await adoptLobbySession(session);
+        const identity = await loadLocalWallet(
+          session.did,
+          session.username,
+        );
+        if (identity) {
+          await setIdentity(identity);
+          return identity;
+        }
+        // OPAQUE-authenticated, but the wallet key is not on this
+        // device — caller routes to seed-phrase recovery.
+        return null;
+      } catch (err: any) {
+        setError(err?.message || 'Sign-in failed');
+        throw err;
+      } finally {
+        setIsLoading(false);
+      }
+    },
+    [adoptLobbySession, loadLocalWallet, setIdentity],
+  );
+
+  const upgradeLegacyAccount = useCallback(
+    async (
+      username: string,
+      password: string,
+    ): Promise<Identity | null> => {
+      setError(null);
+      setIsLoading(true);
+      try {
+        // Upgrading a legacy account re-registers its OPAQUE credential
+        // against the existing wallet DID — which must be on this
+        // device for register/finish to authenticate.
+        const did = await SecureIdentityStorage.getIdentityId();
+        if (!did) {
+          throw new Error(
+            'Restore your wallet on this device before upgrading this account.',
+          );
+        }
+        const normalized = username.trim().toLowerCase();
+        const handle = await opaqueRegisterBegin({
+          username: normalized,
+          password,
+        });
+        try {
+          await opaqueRegisterComplete(handle, password, did);
+        } catch (err) {
+          await opaqueRegisterCancel(handle);
+          throw err;
+        }
+        // Credential re-registered — sign in normally.
+        const session = await opaqueLogin({
+          username: normalized,
+          password,
+        });
+        await adoptLobbySession(session);
+        const identity = await loadLocalWallet(
+          session.did,
+          session.username,
+        );
+        if (identity) {
+          await setIdentity(identity);
+          return identity;
+        }
+        return null;
+      } catch (err: any) {
+        setError(err?.message || 'Account upgrade failed');
+        throw err;
+      } finally {
+        setIsLoading(false);
+      }
+    },
+    [adoptLobbySession, loadLocalWallet, setIdentity],
+  );
+
   const value = useMemo<AuthContextType>(() => ({
     currentIdentity,
     isAuthenticated: currentIdentity !== null,
@@ -1138,6 +1485,10 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
     getMasterSeedPhrase,
     needsUsernameClaim,
     claimUsername,
+    lobbySession,
+    registerAccount,
+    passwordSignIn,
+    upgradeLegacyAccount,
   }), [
     currentIdentity,
     isLoading,
@@ -1164,6 +1515,10 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
     getMasterSeedPhrase,
     needsUsernameClaim,
     claimUsername,
+    lobbySession,
+    registerAccount,
+    passwordSignIn,
+    upgradeLegacyAccount,
   ]);
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;

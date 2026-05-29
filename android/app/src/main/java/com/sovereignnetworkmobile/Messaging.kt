@@ -98,6 +98,24 @@ class Messaging private constructor(
         ) == 0
     }
 
+    /**
+     * Stateful receive-side decrypt — verifies the sender's Dilithium
+     * signature, then opens the body against THIS session's receive
+     * ratchet, advancing it so the next call decrypts the following
+     * sequence. The receive-side counterpart of `sealTextSigned`.
+     * Empty bytes on bad signature / decrypt failure; the session is
+     * left untouched so the caller may retry.
+     */
+    fun openVerifiedWithSession(
+        envelopeBytes: ByteArray,
+        peerDilithiumPk: ByteArray,
+    ): ByteArray {
+        check(!closed) { "session is closed" }
+        return nativeEnvelopeOpenVerifiedWithSession(
+            handle, envelopeBytes, peerDilithiumPk
+        ) ?: ByteArray(0)
+    }
+
     override fun close() {
         if (closed || handle == 0L) return
         nativeSessionFree(handle)
@@ -303,6 +321,9 @@ class Messaging private constructor(
         ): Int
         @JvmStatic private external fun nativeEnvelopeOpenVerified(
             envelopeBytes: ByteArray, chainKey: ByteArray, peerDilithiumPk: ByteArray,
+        ): ByteArray?
+        @JvmStatic private external fun nativeEnvelopeOpenVerifiedWithSession(
+            sessionHandle: Long, envelopeBytes: ByteArray, peerDilithiumPk: ByteArray,
         ): ByteArray?
 
         // Envelope-shaped accept variants (receive path)

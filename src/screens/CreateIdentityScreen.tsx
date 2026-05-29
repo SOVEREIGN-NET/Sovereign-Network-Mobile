@@ -36,7 +36,7 @@ const resolveUsernameStatusLabel = (
 
 const CreateIdentityScreen = ({ navigation }: CreateIdentityScreenProps) => {
   const { t } = useTranslation();
-  const { createIdentity, checkUsernameAvailability } = useAuth();
+  const { registerAccount, checkUsernameAvailability } = useAuth();
   const { isConnected, hasChecked } = useNodeConnection(true);
 
   // Form state
@@ -174,39 +174,34 @@ const CreateIdentityScreen = ({ navigation }: CreateIdentityScreenProps) => {
 
     const backendType = identityType === 'citizen' ? 'human' : identityType;
 
-    createIdentity({
-      display_name: displayName.trim(),
-      password,
-      identity_type: backendType,
-      recovery_options: [],
-    }).then((identity) => {
-      // SECURITY: No logging of sensitive data (seed phrases, keys, etc.)
-      // Only log non-sensitive metadata in development mode
-      if (__DEV__) {
-        console.log('✅ Identity created successfully');
-      }
-
-      const phrase = identity?.masterSeedPhrase?.trim();
-      if (phrase) {
-        const words = phrase.split(/\s+/);
-        navigation.navigate('SeedPhrase', {
-          seedPhrases: words,
-          identity,
-        });
-      } else {
-        console.warn('⚠️ Identity created but no master seed phrase available');
+    // Registration runs the OPAQUE username/password register + login
+    // around the existing wallet creation — see AuthContext.registerAccount.
+    registerAccount(displayName.trim(), password, backendType)
+      .then(({ identity, seedPhrases }) => {
+        // SECURITY: No logging of sensitive data (seed phrases, keys).
+        if (__DEV__) {
+          console.log('✅ Account registered successfully');
+        }
+        if (seedPhrases.length > 0) {
+          navigation.navigate('SeedPhrase', { seedPhrases, identity });
+        } else {
+          console.warn('⚠️ Account created but no master seed phrase available');
+          setFieldErrors({
+            displayName:
+              'Master seed phrase is not available. Please contact support.',
+          });
+        }
+      })
+      .catch((err) => {
+        console.error('❌ Registration error:', err);
         setFieldErrors({
-          displayName: 'Master seed phrase is not available. Please contact support.',
+          displayName:
+            err?.message || 'Failed to create account. Please try again.',
         });
-      }
-    }).catch((err) => {
-      console.error('❌ Identity creation error:', err);
-      setFieldErrors({
-        displayName: err?.message || 'Failed to create identity. Please try again.',
+      })
+      .finally(() => {
+        setIsCreatingIdentity(false);
       });
-    }).finally(() => {
-      setIsCreatingIdentity(false);
-    });
   };
 
   const isCreateDisabled = isCreatingIdentity;

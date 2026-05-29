@@ -15,6 +15,16 @@ set -euo pipefail
 # Force nightly to match lib-client's workspace toolchain.
 export RUSTUP_TOOLCHAIN="${RUSTUP_TOOLCHAIN:-nightly}"
 
+# When Gradle is launched from Android Studio (or any non-login process)
+# rather than a terminal, ~/.cargo/bin is not on PATH — `cargo` then
+# isn't found and the build dies confusingly. Source the cargo env /
+# prepend its bin dir so this works however Gradle was started.
+if [[ -f "$HOME/.cargo/env" ]]; then
+    # shellcheck disable=SC1091
+    source "$HOME/.cargo/env"
+fi
+export PATH="$HOME/.cargo/bin:$PATH"
+
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 cd "$SCRIPT_DIR"
 
@@ -88,8 +98,20 @@ for target_info in "${TARGETS[@]}"; do
     export CARGO_TARGET_ARMV7_LINUX_ANDROIDEABI_LINKER="$TOOLCHAIN/bin/${clang_prefix}${api_level}-clang"
     export CARGO_TARGET_X86_64_LINUX_ANDROID_LINKER="$TOOLCHAIN/bin/${clang_prefix}${api_level}-clang"
 
-    # Build quic-jni (which depends on lib-client from node code)
-    cargo build --release --target "$rust_target" 2>&1 | tail -5
+    # Build quic-jni (which depends on lib-client from node code).
+    # Keep the console quiet on success (tail), but on failure dump the
+    # whole log — a bare `| tail -5` once hid a cc-rs toolchain error
+    # behind an opaque Gradle "exit value 101" with nothing to act on.
+    build_log="$(mktemp -t quic-jni-build.XXXXXX)"
+    if cargo build --release --target "$rust_target" > "$build_log" 2>&1; then
+        tail -5 "$build_log"
+        rm -f "$build_log"
+    else
+        echo "❌ cargo build failed for $rust_target — full output:" >&2
+        cat "$build_log" >&2
+        rm -f "$build_log"
+        exit 1
+    fi
 
     # Copy .so to jniLibs
     mkdir -p "$OUTPUT_DIR/$android_abi"

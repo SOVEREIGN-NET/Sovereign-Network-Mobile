@@ -43,6 +43,23 @@ export const DEFAULT_SOV_NODE_URL = generatedConfig.ZHTP_NODE_URL;
 export const CERTIFICATE_PIN = generatedConfig.CERTIFICATE_PIN;
 
 /**
+ * Known gateways (hostnames + SPKI pins) used as the fallback list when
+ * the ZDNS-resolved IPs don't answer. Generated from `ZHTP_NODE_REGISTRY`
+ * in `.env` by `scripts/generate-config.js`. Empty array if .env doesn't
+ * declare any.
+ */
+export interface KnownGateway {
+  host: string;
+  port: number;
+  pin: string;
+}
+export const NODE_REGISTRY: KnownGateway[] = Array.isArray(
+  (generatedConfig as { NODE_REGISTRY?: unknown }).NODE_REGISTRY,
+)
+  ? ((generatedConfig as { NODE_REGISTRY: KnownGateway[] }).NODE_REGISTRY)
+  : [];
+
+/**
  * ZDNS bootstrap — A-record lookup of `directory.sov` feeds the validator
  * set. All generated from .env (single source of truth); override there,
  * don't inline in code. Fallbacks match current mainnet defaults so a

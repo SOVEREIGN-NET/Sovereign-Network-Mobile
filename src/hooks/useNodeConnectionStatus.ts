@@ -9,7 +9,7 @@
 
 import { useState, useEffect, useCallback, useRef } from 'react';
 import { AppState, AppStateStatus } from 'react-native';
-import { isQuicSupported, testQuicConnection } from '../services/quic';
+import { isQuicSupported, testQuicHealthCheck } from '../services/quic';
 import { getActiveTarget } from '../services/NetworkBootstrap';
 import { refreshFeeConfig } from '../services/FeeConfigService';
 
@@ -58,8 +58,14 @@ async function _check() {
     _notify();
     const target = getActiveTarget();
     if (__DEV__) console.log('[NodeStatus] Testing connection to', target.host, target.port);
-    const result = await testQuicConnection(target.host, target.port);
-    if (__DEV__) console.log('[NodeStatus] testQuicConnection result:', JSON.stringify(result));
+    // Route through the health-check path (NativeQuic.request → /api/v1/
+    // protocol/health) rather than the bare transport probe. The bare
+    // probe (uhp_quic_connect_public) panics in lib-client on iOS,
+    // taking the process with it; the health check uses the same
+    // request path the rest of the app uses and degrades to a clean
+    // failure instead of a crash.
+    const result = await testQuicHealthCheck(target.host, target.port);
+    if (__DEV__) console.log('[NodeStatus] testQuicHealthCheck result:', JSON.stringify(result));
 
     if (result.success) {
       _status = 'connected';

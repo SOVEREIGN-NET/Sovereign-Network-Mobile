@@ -1,5 +1,6 @@
 package com.sovereignnetworkmobile
 
+import android.os.Bundle
 import com.facebook.react.ReactActivity
 import com.facebook.react.ReactActivityDelegate
 import com.facebook.react.defaults.DefaultNewArchitectureEntryPoint.fabricEnabled
@@ -12,6 +13,17 @@ class MainActivity : ReactActivity() {
    * rendering of the component.
    */
   override fun getMainComponentName(): String = "SovereignNetworkMobile"
+
+  /**
+   * Pass `null` instead of `savedInstanceState` to prevent Android from
+   * trying to restore react-native-screens fragments before the JS layer
+   * has set them back up. Without this, process death + relaunch crashes
+   * in `ScreenFragment.<init>` with "Screen fragments should never be
+   * restored." See react-native-screens#17.
+   */
+  override fun onCreate(savedInstanceState: Bundle?) {
+    super.onCreate(null)
+  }
 
   /**
    * Returns the instance of the [ReactActivityDelegate]. We use [DefaultReactActivityDelegate]

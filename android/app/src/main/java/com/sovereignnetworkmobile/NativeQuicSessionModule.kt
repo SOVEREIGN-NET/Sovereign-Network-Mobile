@@ -11,7 +11,9 @@ import com.facebook.react.modules.core.DeviceEventManagerModule
 import java.net.InetAddress
 import java.util.UUID
 import java.util.concurrent.ConcurrentHashMap
+import java.util.concurrent.CountDownLatch
 import java.util.concurrent.Executors
+import java.util.concurrent.TimeUnit
 import java.util.concurrent.atomic.AtomicBoolean
 
 /**
@@ -119,10 +121,26 @@ class NativeQuicSessionModule(reactContext: ReactApplicationContext) :
 
     @ReactMethod
     fun closeSession(sessionId: String) {
-        val s = sessions.remove(sessionId) ?: return
-        try {
-            s.close()
-        } catch (_: Throwable) { /* best-effort */ }
+        // Any inbound readers attached to this session are blocked
+        // in `nativeInboundRead` (1 s polling timeout). Freeing the
+        // session while a read is in-flight crashes the process —
+        // cancel-and-join readers first, then close the session.
+        // Hop off the bridge thread because the join can take up
+        // to ~2.5 s if a reader is mid-blocking-call.
+        rpcPool.execute {
+            val attached = inboundStreams.values
+                .filter { it.sessionId == sessionId }
+            for (r in attached) r.cancelled.set(true)
+            for (r in attached) {
+                try {
+                    r.exited.await(2_500, TimeUnit.MILLISECONDS)
+                } catch (_: InterruptedException) { /* shutting down */ }
+            }
+            val s = sessions.remove(sessionId) ?: return@execute
+            try {
+                s.close()
+            } catch (_: Throwable) { /* best-effort */ }
+        }
     }
 
     // ── rpc ─────────────────────────────────────────────────────
@@ -182,11 +200,17 @@ class NativeQuicSessionModule(reactContext: ReactApplicationContext) :
                     )
                 val streamId = UUID.randomUUID().toString()
                 val cancelled = AtomicBoolean(false)
-                val runner = InboundStreamRunner(stream, cancelled)
+                val exited = CountDownLatch(1)
+                val runner = InboundStreamRunner(
+                    stream = stream,
+                    sessionId = sessionId,
+                    cancelled = cancelled,
+                    exited = exited,
+                )
                 inboundStreams[streamId] = runner
 
                 readerPool.execute {
-                    runReaderLoop(streamId, stream, cancelled)
+                    runReaderLoop(streamId, stream, cancelled, exited)
                 }
                 promise.resolve(streamId)
             } catch (e: Throwable) {
@@ -201,59 +225,73 @@ class NativeQuicSessionModule(reactContext: ReactApplicationContext) :
 
     @ReactMethod
     fun closeInbound(streamId: String) {
-        val runner = inboundStreams.remove(streamId) ?: return
+        // Only signal cancellation. The reader thread is blocked
+        // in `nativeInboundRead` for up to 1 s; calling
+        // `stream.close()` from here while that's in-flight is a
+        // UAF on the lib-client side. The reader closes the stream
+        // itself when its loop exits.
+        val runner = inboundStreams[streamId] ?: return
         runner.cancelled.set(true)
-        try {
-            runner.stream.close()
-        } catch (_: Throwable) { /* best-effort */ }
     }
 
     private fun runReaderLoop(
         streamId: String,
         stream: InboundStream,
         cancelled: AtomicBoolean,
+        exited: CountDownLatch,
     ) {
-        while (!cancelled.get()) {
-            val frame = try {
-                stream.read(1000)
-            } catch (e: Throwable) {
-                emit(
-                    "QuicInboundError",
-                    Arguments.createMap().apply {
-                        putString("streamId", streamId)
-                        putString("error", e.message ?: e.toString())
-                    },
-                )
-                inboundStreams.remove(streamId)
-                return
-            }
-
-            when {
-                frame == null -> {
+        try {
+            while (!cancelled.get()) {
+                val frame = try {
+                    stream.read(1000)
+                } catch (e: Throwable) {
                     emit(
-                        "QuicInboundClosed",
+                        "QuicInboundError",
                         Arguments.createMap().apply {
                             putString("streamId", streamId)
+                            putString("error", e.message ?: e.toString())
                         },
                     )
-                    inboundStreams.remove(streamId)
                     return
                 }
-                frame.isEmpty() -> {
-                    // timeout — loop again, letting the cancelled
-                    // check fire promptly.
-                }
-                else -> {
-                    val b64 = Base64.encodeToString(frame, Base64.NO_WRAP)
-                    emit(
-                        "QuicInboundFrame",
-                        Arguments.createMap().apply {
-                            putString("streamId", streamId)
-                            putString("frameB64", b64)
-                        },
-                    )
+
+                when {
+                    frame == null -> {
+                        emit(
+                            "QuicInboundClosed",
+                            Arguments.createMap().apply {
+                                putString("streamId", streamId)
+                            },
+                        )
+                        return
+                    }
+                    frame.isEmpty() -> {
+                        // timeout — loop again, letting the cancelled
+                        // check fire promptly.
+                    }
+                    else -> {
+                        val b64 = Base64.encodeToString(frame, Base64.NO_WRAP)
+                        emit(
+                            "QuicInboundFrame",
+                            Arguments.createMap().apply {
+                                putString("streamId", streamId)
+                                putString("frameB64", b64)
+                            },
+                        )
+                    }
                 }
             }
+        } finally {
+            // Close the stream from the same thread that was driving
+            // the blocking read. This is the only safe sequencing —
+            // freeing the native handle while another thread is in
+            // `nativeInboundRead` is a UAF. After this returns, the
+            // session-close path is free to drop the parent session.
+            try {
+                stream.close()
+            } catch (_: Throwable) { /* best-effort */ }
+            inboundStreams.remove(streamId)
+            exited.countDown()
         }
     }
 
@@ -271,7 +309,17 @@ class NativeQuicSessionModule(reactContext: ReactApplicationContext) :
     fun removeListeners(count: Int) { /* no-op */ }
 }
 
+/**
+ * Per-inbound-stream state. The reader thread closes the stream
+ * itself on exit (after its blocking `nativeInboundRead` returns
+ * or sees cancellation) and counts down `exited`. External
+ * callers must NOT call `stream.close()` while the reader could
+ * be mid-read — concurrent close while a read is in flight is a
+ * UAF on the lib-client side.
+ */
 internal data class InboundStreamRunner(
     val stream: InboundStream,
+    val sessionId: String,
     val cancelled: AtomicBoolean,
+    val exited: CountDownLatch,
 )

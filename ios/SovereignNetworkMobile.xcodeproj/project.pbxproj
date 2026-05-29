@@ -56,6 +56,9 @@
 		A1B2C3D40000000000000001 /* QuicSession.swift in Sources */ = {isa = PBXBuildFile; fileRef = A1B2C3D40000000000000002 /* QuicSession.swift */; };
 		A1B2C3D40000000000000003 /* NativeQuicSession.swift in Sources */ = {isa = PBXBuildFile; fileRef = A1B2C3D40000000000000004 /* NativeQuicSession.swift */; };
 		A1B2C3D40000000000000005 /* NativeQuicSession.m in Sources */ = {isa = PBXBuildFile; fileRef = A1B2C3D40000000000000006 /* NativeQuicSession.m */; };
+		A1B2C3D40000000000000007 /* LobbyAuth.swift in Sources */ = {isa = PBXBuildFile; fileRef = A1B2C3D40000000000000008 /* LobbyAuth.swift */; };
+		A1B2C3D40000000000000009 /* NativeLobbyAuth.swift in Sources */ = {isa = PBXBuildFile; fileRef = A1B2C3D4000000000000000A /* NativeLobbyAuth.swift */; };
+		A1B2C3D4000000000000000B /* NativeLobbyAuth.m in Sources */ = {isa = PBXBuildFile; fileRef = A1B2C3D4000000000000000C /* NativeLobbyAuth.m */; };
 		E0E690FBF083DE4383E70BAA /* NativeMessaging.m in Sources */ = {isa = PBXBuildFile; fileRef = E3D750521401B693A3C5B4CA /* NativeMessaging.m */; };
 		E7A1B0B02F9A1B2C3D4E5F60 /* web4apps in Resources */ = {isa = PBXBuildFile; fileRef = E7A1B0A02F9A1B2C3D4E5F60 /* web4apps */; };
 		F6517E0A47AD79DAC6402FB3 /* Messaging.swift in Sources */ = {isa = PBXBuildFile; fileRef = 37E0063D47E5E71CCB492A93 /* Messaging.swift */; };
@@ -120,6 +123,9 @@
 		A1B2C3D40000000000000002 /* QuicSession.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; name = QuicSession.swift; path = QuicSession.swift; sourceTree = "<group>"; };
 		A1B2C3D40000000000000004 /* NativeQuicSession.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; name = NativeQuicSession.swift; path = NativeQuicSession.swift; sourceTree = "<group>"; };
 		A1B2C3D40000000000000006 /* NativeQuicSession.m */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.c.objc; name = NativeQuicSession.m; path = NativeQuicSession.m; sourceTree = "<group>"; };
+		A1B2C3D40000000000000008 /* LobbyAuth.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; name = LobbyAuth.swift; path = LobbyAuth.swift; sourceTree = "<group>"; };
+		A1B2C3D4000000000000000A /* NativeLobbyAuth.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; name = NativeLobbyAuth.swift; path = NativeLobbyAuth.swift; sourceTree = "<group>"; };
+		A1B2C3D4000000000000000C /* NativeLobbyAuth.m */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.c.objc; name = NativeLobbyAuth.m; path = NativeLobbyAuth.m; sourceTree = "<group>"; };
 		A7A2C04642DBBDA9BDFAED92 /* Pods-SovereignNetworkMobile.debug.xcconfig */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = text.xcconfig; name = "Pods-SovereignNetworkMobile.debug.xcconfig"; path = "Target Support Files/Pods-SovereignNetworkMobile/Pods-SovereignNetworkMobile.debug.xcconfig"; sourceTree = "<group>"; };
 		D7A3C60A85BF21F0504F9302 /* Pods-SovereignNetworkMobile.release.xcconfig */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = text.xcconfig; name = "Pods-SovereignNetworkMobile.release.xcconfig"; path = "Target Support Files/Pods-SovereignNetworkMobile/Pods-SovereignNetworkMobile.release.xcconfig"; sourceTree = "<group>"; };
 		E3D750521401B693A3C5B4CA /* NativeMessaging.m */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.c.objc; name = NativeMessaging.m; path = NativeMessaging.m; sourceTree = "<group>"; };
@@ -192,6 +198,9 @@
 				A1B2C3D40000000000000002 /* QuicSession.swift */,
 				A1B2C3D40000000000000004 /* NativeQuicSession.swift */,
 				A1B2C3D40000000000000006 /* NativeQuicSession.m */,
+				A1B2C3D40000000000000008 /* LobbyAuth.swift */,
+				A1B2C3D4000000000000000A /* NativeLobbyAuth.swift */,
+				A1B2C3D4000000000000000C /* NativeLobbyAuth.m */,
 			);
 			name = SovereignNetworkMobile;
 			sourceTree = "<group>";
@@ -463,6 +472,9 @@
 				A1B2C3D40000000000000001 /* QuicSession.swift in Sources */,
 				A1B2C3D40000000000000003 /* NativeQuicSession.swift in Sources */,
 				A1B2C3D40000000000000005 /* NativeQuicSession.m in Sources */,
+				A1B2C3D40000000000000007 /* LobbyAuth.swift in Sources */,
+				A1B2C3D40000000000000009 /* NativeLobbyAuth.swift in Sources */,
+				A1B2C3D4000000000000000B /* NativeLobbyAuth.m in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -478,7 +490,7 @@
 				CLANG_ENABLE_MODULES = YES;
 				CODE_SIGN_IDENTITY = "Apple Development";
 				CODE_SIGN_STYLE = Automatic;
-				CURRENT_PROJECT_VERSION = 23;
+				CURRENT_PROJECT_VERSION = 31;
 				DEVELOPMENT_TEAM = P7QAGNGM38;
 				ENABLE_BITCODE = NO;
 				HEADER_SEARCH_PATHS = (
@@ -607,7 +619,7 @@
 				CLANG_ENABLE_MODULES = YES;
 				CODE_SIGN_IDENTITY = "Apple Development";
 				CODE_SIGN_STYLE = Automatic;
-				CURRENT_PROJECT_VERSION = 23;
+				CURRENT_PROJECT_VERSION = 31;
 				DEVELOPMENT_TEAM = P7QAGNGM38;
 				HEADER_SEARCH_PATHS = (
 					"$(inherited)",

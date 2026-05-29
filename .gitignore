@@ -156,3 +156,6 @@ docs/RELEASE_DEPLOYMENT.md
 .expo/
 .qoder/
 .vscode/
+
+# Claude Code session state (PID lockfile, local settings)
+.claude/

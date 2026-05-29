@@ -209,6 +209,19 @@ private func cMsgEnvelopeOpenVerified(
     _ peerDilithiumPkLen: Int
 ) -> ByteBuffer
 
+// Stateful + verified open. Decrypts against the session's receive
+// ratchet and advances it in place — the next call opens the next
+// sequence. Handles in-order, skip-forward and out-of-order delivery
+// internally; on any failure the session is left untouched.
+@_silgen_name("zhtp_msg_envelope_open_verified_with_session")
+private func cMsgEnvelopeOpenVerifiedWithSession(
+    _ handle: UnsafeMutableRawPointer,
+    _ envelopeBytes: UnsafePointer<UInt8>,
+    _ envelopeLen: Int,
+    _ peerDilithiumPk: UnsafePointer<UInt8>,
+    _ peerDilithiumPkLen: Int
+) -> ByteBuffer
+
 // Envelope-shaped session accept variants — Rust extracts the Kyber
 // ciphertext from the bincode envelope itself, mirroring the send-side
 // `seal_key_exchange_signed` API.
@@ -522,6 +535,29 @@ public final class MessagingSession {
             throw MessagingError.sealFailed("binary_signed")
         }
         return s
+    }
+
+    /// Verify the sender's Dilithium signature + DID binding, then
+    /// decrypt the body — advancing THIS session's receive ratchet in
+    /// place, so the next call decrypts the following sequence. This is
+    /// the receive-side counterpart of `sealTextSigned`. Throws on bad
+    /// signature / decrypt failure; the session is left untouched so
+    /// the caller may retry.
+    public func openVerifiedWithSession(
+        envelope: Data,
+        peerDilithiumPk: Data
+    ) throws -> Data {
+        let buf: ByteBuffer = envelope.withRustBytes { envPtr, envLen in
+            peerDilithiumPk.withRustBytes { pkPtr, pkLen in
+                cMsgEnvelopeOpenVerifiedWithSession(
+                    handle, envPtr, envLen, pkPtr, pkLen
+                )
+            }
+        }
+        guard let body = bufferToData(buf) else {
+            throw MessagingError.openFailed
+        }
+        return body
     }
 }
 

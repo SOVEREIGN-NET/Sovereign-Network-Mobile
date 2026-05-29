@@ -20,6 +20,7 @@ import {
   View,
 } from 'react-native';
 import { ScreenLayout } from '../../components';
+import { BublMiniWallet, ReleaseNotifyCard } from '../../components/organisms';
 import { usePersistedState } from '../../hooks/usePersistedState';
 import { colors, spacing, typography, borderRadius } from '../../theme';
 import {
@@ -31,6 +32,7 @@ import {
   type WireProbeResult,
 } from '../../services/MessagingService';
 import { publishKyberKey } from '../../services/KyberKeyService';
+import { fireActiveSession } from '../../services/RewardsService';
 import { useAuth } from '../../hooks/useAuth';
 import type { Conversation } from '../../types/messaging';
 import {
@@ -119,6 +121,13 @@ const MessagesScreen: React.FC<Props> = ({ navigation }) => {
     if (currentIdentity?.did) runProbe();
   }, [currentIdentity?.did, runProbe]);
 
+  // BUBL active-session reward — reaching the messages tab counts as an
+  // active session for the day. Fire-and-forget; the service guards it
+  // to once per launch and the server enforces once per UTC day.
+  useEffect(() => {
+    void fireActiveSession(currentIdentity?.did);
+  }, [currentIdentity?.did]);
+
   // Single source of truth for "fetch + decrypt + ingest one batch of
   // envelopes from /msg/receive". Used by both pull-to-refresh and the
   // foreground polling loop below; the body is identical, only the
@@ -177,7 +186,7 @@ const MessagesScreen: React.FC<Props> = ({ navigation }) => {
           <Text style={styles.title}>Bubl Social</Text>
           <Text style={styles.subtitle}>
             {privacyOn
-              ? 'Privacy on · contacts hidden'
+              ? 'Privacy on · messages hidden'
               : totalUnread > 0
                 ? `${totalUnread} unread`
                 : 'Post-quantum encrypted'}
@@ -205,6 +214,15 @@ const MessagesScreen: React.FC<Props> = ({ navigation }) => {
           </TouchableOpacity>
         </View>
       </View>
+
+      {/* BUBL mini-wallet — balance-only; opens the full rewards ledger. */}
+      <BublMiniWallet
+        did={currentIdentity?.did}
+        onPress={() => navigation.navigate('BublRewards')}
+      />
+
+      {/* Release-announcement opt-in. */}
+      <ReleaseNotifyCard did={currentIdentity?.did} />
 
       <View style={styles.searchWrap}>
         <TextInput
@@ -308,17 +326,15 @@ const ConversationRow: React.FC<RowProps> = ({
   const { contact, last_message, unread_count } = conversation;
   const unread = unread_count > 0;
 
-  // The display name in privacy mode is the truncated DID — recognisable
-  // to the user (their contacts hash to stable IDs they'll learn) but
-  // useless to anyone glancing at the screen.
-  const renderedName = privacyOn
-    ? redactedName(contact.did)
-    : contact.display_name;
-  const renderedSubtitle = !last_message
-    ? privacyOn
-      ? redactedName(contact.did)
-      : `@${contact.username}`
-    : null;
+  // The @handle is always the conversation's title — it's the label the
+  // user recognises, so privacy mode no longer hides it. A contact with
+  // no handle falls back to the truncated DID. The DID sits on its own
+  // quiet line just beneath, so the username reads above the identifier.
+  const handle =
+    contact.username && contact.username.length > 0
+      ? `@${contact.username.replace(/^@+/, '')}`
+      : null;
+  const title = handle ?? redactedName(contact.did);
 
   return (
     <Pressable
@@ -331,16 +347,19 @@ const ConversationRow: React.FC<RowProps> = ({
         redacted={privacyOn}
       />
       <View style={styles.rowBody}>
+        {/* Identity + timestamp */}
         <View style={styles.rowTop}>
           <Text
             style={[
               styles.rowName,
               unread && styles.rowNameUnread,
-              privacyOn && styles.rowNamePrivate,
+              // Monospace DID look only when the title *is* a raw DID
+              // (a handle-less contact) — never for a @username.
+              handle == null && styles.rowNamePrivate,
             ]}
             numberOfLines={1}
           >
-            {renderedName}
+            {title}
           </Text>
           <Text style={styles.rowTime}>
             {last_message
@@ -348,6 +367,15 @@ const ConversationRow: React.FC<RowProps> = ({
               : ''}
           </Text>
         </View>
+
+        {/* DID — the identifier, sitting under the handle */}
+        {handle != null && (
+          <Text style={styles.rowDid} numberOfLines={1}>
+            {redactedName(contact.did)}
+          </Text>
+        )}
+
+        {/* Last message + unread count */}
         <View style={styles.rowBottom}>
           {last_message ? (
             privacyOn ? (
@@ -366,8 +394,8 @@ const ConversationRow: React.FC<RowProps> = ({
               </Text>
             )
           ) : (
-            <Text style={styles.rowPreview} numberOfLines={1}>
-              {renderedSubtitle ?? ''}
+            <Text style={styles.rowPreviewEmpty} numberOfLines={1}>
+              {privacyOn ? '' : 'No messages yet'}
             </Text>
           )}
           {unread && (
@@ -478,6 +506,10 @@ const styles = StyleSheet.create({
     paddingHorizontal: spacing.lg,
     paddingVertical: spacing.md,
     gap: spacing.md,
+    // A hairline between rows — gives the list an even, settled rhythm
+    // without the heaviness of a full divider.
+    borderBottomWidth: StyleSheet.hairlineWidth,
+    borderBottomColor: colors.border,
   },
   rowPressed: {
     backgroundColor: colors.bg_dark,
@@ -524,6 +556,18 @@ const styles = StyleSheet.create({
   },
   rowPreviewUnread: {
     color: colors.text_primary,
+  },
+  rowDid: {
+    fontSize: typography.size.xs,
+    color: colors.text_tertiary,
+    letterSpacing: 0.2,
+    marginBottom: 3,
+  },
+  rowPreviewEmpty: {
+    flex: 1,
+    fontSize: typography.size.sm,
+    color: colors.text_tertiary,
+    marginRight: spacing.sm,
   },
   rowPrivatePreview: {
     flex: 1,

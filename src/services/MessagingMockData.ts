@@ -217,7 +217,116 @@ export function markRead(did: Did): void {
   notify();
 }
 
+/**
+ * Swap one message for another, in place. Used when an undecryptable
+ * placeholder is rescued by a later KeyExchange: the placeholder's slot
+ * in the timeline (and the unread count it already contributed) stays
+ * put, but its content is now the decoded plaintext. No-op if `oldId`
+ * isn't present in the conversation.
+ */
+export function replaceMessage(
+  did: Did,
+  oldId: string,
+  next: LocalMessage,
+): void {
+  const arr = messagesByConversation.get(did);
+  if (!arr) return;
+  const idx = arr.findIndex(m => m.id === oldId);
+  if (idx < 0) return;
+  const updated = [...arr.slice(0, idx), next, ...arr.slice(idx + 1)];
+  messagesByConversation.set(did, updated);
+  notify();
+}
+
+/**
+ * Drop a single message from a conversation by id. Used when an
+ * undecryptable placeholder turns out, on retry, to have been a
+ * `ReadReceipt` smuggled through the Text channel — the receipt is
+ * processed (status flipped on the matching sent message) and the
+ * placeholder removed so the timeline isn't littered with marker text.
+ * No-op if `id` isn't present.
+ */
+export function removeMessage(did: Did, id: string): void {
+  const arr = messagesByConversation.get(did);
+  if (!arr) return;
+  const filtered = arr.filter(m => m.id !== id);
+  if (filtered.length === arr.length) return;
+  messagesByConversation.set(did, filtered);
+  notify();
+}
+
+/**
+ * Update the status of a single message (and optionally other fields)
+ * by id. Used by the resend path to flip a `'failed'` message back
+ * through `'pending'` → `'sent'`/`'delivered'` as the retry POST
+ * progresses, refreshing the seq + epoch from the post-seal session.
+ * Returns true when the message was found, false otherwise.
+ */
+export function updateMessageStatus(
+  did: Did,
+  id: string,
+  status: LocalMessage['status'],
+  patch?: Partial<LocalMessage>,
+): boolean {
+  const arr = messagesByConversation.get(did);
+  if (!arr) return false;
+  const idx = arr.findIndex(m => m.id === id);
+  if (idx < 0) return false;
+  const updated = [...arr];
+  updated[idx] = { ...updated[idx], ...patch, status };
+  messagesByConversation.set(did, updated);
+  notify();
+  return true;
+}
+
+/**
+ * Flip the status of a sent message identified by `(seq, epoch)` to
+ * `'read'` — the end-to-end "recipient confirmed receipt" state, set
+ * when a `ReadReceipt` envelope from the peer arrives. No-op if no
+ * matching sent message is in the local store. Returns true when found.
+ */
+export function confirmSentMessage(
+  did: Did,
+  seq: number,
+  epoch: number,
+): boolean {
+  const arr = messagesByConversation.get(did);
+  if (!arr) return false;
+  const idx = arr.findIndex(
+    m =>
+      m.direction === 'sent' &&
+      m.sequence === seq &&
+      m.epoch === epoch,
+  );
+  if (idx < 0) return false;
+  const updated = [...arr];
+  updated[idx] = { ...updated[idx], status: 'read' };
+  messagesByConversation.set(did, updated);
+  notify();
+  return true;
+}
+
 export function setSerializedSession(did: Did, blobB64: string): void {
   serializedSessionsByDid.set(did, blobB64);
+  notify();
+}
+
+/** Drop the persisted session blob for `did` so the next send
+ *  re-handshakes from scratch instead of restoring a stale session. */
+export function clearSerializedSession(did: Did): void {
+  if (serializedSessionsByDid.delete(did)) {
+    notify();
+  }
+}
+
+/** Erase every local trace of a conversation — messages, contact,
+ *  unread count and persisted session blob. Used by the "Delete
+ *  conversation" action so a desynced thread can be restarted from
+ *  a clean slate. */
+export function deleteConversation(did: Did): void {
+  messagesByConversation.delete(did);
+  contactsByDid.delete(did);
+  unreadByDid.delete(did);
+  serializedSessionsByDid.delete(did);
   notify();
 }

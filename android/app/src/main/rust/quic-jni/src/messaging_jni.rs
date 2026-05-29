@@ -13,8 +13,9 @@ use jni::JNIEnv;
 
 use zhtp_client::messaging::{
     accept_rekey, accept_session, decode_envelope, encode_envelope, initiate_session,
-    open_envelope, rekey_session, seal_binary_message, seal_key_exchange, seal_text_message,
-    sign_envelope, verify_envelope, ContentType, MessageEnvelope, MessagingSession,
+    open_envelope, open_envelope_with_session, rekey_session, seal_binary_message,
+    seal_key_exchange, seal_text_message, sign_envelope, verify_envelope, ContentType,
+    MessageEnvelope, MessagingSession,
 };
 
 // ── Helpers ──────────────────────────────────────────────────────────
@@ -819,6 +820,50 @@ pub extern "system" fn Java_com_sovereignnetworkmobile_Messaging_nativeEnvelopeO
     let mut key_arr = [0u8; 32];
     key_arr.copy_from_slice(&key_bytes);
     match open_envelope(&envelope, &key_arr) {
+        Ok(body) => vec_to_jbytes(&mut env, &body),
+        Err(_) => empty_bytes(&mut env),
+    }
+}
+
+/// Stateful receive-side decrypt. Verifies the sender's Dilithium
+/// signature, then opens the body against the session's receive
+/// ratchet — advancing it in place so the next call decrypts the
+/// following sequence. `open_envelope_with_session` is atomic on
+/// failure (it walks a local copy and commits only on success), so a
+/// rejected envelope leaves the session untouched. Returns the
+/// decrypted body, or an empty array on any failure.
+#[no_mangle]
+pub extern "system" fn Java_com_sovereignnetworkmobile_Messaging_nativeEnvelopeOpenVerifiedWithSession<
+    'local,
+>(
+    mut env: JNIEnv<'local>,
+    _class: JClass<'local>,
+    session_handle: jlong,
+    envelope_bytes: JByteArray<'local>,
+    peer_dilithium_pk: JByteArray<'local>,
+) -> JByteArray<'local> {
+    let session = match unsafe { session_mut(session_handle) } {
+        Some(s) => s,
+        None => return empty_bytes(&mut env),
+    };
+    let env_bytes = match jbytes_to_vec(&mut env, &envelope_bytes) {
+        Some(b) => b,
+        None => return empty_bytes(&mut env),
+    };
+    let envelope: MessageEnvelope = match bincode::deserialize(&env_bytes) {
+        Ok(e) => e,
+        Err(_) => return empty_bytes(&mut env),
+    };
+    let pk = match jbytes_to_vec(&mut env, &peer_dilithium_pk) {
+        Some(b) => b,
+        None => return empty_bytes(&mut env),
+    };
+    // Verify first; collapse any non-`true` to a hard reject.
+    match verify_envelope(&envelope, &pk) {
+        Ok(true) => {}
+        _ => return empty_bytes(&mut env),
+    }
+    match open_envelope_with_session(session, &envelope) {
         Ok(body) => vec_to_jbytes(&mut env, &body),
         Err(_) => empty_bytes(&mut env),
     }
