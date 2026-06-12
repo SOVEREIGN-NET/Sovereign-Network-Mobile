@@ -71,3 +71,5 @@ export type { HeaderBarProps } from './HeaderBar';
 
 export { SideDrawer } from './SideDrawer';
 export type { SideDrawerProps, DrawerItem } from './SideDrawer';
+
+export { AnnouncementBanner } from './AnnouncementBanner';
