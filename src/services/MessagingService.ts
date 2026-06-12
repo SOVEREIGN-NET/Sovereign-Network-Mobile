@@ -1585,13 +1585,145 @@ let inboundStopped = false;
 const INBOUND_REOPEN_BASE_MS = 2_000;
 const INBOUND_REOPEN_MAX_MS = 30_000;
 
+// Cap consecutive failures. The persistent session FFI currently has
+// an unresolved server-side handshake-divergence bug — under that
+// regime every reopen attempt fails identically, and the uncapped
+// retry loop produces dozens of `getSession failed: openFailed` lines
+// per session for no benefit. The cap stops the noise after a few
+// attempts and surfaces an "offline" flag the UI can render. Reset
+// on: AppState foreground transition, a frame actually being
+// delivered, OR a new consumer registering — BUT consumer
+// registration honors a quiet-period: navigating BUBL tab in and out
+// of view (re-mounting MessagesScreen / ChatScreen) within
+// `INBOUND_CAP_QUIET_MS` does NOT re-arm the cap. Otherwise every
+// tab switch produced another 3-attempt burst against a known-broken
+// server endpoint.
+const INBOUND_MAX_CONSECUTIVE_FAILURES = 3;
+const INBOUND_CAP_QUIET_MS = 60_000;
+let inboundConsecutiveFailures = 0;
+let inboundSubscriptionOffline = false;
+let inboundCapHitAtMs: number | null = null;
+const inboundOfflineListeners = new Set<() => void>();
+
+function setInboundSubscriptionOffline(value: boolean): void {
+  if (inboundSubscriptionOffline === value) return;
+  inboundSubscriptionOffline = value;
+  for (const cb of inboundOfflineListeners) {
+    try {
+      cb();
+    } catch (e) {
+      console.warn('[MessagingService] offline listener threw:', e);
+    }
+  }
+}
+
+/** Whether the persistent push subscription has exhausted its retry budget. */
+export function isInboundSubscriptionOffline(): boolean {
+  return inboundSubscriptionOffline;
+}
+
+/** Subscribe to subscription-offline state changes (for UI badges). */
+export function subscribeInboundSubscriptionState(cb: () => void): () => void {
+  inboundOfflineListeners.add(cb);
+  return () => {
+    inboundOfflineListeners.delete(cb);
+  };
+}
+
+// Lazy-gate registration. The persistent push subscription is expensive
+// (one persistent QUIC session per app instance) and currently broken
+// upstream — so we only run it when a screen that actually needs
+// real-time inbound delivery (MessagesScreen, ChatScreen) is mounted.
+// The drain in AuthContext still runs unconditionally on startup +
+// foreground so queued envelopes never get lost.
+let inboundConsumerCount = 0;
+
+/**
+ * Register a consumer of the inbound push stream. Returns an
+ * unregister function. The first consumer to register kicks off the
+ * subscription (and resets the failure cap); the last to unregister
+ * is a no-op (we don't tear the stream down on the off-chance another
+ * consumer mounts right after — `stopInboundSubscription` on sign-out
+ * is the explicit teardown).
+ */
+export function registerInboundConsumer(): () => void {
+  inboundConsumerCount++;
+  if (inboundConsumerCount === 1) {
+    // New consumer arriving. If we've recently hit the cap, hold
+    // offline state — the user navigating BUBL tab in/out shouldn't
+    // re-arm the retry storm against a server we just verified is
+    // broken. Only reset and retry once the quiet period has elapsed
+    // (or if we've never capped — first mount of the session).
+    const sinceCap =
+      inboundCapHitAtMs === null
+        ? Infinity
+        : Date.now() - inboundCapHitAtMs;
+    if (sinceCap >= INBOUND_CAP_QUIET_MS) {
+      inboundConsecutiveFailures = 0;
+      inboundCapHitAtMs = null;
+      setInboundSubscriptionOffline(false);
+      void startInboundSubscription();
+    } else {
+      console.log(
+        '[msg] consumer registered but cap-quiet-period not elapsed (' +
+          Math.round(sinceCap / 1000) +
+          's of ' +
+          Math.round(INBOUND_CAP_QUIET_MS / 1000) +
+          's) — staying offline',
+      );
+    }
+  }
+  let alreadyUnregistered = false;
+  return () => {
+    if (alreadyUnregistered) return;
+    alreadyUnregistered = true;
+    inboundConsumerCount = Math.max(0, inboundConsumerCount - 1);
+  };
+}
+
+/**
+ * Called by AuthContext on AppState='active' (foreground). If a consumer
+ * is registered, reset the failure cap and kick the subscription so a
+ * transient outage that capped us out doesn't keep us offline forever.
+ * No-op when no consumer is registered.
+ */
+export function resumeInboundOnForeground(): void {
+  if (inboundConsumerCount === 0) return;
+  // Foreground transitions reset unconditionally — backgrounding and
+  // returning is a clear-enough user signal of "try again". This does
+  // NOT honor `INBOUND_CAP_QUIET_MS` (that guard is only for rapid
+  // consumer re-registration via tab navigation).
+  inboundConsecutiveFailures = 0;
+  inboundCapHitAtMs = null;
+  setInboundSubscriptionOffline(false);
+  void startInboundSubscription(true);
+}
+
 /**
  * Schedule a re-open of the inbound stream after a backoff. A healthy
  * stream resets the backoff via `onFrame`; a stream that keeps
- * flapping without delivering escalates the delay to the cap.
+ * flapping without delivering escalates the delay to the cap, then
+ * stops scheduling once `INBOUND_MAX_CONSECUTIVE_FAILURES` is hit.
  */
 function scheduleInboundReopen(): void {
   if (inboundStopped || inboundReopenTimer) return;
+  if (inboundConsecutiveFailures >= INBOUND_MAX_CONSECUTIVE_FAILURES) {
+    // Capped — stop the storm. Foreground transition resets
+    // unconditionally; consumer (re-)registration only resets after
+    // `INBOUND_CAP_QUIET_MS` so rapid BUBL tab in/out doesn't loop.
+    if (!inboundSubscriptionOffline) {
+      console.warn(
+        '[msg] inbound reopen capped after ' +
+          inboundConsecutiveFailures +
+          ' consecutive failures — marking subscription offline until ' +
+          'foreground / quiet-period consumer re-mount',
+      );
+    }
+    inboundCapHitAtMs = Date.now();
+    setInboundSubscriptionOffline(true);
+    return;
+  }
+  inboundConsecutiveFailures++;
   const delay = Math.min(
     INBOUND_REOPEN_BASE_MS * 2 ** inboundReopenAttempts,
     INBOUND_REOPEN_MAX_MS,
@@ -1723,9 +1855,14 @@ export async function startInboundSubscription(
 
     const unsub = NativeQuicSession.subscribeInbound(pendingStreamId, {
       onFrame: (frameB64: string) => {
-        // A delivered frame means the stream is healthy — reset the
-        // reopen backoff so a future drop revives promptly.
+        // A delivered frame means the stream is healthy — reset both
+        // the reopen backoff (so a future drop revives promptly) and
+        // the consecutive-failure cap + quiet-period timestamp (so
+        // we don't hold an "offline" mark from a prior outage).
         inboundReopenAttempts = 0;
+        inboundConsecutiveFailures = 0;
+        inboundCapHitAtMs = null;
+        setInboundSubscriptionOffline(false);
         // Each frame is exactly one MessageEnvelope's bincode bytes.
         // Wrap in the ReceiveResponse shape `ingestEnvelopes` expects
         // and let the existing pipeline run unchanged. `sender_did`
@@ -1782,6 +1919,9 @@ export function stopInboundSubscription(): void {
     inboundReopenTimer = null;
   }
   inboundReopenAttempts = 0;
+  inboundConsecutiveFailures = 0;
+  inboundCapHitAtMs = null;
+  setInboundSubscriptionOffline(false);
   if (inboundUnsubscribe) {
     inboundUnsubscribe();
     inboundUnsubscribe = null;

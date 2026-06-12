@@ -32,6 +32,7 @@ import {
   getMessages,
   markRead,
   reconnectSession,
+  registerInboundConsumer,
   resendMessage,
   sendTextMessage,
   subscribe,
@@ -84,6 +85,15 @@ const ChatScreen: React.FC<Props> = ({ navigation, route }) => {
     () => conversationConnected(did),
     [did, messages],
   );
+
+  // Tell the messaging service this screen wants real-time inbound
+  // delivery (mirror of MessagesScreen). Caps the retry storm when the
+  // upstream session FFI is broken; the AuthContext startup drain is
+  // still the safety net for queued messages.
+  useEffect(() => {
+    const unregister = registerInboundConsumer();
+    return unregister;
+  }, []);
 
   // Keep the local view bound to the store. `markRead` is fire-and-forget —
   // server read receipts will be a separate flow once the wire path lands.
