@@ -64,19 +64,27 @@ class NativeQuic: NSObject {
   // These values are loaded from GeneratedConfig.swift which is generated from .env file
   // GeneratedConfig.swift is the single source of truth - updated at build time
   private let defaultTimeout: TimeInterval = 30.0
-  // Active validator target — initialized from GeneratedConfig (bootstrap),
-  // can be swapped at runtime via `setActiveValidator` once the directory
-  // has been fetched and a better validator is selected.
-  private var quinnControlPlaneHost = GeneratedConfig.quinnControlPlaneHost
-  private var quinnControlPlanePort = GeneratedConfig.quinnControlPlanePort
-  // Empty serverName → use host as SNI (Rust rejects empty string)
-  private var quinnControlPlaneServerName: String = {
-    let s = GeneratedConfig.quinnControlPlaneServerName
-    return s.isEmpty ? GeneratedConfig.quinnControlPlaneHost : s
-  }()
-  // Active SPKI pin (hex). Starts from GeneratedConfig; replaced alongside
-  // host when a directory-selected validator comes in.
-  private var activeSpkiPinHex: String = GeneratedConfig.quinnSpkiPinHex
+  // Active validator target — initialized from the primary bootstrap
+  // gateway. Identity is the on-chain DID (`activeExpectedDid`); TLS is
+  // accept-any. The dial target is the gateway's IP (skips DNS so a
+  // single DNS-record typo can't black-hole us); SNI is its hostname.
+  // `setActiveValidator(host, port, expectedDid)` swaps all three once
+  // the directory has been fetched.
+  private static func defaultBootstrap() -> (host: String, port: UInt16, sni: String, did: String) {
+    if let primary = GeneratedConfig.bootstrapGateways.first {
+      let dialHost = primary.ip.isEmpty ? primary.host : primary.ip
+      return (dialHost, GeneratedConfig.nodePort, primary.host, primary.did)
+    }
+    return (GeneratedConfig.nodeHost, GeneratedConfig.nodePort, GeneratedConfig.nodeHost, "")
+  }
+  private var quinnControlPlaneHost = NativeQuic.defaultBootstrap().host
+  private var quinnControlPlanePort = NativeQuic.defaultBootstrap().port
+  private var quinnControlPlaneServerName = NativeQuic.defaultBootstrap().sni
+  // Expected on-chain DID for the active validator. After every UHP-v2
+  // handshake we compare `result.session.peerDid` against this. Mismatch
+  // is treated as MITM and the connection is rejected before any request
+  // is routed over it. Empty string disables the check (debug only).
+  private var activeExpectedDid: String = NativeQuic.defaultBootstrap().did
   private let alpnPublic = "zhtp-public/1"
   private let alpnAuthenticated = "zhtp-uhp/2"
 
@@ -125,12 +133,10 @@ class NativeQuic: NSObject {
     let serverName = quinnControlPlaneServerName.isEmpty ? host : quinnControlPlaneServerName
     var handle: UInt64 = 0
 
-    // Public ALPN: always go through webpki-roots chain validation
-    // (nil pin → quinn-ffi uses `make_public_client_config`). The
-    // gateways now ship Let's Encrypt certs that rotate ~every 60
-    // days, so an SPKI pin would expire with each renewal. The active
-    // pin from GeneratedConfig still applies to the UHP-handshake
-    // path; only the public probe / directory path uses chain trust.
+    // Public ALPN: TLS is accept-any (cluster ships self-signed certs;
+    // chain validation cannot work). Authenticity is provided at a
+    // higher layer (UHP-v2 handshake + DID compare) for any path that
+    // makes trust decisions on this response — see NetworkBootstrap.
     let rc: Int32 = host.withCString { hostPtr in
       serverName.withCString { serverNamePtr in
         uhp_quic_connect_public(hostPtr, UInt16(port), serverNamePtr, nil, &handle)
@@ -239,25 +245,16 @@ class NativeQuic: NSObject {
       return
     }
 
-    let spkiPin: Data
-    let pinHex = activeSpkiPinHex
-    if pinHex.isEmpty {
-      spkiPin = Data() // system CA trust — empty means no pinning
-    } else {
-      guard let pin = dataFromHex(pinHex), pin.count == 32 else {
-        reject("QUIC_ERROR", "Invalid SPKI pin configuration", nil)
-        return
-      }
-      spkiPin = pin
-    }
-
+    // No SPKI pin: TLS is accept-any (see quinn-ffi AcceptAnyVerifier).
+    // Authenticity is checked after the UHP-v2 handshake by comparing
+    // `result.session.peerDid` against `activeExpectedDid`.
     enqueueQuinnRequest(
       identityId: identityId,
       parsedUrl: parsedUrl,
       method: method,
       headers: headers,
       body: body,
-      spkiPin: spkiPin,
+      spkiPin: Data(),
       resolve: resolve,
       reject: reject
     )
@@ -560,6 +557,32 @@ class NativeQuic: NSObject {
       let sessionId = result.sessionId
       let peerDid = result.peerDid
 
+      // UHP-v2 identity check (same policy as the legacy path — fail
+      // closed in release on empty expectedDid; bypass only under DEBUG).
+      let expectedDid = self.activeExpectedDid
+      if expectedDid.isEmpty {
+        #if DEBUG
+        print("[NativeQuic] ⚠️ DID check skipped (lib-client) — empty expectedDid (DEBUG build only)")
+        #else
+        uhp_quic_close(quinnHandle)
+        return .failure(NSError(
+          domain: "NativeQuic",
+          code: -1,
+          userInfo: [NSLocalizedDescriptionKey: "No expected DID configured — refusing handshake (set BOOTSTRAP_GATEWAY_DID in .env)"]
+        ))
+        #endif
+      } else if peerDid != expectedDid {
+        uhp_quic_close(quinnHandle)
+        let masked = peerDid.count > 24 ? String(peerDid.prefix(24)) + "…" : peerDid
+        let expectedMasked = expectedDid.count > 24 ? String(expectedDid.prefix(24)) + "…" : expectedDid
+        print("[NativeQuic] ❌ DID mismatch (lib-client): expected=\(expectedMasked) got=\(masked) host=\(host):\(port)")
+        return .failure(NSError(
+          domain: "NativeQuic",
+          code: -1,
+          userInfo: [NSLocalizedDescriptionKey: "Peer DID mismatch — expected \(expectedDid), got \(peerDid)"]
+        ))
+      }
+
       guard sessionKey.count == 32 else {
         uhp_quic_close(quinnHandle)
         return .failure(NSError(domain: "NativeQuic", code: -1, userInfo: [NSLocalizedDescriptionKey: "Invalid session key length from lib-client handshake"]))
@@ -747,6 +770,35 @@ class NativeQuic: NSObject {
     let peerDid = String(cString: peerDidPtr)
     uhp_quinn_free_string(peerDidPtr)
 
+    // UHP-v2 identity check. In release builds an empty expectedDid is a
+    // hard failure (means bootstrap config is missing — refuse to route
+    // any request over a connection of unknown identity). Debug builds
+    // allow the bypass so dev nodes without a published on-chain DID
+    // can still be reached during local iteration.
+    let expectedDid = self.activeExpectedDid
+    if expectedDid.isEmpty {
+      #if DEBUG
+      print("[NativeQuic] ⚠️ DID check skipped — empty expectedDid (DEBUG build only)")
+      #else
+      uhp_quic_close(handle)
+      return .failure(NSError(
+        domain: "NativeQuic",
+        code: -1,
+        userInfo: [NSLocalizedDescriptionKey: "No expected DID configured — refusing handshake (set BOOTSTRAP_GATEWAY_DID in .env)"]
+      ))
+      #endif
+    } else if peerDid != expectedDid {
+      uhp_quic_close(handle)
+      let masked = peerDid.count > 24 ? String(peerDid.prefix(24)) + "…" : peerDid
+      let expectedMasked = expectedDid.count > 24 ? String(expectedDid.prefix(24)) + "…" : expectedDid
+      print("[NativeQuic] ❌ DID mismatch: expected=\(expectedMasked) got=\(masked) host=\(host):\(port)")
+      return .failure(NSError(
+        domain: "NativeQuic",
+        code: -1,
+        userInfo: [NSLocalizedDescriptionKey: "Peer DID mismatch — expected \(expectedDid), got \(peerDid)"]
+      ))
+    }
+
     let sessionIdFull = withUnsafeBytes(of: session.session_id) { Data($0) }
     let sessionId = Data(sessionIdFull.prefix(32))
     guard sessionId.count == 32 else {
@@ -779,10 +831,25 @@ class NativeQuic: NSObject {
   }
 
   private func resolveServerName(host: String, headers: [String: String]) -> String {
-    if let hostHeader = headers["Host"], !hostHeader.isEmpty {
-      return hostHeader
+    // SNI precedence (most explicit wins, no caching across hosts):
+    //   1. Per-request `x-zhtp-sni` header — caller knows the cert hostname
+    //      for this specific dial (e.g. dialing by IP, SNI = hostname).
+    //   2. `quinnControlPlaneServerName` ONLY when the URL host matches the
+    //      currently-active control-plane target. Otherwise the global SNI
+    //      bleeds onto unrelated hosts — the exact race that produced
+    //      `host=gw-1 sni=gw-2` after a bootstrap fallback to gateway 2.
+    //   3. The URL host itself.
+    // The HTTP `Host` header is intentionally NOT consulted — it's an
+    // application-layer routing hint and letting it drive SNI broke Web4
+    // (`Host: central.sov` while dialing the gateway's IP).
+    if let explicit = headers["x-zhtp-sni"], !explicit.isEmpty {
+      return explicit
     }
-    if !quinnControlPlaneServerName.isEmpty {
+    if let explicit = headers["X-Zhtp-Sni"], !explicit.isEmpty {
+      return explicit
+    }
+    if !quinnControlPlaneServerName.isEmpty
+        && host == quinnControlPlaneHost {
       return quinnControlPlaneServerName
     }
     return host
@@ -824,10 +891,12 @@ class NativeQuic: NSObject {
     let serverName = resolveServerName(host: parsedUrl.host, headers: headers)
     var handle: UInt64 = 0
 
-    // Public ALPN: always use webpki-roots chain validation. See note
-    // in `testConnection` — the gateways serve LE certs whose SPKI
-    // rotates with each renewal, so the pin from GeneratedConfig is
-    // worthless here. The pin still applies to the UHP-handshake path.
+    // Public ALPN: TLS uses AcceptAnyVerifier (cluster certs are
+    // self-signed — webpki-roots can never validate). Authenticity is
+    // the caller's job: the bootstrap path matches `peer_did` against
+    // `BOOTSTRAP_GATEWAY_DID` after the UHP-v2 handshake; downstream
+    // connects match against the directory entry's `did`. Skip those
+    // checks and the connection is unauthenticated.
     let connectRc: Int32 = parsedUrl.host.withCString { hostPtr in
       serverName.withCString { serverNamePtr in
         uhp_quic_connect_public(hostPtr, UInt16(parsedUrl.port), serverNamePtr, nil, &handle)
@@ -1030,21 +1099,27 @@ class NativeQuic: NSObject {
   }
 
   /**
-   * Swap the active validator (control-plane endpoint + SPKI pin) at runtime.
+   * Swap the active validator (control-plane endpoint + expected DID) at runtime.
    * Called by the TS bootstrap after `GET /api/v1/network/directory` resolves
    * a better validator than the one we connected to. Drops all cached handshake
    * state so the next request rehandshakes against the new target.
    *
    * - Parameters:
-   *   - host: new validator host (IP or hostname)
+   *   - host: new validator host or IP (used as the dial target — IP recommended)
    *   - port: new validator port
-   *   - pinHex: 64-char hex SPKI pin (SHA-256 of SubjectPublicKeyInfo)
+   *   - expectedDid: on-chain DID the UHP-v2 handshake must produce
+   *   - sni:  TLS SNI hostname. Optional — defaults to `host` when empty.
+   *           Useful when dialing by IP but SNI must carry the cert hostname.
+   *
+   * There is no SPKI pin: the TLS verifier accepts any cert; the DID check
+   * after handshake is what authenticates the peer.
    */
   @objc
   func setActiveValidator(
     _ host: String,
     port: Int,
-    pinHex: String,
+    expectedDid: String,
+    sni: String,
     resolve: @escaping RCTPromiseResolveBlock,
     reject: @escaping RCTPromiseRejectBlock
   ) {
@@ -1056,29 +1131,32 @@ class NativeQuic: NSObject {
       reject("INVALID_PARAMS", "port must be 1..65535", nil)
       return
     }
-    // Allow empty pinHex (system CA trust) OR a 64-char hex string.
-    if !pinHex.isEmpty && pinHex.count != 64 {
-      reject("INVALID_PARAMS", "pinHex must be 64 hex chars (or empty)", nil)
+    guard !expectedDid.isEmpty else {
+      reject("INVALID_PARAMS", "expectedDid is required (no SPKI pinning — identity is the DID)", nil)
       return
     }
+
+    let serverName = sni.isEmpty ? host : sni
 
     connectionLock.lock()
     let oldTarget = "\(quinnControlPlaneHost):\(quinnControlPlanePort)"
     quinnControlPlaneHost = host
     quinnControlPlanePort = UInt16(port)
-    quinnControlPlaneServerName = host // use new host as SNI
-    activeSpkiPinHex = pinHex
+    quinnControlPlaneServerName = serverName
+    activeExpectedDid = expectedDid
     // Drop cached session state — old session ticket is bound to the old host.
     quinnRequestQueue.removeAll()
     quinnHandshakeInProgress.removeAll()
     quinnSessionIdPrefixByIdentity.removeAll()
     connectionLock.unlock()
 
-    print("[NativeQuic] 🔀 Active validator switched: \(oldTarget) → \(host):\(port)")
+    let didMasked = expectedDid.count > 24 ? String(expectedDid.prefix(24)) + "…" : expectedDid
+    print("[NativeQuic] 🔀 Active validator switched: \(oldTarget) → \(host):\(port) (sni=\(serverName), did=\(didMasked))")
     resolve([
       "host": host,
       "port": port,
-      "pinHex": pinHex,
+      "expectedDid": expectedDid,
+      "sni": serverName,
     ])
   }
 

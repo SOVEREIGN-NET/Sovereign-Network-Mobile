@@ -8,6 +8,7 @@ import com.facebook.react.bridge.Promise
 import com.facebook.react.bridge.ReadableMap
 import com.facebook.react.bridge.WritableNativeArray
 import com.facebook.react.bridge.WritableNativeMap
+import com.sovereignnetworkmobile.BuildConfig
 import org.json.JSONObject
 import java.net.DatagramPacket
 import java.net.DatagramSocket
@@ -31,20 +32,28 @@ class NativeQuicModule(reactContext: ReactApplicationContext) :
         private const val ALPN_PROTOCOL = "zhtp-public/1"
     }
 
-    // Active validator target — initialized from GeneratedConfig (bootstrap),
-    // can be swapped at runtime via `setActiveValidator` once the directory
-    // has been fetched and a better validator is selected.
+    // Active validator target — initialized from the primary bootstrap
+    // gateway. Identity is the on-chain DID (`activeExpectedDid`); TLS is
+    // accept-any. The dial target is the gateway's IP (skips DNS so a
+    // single DNS-record typo can't black-hole us); SNI is its hostname.
+    // `setActiveValidator(host, port, expectedDid, sni)` swaps all four
+    // once the directory has been fetched.
+    private val bootstrapPrimary =
+        com.sovereignnetworkmobile.config.GeneratedConfig.BOOTSTRAP_GATEWAYS.firstOrNull()
     private var quinnControlPlaneHost: String =
-        com.sovereignnetworkmobile.config.GeneratedConfig.QUINN_CONTROL_PLANE_HOST
+        bootstrapPrimary?.ip?.takeIf { it.isNotEmpty() }
+            ?: bootstrapPrimary?.host
+            ?: com.sovereignnetworkmobile.config.GeneratedConfig.NODE_HOST
     private var quinnControlPlanePort: Int =
-        com.sovereignnetworkmobile.config.GeneratedConfig.QUINN_CONTROL_PLANE_PORT
+        com.sovereignnetworkmobile.config.GeneratedConfig.NODE_PORT
     private var quinnControlPlaneServerName: String =
-        com.sovereignnetworkmobile.config.GeneratedConfig.QUINN_CONTROL_PLANE_SERVER_NAME
-            .ifEmpty { quinnControlPlaneHost }
-    // Active SPKI pin (hex). Replaced alongside host when a directory-selected
-    // validator comes in.
-    private var activeSpkiPinHex: String =
-        com.sovereignnetworkmobile.config.GeneratedConfig.spkiPinFor(quinnControlPlaneHost)
+        bootstrapPrimary?.host
+            ?: com.sovereignnetworkmobile.config.GeneratedConfig.NODE_HOST
+    // Expected on-chain DID for the active validator. The UHP-v2 handshake's
+    // `peer_did` is matched against this on every connect — mismatch is
+    // treated as MITM and rejected before any request is routed. Empty
+    // string disables the check (debug only).
+    private var activeExpectedDid: String = bootstrapPrimary?.did ?: ""
 
     private val executor: Executor = Executors.newCachedThreadPool()
     private var isInitialized = false
@@ -196,13 +205,16 @@ class NativeQuicModule(reactContext: ReactApplicationContext) :
         val method = if (options.hasKey("method")) options.getString("method") ?: "GET" else "GET"
         val timeout = if (options.hasKey("timeout")) options.getInt("timeout") else DEFAULT_TIMEOUT
         val body = if (options.hasKey("body")) options.getString("body") ?: "" else ""
-        // Default to SECURE chain validation (webpki-roots). The old
-        // default was `true` which routed every JS-issued QUIC request
-        // through `create_insecure_client_config` — i.e. NO TLS
-        // validation at all — and that's the wrong default for public
-        // gateways behind Let's Encrypt certs. Dev/local callers can
-        // still opt in explicitly via `options.insecure = true`.
-        val insecure = if (options.hasKey("insecure")) options.getBoolean("insecure") else false
+        // Default to accept-any TLS (`insecure = true`). The cluster
+        // ships self-signed rcgen certs on every gateway — webpki-roots
+        // can never validate them, so the previous SECURE default
+        // produced `certificate not valid for name <IP>` on every
+        // bootstrap-fallback dial. Authenticity is provided one layer
+        // up by the UHP-v2 handshake's `peer_did` matched against the
+        // configured gateway DID (PR #2697); TLS is just transport.
+        // Mirrors the iOS path which has used AcceptAnyVerifier
+        // unconditionally since the same PR landed.
+        val insecure = if (options.hasKey("insecure")) options.getBoolean("insecure") else true
         val alpn = if (options.hasKey("alpn")) options.getString("alpn") ?: "authenticated" else "authenticated"
         val headersJson = if (options.hasKey("headers")) headersMapToJson(options.getMap("headers")) else "{}"
         return RequestOptions(method, timeout, body, insecure, alpn, headersJson)
@@ -334,13 +346,27 @@ class NativeQuicModule(reactContext: ReactApplicationContext) :
     }
 
     /**
-     * Swap the active validator (control-plane endpoint + SPKI pin) at runtime.
+     * Swap the active validator (control-plane endpoint + expected DID) at runtime.
      * Called by the TS bootstrap after `GET /api/v1/network/directory` resolves
      * a better validator than the one we connected to. Drops all cached handshake
      * state so the next request rehandshakes against the new target.
+     *
+     * - host: new validator host or IP (used as the dial target — IP recommended)
+     * - port: new validator port
+     * - expectedDid: on-chain DID the UHP-v2 handshake must produce
+     * - sni: TLS SNI hostname. Empty → defaults to host. Useful when dialing
+     *   by IP but SNI must carry the cert hostname.
+     *
+     * No SPKI pin: TLS is accept-any; identity is the DID.
      */
     @ReactMethod
-    fun setActiveValidator(host: String, port: Int, pinHex: String, promise: Promise) {
+    fun setActiveValidator(
+        host: String,
+        port: Int,
+        expectedDid: String,
+        sni: String,
+        promise: Promise,
+    ) {
         if (host.isEmpty()) {
             promise.reject("INVALID_PARAMS", "host is required")
             return
@@ -349,28 +375,38 @@ class NativeQuicModule(reactContext: ReactApplicationContext) :
             promise.reject("INVALID_PARAMS", "port must be 1..65535")
             return
         }
-        if (pinHex.isNotEmpty() && pinHex.length != 64) {
-            promise.reject("INVALID_PARAMS", "pinHex must be 64 hex chars (or empty)")
+        if (expectedDid.isEmpty()) {
+            promise.reject(
+                "INVALID_PARAMS",
+                "expectedDid is required (no SPKI pinning — identity is the DID)",
+            )
             return
         }
+
+        val serverName = if (sni.isEmpty()) host else sni
 
         val oldTarget = "$quinnControlPlaneHost:$quinnControlPlanePort"
         synchronized(connectionLock) {
             quinnControlPlaneHost = host
             quinnControlPlanePort = port
-            quinnControlPlaneServerName = host // use new host as SNI
-            activeSpkiPinHex = pinHex
+            quinnControlPlaneServerName = serverName
+            activeExpectedDid = expectedDid
             // Drop cached session state — old session is bound to the old host.
             quinnRequestQueue.clear()
             quinnHandshakeInProgress.clear()
             quinnSessionIdPrefixByIdentity.clear()
         }
-        Log.d(TAG, "[🌐 Web4] 🔀 Active validator switched: $oldTarget → $host:$port")
+        val didMasked = if (expectedDid.length > 24) expectedDid.take(24) + "…" else expectedDid
+        Log.d(
+            TAG,
+            "[🌐 Web4] 🔀 Active validator switched: $oldTarget → $host:$port (sni=$serverName, did=$didMasked)",
+        )
 
         val result = WritableNativeMap()
         result.putString("host", host)
         result.putInt("port", port)
-        result.putString("pinHex", pinHex)
+        result.putString("expectedDid", expectedDid)
+        result.putString("sni", serverName)
         promise.resolve(result)
     }
 
@@ -426,6 +462,48 @@ class NativeQuicModule(reactContext: ReactApplicationContext) :
             return
         }
         val handle = (handshake?.get("handle") as? Number)?.toLong() ?: 0L
+
+        // UHP-v2 identity check. In release builds an empty expectedDid is
+        // a hard failure (means bootstrap config is missing — refuse to
+        // route any request over a connection of unknown identity). Debug
+        // builds allow the bypass for local dev against test nodes whose
+        // DID isn't on chain yet.
+        val expectedDid = activeExpectedDid
+        if (expectedDid.isEmpty()) {
+            if (BuildConfig.DEBUG) {
+                Log.w(
+                    TAG,
+                    "[🌐 Web4] ⚠️ DID check skipped — empty expectedDid (DEBUG build only)",
+                )
+            } else {
+                if (handle != 0L) NativeQuicBridge.uhpQuicClose(handle)
+                failQuinnQueue(
+                    identityId,
+                    "No expected DID configured — refusing handshake (set BOOTSTRAP_GATEWAY_DID in .env)",
+                )
+                return
+            }
+        } else {
+            val peerDid = handshake?.get("peerDid") as? String ?: ""
+            if (peerDid != expectedDid) {
+                val didMaskedExpected =
+                    if (expectedDid.length > 24) expectedDid.take(24) + "…" else expectedDid
+                val didMaskedGot =
+                    if (peerDid.length > 24) peerDid.take(24) + "…" else peerDid
+                Log.e(
+                    TAG,
+                    "[🌐 Web4] ❌ DID mismatch: expected=$didMaskedExpected got=$didMaskedGot " +
+                        "host=$quinnControlPlaneHost:$quinnControlPlanePort",
+                )
+                if (handle != 0L) NativeQuicBridge.uhpQuicClose(handle)
+                failQuinnQueue(
+                    identityId,
+                    "Peer DID mismatch — expected $expectedDid, got $peerDid",
+                )
+                return
+            }
+        }
+
         cacheSessionPrefix(identityId, extractSessionPrefix(handshake))
         Log.d(TAG, "[🌐 Web4] Handshake ok handle=$handle identity_id=${maskIdentifier(identityId)}")
         drainQuinnQueue(identityId, handle)
@@ -433,7 +511,10 @@ class NativeQuicModule(reactContext: ReactApplicationContext) :
 
     /** Dispatch to the lib-client 3-leg path when enabled, otherwise the legacy path. */
     private fun performHandshake(identity: Identity): Map<String, Any?>? {
-        val spkiPin = activeSpkiPinHex
+        // No SPKI pin: TLS is accept-any (JNI passes empty → AcceptAnyVerifier).
+        // Identity is verified post-handshake against `activeExpectedDid` in
+        // `runHandshakeAndDrain`. Cert rotation is a non-event for the app.
+        val spkiPin = ""
         if (NativeQuicBridge.useLibClientHandshake) {
             // New path: keys stay in Rust.
             // NOTE: Blocked on quinn-ffi ALPN-aware connect (zhtp-uhp/2).

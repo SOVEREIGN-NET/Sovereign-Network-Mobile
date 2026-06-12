@@ -17,9 +17,75 @@ import {
 } from '../components';
 import { colors, spacing, typography, borderRadius } from '../theme';
 import domainService from '../services/DomainService';
+import { DOMAIN_REGISTRATION_DURATION_SECS } from '../types/domain';
 
 // Storage keys
 const REGISTERED_DOMAINS_KEY = 'sov:registered_domains';
+// Idempotence guard for the one-shot AsyncStorage migration. We run it on
+// every loadDomains, but only do the write when at least one entry was
+// actually fixed — the flag stops us from writing on subsequent loads if
+// nothing needed fixing.
+const MIGRATION_FLAG_KEY = 'sov:registered_domains_migrated_v1';
+
+/**
+ * Pre-2026-06-12 entries written by DomainRegistrationScreen carried
+ * `expires_at: undefined` (the screen read a non-existent field off the
+ * server response). For each entry whose `registered_at` parses but
+ * `expires_at` doesn't, recompute `expires_at` as
+ * `registered_at + DOMAIN_REGISTRATION_DURATION_SECS`. Returns the
+ * possibly-modified array and a flag indicating whether anything changed.
+ *
+ * Also dedupes the array by domain name (case-insensitive, keeping the
+ * latest entry per name) — pre-2026-06-12 the same screen also pushed
+ * without deduping, so existing storage may contain duplicate keys that
+ * cause React "duplicate key" warnings downstream.
+ */
+function migrateStoredDomains(
+  raw: unknown,
+): { entries: StoredDomain[]; changed: boolean } {
+  if (!Array.isArray(raw)) return { entries: [], changed: !!raw };
+  let changed = false;
+
+  // Repair pass.
+  const repaired = raw.map((entry) => {
+    if (!entry || typeof entry !== 'object') {
+      changed = true;
+      return null;
+    }
+    const e = entry as Partial<StoredDomain> & Record<string, unknown>;
+    const expiryMs = e.expires_at ? new Date(e.expires_at).getTime() : NaN;
+    if (Number.isFinite(expiryMs)) return e as StoredDomain;
+
+    // expires_at is missing / unparseable — try to recompute from registered_at.
+    const registeredMs = e.registered_at
+      ? new Date(e.registered_at).getTime()
+      : NaN;
+    if (!Number.isFinite(registeredMs)) {
+      // Can't recover this entry — but keep it (the loader marks it as
+      // status: 'unknown' so the user can still see + delete it).
+      return e as StoredDomain;
+    }
+    const recomputedExpiryMs =
+      registeredMs + DOMAIN_REGISTRATION_DURATION_SECS * 1000;
+    changed = true;
+    return {
+      ...e,
+      expires_at: new Date(recomputedExpiryMs).toISOString(),
+    } as StoredDomain;
+  }).filter((e): e is StoredDomain => e !== null);
+
+  // Dedupe pass — keep the latest entry per (case-insensitive) domain name.
+  const byDomain = new Map<string, StoredDomain>();
+  for (const entry of repaired) {
+    if (!entry.domain) continue;
+    const key = entry.domain.toLowerCase();
+    if (byDomain.has(key)) changed = true;
+    byDomain.set(key, entry);
+  }
+  const deduped = Array.from(byDomain.values());
+
+  return { entries: deduped, changed };
+}
 
 interface StoredDomain {
   domain: string;
@@ -44,7 +110,40 @@ const MyDomainsScreen = ({ navigation }: any) => {
     try {
       setLoading(true);
       const storedDomainsJson = await AsyncStorage.getItem(REGISTERED_DOMAINS_KEY);
-      const storedDomains = storedDomainsJson ? JSON.parse(storedDomainsJson) : [];
+      let storedDomains: StoredDomain[] = [];
+      if (storedDomainsJson) {
+        let parsed: unknown;
+        try {
+          parsed = JSON.parse(storedDomainsJson);
+        } catch (e) {
+          console.warn(
+            '[MyDomainsScreen] AsyncStorage value is not valid JSON, ignoring:',
+            e,
+          );
+          parsed = [];
+        }
+        const migrated = migrateStoredDomains(parsed);
+        storedDomains = migrated.entries;
+        if (migrated.changed) {
+          console.log(
+            '[MyDomainsScreen] migration: rewrote',
+            storedDomains.length,
+            'entries (repaired expires_at and/or deduped)',
+          );
+          try {
+            await AsyncStorage.setItem(
+              REGISTERED_DOMAINS_KEY,
+              JSON.stringify(storedDomains),
+            );
+            await AsyncStorage.setItem(MIGRATION_FLAG_KEY, '1');
+          } catch (e) {
+            console.warn(
+              '[MyDomainsScreen] failed to persist migration result:',
+              e,
+            );
+          }
+        }
+      }
 
       // Check status of each domain
       const domainsWithStatus: DomainWithStatus[] = await Promise.all(

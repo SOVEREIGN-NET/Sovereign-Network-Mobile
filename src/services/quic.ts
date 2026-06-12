@@ -12,6 +12,7 @@
 
 import { NativeModules, Platform } from 'react-native';
 import { DEFAULT_NODE_HOST, DEFAULT_NODE_PORT, QUIC_CONFIG } from '../config';
+import { getActiveTarget } from './NetworkBootstrap';
 import SecureIdentityStorage from './SecureIdentityStorage';
 // Gate the transport on ZDNS bootstrap — ensures the first request dials
 // the DNS-selected validator, not the hardcoded fallback.
@@ -331,8 +332,19 @@ async function runWithSessionRecovery(
   // requests + platforms without the bridge (Android until its
   // build ships) fall back to the legacy one-shot
   // `NativeQuic.request`.
+  //
+  // FORCED OFF 2026-06-10 — the persistent path goes through
+  // `lib-client::zhtp_quic_session_open` → `lib-network::ZhtpClient::connect`,
+  // whose `lib-network::quic_handshake::handshake_as_initiator` produces
+  // a ClientHello that the current server resets mid-handshake (UHP v2
+  // protocol error: "Failed to read length prefix byte 0: connection
+  // lost"). The legacy `NativeQuic.request` path uses quinn-ffi's
+  // hand-rolled `handshake_with_transcript`, which the server accepts —
+  // proven by `[quinn-ffi] response: bytes=N` for `/pouw/rewards/...` and
+  // `/identity/update-kyber-key` etc. in the same build. Re-enable once
+  // the two handshake paths re-converge upstream.
   const usePersistent =
-    alpn === 'authenticated' && isNativeQuicSessionAvailable;
+    false && alpn === 'authenticated' && isNativeQuicSessionAvailable;
   const parsed = parseQuicUrl(url);
   const pathOnly = parsed ? parsed.path : url;
 
@@ -433,9 +445,34 @@ async function rawRequest(
     body = populateIdentityFields(body, path, method, identityId);
   }
 
-  const url = `quic://${options.host ?? DEFAULT_NODE_HOST}:${
-    options.port ?? DEFAULT_NODE_PORT
-  }${path}`;
+  // Prefer the bootstrap's active target over the static `DEFAULT_NODE_HOST`
+  // — once bootstrap has fallen over to a working gateway, every subsequent
+  // request must follow, not keep dialing the dead one. The active target
+  // typically dials by IP and tracks the cert hostname in `sni`; pass that
+  // through `x-zhtp-sni` so the native QUIC layer puts the right hostname
+  // in the TLS handshake without the URL host having to be a hostname.
+  // Caller-supplied `options.host` still wins (used by NetworkDirectory
+  // probing specific gateways during bootstrap).
+  const active = getActiveTarget();
+  const fallbackHost = active.host || DEFAULT_NODE_HOST;
+  const fallbackPort = active.port || DEFAULT_NODE_PORT;
+  const dialHost = options.host ?? fallbackHost;
+  const dialPort = options.port ?? fallbackPort;
+  const url = `quic://${dialHost}:${dialPort}${path}`;
+
+  // Inject SNI only when we're using the active target and its SNI differs
+  // from the URL host (i.e. dialing by IP). If the caller picked a specific
+  // host or the active SNI matches, the native side derives SNI from the
+  // URL host itself.
+  if (
+    options.host === undefined &&
+    active.sni &&
+    active.sni !== dialHost &&
+    headers['x-zhtp-sni'] === undefined &&
+    headers['X-Zhtp-Sni'] === undefined
+  ) {
+    headers['x-zhtp-sni'] = active.sni;
+  }
 
   const requestOptions: QuicRequestOptions = {
     method,

@@ -44,6 +44,51 @@ static NEXT_ID: AtomicU64 = AtomicU64::new(1);
 static RUNTIME: OnceLock<Runtime> = OnceLock::new();
 static CRYPTO_PROVIDER: Once = Once::new();
 
+/// Process-wide singleton client `Endpoint`. Quinn's `Endpoint` is Arc-backed
+/// and `Clone`, so every connect site can share the same UDP socket + I/O
+/// driver task. Without this, each FFI call bound a fresh socket — under load
+/// (e.g. once the persistent-session FFI's handshake bug forced every
+/// authenticated request through quinn-ffi instead of multiplexing on one
+/// long-lived session) iOS exhausted its per-app UDP socket budget and the
+/// kernel started rejecting new binds with `EPERM` ("Operation not
+/// permitted"), which bubbled up to JS as `QuicSession.open failed:
+/// openFailed`. Same fix-shape lib-network shipped on the server-team side
+/// (PR #2703).
+///
+/// The endpoint's I/O driver task is spawned on `RUNTIME`, which is a
+/// process-wide multi-thread runtime — so the driver outlives any single
+/// FFI call's scope.
+///
+/// Per-connection TLS config goes through `connect_with(...)`. We do NOT
+/// touch `set_default_client_config` on the shared endpoint — two
+/// concurrent FFI calls with different ALPNs / verifiers would race on the
+/// default (lib-network hit the same trap in PR #2702).
+static CLIENT_ENDPOINT: OnceLock<Endpoint> = OnceLock::new();
+static CLIENT_ENDPOINT_MUTEX: Mutex<()> = Mutex::new(());
+
+fn shared_client_endpoint() -> Result<Endpoint> {
+    if let Some(ep) = CLIENT_ENDPOINT.get() {
+        return Ok(ep.clone());
+    }
+    let _guard = CLIENT_ENDPOINT_MUTEX
+        .lock()
+        .map_err(|_| anyhow::anyhow!("client endpoint init mutex poisoned"))?;
+    if let Some(ep) = CLIENT_ENDPOINT.get() {
+        return Ok(ep.clone());
+    }
+    // Enter the long-lived runtime so the endpoint's I/O driver is parented
+    // to it (and survives any caller-local async scope ending).
+    let rt = runtime();
+    let _enter = rt.enter();
+    let bind_addr: std::net::SocketAddr = "[::]:0"
+        .parse()
+        .map_err(|e| anyhow::anyhow!("Failed to parse default bind address: {e}"))?;
+    let ep = Endpoint::client(bind_addr)
+        .map_err(|e| anyhow::anyhow!("Failed to create shared QUIC endpoint: {e}"))?;
+    let _ = CLIENT_ENDPOINT.set(ep.clone());
+    Ok(ep)
+}
+
 thread_local! {
     static LAST_ERROR: RefCell<Option<CString>> = RefCell::new(None);
 }
@@ -110,14 +155,16 @@ fn ensure_crypto_provider() {
     });
 }
 
-fn parse_spki_pin(spki_pin_32: *const u8) -> Result<[u8; 32], String> {
+/// Read 32 bytes of SPKI pin from a raw pointer. Returns None when the
+/// pointer is null (caller will use AcceptAnyVerifier instead).
+fn parse_spki_pin(spki_pin_32: *const u8) -> Result<Option<[u8; 32]>, String> {
     if spki_pin_32.is_null() {
-        return Err("missing SPKI pin".to_string());
+        return Ok(None);
     }
     let spki = unsafe { std::slice::from_raw_parts(spki_pin_32, 32) };
     let mut spki_pin = [0u8; 32];
     spki_pin.copy_from_slice(spki);
-    Ok(spki_pin)
+    Ok(Some(spki_pin))
 }
 
 #[no_mangle]
@@ -179,6 +226,52 @@ impl ServerCertVerifier for SpkiPinVerifier {
         } else {
             Err(TlsError::InvalidCertificate(CertificateError::UnknownIssuer))
         }
+    }
+
+    fn verify_tls12_signature(
+        &self,
+        _message: &[u8],
+        _cert: &CertificateDer<'_>,
+        _dss: &rustls::DigitallySignedStruct,
+    ) -> Result<HandshakeSignatureValid, TlsError> {
+        Err(TlsError::General("TLS1.2 not supported".into()))
+    }
+
+    fn verify_tls13_signature(
+        &self,
+        _message: &[u8],
+        _cert: &CertificateDer<'_>,
+        _dss: &rustls::DigitallySignedStruct,
+    ) -> Result<HandshakeSignatureValid, TlsError> {
+        Ok(HandshakeSignatureValid::assertion())
+    }
+
+    fn supported_verify_schemes(&self) -> Vec<SignatureScheme> {
+        vec![
+            SignatureScheme::ECDSA_NISTP256_SHA256,
+            SignatureScheme::ED25519,
+            SignatureScheme::RSA_PSS_SHA256,
+        ]
+    }
+}
+
+/// Accept-any TLS cert verifier. Used when peer authenticity is checked at a
+/// higher layer (UHP-v2 handshake's `peer_did` matched against the configured
+/// gateway DID). TLS is just transport here — pinning at this layer is dead
+/// weight because cert rotation would force an app rebuild.
+#[derive(Debug)]
+struct AcceptAnyVerifier;
+
+impl ServerCertVerifier for AcceptAnyVerifier {
+    fn verify_server_cert(
+        &self,
+        _end_entity: &CertificateDer<'_>,
+        _intermediates: &[CertificateDer<'_>],
+        _server_name: &ServerName<'_>,
+        _ocsp: &[u8],
+        _now: UnixTime,
+    ) -> Result<ServerCertVerified, TlsError> {
+        Ok(ServerCertVerified::assertion())
     }
 
     fn verify_tls12_signature(
@@ -436,48 +529,21 @@ fn apply_deterministic_node_id(identity: &mut ZhtpIdentity) {
     );
 }
 
-fn make_client_config(spki_pin: [u8; 32]) -> ClientConfig {
+fn make_client_config(spki_pin: Option<[u8; 32]>) -> ClientConfig {
     make_client_config_with_alpn(spki_pin, ALPN_AUTH)
 }
 
-fn make_client_config_with_alpn(spki_pin: [u8; 32], alpn: &[u8]) -> ClientConfig {
-    let verifier = Arc::new(SpkiPinVerifier::new(spki_pin));
+fn make_client_config_with_alpn(spki_pin: Option<[u8; 32]>, alpn: &[u8]) -> ClientConfig {
+    let verifier: Arc<dyn ServerCertVerifier> = match spki_pin {
+        Some(pin) => Arc::new(SpkiPinVerifier::new(pin)),
+        None => Arc::new(AcceptAnyVerifier),
+    };
     let provider = Arc::new(rustls::crypto::ring::default_provider());
     let mut tls = rustls::ClientConfig::builder_with_provider(provider)
         .with_protocol_versions(&[&rustls::version::TLS13])
         .expect("TLS versions")
         .dangerous()
         .with_custom_certificate_verifier(verifier)
-        .with_no_client_auth();
-
-    tls.alpn_protocols = vec![alpn.to_vec()];
-
-    let mut transport = TransportConfig::default();
-    transport.max_idle_timeout(Some(Duration::from_secs(60).try_into().unwrap()));
-    transport.keep_alive_interval(Some(Duration::from_secs(15)));
-
-    let mut cfg = ClientConfig::new(Arc::new(
-        quinn::crypto::rustls::QuicClientConfig::try_from(tls).unwrap(),
-    ));
-    cfg.transport_config(Arc::new(transport));
-    cfg
-}
-
-/// Standard chain-validating ClientConfig for the public ALPN. Used when
-/// no SPKI pin is supplied — trust is anchored in webpki-roots and the
-/// usual hostname/SAN check against `server_name` applies. This is the
-/// right model for gateways behind publicly-trusted certs (Let's Encrypt
-/// etc.) where the leaf cert rotates on its own schedule and a fixed
-/// SPKI pin would expire with every renewal.
-fn make_public_client_config(alpn: &[u8]) -> ClientConfig {
-    let mut roots = rustls::RootCertStore::empty();
-    roots.extend(webpki_roots::TLS_SERVER_ROOTS.iter().cloned());
-
-    let provider = Arc::new(rustls::crypto::ring::default_provider());
-    let mut tls = rustls::ClientConfig::builder_with_provider(provider)
-        .with_protocol_versions(&[&rustls::version::TLS13])
-        .expect("TLS versions")
-        .with_root_certificates(roots)
         .with_no_client_auth();
 
     tls.alpn_protocols = vec![alpn.to_vec()];
@@ -500,15 +566,19 @@ async fn quic_connect(
     cfg: ClientConfig,
 ) -> Result<Connection> {
     eprintln!("[quinn-ffi] connect: host={host} port={port} sni={server_name}");
-    let bind_addr = "[::]:0".parse()?;
-    let mut endpoint = Endpoint::client(bind_addr)?;
-    endpoint.set_default_client_config(cfg);
+    // Reuse the process-wide singleton — see `CLIENT_ENDPOINT` for why.
+    let endpoint = shared_client_endpoint()?;
 
     let addr = (host, port)
         .to_socket_addrs()?
         .next()
         .ok_or_else(|| anyhow::anyhow!("failed to resolve host"))?;
-    let connecting = endpoint.connect(addr, server_name)?;
+    // Per-connection config via `connect_with` — never mutate the shared
+    // endpoint's default config (concurrent FFI calls with different ALPNs
+    // would race on it).
+    let connecting = endpoint
+        .connect_with(cfg, addr, server_name)
+        .map_err(|e| anyhow::anyhow!("connect_with failed: {e}"))?;
     let conn = timeout(Duration::from_secs(10), connecting)
         .await
         .map_err(|_| anyhow::anyhow!("connect timed out"))??;
@@ -523,19 +593,22 @@ async fn quic_connect_with_endpoint(
     cfg: ClientConfig,
 ) -> Result<(Endpoint, Connection)> {
     eprintln!("[quinn-ffi] connect: host={host} port={port} sni={server_name}");
-    let bind_addr = "[::]:0".parse()?;
-    let mut endpoint = Endpoint::client(bind_addr)?;
-    endpoint.set_default_client_config(cfg);
+    let endpoint = shared_client_endpoint()?;
 
     let addr = (host, port)
         .to_socket_addrs()?
         .next()
         .ok_or_else(|| anyhow::anyhow!("failed to resolve host"))?;
-    let connecting = endpoint.connect(addr, server_name)?;
+    let connecting = endpoint
+        .connect_with(cfg, addr, server_name)
+        .map_err(|e| anyhow::anyhow!("connect_with failed: {e}"))?;
     let conn = timeout(Duration::from_secs(10), connecting)
         .await
         .map_err(|_| anyhow::anyhow!("connect timed out"))??;
     eprintln!("[quinn-ffi] connect: ok");
+    // The endpoint we return is the same Arc-backed singleton — clones are
+    // cheap and the per-connection lifetime is now decoupled from any
+    // per-call socket. `QuinnClient._endpoint` just holds an extra Arc ref.
     Ok((endpoint, conn))
 }
 
@@ -733,6 +806,8 @@ pub extern "C" fn uhp_handshake_quic(
         }
     };
 
+    // NULL pin → accept-any TLS. UHP-v2 handshake then proves the
+    // peer's on-chain DID; caller compares against expected.
     let spki_pin = match parse_spki_pin(spki_pin_32) {
         Ok(val) => val,
         Err(err) => {
@@ -858,6 +933,8 @@ pub extern "C" fn uhp_quic_connect_and_handshake(
         }
     };
 
+    // NULL pin → accept-any TLS. UHP-v2 handshake then proves the
+    // peer's on-chain DID; caller compares against expected.
     let spki_pin = match parse_spki_pin(spki_pin_32) {
         Ok(val) => val,
         Err(err) => {
@@ -983,21 +1060,22 @@ pub extern "C" fn uhp_quic_connect_public(
         return -1;
     }
 
-    // Pin is now optional on the public path. If the caller supplies one,
-    // we keep the SpkiPinVerifier (legacy self-signed dev/testnet flow).
-    // If they pass null, fall back to standard chain validation against
-    // webpki-roots — the right model for gateways behind public CAs
-    // (Let's Encrypt etc.) where the leaf SPKI rotates on its own
-    // schedule.
-    let spki_pin = if spki_pin_32.is_null() {
-        None
-    } else {
-        match parse_spki_pin(spki_pin_32) {
-            Ok(val) => Some(val),
-            Err(err) => {
-                set_last_error(err);
-                return -1;
-            }
+    // Pin is optional. If supplied, SpkiPinVerifier is used (legacy
+    // self-signed dev/testnet flow with hard-coded SHA-256(SPKI)). If
+    // null, we use AcceptAnyVerifier — the cluster ships self-signed
+    // certs everywhere (no public CA), so webpki-roots can never validate
+    // and would universally fail with `UnknownIssuer`. Authenticity for
+    // this path is checked one layer up: the caller (NetworkBootstrap +
+    // NetworkDirectoryService) only trusts a connection once the UHP-v2
+    // handshake's `peer_did` matches the expected DID from .env /
+    // directory. Without that DID compare TLS gives the caller no
+    // identity — see the spec at docs (Frontend Spec — Domain Auth via
+    // UHP-v2 DID, 2026-06-09).
+    let spki_pin = match parse_spki_pin(spki_pin_32) {
+        Ok(val) => val,
+        Err(err) => {
+            set_last_error(err);
+            return -1;
         }
     };
 
@@ -1005,10 +1083,7 @@ pub extern "C" fn uhp_quic_connect_public(
     let server_name = unsafe { CStr::from_ptr(server_name) }.to_string_lossy().to_string();
 
     let result = block_on_with_runtime(async {
-        let cfg = match spki_pin {
-            Some(pin) => make_client_config_with_alpn(pin, ALPN_PUBLIC),
-            None => make_public_client_config(ALPN_PUBLIC),
-        };
+        let cfg = make_client_config_with_alpn(spki_pin, ALPN_PUBLIC);
         let (endpoint, conn) = quic_connect_with_endpoint(&host, port, &server_name, cfg).await?;
         Ok::<QuinnClient, anyhow::Error>(QuinnClient {
             _endpoint: endpoint,

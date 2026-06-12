@@ -148,7 +148,22 @@ async function postOpaque<T>(
     headers: { 'Content-Type': 'application/json' },
     alpnOverride: alpn,
   });
-  if (!res.ok) throw mapServerError(res.status, res.body);
+  if (!res.ok) {
+    // The OPAQUE path uses `quicRequestRaw` (not `quicRequest`), so the
+    // generic `[quic] error body:` log in quic.ts doesn't fire. Capture
+    // the server's actual message here so a 401 surfaces as the real
+    // reason ("unknown username", "ratelimited", "stale start state",
+    // etc.) instead of being collapsed to a generic "wrong password".
+    if (__DEV__) {
+      console.log(
+        '[LobbyAuth] postOpaque non-OK:',
+        'path=' + path,
+        'status=' + res.status,
+        'body=' + (res.body ?? '(empty)'),
+      );
+    }
+    throw mapServerError(res.status, res.body);
+  }
   return JSON.parse(res.body) as T;
 }
 

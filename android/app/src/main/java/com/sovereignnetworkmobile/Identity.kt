@@ -159,7 +159,7 @@ class Identity private constructor(
 
         // ─── JNI: Domain requests (returns JSON for REST API) ───
         @JvmStatic private external fun nativeBuildDomainRegisterRequest(
-            handle: Long, domain: String, contentMappingsJson: String?
+            handle: Long, domain: String, contentMappingsJson: String?, feePaymentTxHex: String
         ): String?
 
         @JvmStatic private external fun nativeBuildDomainUpdateRequest(
@@ -168,6 +168,17 @@ class Identity private constructor(
 
         @JvmStatic private external fun nativeBuildDomainTransferRequest(
             handle: Long, domain: String, toOwnerDid: String
+        ): String?
+
+        // Empty treasuryWalletId byte array → JNI uses the deterministic
+        // blake3("SOV_DAO_TREASURY_V1") constant (matches lib-client C FFI).
+        @JvmStatic private external fun nativeBuildDomainFeePaymentTx(
+            handle: Long,
+            senderWalletId: ByteArray,
+            treasuryWalletId: ByteArray,
+            amountAtoms: String,
+            nonce: Long,
+            chainId: Int
         ): String?
 
         // ─── JNI: Fee config (global, no handle) ───
@@ -321,9 +332,37 @@ class Identity private constructor(
 
     // ─── Domain requests (returns JSON for REST API) ───
 
-    /** Build domain register request. contentMappingsJson is optional JSON: {"path": {"content": "...", "content_type": "..."}} */
-    fun buildDomainRegisterRequest(domain: String, contentMappingsJson: String? = null): String? =
-        nativeBuildDomainRegisterRequest(handle, domain, contentMappingsJson)
+    /**
+     * Build domain register request body for `POST /api/v1/web4/domains/register`.
+     * `contentMappingsJson` is optional JSON `{"path": {"content": "<base64>", "content_type": "<mime>"}, ...}`.
+     * `feePaymentTxHex` is REQUIRED for new registrations — build it via [buildDomainFeePaymentTx] first.
+     */
+    fun buildDomainRegisterRequest(
+        domain: String,
+        contentMappingsJson: String? = null,
+        feePaymentTxHex: String,
+    ): String? = nativeBuildDomainRegisterRequest(handle, domain, contentMappingsJson, feePaymentTxHex)
+
+    /**
+     * Build the signed 10 SOV fee TokenTransfer (Primary wallet → DAO treasury) to attach
+     * as `fee_payment_tx` on a domain registration. `treasuryWalletId` may be empty/null
+     * to use lib-client's deterministic `blake3("SOV_DAO_TREASURY_V1")` constant.
+     * `amountAtoms` is a decimal u128 atoms string (10 SOV = "10000000000000000000").
+     */
+    fun buildDomainFeePaymentTx(
+        senderWalletId: ByteArray,
+        treasuryWalletId: ByteArray? = null,
+        amountAtoms: String,
+        nonce: Long,
+        chainId: Int = 0x03,
+    ): String? = nativeBuildDomainFeePaymentTx(
+        handle,
+        senderWalletId,
+        treasuryWalletId ?: ByteArray(0),
+        amountAtoms,
+        nonce,
+        chainId,
+    )
 
     /** Build domain update request with manifest CID versioning. */
     fun buildDomainUpdateRequest(domain: String, newManifestCid: String, expectedPreviousManifestCid: String): String? =

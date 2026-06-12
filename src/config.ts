@@ -40,23 +40,27 @@ if (!generatedConfig.ZHTP_NODE_URL) {
 }
 
 export const DEFAULT_SOV_NODE_URL = generatedConfig.ZHTP_NODE_URL;
-export const CERTIFICATE_PIN = generatedConfig.CERTIFICATE_PIN;
 
 /**
- * Known gateways (hostnames + SPKI pins) used as the fallback list when
- * the ZDNS-resolved IPs don't answer. Generated from `ZHTP_NODE_REGISTRY`
- * in `.env` by `scripts/generate-config.js`. Empty array if .env doesn't
- * declare any.
+ * Bootstrap gateways — primary + optional fallback. The app dials these in
+ * order, runs the UHP-v2 handshake, and verifies the peer's on-chain DID
+ * matches `did`. Mismatch is treated as MITM and the connection is rejected.
+ *
+ * There is no TLS SPKI pin — TLS is just transport; identity is the DID.
+ * Cert rotation on the gateway is a non-event for the app.
+ *
+ * Populated by `scripts/generate-config.js` from
+ * `BOOTSTRAP_GATEWAY[_2]_{HOST,IP,DID}` in `.env`.
  */
-export interface KnownGateway {
+export interface BootstrapGateway {
   host: string;
-  port: number;
-  pin: string;
+  ip: string;
+  did: string;
 }
-export const NODE_REGISTRY: KnownGateway[] = Array.isArray(
-  (generatedConfig as { NODE_REGISTRY?: unknown }).NODE_REGISTRY,
+export const BOOTSTRAP_GATEWAYS: BootstrapGateway[] = Array.isArray(
+  (generatedConfig as { BOOTSTRAP_GATEWAYS?: unknown }).BOOTSTRAP_GATEWAYS,
 )
-  ? ((generatedConfig as { NODE_REGISTRY: KnownGateway[] }).NODE_REGISTRY)
+  ? ((generatedConfig as { BOOTSTRAP_GATEWAYS: BootstrapGateway[] }).BOOTSTRAP_GATEWAYS)
   : [];
 
 /**
@@ -135,13 +139,15 @@ export const BUILD_INFO: BuildInfo =
   (generatedConfig.BUILD_INFO as BuildInfo | undefined) ?? FALLBACK_BUILD_INFO;
 
 /**
- * Determine if testnet uses self-signed certificates
- * Network nodes use system CA trust (no certificate pinning)
- * Mainnet would use proper SSL certificates
+ * TLS is accept-any across the board now. Authenticity is checked at the
+ * UHP-v2 handshake layer against the on-chain DID — see BOOTSTRAP_GATEWAYS
+ * and `NetworkBootstrap.refreshActiveValidator` for the verification path.
+ *
+ * Returns true on every build; the helper is kept to preserve the existing
+ * `QUIC_CONFIG.insecure` shape for downstream consumers that still read it.
  */
 function isTestnetWithSelfSignedCerts(): boolean {
-  const networkType = DEFAULT_NETWORK_TYPE;
-  return networkType === 'testnet'; // Testnet server uses self-signed cert
+  return true;
 }
 
 // =============================================================================
@@ -299,7 +305,6 @@ export const config = {
   ZHTP_NODE_URL: DEFAULT_SOV_NODE_URL,
   NODE_HOST: DEFAULT_NODE_HOST,
   NODE_PORT: DEFAULT_NODE_PORT,
-  CERTIFICATE_PIN,
   CHAIN_ID,
   NETWORK_TYPE: DEFAULT_NETWORK_TYPE,
   API_ENDPOINTS,
