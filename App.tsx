@@ -14,6 +14,7 @@ import {
   ApiProvider,
 } from './src/context';
 import RootNavigator from './src/navigation/RootNavigator';
+import { AnnouncementBanner } from './src/components/molecules';
 import { colors } from './src/theme';
 import { Text } from './src/components'; // NavigationContainer is handled by each navigator
 import UsernameClaimModal from './src/components/organisms/UsernameClaimModal/UsernameClaimModal';
@@ -122,6 +123,13 @@ function AppContent() {
   // This allows guests to browse public content (trending apps, explorer, DAO)
   return (
     <>
+      {/*
+        AnnouncementBanner: app-wide remote banner driven by a JSON file
+        on GitHub raw (see src/services/RemoteAnnouncement.ts ANNOUNCEMENT_URL).
+        Renders null when no announcement is active, so zero-cost when idle.
+        Sits above the navigator so it's visible on every route.
+      */}
+      <AnnouncementBanner />
       <RootNavigator />
       <UsernameClaimModal />
     </>
