@@ -243,15 +243,6 @@ private func cBuildDaoStake(
 
 // MARK: - C FFI Declarations: Domain transactions (handle is opaque IdentityHandle*)
 
-/// Build signed domain registration transaction
-@_silgen_name("zhtp_client_build_domain_register")
-private func cBuildDomainRegister(
-    _ handle: UnsafeMutableRawPointer,
-    _ domain: UnsafePointer<CChar>?,
-    _ contentCid: UnsafePointer<CChar>?,
-    _ chainId: UInt8
-) -> UnsafeMutablePointer<CChar>?
-
 /// Build signed domain update transaction
 @_silgen_name("zhtp_client_build_domain_update")
 private func cBuildDomainUpdate(
@@ -268,6 +259,30 @@ private func cBuildDomainTransfer(
     _ domain: UnsafePointer<CChar>?,
     _ toPubkey: UnsafePointer<UInt8>?,
     _ chainId: UInt8
+) -> UnsafeMutablePointer<CChar>?
+
+/// Build signed 10 SOV fee TokenTransfer from owner's Primary wallet to DAO treasury.
+/// Returns hex-encoded TokenTransfer string. If `treasuryWalletId` is NULL, lib-client
+/// uses the deterministic blake3("SOV_DAO_TREASURY_V1") constant.
+@_silgen_name("zhtp_client_build_domain_fee_payment_tx")
+private func cBuildDomainFeePaymentTx(
+    _ handle: UnsafeMutableRawPointer,
+    _ senderWalletId: UnsafePointer<UInt8>?,   // 32 bytes
+    _ treasuryWalletId: UnsafePointer<UInt8>?, // 32 bytes or NULL for deterministic
+    _ amountLo: UInt64,
+    _ amountHi: UInt64,
+    _ nonce: UInt64,
+    _ chainId: UInt8
+) -> UnsafeMutablePointer<CChar>?
+
+/// Build full /api/v1/web4/domains/register JSON body with attached fee_payment_tx.
+/// `contentMappingsJson` may be NULL for metadata-only registration.
+@_silgen_name("zhtp_client_build_domain_register_request_with_fee_payment")
+private func cBuildDomainRegisterRequestWithFeePayment(
+    _ handle: UnsafeMutableRawPointer,
+    _ domain: UnsafePointer<CChar>?,
+    _ contentMappingsJson: UnsafePointer<CChar>?,
+    _ feePaymentTxHex: UnsafePointer<CChar>?
 ) -> UnsafeMutablePointer<CChar>?
 
 // MARK: - C FFI Declarations: Fee Config (global, no handle)
@@ -1028,18 +1043,86 @@ public class ZhtpClient {
     // which return JSON. New parameters (content_mappings, expected_previous_manifest_cid)
     // require new C FFI exports from lib-client.
 
-    /// Build domain registration request (returns JSON for REST API)
+    /// Build signed 10 SOV fee payment TokenTransfer from Primary wallet to DAO treasury.
+    /// `treasuryWalletId` may be nil to use lib-client's deterministic
+    /// blake3("SOV_DAO_TREASURY_V1") constant. `amountAtoms` is a decimal u128 atoms
+    /// string (10 SOV = "10000000000000000000").
+    public static func buildDomainFeePaymentTx(
+        senderWalletId: Data,
+        treasuryWalletId: Data?,
+        amountAtoms: String,
+        nonce: UInt64,
+        using identity: Identity,
+        chainId: UInt8 = 0x03
+    ) throws -> String {
+        guard senderWalletId.count == 32 else {
+            throw ClientError.signingError("senderWalletId must be exactly 32 bytes, got \(senderWalletId.count)")
+        }
+        if let treasury = treasuryWalletId, treasury.count != 32 {
+            throw ClientError.signingError("treasuryWalletId must be exactly 32 bytes when provided, got \(treasury.count)")
+        }
+        guard let (amountLo, amountHi) = parseU128Halves(amountAtoms) else {
+            throw ClientError.signingError("amountAtoms must be a non-negative u128 decimal string; got \"\(amountAtoms)\"")
+        }
+
+        let hexPtr: UnsafeMutablePointer<CChar>? = senderWalletId.withUnsafeBytes { senderPtr -> UnsafeMutablePointer<CChar>? in
+            let sender = senderPtr.baseAddress?.assumingMemoryBound(to: UInt8.self)
+            if let treasury = treasuryWalletId {
+                return treasury.withUnsafeBytes { treasuryPtr in
+                    cBuildDomainFeePaymentTx(
+                        identity.getHandle(),
+                        sender,
+                        treasuryPtr.baseAddress?.assumingMemoryBound(to: UInt8.self),
+                        amountLo, amountHi,
+                        nonce,
+                        chainId
+                    )
+                }
+            }
+            return cBuildDomainFeePaymentTx(
+                identity.getHandle(),
+                sender,
+                nil,
+                amountLo, amountHi,
+                nonce,
+                chainId
+            )
+        }
+
+        guard let ptr = hexPtr else {
+            throw ClientError.signingError("Failed to build domain fee payment transaction")
+        }
+        defer { cStringFree(ptr) }
+        return String(cString: ptr)
+    }
+
+    /// Build the full POST /api/v1/web4/domains/register JSON body with fee_payment_tx attached.
+    /// `contentMappingsJson` may be nil for metadata-only registrations.
     public static func buildDomainRegisterRequest(
         domain: String,
+        contentMappingsJson: String?,
+        feePaymentTxHex: String,
         using identity: Identity
     ) throws -> String {
-        let resultPtr = domain.withCString { domainPtr in
-            cBuildDomainRegister(
-                identity.getHandle(),
-                domainPtr,
-                nil,
-                0x03
-            )
+        let resultPtr: UnsafeMutablePointer<CChar>? = domain.withCString { domainPtr -> UnsafeMutablePointer<CChar>? in
+            feePaymentTxHex.withCString { feePtr -> UnsafeMutablePointer<CChar>? in
+                if let mappings = contentMappingsJson {
+                    return mappings.withCString { mappingsPtr in
+                        cBuildDomainRegisterRequestWithFeePayment(
+                            identity.getHandle(),
+                            domainPtr,
+                            mappingsPtr,
+                            feePtr
+                        )
+                    }
+                }
+                return cBuildDomainRegisterRequestWithFeePayment(
+                    identity.getHandle(),
+                    domainPtr,
+                    nil,
+                    feePtr
+                )
+            }
         }
 
         guard let ptr = resultPtr else {

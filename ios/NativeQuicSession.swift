@@ -200,6 +200,7 @@ class NativeQuicSession: RCTEventEmitter {
                 let id = QuicSessionStore.shared.add(session)
                 resolve(id)
             } catch {
+                print("[NativeQuicSession] ❌ open failed: \(error)")
                 reject(
                     "OPEN_FAILED",
                     "QuicSession.open failed: \(error)",

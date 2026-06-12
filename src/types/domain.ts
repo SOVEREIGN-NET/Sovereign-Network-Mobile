@@ -8,29 +8,39 @@
 
 export interface DomainRegisterRequest {
   domain: string;
-  owner: string;
-  fee: number;
-  content_mappings: Record<
+  // Hex (64 chars) wallet_id of the owner's Primary wallet. The 10 SOV
+  // registration fee is debited from this wallet; lib-client signs the
+  // TokenTransfer to the DAO treasury and attaches it as fee_payment_tx.
+  primary_wallet_id: string;
+  content_mappings?: Record<
     string,
     {
       content: string;
       content_type: string;
     }
   >;
-  metadata?: {
-    title?: string;
-    description?: string;
-    tags?: string[];
-  };
 }
 
 export interface DomainRegisterResponse {
   success: boolean;
   domain: string;
-  expires_at: string;
   owner: string; // DID
-  tx_hash: string;
+  // Unix seconds; server sets `registered_at` and the chain enforces a
+  // 365-day expiry off it (see zhtp/src/api/handlers/web4/domains.rs).
+  // The register response does NOT include an explicit `expires_at` — the
+  // mobile computes it as `registered_at + 365 * 86400`.
+  registered_at: number;
+  // Optional blockchain hash when the chain deploy succeeded. May be
+  // absent (e.g. registration accepted but chain deploy failed / pending).
+  blockchain_transaction?: string;
+  // Optional flag mirroring `blockchain_transaction` presence.
+  contract_deployed?: boolean;
+  fees_charged?: number;
+  message?: string;
 }
+
+/** Seconds in 365 days — matches zhtp::handlers::web4::domains.rs:633 expiry calc. */
+export const DOMAIN_REGISTRATION_DURATION_SECS = 365 * 86400;
 
 // ============ DOMAIN INFO ============
 

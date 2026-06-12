@@ -92,7 +92,21 @@ impl QuicClient {
         let (host, port, path) = parse_quic_url(url)?;
         let addr = resolve_addr(&host, port)?;
 
-        log::info!("[🌐 Web4] QUIC request: {} {} to {}", method, path, addr);
+        // SNI is derived per-request, not from any shared state, so two
+        // back-to-back connects to different hosts can't bleed SNI into
+        // each other. Caller may override via `x-zhtp-sni` (useful when
+        // dialing by IP but the cert is bound to a hostname).
+        let server_name = headers
+            .get("x-zhtp-sni")
+            .or_else(|| headers.get("X-Zhtp-Sni"))
+            .filter(|s| !s.is_empty())
+            .cloned()
+            .unwrap_or_else(|| host.clone());
+
+        log::info!(
+            "[🌐 Web4] QUIC request: {} {} to {} (sni={})",
+            method, path, addr, server_name
+        );
 
         // Create endpoint
         let client_config = if insecure {
@@ -105,7 +119,7 @@ impl QuicClient {
         endpoint.set_default_client_config(client_config);
 
         // Connect with timeout
-        let connection = tokio::time::timeout(timeout, endpoint.connect(addr, &host)?.into_future())
+        let connection = tokio::time::timeout(timeout, endpoint.connect(addr, &server_name)?.into_future())
             .await
             .map_err(|_| "Connection timeout")??;
 
@@ -170,7 +184,18 @@ impl QuicClient {
         let (host, port, path) = parse_quic_url(url)?;
         let addr = resolve_addr(&host, port)?;
 
-        log::info!("[🌐 Web4] QUIC request (bytes): {} {} to {}", method, path, addr);
+        // Per-request SNI override (see note on `request`).
+        let server_name = headers
+            .get("x-zhtp-sni")
+            .or_else(|| headers.get("X-Zhtp-Sni"))
+            .filter(|s| !s.is_empty())
+            .cloned()
+            .unwrap_or_else(|| host.clone());
+
+        log::info!(
+            "[🌐 Web4] QUIC request (bytes): {} {} to {} (sni={})",
+            method, path, addr, server_name
+        );
 
         // Create endpoint
         let client_config = if insecure {
@@ -183,7 +208,7 @@ impl QuicClient {
         endpoint.set_default_client_config(client_config);
 
         // Connect with timeout
-        let connection = tokio::time::timeout(timeout, endpoint.connect(addr, &host)?.into_future())
+        let connection = tokio::time::timeout(timeout, endpoint.connect(addr, &server_name)?.into_future())
             .await
             .map_err(|_| "Connection timeout")??;
 

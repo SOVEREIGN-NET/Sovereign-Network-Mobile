@@ -1,24 +1,27 @@
 /**
- * NetworkBootstrap — validator discovery via public directory endpoint.
+ * NetworkBootstrap — connects to a bootstrap gateway, verifies its on-chain
+ * DID against the configured `BOOTSTRAP_GATEWAY[_2]_DID`, then fetches the
+ * /api/v1/network/directory list to inform later routing decisions.
  *
- * Flow at app start (before any QUIC request dispatches):
- *   1. App boots with hardcoded validator + pin (from GeneratedConfig / .env).
- *   2. Try ZDNS to resolve the validator IP set; use the first IP for a
- *      public-mode directory fetch. Fall back to the hardcoded target
- *      if ZDNS is unreachable.
- *   3. Parse `topology.validators`. Policy:
- *        - if the bootstrap target is still the best pick → no-op.
- *        - otherwise, we can't safely swap: the 2026-04-24 directory
- *          contract removed per-validator `spki_pin` entries, so there
- *          is no pin to hand to the native UHP handshake. We log a
- *          "would switch" note and stay on the current validator, and
- *          a future revision that either (a) adds pins back, or (b)
- *          moves gateways behind publicly-trusted certs can flip this
- *          branch to actually call `setActiveValidator`.
+ * Authenticity model (no SPKI):
+ *   - The native QUIC layer (`NativeQuic.setActiveValidator`) holds an
+ *     expected DID. The next time a request triggers the UHP-v2 handshake,
+ *     the resulting `peer_did` must equal the expected DID — otherwise the
+ *     handshake is rejected and no request is routed over the connection.
+ *   - TLS itself is accept-any. Cert rotation on the gateway is a non-event.
+ *
+ * Bootstrap flow at app start (before any QUIC request dispatches):
+ *   1. Read BOOTSTRAP_GATEWAYS from generated config (primary + fallback).
+ *   2. For each gateway in order:
+ *        - setActiveValidator(ip OR host, port, did, sni=host)
+ *        - GET /api/v1/network/directory
+ *        - if it answers AND directory.local_did matches expected → done
+ *        - if mismatch or no answer → try next gateway
+ *   3. If all gateways fail, leave the active validator on the last working
+ *      one (or the primary if none worked) and let later requests retry.
  *
  * The `bootstrapReady` promise resolves when this flow settles (success,
- * failure, or timeout). Every QUIC request in `quic.ts` awaits it, so
- * nothing is dispatched to the old target.
+ * failure, or timeout). Every QUIC request in `quic.ts` awaits it.
  */
 
 import { NativeModules } from 'react-native';
@@ -26,12 +29,7 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import networkDirectoryService from './NetworkDirectoryService';
 import type { DirectoryValidator, DirectoryView } from './NetworkDirectoryService';
 import {
-  DEFAULT_NODE_HOST,
-  DEFAULT_NODE_PORT,
-  NODE_REGISTRY,
-  ZDNS_HOST,
-  ZDNS_PORT,
-  ZDNS_DIRECTORY_NAME,
+  BOOTSTRAP_GATEWAYS,
   QUIC_PORT,
 } from '../config';
 
@@ -39,8 +37,9 @@ interface NativeQuicModule {
   setActiveValidator(
     host: string,
     port: number,
-    pinHex: string,
-  ): Promise<{ host: string; port: number; pinHex: string }>;
+    expectedDid: string,
+    sni: string,
+  ): Promise<{ host: string; port: number; expectedDid: string; sni: string }>;
   resolveDirectory(
     zdnsHost: string,
     port: number,
@@ -54,50 +53,43 @@ const nativeQuic: NativeQuicModule | undefined =
     | undefined;
 
 const LAST_VALIDATOR_KEY = 'sov:active_validator_v1';
-const BOOTSTRAP_TIMEOUT_MS = 3500;
-
-/**
- * Resolve the validator IP set via ZDNS. Returns empty on any failure so
- * the caller can fall back to the hardcoded bootstrap target.
- * Server address + port + directory name are wired from .env via
- * GeneratedConfig — see `scripts/generate-config.js`.
- */
-async function resolveValidatorIPs(): Promise<string[]> {
-  if (!nativeQuic?.resolveDirectory) return [];
-  try {
-    const ips = await nativeQuic.resolveDirectory(
-      ZDNS_HOST,
-      ZDNS_PORT,
-      ZDNS_DIRECTORY_NAME,
-    );
-    if (!Array.isArray(ips) || ips.length === 0) return [];
-    console.log(`[NetworkBootstrap] ZDNS resolved ${ips.length} IP(s): ${ips.join(', ')}`);
-    return ips;
-  } catch (err) {
-    console.warn('[NetworkBootstrap] ZDNS failed:', err);
-    return [];
-  }
-}
+// Each gateway dial inside `tryBootstrapGateway` waits up to ~10 s for the
+// QUIC connect (quinn-ffi default). With one fallback gateway, the worst
+// case is ~22 s end-to-end. Anything shorter declares "settled" before the
+// first connect has even had a chance to respond, which produced the log:
+//   `[NetworkBootstrap] bootstrap settled in 4003ms`
+// followed by a dozen requests firing against an unverified target.
+const BOOTSTRAP_TIMEOUT_MS = 22000;
 
 interface PersistedValidator {
   host: string;
   port: number;
-  pinHex: string;
   did: string;
+  sni: string;
   chosenAt: number;
 }
 
 // Current active target. Updated whenever `setActiveValidator` is invoked so
-// health probes / UI indicators reflect the live endpoint instead of the
-// hardcoded bootstrap.
-let activeTarget = { host: DEFAULT_NODE_HOST, port: DEFAULT_NODE_PORT };
+// health probes / UI indicators reflect the live endpoint.
+//
+// `sni` is the cert hostname (used as TLS SNI); `host` is the dial target
+// (IP). When dialing by IP we still need the hostname for SNI so the
+// caller can pass it through `x-zhtp-sni` — see quic.ts `rawRequest`.
+const initialTarget = (() => {
+  const primary = BOOTSTRAP_GATEWAYS[0];
+  if (!primary) {
+    return { host: '', port: QUIC_PORT, sni: '' };
+  }
+  return {
+    host: primary.ip || primary.host,
+    port: QUIC_PORT,
+    sni: primary.host,
+  };
+})();
+let activeTarget = { ...initialTarget };
 
-export function getActiveTarget(): { host: string; port: number } {
+export function getActiveTarget(): { host: string; port: number; sni: string } {
   return { ...activeTarget };
-}
-
-function matchesCurrentBootstrap(v: DirectoryValidator): boolean {
-  return v.host === DEFAULT_NODE_HOST && v.port === DEFAULT_NODE_PORT;
 }
 
 async function persistSelection(v: PersistedValidator): Promise<void> {
@@ -109,164 +101,93 @@ async function persistSelection(v: PersistedValidator): Promise<void> {
 }
 
 /**
- * Apply the "should we swap validators?" policy after a directory came
- * back. Same conservative rule as before — we only swap if the
- * top-ranked validator is the one that *answered* the directory call
- * (since that's the only node we have a fresh SPKI pin for).
+ * Try a single bootstrap gateway: pin the expected DID on the native layer,
+ * fetch the directory, and confirm `this_node.did` matches expected.
+ * Returns the DirectoryView on success, null otherwise.
  */
-async function maybeSwapAndReturn(
-  directory: DirectoryView,
-): Promise<DirectoryValidator | null> {
+async function tryBootstrapGateway(
+  host: string,
+  ip: string,
+  expectedDid: string,
+): Promise<DirectoryView | null> {
   if (!nativeQuic?.setActiveValidator) return null;
-
-  const ranked = networkDirectoryService.rankValidators(directory.validators);
-  if (ranked.length === 0) {
-    console.warn('[NetworkBootstrap] directory returned no usable validators');
-    return null;
-  }
-  const best = ranked[0];
-  if (matchesCurrentBootstrap(best)) {
-    console.log(
-      '[NetworkBootstrap] bootstrap validator is already the top pick — no switch',
-    );
-    return null;
-  }
-
-  const answeringPin = directory.local_spki_pin;
-  const answeringDid = directory.local_did;
-  const canSwapToBest =
-    !!answeringPin &&
-    answeringPin.length === 64 &&
-    best.did === answeringDid;
-  if (!canSwapToBest) {
-    console.log(
-      `[NetworkBootstrap] would switch to ${best.did.substring(0, 20)}… at ${best.host}:${best.port}, ` +
-        'but the new directory contract does not carry a per-validator SPKI pin — staying',
-    );
-    return null;
-  }
-
+  const dialHost = ip || host;
+  const sni = host;
   try {
-    await nativeQuic.setActiveValidator(best.host, best.port, answeringPin);
-    activeTarget = { host: best.host, port: best.port };
-    console.log(
-      `[NetworkBootstrap] ✓ switched to ${best.did.substring(0, 20)}… at ${best.host}:${best.port}`,
-    );
-    await persistSelection({
-      host: best.host,
-      port: best.port,
-      pinHex: answeringPin,
-      did: best.did,
-      chosenAt: Date.now(),
-    });
-    return best;
+    await nativeQuic.setActiveValidator(dialHost, QUIC_PORT, expectedDid, sni);
+    activeTarget = { host: dialHost, port: QUIC_PORT, sni };
   } catch (err) {
-    console.warn('[NetworkBootstrap] setActiveValidator failed:', err);
+    console.warn(
+      `[NetworkBootstrap] setActiveValidator(${dialHost}) failed:`,
+      err,
+    );
     return null;
   }
+
+  const dir = await networkDirectoryService.fetchDirectory({
+    host: dialHost,
+    port: QUIC_PORT,
+    sni,
+  });
+  if (!dir) return null;
+
+  // Defence in depth: if the directory echoes a `this_node.did` and it
+  // differs from `expectedDid`, treat it as a hostile / misrouted gateway
+  // even if the handshake (which also enforces this) succeeded somehow.
+  if (dir.local_did && dir.local_did !== expectedDid) {
+    console.warn(
+      `[NetworkBootstrap] gateway ${dialHost} returned wrong DID ` +
+        `(${dir.local_did.substring(0, 24)}…, expected ${expectedDid.substring(0, 24)}…) — rejecting`,
+    );
+    return null;
+  }
+  return dir;
 }
 
 /**
- * Fetch the directory and decide whether to swap the active validator.
- * Returns the activated validator or null if we stayed on the bootstrap
- * target.
- *
- * The retry walk has two phases:
- *
- *   Phase A — every IP returned by ZDNS, dialed with the currently
- *     active pin/SNI (bootstrap by default). These are expected to be
- *     load-balanced backends of the bootstrap gateway; the same pin
- *     should match all of them.
- *
- *   Phase B — every entry from `NODE_REGISTRY` (configured in `.env`
- *     as `ZHTP_NODE_REGISTRY`), each with its own per-host pin. We
- *     call `setActiveValidator(host, port, pin)` before each attempt
- *     so SNI + pin line up with the host we're dialing.
- *
- * First gateway that answers wins. If everything fails, we restore the
- * bootstrap as the active target so subsequent QUIC requests don't get
- * pinned to whichever gateway happened to be tried last.
+ * Bootstrap against the configured gateway list. Returns the answering
+ * gateway's directory entry (or null if no entry available). Falls back
+ * to the second gateway on the first one's failure.
  */
 export async function refreshActiveValidator(): Promise<DirectoryValidator | null> {
   if (!nativeQuic?.setActiveValidator) {
     return null;
   }
-
-  const bootstrapEntry = NODE_REGISTRY.find(
-    n => n.host === DEFAULT_NODE_HOST && n.port === DEFAULT_NODE_PORT,
-  );
-
-  // ── Phase A: ZDNS-resolved IPs, current pin/SNI ──
-  const dnsIps = await resolveValidatorIPs();
-  for (const ip of dnsIps) {
-    console.log(`[NetworkBootstrap] phase-A: trying ${ip}:${QUIC_PORT}`);
-    const dir = await networkDirectoryService.fetchDirectory({
-      host: ip,
-      port: QUIC_PORT,
-    });
-    if (dir) {
-      console.log(`[NetworkBootstrap] phase-A: ${ip} answered`);
-      return await maybeSwapAndReturn(dir);
-    }
+  if (BOOTSTRAP_GATEWAYS.length === 0) {
+    console.warn(
+      '[NetworkBootstrap] no bootstrap gateways configured — check .env BOOTSTRAP_GATEWAY_*',
+    );
+    return null;
   }
 
-  // ── Phase B: known gateways from the registry, bootstrap first ──
-  const phaseB =
-    bootstrapEntry !== undefined
-      ? [bootstrapEntry, ...NODE_REGISTRY.filter(n => n !== bootstrapEntry)]
-      : [...NODE_REGISTRY];
-  for (const gw of phaseB) {
-    console.log(`[NetworkBootstrap] phase-B: trying ${gw.host}:${gw.port}`);
-    try {
-      await nativeQuic.setActiveValidator(gw.host, gw.port, gw.pin);
-      activeTarget = { host: gw.host, port: gw.port };
-    } catch (err) {
-      console.warn(`[NetworkBootstrap] setActiveValidator(${gw.host}) failed:`, err);
+  for (const gw of BOOTSTRAP_GATEWAYS) {
+    console.log(
+      `[NetworkBootstrap] trying ${gw.host} (${gw.ip || 'dns'}) — expected did=${gw.did.substring(0, 24)}…`,
+    );
+    const dir = await tryBootstrapGateway(gw.host, gw.ip, gw.did);
+    if (!dir) {
+      console.log(`[NetworkBootstrap] ${gw.host} did not answer or DID mismatch — trying next`);
       continue;
     }
-    const dir = await networkDirectoryService.fetchDirectory({
+    console.log(`[NetworkBootstrap] ✓ bootstrap via ${gw.host}`);
+    await persistSelection({
       host: gw.host,
-      port: gw.port,
+      port: QUIC_PORT,
+      did: gw.did,
+      sni: gw.host,
+      chosenAt: Date.now(),
     });
-    if (dir) {
-      console.log(`[NetworkBootstrap] phase-B: ${gw.host} answered`);
-      // If we landed on a non-bootstrap gateway, persist the choice so
-      // the next launch can prefer it.
-      if (gw.host !== DEFAULT_NODE_HOST || gw.port !== DEFAULT_NODE_PORT) {
-        await persistSelection({
-          host: gw.host,
-          port: gw.port,
-          pinHex: gw.pin,
-          did: dir.local_did ?? '',
-          chosenAt: Date.now(),
-        });
-      }
-      return await maybeSwapAndReturn(dir);
-    }
+
+    // Find the directory entry for the gateway that answered (so callers
+    // can rank it against the rest of the topology). It's fine if the
+    // entry isn't there — the connection is still trusted by DID.
+    const match = dir.validators.find(v => v.did === gw.did) ?? null;
+    return match;
   }
 
-  // ── All attempts failed: restore bootstrap as the active target ──
-  // Without this, the last-tried Phase-B gateway would remain set as
-  // the active validator and every later QUIC request would point at
-  // a known-unreachable host.
-  if (bootstrapEntry) {
-    try {
-      await nativeQuic.setActiveValidator(
-        bootstrapEntry.host,
-        bootstrapEntry.port,
-        bootstrapEntry.pin,
-      );
-      activeTarget = { host: bootstrapEntry.host, port: bootstrapEntry.port };
-    } catch (err) {
-      console.warn('[NetworkBootstrap] restore-bootstrap failed:', err);
-    }
-  } else {
-    console.warn(
-      `[NetworkBootstrap] bootstrap ${DEFAULT_NODE_HOST}:${DEFAULT_NODE_PORT} not in NODE_REGISTRY — ` +
-        'cannot restore active validator after retry walk',
-    );
-  }
-  console.log('[NetworkBootstrap] no gateway answered — staying on bootstrap');
+  console.warn(
+    '[NetworkBootstrap] all bootstrap gateways failed — staying on last-attempted target',
+  );
   return null;
 }
 

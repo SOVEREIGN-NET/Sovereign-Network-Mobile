@@ -485,12 +485,15 @@ class NativeIdentityProvisioningBridge {
   }
 
   /**
-   * Build a signed domain registration request (JSON for REST API)
-   * lib-client builds the complete request body with signature + timestamp
+   * Build a signed domain registration request (JSON for REST API).
+   * lib-client builds the complete request body with signature + timestamp +
+   * attached `fee_payment_tx`. Build the fee tx first via
+   * [signDomainFeePaymentTx] and pass its hex result here.
    */
   async signDomainRegisterRequest(params: {
     domain: string;
     contentMappingsJson?: string | null;
+    feePaymentTxHex: string;
   }): Promise<{ request_json: string }> {
     if (!this.nativeModule) {
       throw new Error(
@@ -505,6 +508,36 @@ class NativeIdentityProvisioningBridge {
     }
 
     return await this.nativeModule.signDomainRegisterRequest(params);
+  }
+
+  /**
+   * Build the signed 10 SOV fee payment TokenTransfer (Primary wallet → DAO
+   * treasury) to attach as `fee_payment_tx` on a domain registration.
+   *
+   * - `senderWalletIdHex`: 64 hex chars (owner's Primary wallet_id)
+   * - `treasuryWalletIdHex`: optional 64 hex chars; omit/empty to use
+   *   lib-client's deterministic blake3("SOV_DAO_TREASURY_V1") constant.
+   * - `amountAtoms`: decimal u128 atoms string (10 SOV = "10000000000000000000")
+   * - `nonce`: current SOV nonce for the sender wallet
+   */
+  async signDomainFeePaymentTx(params: {
+    senderWalletIdHex: string;
+    treasuryWalletIdHex?: string;
+    amountAtoms: string;
+    nonce: number;
+    chainId?: number;
+  }): Promise<{ fee_payment_tx_hex: string }> {
+    if (!this.nativeModule) {
+      throw new Error(
+        'NativeIdentityProvisioning not available on this platform',
+      );
+    }
+    if (!this.nativeModule.signDomainFeePaymentTx) {
+      throw new Error(
+        'NativeIdentityProvisioning.signDomainFeePaymentTx not available — rebuild the app',
+      );
+    }
+    return await this.nativeModule.signDomainFeePaymentTx(params);
   }
 
   /**

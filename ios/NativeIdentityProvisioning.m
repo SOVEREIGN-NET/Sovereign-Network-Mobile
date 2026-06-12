@@ -88,6 +88,10 @@ RCT_EXTERN_METHOD(signDomainTransferRequest:(NSDictionary *)params
                   resolve:(RCTPromiseResolveBlock)resolve
                   reject:(RCTPromiseRejectBlock)reject)
 
+RCT_EXTERN_METHOD(signDomainFeePaymentTx:(NSDictionary *)params
+                  resolve:(RCTPromiseResolveBlock)resolve
+                  reject:(RCTPromiseRejectBlock)reject)
+
 RCT_EXTERN_METHOD(buildKyberKeyUpdate:(nonnull NSNumber *)timestamp
                   resolve:(RCTPromiseResolveBlock)resolve
                   reject:(RCTPromiseRejectBlock)reject)

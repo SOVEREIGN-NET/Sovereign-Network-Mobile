@@ -18,11 +18,15 @@ import { Button, Card, FormField, Text, LoadingView } from '../components';
 import { colors, spacing, typography, borderRadius } from '../theme';
 import domainService from '../services/DomainService';
 import { useAuth } from '../hooks/useAuth';
+import { useWalletList } from '../hooks/useWalletList';
+import { DOMAIN_REGISTRATION_DURATION_SECS } from '../types/domain';
 import {
   validateDomainFormat,
   validateDomainDuration,
   yearsToDays,
 } from '../utils/domainValidation';
+
+const DOMAIN_REGISTRATION_FEE_SOV = 10;
 
 // Storage keys
 const REGISTERED_DOMAINS_KEY = 'sov:registered_domains';
@@ -46,6 +50,8 @@ const DomainRegistrationScreen: React.FC<DomainRegistrationScreenProps> = ({
 }) => {
   const insets = useSafeAreaInsets();
   const { currentIdentity, isBootstrapping, loadIdentityOnDemand } = useAuth();
+  const { walletByType, loading: walletsLoading } = useWalletList();
+  const primaryWallet = walletByType?.primary;
 
   // FORM STATE
   const [domain, setDomain] = useState('');
@@ -68,7 +74,6 @@ const DomainRegistrationScreen: React.FC<DomainRegistrationScreenProps> = ({
   const [debounceTimer, setDebounceTimer] = useState<NodeJS.Timeout | null>(
     null,
   );
-  const [hasExistingDomain, setHasExistingDomain] = useState(false);
   const [resolvedIdentityDid, setResolvedIdentityDid] = useState<string | null>(
     currentIdentity?.did ?? null,
   );
@@ -115,30 +120,6 @@ const DomainRegistrationScreen: React.FC<DomainRegistrationScreenProps> = ({
     identityLoadAttemptedRef.current = true;
     ensureIdentityAvailable();
   }, [ensureIdentityAvailable, isBootstrapping, resolvedIdentityDid]);
-
-  useEffect(() => {
-    const loadExisting = async () => {
-      try {
-        if (!resolvedIdentityDid) {
-          setHasExistingDomain(false);
-          return;
-        }
-        const storedDomainsJson = await AsyncStorage.getItem(
-          REGISTERED_DOMAINS_KEY,
-        );
-        const storedDomains = storedDomainsJson
-          ? JSON.parse(storedDomainsJson)
-          : [];
-        const hasOwned = storedDomains.some(
-          (d: DomainData) => d.owner === resolvedIdentityDid,
-        );
-        setHasExistingDomain(hasOwned);
-      } catch {
-        setHasExistingDomain(false);
-      }
-    };
-    loadExisting();
-  }, [resolvedIdentityDid]);
 
   // Validate registration form
   const validateForm = (): boolean => {
@@ -259,6 +240,20 @@ const DomainRegistrationScreen: React.FC<DomainRegistrationScreenProps> = ({
       });
       return;
     }
+    if (!primaryWallet?.id) {
+      setStatus({
+        type: 'error',
+        message: 'Primary wallet not found — cannot pay registration fee',
+      });
+      return;
+    }
+    if ((primaryWallet.total_balance ?? 0) < DOMAIN_REGISTRATION_FEE_SOV) {
+      setStatus({
+        type: 'error',
+        message: `Insufficient SOV — need ${DOMAIN_REGISTRATION_FEE_SOV} SOV to register a domain`,
+      });
+      return;
+    }
 
     setLoading(true);
     setStatus({ type: null, message: '' });
@@ -266,7 +261,6 @@ const DomainRegistrationScreen: React.FC<DomainRegistrationScreenProps> = ({
     try {
       const fullDomain = `${domain}.sov`;
       const durationDays = yearsToDays(parseInt(years, 10));
-      const feeAmount = 10;
       const contentMappings = {
         '/': {
           content: `<html><body>${fullDomain}</body></html>`,
@@ -277,7 +271,7 @@ const DomainRegistrationScreen: React.FC<DomainRegistrationScreenProps> = ({
       console.log('[DomainRegistrationScreen] Registering domain:', {
         domain: fullDomain,
         durationDays,
-        feeAmount,
+        primaryWalletId: primaryWallet.id,
       });
 
       setStatus({
@@ -287,14 +281,31 @@ const DomainRegistrationScreen: React.FC<DomainRegistrationScreenProps> = ({
 
       const response = await domainService.registerDomain({
         domain: fullDomain,
-        owner: ownerDid,
-        fee: feeAmount,
+        primary_wallet_id: primaryWallet.id,
         content_mappings: contentMappings,
       });
 
+      // Server-returned fields the response actually carries (see
+      // zhtp/src/api/handlers/web4/domains.rs:856 — `blockchain_transaction`,
+      // `registered_at`, etc., NOT `tx_hash` / `expires_at`). Pre-2026-06-12
+      // this screen read `response.tx_hash` and `response.expires_at` which
+      // never existed on the wire, so the success banner always rendered
+      // "Expires: Invalid Date" and AsyncStorage stored `tx_hash: undefined`.
+      const txHash = response.blockchain_transaction ?? '';
+      const registeredAtSecs = Number.isFinite(response.registered_at)
+        ? response.registered_at
+        : Math.floor(Date.now() / 1000);
+      // Expiry is set on chain to `registered_at + 365 days` (server's
+      // `domains.rs:633`); recompute it client-side so we don't need an
+      // extra round-trip to `/status` after every register.
+      const expiresAtSecs = registeredAtSecs + DOMAIN_REGISTRATION_DURATION_SECS;
+      const expiresAtIso = new Date(expiresAtSecs * 1000).toISOString();
+
       console.log(
         '[DomainRegistrationScreen] Domain registered:',
-        response.tx_hash,
+        txHash || '(no chain tx)',
+        'expires:',
+        expiresAtIso,
       );
 
       // Store domain
@@ -308,22 +319,30 @@ const DomainRegistrationScreen: React.FC<DomainRegistrationScreenProps> = ({
       const newDomain = {
         domain: response.domain,
         owner: response.owner,
-        expires_at: response.expires_at,
-        tx_hash: response.tx_hash,
-        registered_at: new Date().toISOString(),
+        expires_at: expiresAtIso,
+        tx_hash: txHash,
+        registered_at: new Date(registeredAtSecs * 1000).toISOString(),
       };
 
-      storedDomains.push(newDomain);
+      // Replace any prior entry for the same domain (case-insensitive) so
+      // re-registering the same name or hitting registration twice never
+      // produces duplicate AsyncStorage entries — those duplicates leak
+      // straight through to MyDomainsScreen, which renders one card per
+      // entry keyed by domain name and produces React "duplicate key"
+      // warnings + visual glitches in the active/expired split.
+      const dedupedDomains = (storedDomains as Array<{ domain?: string }>).filter(
+        (d) => d.domain?.toLowerCase() !== newDomain.domain?.toLowerCase(),
+      );
+      dedupedDomains.push(newDomain);
       await AsyncStorage.setItem(
         REGISTERED_DOMAINS_KEY,
-        JSON.stringify(storedDomains),
+        JSON.stringify(dedupedDomains),
       );
-      setHasExistingDomain(true);
 
       setStatus({
         type: 'success',
         message: `Domain registered. Expires: ${new Date(
-          response.expires_at,
+          expiresAtIso,
         ).toLocaleDateString()}`,
       });
 
@@ -488,37 +507,6 @@ const DomainRegistrationScreen: React.FC<DomainRegistrationScreenProps> = ({
               are yours for the selected duration and can be renewed.
             </Text>
           </View>
-          {hasExistingDomain && (
-            <View
-              style={{
-                marginBottom: spacing.lg,
-                padding: spacing.md,
-                backgroundColor: `${colors.warning}15`,
-                borderRadius: borderRadius.md,
-              }}
-            >
-              <Text
-                style={{
-                  fontSize: typography.size.sm,
-                  color: colors.warning,
-                  fontWeight: typography.weight.semibold,
-                }}
-              >
-                Limit: 1 domain per identity
-              </Text>
-              <Text
-                style={{
-                  fontSize: typography.size.xs,
-                  color: colors.text_secondary,
-                  marginTop: spacing.xs,
-                }}
-              >
-                This identity already has a registered domain. Creating more is
-                not allowed on mobile.
-              </Text>
-            </View>
-          )}
-
           {/* Domain Input */}
           <FormField
             label="Domain Name"
@@ -820,34 +808,46 @@ const DomainRegistrationScreen: React.FC<DomainRegistrationScreenProps> = ({
           )}
 
           {/* Register Button */}
-          <Button
-            onPress={handleRegister}
-            disabled={
+          {(() => {
+            const insufficientBalance =
+              !!primaryWallet &&
+              (primaryWallet.total_balance ?? 0) < DOMAIN_REGISTRATION_FEE_SOV;
+            const noPrimaryWallet = !walletsLoading && !primaryWallet?.id;
+            const disabled =
               loading ||
-              hasExistingDomain ||
               availabilityStatus.available === false ||
               !domain ||
-              !resolvedIdentityDid
-            }
-            style={{
-              backgroundColor:
-                loading ||
-                hasExistingDomain ||
-                availabilityStatus.available === false ||
-                !domain ||
-                !resolvedIdentityDid
-                  ? colors.text_secondary
-                  : colors.primary,
-            }}
-          >
-            {loading
+              !resolvedIdentityDid ||
+              walletsLoading ||
+              noPrimaryWallet ||
+              insufficientBalance;
+
+            const label = loading
               ? 'Registering...'
-              : hasExistingDomain
-              ? 'Limit: 1 domain per identity'
               : !resolvedIdentityDid
               ? 'Unlock Identity to Register'
-              : 'Register Domain'}
-          </Button>
+              : walletsLoading
+              ? 'Loading wallet…'
+              : noPrimaryWallet
+              ? 'Primary Wallet Not Found'
+              : insufficientBalance
+              ? `Need ${DOMAIN_REGISTRATION_FEE_SOV} SOV to Register`
+              : 'Register Domain';
+
+            return (
+              <Button
+                onPress={handleRegister}
+                disabled={disabled}
+                style={{
+                  backgroundColor: disabled
+                    ? colors.text_secondary
+                    : colors.primary,
+                }}
+              >
+                {label}
+              </Button>
+            );
+          })()}
         </ScrollView>
       </View>
     </KeyboardAvoidingView>

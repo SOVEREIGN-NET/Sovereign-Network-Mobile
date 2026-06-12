@@ -874,6 +874,7 @@ pub extern "system" fn Java_com_sovereignnetworkmobile_Identity_nativeBuildDomai
     handle: jlong,
     domain: JString<'local>,
     content_mappings_json: JString<'local>,
+    fee_payment_tx_hex: JString<'local>,
 ) -> JString<'local> {
     if handle == 0 {
         return JString::default();
@@ -883,6 +884,15 @@ pub extern "system" fn Java_com_sovereignnetworkmobile_Identity_nativeBuildDomai
         Some(s) => s,
         None => return JString::default(),
     };
+    let fee_hex = match jstring_to_string(&mut env, &fee_payment_tx_hex) {
+        Some(s) if !s.is_empty() => s,
+        _ => {
+            log::error!(
+                "[Identity JNI] buildDomainRegisterRequest: fee_payment_tx_hex is required for new registrations"
+            );
+            return JString::default();
+        }
+    };
     // content_mappings_json may be null — parse as HashMap<String, ContentMapping> if present
     let mappings = jstring_to_string(&mut env, &content_mappings_json).and_then(|json| {
         serde_json::from_str::<std::collections::HashMap<String, zhtp_client::ContentMapping>>(
@@ -891,10 +901,86 @@ pub extern "system" fn Java_com_sovereignnetworkmobile_Identity_nativeBuildDomai
         .ok()
     });
 
-    match zhtp_client::build_domain_register_request(identity, &domain_str, mappings) {
+    match zhtp_client::build_domain_register_request_with_fee_payment(
+        identity,
+        &domain_str,
+        mappings,
+        Some(fee_hex),
+    ) {
         Ok(json) => env.new_string(&json).unwrap_or_default(),
         Err(e) => {
             log::error!("[Identity JNI] buildDomainRegisterRequest failed: {}", e);
+            JString::default()
+        }
+    }
+}
+
+/// Build a signed 10 SOV fee payment TokenTransfer (Primary wallet → DAO treasury)
+/// to attach as `fee_payment_tx` on the domain registration POST body.
+#[no_mangle]
+pub extern "system" fn Java_com_sovereignnetworkmobile_Identity_nativeBuildDomainFeePaymentTx<
+    'local,
+>(
+    mut env: JNIEnv<'local>,
+    _class: JClass<'local>,
+    handle: jlong,
+    sender_wallet_id: JByteArray<'local>,
+    treasury_wallet_id: JByteArray<'local>, // empty array = use deterministic constant
+    amount_atoms: JString<'local>,
+    nonce: jlong,
+    chain_id: jint,
+) -> JString<'local> {
+    if handle == 0 {
+        return JString::default();
+    }
+    let identity = unsafe { handle_ref(handle) };
+
+    let amount: u128 = match parse_amount_atoms(&mut env, &amount_atoms, "buildDomainFeePaymentTx") {
+        Some(v) => v,
+        None => return JString::default(),
+    };
+
+    let sender = env.convert_byte_array(&sender_wallet_id).unwrap_or_default();
+    if sender.len() != 32 {
+        log::error!(
+            "[Identity JNI] buildDomainFeePaymentTx: sender_wallet_id must be 32 bytes (got {})",
+            sender.len()
+        );
+        return JString::default();
+    }
+    let mut sender_arr = [0u8; 32];
+    sender_arr.copy_from_slice(&sender);
+
+    // Empty treasury byte array → use deterministic blake3("SOV_DAO_TREASURY_V1").
+    // Mirrors lib-client's `zhtp_client_build_domain_fee_payment_tx` C FFI NULL semantics.
+    let treasury = env
+        .convert_byte_array(&treasury_wallet_id)
+        .unwrap_or_default();
+    let mut treasury_arr = [0u8; 32];
+    if treasury.is_empty() {
+        let h = blake3::hash(b"SOV_DAO_TREASURY_V1");
+        treasury_arr.copy_from_slice(h.as_bytes());
+    } else if treasury.len() == 32 {
+        treasury_arr.copy_from_slice(&treasury);
+    } else {
+        log::error!(
+            "[Identity JNI] buildDomainFeePaymentTx: treasury_wallet_id must be 0 or 32 bytes (got {})",
+            treasury.len()
+        );
+        return JString::default();
+    }
+
+    match zhtp_client::build_sov_wallet_transfer_tx(
+        identity,
+        &sender_arr,
+        &treasury_arr,
+        amount,
+        chain_id as u8,
+        nonce as u64,
+    ) {
+        Ok(hex) => env.new_string(&hex).unwrap_or_default(),
+        Err(e) => {
+            log::error!("[Identity JNI] buildDomainFeePaymentTx failed: {}", e);
             JString::default()
         }
     }

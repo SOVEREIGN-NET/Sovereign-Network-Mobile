@@ -816,9 +816,17 @@ class NativeIdentityProvisioning(reactContext: ReactApplicationContext) :
             try {
                 val domain = params.getString("domain") ?: ""
                 val contentMappingsJson = params.getString("contentMappingsJson")
+                val feePaymentTxHex = params.getString("feePaymentTxHex") ?: ""
 
                 if (domain.isEmpty()) {
                     promise.reject("INVALID_PARAMS", "domain parameter is required")
+                    return@execute
+                }
+                if (feePaymentTxHex.isEmpty()) {
+                    promise.reject(
+                        "INVALID_PARAMS",
+                        "feePaymentTxHex is required (build via signDomainFeePaymentTx first)",
+                    )
                     return@execute
                 }
 
@@ -830,7 +838,11 @@ class NativeIdentityProvisioning(reactContext: ReactApplicationContext) :
 
                 Log.d(TAG, "Building domain register request: $domain")
 
-                val requestJson = identity.buildDomainRegisterRequest(domain, contentMappingsJson)
+                val requestJson = identity.buildDomainRegisterRequest(
+                    domain = domain,
+                    contentMappingsJson = contentMappingsJson,
+                    feePaymentTxHex = feePaymentTxHex,
+                )
                 if (requestJson == null) {
                     promise.reject("SIGNING_ERROR", "Failed to build domain registration request")
                     return@execute
@@ -842,6 +854,114 @@ class NativeIdentityProvisioning(reactContext: ReactApplicationContext) :
             } catch (e: Exception) {
                 Log.e(TAG, "Domain registration request failed", e)
                 promise.reject("IDENTITY_ERROR", "Failed to build domain registration request: ${e.message}", e)
+            }
+        }
+    }
+
+    /**
+     * Build the signed 10 SOV fee payment TokenTransfer (Primary wallet → DAO treasury)
+     * to attach as `fee_payment_tx` on a domain registration.
+     *
+     * Params:
+     *   senderWalletIdHex  — 64 hex chars (Primary wallet id)
+     *   treasuryWalletIdHex (optional) — 64 hex chars; empty/missing = use deterministic constant
+     *   amountAtoms        — decimal u128 atoms string (10 SOV = "10000000000000000000")
+     *   nonce              — number|string (current SOV nonce for sender)
+     *   chainId (optional) — defaults to 0x03
+     */
+    @ReactMethod
+    fun signDomainFeePaymentTx(params: ReadableMap, promise: Promise) {
+        executor.execute {
+            try {
+                val senderHex = params.getString("senderWalletIdHex") ?: ""
+                if (senderHex.length != 64 || !senderHex.matches(Regex("[0-9a-fA-F]+"))) {
+                    promise.reject("INVALID_PARAMS", "senderWalletIdHex must be 64 hex characters (32 bytes)")
+                    return@execute
+                }
+                val treasuryHex = params.getString("treasuryWalletIdHex") ?: ""
+                if (treasuryHex.isNotEmpty() &&
+                    (treasuryHex.length != 64 || !treasuryHex.matches(Regex("[0-9a-fA-F]+")))
+                ) {
+                    promise.reject(
+                        "INVALID_PARAMS",
+                        "treasuryWalletIdHex must be 64 hex characters (32 bytes) when provided",
+                    )
+                    return@execute
+                }
+
+                val amountAtoms = parseAmountAtoms(params, "amountAtoms")
+                    ?: run {
+                        promise.reject(
+                            "INVALID_PARAMS",
+                            "amountAtoms must be a decimal u128 atoms string (no negatives, no fractions)",
+                        )
+                        return@execute
+                    }
+
+                val nonce: Long = when {
+                    params.hasKey("nonce") && !params.isNull("nonce") -> {
+                        try {
+                            params.getDouble("nonce").toLong()
+                        } catch (_: Exception) {
+                            val s = params.getString("nonce")
+                            if (s.isNullOrEmpty()) {
+                                promise.reject("INVALID_PARAMS", "nonce is required (string or number)")
+                                return@execute
+                            }
+                            s.toLongOrNull() ?: run {
+                                promise.reject("INVALID_PARAMS", "nonce must be a valid integer")
+                                return@execute
+                            }
+                        }
+                    }
+                    else -> {
+                        promise.reject("INVALID_PARAMS", "nonce is required (string or number)")
+                        return@execute
+                    }
+                }
+
+                val chainId = if (params.hasKey("chainId") && !params.isNull("chainId")) {
+                    params.getInt("chainId")
+                } else {
+                    0x03
+                }
+
+                val identity = getLatestIdentity()
+                if (identity == null) {
+                    promise.reject("IDENTITY_ERROR", "No identity available for signing")
+                    return@execute
+                }
+
+                val senderBytes = hexToBytes(senderHex)
+                val treasuryBytes = if (treasuryHex.isEmpty()) null else hexToBytes(treasuryHex)
+
+                Log.d(
+                    TAG,
+                    "Building domain fee payment tx: from=$senderHex atoms=$amountAtoms nonce=$nonce",
+                )
+
+                val hex = identity.buildDomainFeePaymentTx(
+                    senderWalletId = senderBytes,
+                    treasuryWalletId = treasuryBytes,
+                    amountAtoms = amountAtoms,
+                    nonce = nonce,
+                    chainId = chainId,
+                )
+                if (hex == null) {
+                    promise.reject("SIGNING_ERROR", "Failed to build domain fee payment tx")
+                    return@execute
+                }
+
+                promise.resolve(WritableNativeMap().apply {
+                    putString("fee_payment_tx_hex", hex)
+                })
+            } catch (e: Exception) {
+                Log.e(TAG, "Domain fee payment tx signing failed", e)
+                promise.reject(
+                    "IDENTITY_ERROR",
+                    "Failed to build domain fee payment tx: ${e.message}",
+                    e,
+                )
             }
         }
     }
