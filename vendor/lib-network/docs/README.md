@@ -61,7 +61,7 @@ ZHTP lib-network enables:
 - **Routing Rewards**: Earn tokens for forwarding mesh traffic
 - **Storage Rewards**: Get paid for providing DHT storage
 - **Relay Rewards**: Compensation for internet bridge services
-- **UBI Distribution**: Universal Basic Income through network participation
+- **UBS Distribution**: Universal Basic Services through network participation
 
 ###  Intelligent Discovery
 - **Cross-Platform Hardware Detection**: Automatic protocol enablement

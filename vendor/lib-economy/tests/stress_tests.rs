@@ -89,7 +89,7 @@ mod stress_tests {
                 .unwrap();
             total_fees_added += fee;
             
-            // Periodically distribute UBI
+            // Periodically distribute UBS
             if i % 10000 == 0 && i > 0 {
                 let citizens = ((i / 1000) + 1000) as u64; // Growing population
                 let ubi_per_citizen = treasury.calculate_ubi_per_citizen(citizens);

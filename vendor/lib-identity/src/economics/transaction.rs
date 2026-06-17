@@ -9,7 +9,7 @@ use lib_crypto::Hash;
 pub enum TransactionType {
     /// Standard payment transaction
     Standard,
-    /// UBI distribution transaction
+    /// UBS distribution transaction
     UbiDistribution,
     /// DAO fee transaction
     DaoFee,

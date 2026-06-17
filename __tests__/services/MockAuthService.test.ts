@@ -94,12 +94,12 @@ describe('MockAuthService', () => {
 
       expect(identity.wallets).toBeDefined();
       expect(identity.wallets!.primary).toBeDefined();
-      expect(identity.wallets!.ubi).toBeDefined();
+      expect(identity.wallets!.ubs).toBeDefined();
       expect(identity.wallets!.savings).toBeDefined();
 
       // Verify wallet structure
       expect(identity.wallets!.primary.wallet_type).toBe('Primary');
-      expect(identity.wallets!.ubi.wallet_type).toBe('UBI');
+      expect(identity.wallets!.ubs.wallet_type).toBe('UBS');
       expect(identity.wallets!.savings.wallet_type).toBe('Savings');
     });
 
@@ -227,7 +227,7 @@ describe('MockAuthService', () => {
 
       expect(identity.wallets).toBeDefined();
       expect(identity.wallets!.primary).toBeDefined();
-      expect(identity.wallets!.ubi).toBeDefined();
+      expect(identity.wallets!.ubs).toBeDefined();
       expect(identity.wallets!.savings).toBeDefined();
 
       // Verify 5000 ZHTP welcome bonus for citizens

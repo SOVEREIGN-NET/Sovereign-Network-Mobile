@@ -33,7 +33,7 @@ pub trait BlockchainEconomics {
 pub struct EconomicBlockchainData {
     /// Network transaction fees
     pub transaction_fees: u64,
-    /// DAO fees for UBI/DAO allocations
+    /// DAO fees for UBS/DAO allocations
     pub dao_fees: u64,
     /// Infrastructure provider rewards
     pub infrastructure_rewards: u64,
@@ -248,7 +248,7 @@ impl BlockchainEconomics for BlockchainIntegration {
         self.dao_treasury.apply_fee_distribution(distribution)?;
         
         info!(
-            " Processed {} ZHTP DAO fees for UBI/DAO allocations",
+            " Processed {} ZHTP DAO fees for UBS/DAO allocations",
             dao_fees
         );
         

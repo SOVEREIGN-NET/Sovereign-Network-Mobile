@@ -98,15 +98,21 @@ export function getUseMockService(): boolean {
 
 /**
  * Set feature flag state (called from Developer Settings)
+ * Only allowed in __DEV__ builds — production always uses real services.
  */
-export function setUseMockService(_value: boolean): void {
-  // Mock mode is disabled across all builds.
-  const enforcedValue = false;
+export function setUseMockService(value: boolean): void {
+  const enforcedValue = __DEV__ ? value : false;
   if (cachedUseMockService !== enforcedValue) {
     cachedUseMockService = enforcedValue;
-    storage.removeItem('zhtp_use_mock_service').catch(err =>
-      console.warn('Failed to clear mock service setting:', err),
-    );
+    if (enforcedValue) {
+      storage.setItem('zhtp_use_mock_service', 'true').catch(err =>
+        console.warn('Failed to persist mock service setting:', err),
+      );
+    } else {
+      storage.removeItem('zhtp_use_mock_service').catch(err =>
+        console.warn('Failed to clear mock service setting:', err),
+      );
+    }
     notifyMockServiceListeners(enforcedValue);
   }
 }
@@ -132,15 +138,22 @@ function notifyMockServiceListeners(value: boolean): void {
 
 /**
  * Initialize the mock service flag from storage
+ * Dev builds: default to true so hot-reloading doesn't require re-login.
+ * Production: always false.
  */
 async function initializeMockServiceFlag(): Promise<void> {
   try {
-    // Clear stale mock flag — mock is now opt-in only via Settings
-    await storage.removeItem('zhtp_use_mock_service');
-    cachedUseMockService = false;
+    if (__DEV__) {
+      // Dev builds: restore persisted choice, default to true (mock).
+      const stored = await storage.getItem('zhtp_use_mock_service');
+      cachedUseMockService = stored === null ? true : stored === 'true';
+    } else {
+      await storage.removeItem('zhtp_use_mock_service');
+      cachedUseMockService = false;
+    }
   } catch (err) {
     console.warn('Failed to initialize mock service setting:', err);
-    cachedUseMockService = false;
+    cachedUseMockService = __DEV__; // fallback to true in dev
   }
 }
 
@@ -1379,6 +1392,29 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
       setIsLoading(true);
       try {
         const normalized = username.trim().toLowerCase();
+
+        // DEV / Mock mode: bypass native OPAQUE bridge entirely
+        if (getUseMockService()) {
+          const identity = await MockAuthService.signIn({
+            did: normalized,
+            passphrase: password,
+          });
+          // Best-effort persist — native Keychain may not be set up
+          // in dev, but the in-memory identity is enough for UI testing.
+          try {
+            await SecureIdentityStorage.setIdentity(identity, {
+              requireBiometric: false,
+            });
+          } catch (storeErr) {
+            console.warn(
+              '[AuthContext.passwordSignIn] mock: storage persist failed (non-fatal):',
+              storeErr,
+            );
+          }
+          setCurrentIdentity(identity);
+          return identity;
+        }
+
         const session = await opaqueLogin({
           username: normalized,
           password,

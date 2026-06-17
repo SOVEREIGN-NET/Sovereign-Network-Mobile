@@ -2,7 +2,7 @@
 
 ## Vision: Post-Scarcity Economics for Web4
 
-lib-economy implements a radical departure from traditional blockchain economics, creating a **post-scarcity economic model** where tokens are minted based on utility rather than artificial scarcity. The system replaces traditional ISP revenue models with fair compensation for infrastructure services while funding Universal Basic Income (UBI) through mandatory DAO contributions.
+lib-economy implements a radical departure from traditional blockchain economics, creating a **post-scarcity economic model** where tokens are minted based on utility rather than artificial scarcity. The system replaces traditional ISP revenue models with fair compensation for infrastructure services while funding Universal Basic Services (UBS) through mandatory DAO contributions.
 
 ## Core Economic Principles
 
@@ -52,10 +52,10 @@ pub const ISP_BYPASS_UPTIME_BONUS: u64 = 10;       // 10 ZHTP per hour
 
 ### 3. DAO-Driven Welfare System
 
-Every transaction (except UBI/welfare distributions) contributes 2% to the DAO treasury:
+Every transaction (except UBS/welfare distributions) contributes 2% to the DAO treasury:
 
 **Fund Allocation:**
-- **40% UBI**: Universal Basic Income for all verified citizens
+- **40% UBS**: Universal Basic Services for all verified citizens
 - **30% Welfare**: Emergency assistance and social programs
 - **30% Development**: Network development and maintenance
 
@@ -66,7 +66,7 @@ Every transaction (except UBI/welfare distributions) contributes 2% to the DAO t
 
 ```rust
 pub const DEFAULT_DAO_FEE_RATE: u64 = 200;          // 2% (200 basis points)
-pub const UBI_ALLOCATION_PERCENTAGE: u64 = 40;      // 40% to UBI
+pub const UBI_ALLOCATION_PERCENTAGE: u64 = 40;      // 40% to UBS
 pub const WELFARE_ALLOCATION_PERCENTAGE: u64 = 30;  // 30% to welfare
 pub const DEVELOPMENT_ALLOCATION_PERCENTAGE: u64 = 30; // 30% to development
 ```
@@ -84,7 +84,7 @@ pub const DEVELOPMENT_ALLOCATION_PERCENTAGE: u64 = 30; // 30% to development
 │  │    Model       │      │   Economics    │                     │
 │  │                │      │                │                     │
 │  │ • Fee calc     │      │ • DAO fees     │                     │
-│  │ • Rewards      │      │ • UBI alloc    │                     │
+│  │ • Rewards      │      │ • UBS alloc    │                     │
 │  │ • Parameters   │      │ • Welfare      │                     │
 │  └────────┬───────┘      └────────┬───────┘                     │
 │           │                       │                              │
@@ -117,7 +117,7 @@ pub const DEVELOPMENT_ALLOCATION_PERCENTAGE: u64 = 30; // 30% to development
 │   STUB MODULES (Need Implementation)                           │
 │  ┌─────────────────────────────────────┐                        │
 │  │  Distribution   │  Reward Calculator │                       │
-│  │  (UBI stub)     │  (Empty)           │                       │
+│  │  (UBS stub)     │  (Empty)           │                       │
 │  └─────────────────────────────────────┘                        │
 └─────────────────────────────────────────────────────────────────┘
          ▲                      ▲                    ▲
@@ -174,8 +174,8 @@ pub const DEVELOPMENT_ALLOCATION_PERCENTAGE: u64 = 30; // 30% to development
 
 **Key Functions:**
 - Receive and track DAO fees (2% of all transactions)
-- Allocate funds: 40% UBI, 30% welfare, 30% development
-- Calculate optimal UBI per citizen
+- Allocate funds: 40% UBS, 30% welfare, 30% development
+- Calculate optimal UBS per citizen
 - Track efficiency metrics (distribution vs collection)
 - Sustainability analysis and funding gap calculations
 
@@ -197,7 +197,7 @@ pub const DEVELOPMENT_ALLOCATION_PERCENTAGE: u64 = 30; // 30% to development
 **Transaction Types:**
 - Payment (with fees)
 - Reward (fee-free from network)
-- UBI Distribution (fee-free from DAO)
+- UBS Distribution (fee-free from DAO)
 - Welfare Distribution (fee-free from DAO)
 - Staking (with fees)
 - Infrastructure Service (with fees)
@@ -295,10 +295,10 @@ uptime_bonus = if uptime > 0.99 {
 total_reward = routing + storage + compute + quality_bonus + uptime_bonus
 ```
 
-### UBI Distribution
+### UBS Distribution
 
 ```rust
-// Calculate optimal UBI per citizen
+// Calculate optimal UBS per citizen
 ubi_per_citizen = treasury.ubi_allocated / total_verified_citizens
 
 // Verify sustainability
@@ -402,7 +402,7 @@ pub fn generate_dao_fee_proof(dao_fee: u64, timestamp: u64) -> [u8; 32] {
 
 ### 3. Identity Verification
 - All wallets require verified identity
-- UBI recipients must have verified citizenship
+- UBS recipients must have verified citizenship
 - Prevents duplicate welfare claims
 
 ### 4. Treasury Protection
@@ -427,7 +427,7 @@ pub fn generate_dao_fee_proof(dao_fee: u64, timestamp: u64) -> [u8; 32] {
 - Horizontal scaling through sharding
 - Independent wallet managers per identity
 - Async treasury updates
-- Batch UBI distributions
+- Batch UBS distributions
 
 ## Future Enhancements
 
@@ -435,7 +435,7 @@ pub fn generate_dao_fee_proof(dao_fee: u64, timestamp: u64) -> [u8; 32] {
 -  Economic model and fee calculation
 -  Multi-wallet system
 -  Treasury management
--  UBI distribution (stub - needs implementation)
+-  UBS distribution (stub - needs implementation)
 -  Reward calculator (empty - needs implementation)
 
 ### Phase 2: Advanced Features

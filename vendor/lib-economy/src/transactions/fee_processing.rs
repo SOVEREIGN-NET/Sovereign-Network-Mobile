@@ -8,7 +8,7 @@ use crate::wasm::logging::info;
 
 #[derive(Debug, Clone, Copy, Serialize, Deserialize)]
 pub struct DaoFeeDistribution {
-    pub ubi: u64,
+    pub ubs: u64,
     pub sector_daos: u64,
     pub emergency_reserve: u64,
     pub dev_grants: u64,
@@ -16,7 +16,7 @@ pub struct DaoFeeDistribution {
 
 impl DaoFeeDistribution {
     pub fn total(&self) -> u64 {
-        self.ubi
+        self.ubs
             .saturating_add(self.sector_daos)
             .saturating_add(self.emergency_reserve)
             .saturating_add(self.dev_grants)
@@ -34,14 +34,14 @@ pub fn process_network_fees(total_fees: u64) -> Result<u64> {
     Ok(total_fees) // All fees stay in circulation for infrastructure
 }
 
-/// Process DAO fees for UBI and DAO allocations
+/// Process DAO fees for UBS and DAO allocations
 pub fn process_dao_fees(dao_fees: u64) -> Result<u64> {
     info!(
         " Processed {} SOV tokens in DAO fees - added to treasury allocations",
         dao_fees
     );
     
-    Ok(dao_fees) // DAO fees go to UBI/welfare treasury
+    Ok(dao_fees) // DAO fees go to UBS/welfare treasury
 }
 
 /// Calculate DAO fee distribution breakdown (single source of truth for allocation)
@@ -76,7 +76,7 @@ pub fn calculate_dao_fee_distribution(dao_fees: u64) -> DaoFeeDistribution {
     let remainder = dao_fees.saturating_sub(allocated);
 
     DaoFeeDistribution {
-        ubi: ubi_allocation,
+        ubs: ubi_allocation,
         sector_daos: dao_allocation,
         emergency_reserve: emergency_allocation.saturating_add(remainder),
         dev_grants: dev_grant_allocation,
@@ -119,13 +119,13 @@ pub fn calculate_fee_distribution(network_fees: u64, dao_fees: u64) -> serde_jso
         "network_percentage": network_percentage,
         "dao_percentage": dao_percentage,
         "allocation": {
-            "ubi": dao_allocation.ubi,
+            "ubs": dao_allocation.ubs,
             "sector_daos": dao_allocation.sector_daos,
             "emergency_reserve": dao_allocation.emergency_reserve,
             "dev_grants": dao_allocation.dev_grants
         },
         "allocation_percentages": {
-            "ubi": crate::UBI_ALLOCATION_PERCENTAGE,
+            "ubs": crate::UBI_ALLOCATION_PERCENTAGE,
             "sector_daos": crate::SECTOR_DAO_ALLOCATION_PERCENTAGE,
             "emergency_reserve": crate::EMERGENCY_ALLOCATION_PERCENTAGE,
             "dev_grants": crate::DEV_GRANT_ALLOCATION_PERCENTAGE
@@ -152,7 +152,7 @@ pub fn calculate_fee_distribution(network_fees: u64, dao_fees: u64) -> serde_jso
         assert_eq!(distribution.total(), large_fee);
         
         // Each allocation should be at most the full fee
-        assert!(distribution.ubi <= large_fee);
+        assert!(distribution.ubs <= large_fee);
         assert!(distribution.sector_daos <= large_fee);
         assert!(distribution.emergency_reserve <= large_fee);
         assert!(distribution.dev_grants <= large_fee);
@@ -183,7 +183,7 @@ pub fn calculate_fee_distribution(network_fees: u64, dao_fees: u64) -> serde_jso
             
             // Each component calculated correctly with u128 intermediates
             let ubi_expected = ((fee as u128 * crate::UBI_ALLOCATION_PERCENTAGE as u128) / 100) as u64;
-            assert_eq!(distribution.ubi, ubi_expected, "UBI calculation incorrect for fee={}", fee);
+            assert_eq!(distribution.ubs, ubi_expected, "UBS calculation incorrect for fee={}", fee);
         }
     }
 #[cfg(test)]
@@ -198,7 +198,7 @@ mod tests {
         
         // Use a fee amount that produces a remainder:
         // 123 SOV * allocation percentages:
-        // - UBI: (123 * 45) / 100 = 55 (with 0.35 lost)
+        // - UBS: (123 * 45) / 100 = 55 (with 0.35 lost)
         // - Sector DAOs: (123 * 30) / 100 = 36 (with 0.9 lost)
         // - Emergency: (123 * 15) / 100 = 18 (with 0.45 lost)
         // - Dev Grants: (123 * 10) / 100 = 12 (with 0.3 lost)
@@ -209,7 +209,7 @@ mod tests {
         let distribution = calculate_dao_fee_distribution(123);
         
         // Verify allocations (integer division)
-        assert_eq!(distribution.ubi, 55);
+        assert_eq!(distribution.ubs, 55);
         assert_eq!(distribution.sector_daos, 36);
         assert_eq!(distribution.dev_grants, 12);
         
@@ -257,7 +257,7 @@ mod tests {
         assert_eq!(d1.emergency_reserve, 1); // 0 + 1 remainder
         assert_eq!(d1.total(), 1);
         
-        // 7: UBI=3, Sector=2, Emergency=1, Dev=1, remainder=0
+        // 7: UBS=3, Sector=2, Emergency=1, Dev=1, remainder=0
         let d7 = calculate_dao_fee_distribution(7);
         assert_eq!(d7.total(), 7);
         
@@ -273,7 +273,7 @@ mod tests {
         // At 100 SOV fee, allocations should be clean (no remainder)
         let distribution = calculate_dao_fee_distribution(100);
         
-        assert_eq!(distribution.ubi, 45);
+        assert_eq!(distribution.ubs, 45);
         assert_eq!(distribution.sector_daos, 30);
         assert_eq!(distribution.emergency_reserve, 15);
         assert_eq!(distribution.dev_grants, 10);
@@ -285,7 +285,7 @@ mod tests {
         // Zero fee should produce zero allocations
         let distribution = calculate_dao_fee_distribution(0);
         
-        assert_eq!(distribution.ubi, 0);
+        assert_eq!(distribution.ubs, 0);
         assert_eq!(distribution.sector_daos, 0);
         assert_eq!(distribution.emergency_reserve, 0);
         assert_eq!(distribution.dev_grants, 0);

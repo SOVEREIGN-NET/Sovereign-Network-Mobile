@@ -58,7 +58,7 @@ pub struct EconomicRequirements {
     pub required_payment_methods: Vec<String>,
     /// Economic incentive multiplier
     pub incentive_multiplier: f64,
-    /// UBI contribution requirement
+    /// UBS contribution requirement
     pub ubi_contribution_required: bool,
     /// Fee tier (affects routing priority)
     pub fee_tier: FeeTier,
@@ -612,9 +612,9 @@ impl Router {
             }
         }
         
-        // Check UBI contribution requirement
+        // Check UBS contribution requirement
         if requirements.ubi_contribution_required {
-            let ubi_contribution = request.headers.get("X-UBI-Contribution")
+            let ubi_contribution = request.headers.get("X-UBS-Contribution")
                 .and_then(|s| s.parse::<bool>().ok())
                 .unwrap_or(false);
             

@@ -33,9 +33,9 @@ Details:
 
 ## Step 2: Verify Service Account
 
-Your service account JSON is at:
+Your service account JSON is at a path of your choosing (e.g., a secure download folder):
 ```
-/Users/supertramp/Downloads/sovereign-network-mobile-906a1-7093f108fa6c.json
+/path/to/your/sovereign-network-mobile-service-account.json
 ```
 
 In Google Play Console:
@@ -76,7 +76,7 @@ Paste into the secret value.
 
 **2. GOOGLE_PLAY_SERVICE_ACCOUNT_JSON** (JSON content)
 ```bash
-cat /Users/supertramp/Downloads/sovereign-network-mobile-906a1-7093f108fa6c.json
+cat /path/to/your/sovereign-network-mobile-service-account.json
 ```
 Copy the entire JSON and paste it.
 

@@ -6,13 +6,13 @@
 |------|----------|
 | Release keystore | `android/app/release.keystore` |
 | Keystore credentials | `android/vault/release-keystore-credentials.txt` |
-| Play Store service account | `/Users/supertramp/Downloads/sovereign-network-mobile-906a1-a6a74897ca20.json` |
+| Play Store service account | Set via `GOOGLE_PLAY_SERVICE_ACCOUNT_JSON` env var |
 
 ## Keystore Credentials
 
-- **Password**: `JEqWT2SygxdEf5MIA8x6`
+- **Password**: See `android/vault/release-keystore-credentials.txt` (gitignored)
 - **Alias**: `release-key`
-- **Key password**: `JEqWT2SygxdEf5MIA8x6`
+- **Key password**: See `android/vault/release-keystore-credentials.txt` (gitignored)
 - **Type**: PKCS12
 - **Regenerated**: 2026-02-24 (keep this keystore safe — losing it means you can't upload updates)
 
@@ -21,9 +21,9 @@
 ```bash
 cd android
 
-RELEASE_KEYSTORE_PASSWORD="JEqWT2SygxdEf5MIA8x6" \
+RELEASE_KEYSTORE_PASSWORD="..." \
 RELEASE_KEY_ALIAS="release-key" \
-RELEASE_KEY_PASSWORD="JEqWT2SygxdEf5MIA8x6" \
+RELEASE_KEY_PASSWORD="..." \
 ./gradlew bundleRelease -x buildQuicJni
 ```
 
@@ -36,10 +36,10 @@ Requires the service account to have **Release Manager** role in Play Console (s
 ```bash
 cd android
 
-GOOGLE_PLAY_SERVICE_ACCOUNT_JSON="/Users/supertramp/Downloads/sovereign-network-mobile-906a1-a6a74897ca20.json" \
-RELEASE_KEYSTORE_PASSWORD="JEqWT2SygxdEf5MIA8x6" \
+GOOGLE_PLAY_SERVICE_ACCOUNT_JSON="/path/to/your/service-account.json" \
+RELEASE_KEYSTORE_PASSWORD="..." \
 RELEASE_KEY_ALIAS="release-key" \
-RELEASE_KEY_PASSWORD="JEqWT2SygxdEf5MIA8x6" \
+RELEASE_KEY_PASSWORD="..." \
 ./gradlew publishReleaseBundle -x buildQuicJni -PplayTrack=internal
 ```
 
@@ -57,7 +57,7 @@ Change `-PplayTrack=` to `alpha`, `beta`, or `production` as needed.
 
 ## One-time Setup: Grant Service Account Access to Play Console
 
-The service account (`sovereign-network-mobile-906a1-a6a74897ca20.json`) must be linked to Play Console before automated uploads work.
+The service account JSON file must be linked to Play Console before automated uploads work.
 
 1. Go to [Play Console](https://play.google.com/console) → **Settings → API access**
 2. Under "Service accounts", find the account ending in `...iam.gserviceaccount.com`
@@ -77,7 +77,7 @@ You must submit the new certificate to Google:
 keytool -export -rfc \
   -keystore android/app/release.keystore \
   -alias release-key \
-  -storepass "JEqWT2SygxdEf5MIA8x6" \
+  -storepass "..." \
   -file upload_cert.pem
 ```
 
@@ -98,8 +98,7 @@ versionName "1.1.0"   // semantic version shown to users
 ```bash
 # Re-encode and push new keystore to GitHub secrets
 base64 < android/app/release.keystore | gh secret set RELEASE_KEYSTORE_FILE
-gh secret set RELEASE_KEYSTORE_PASSWORD --body "JEqWT2SygxdEf5MIA8x6"
+gh secret set RELEASE_KEYSTORE_PASSWORD --body "..."
 gh secret set RELEASE_KEY_ALIAS --body "release-key"
-gh secret set RELEASE_KEY_PASSWORD --body "JEqWT2SygxdEf5MIA8x6"
-gh secret set GOOGLE_PLAY_SERVICE_ACCOUNT_JSON < /Users/supertramp/Downloads/sovereign-network-mobile-906a1-a6a74897ca20.json
-```
+gh secret set RELEASE_KEY_PASSWORD --body "..."
+gh secret set GOOGLE_PLAY_SERVICE_ACCOUNT_JSON < /path/to/your/service-account.json

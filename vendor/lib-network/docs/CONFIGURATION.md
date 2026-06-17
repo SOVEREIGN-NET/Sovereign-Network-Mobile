@@ -216,9 +216,9 @@ let economic_config = EconomicConfig {
     latency_bonus_threshold_ms: 100,  // Bonus for low latency
     reliability_bonus_threshold: 0.99, // Bonus for high reliability
     
-    // UBI distribution
-    ubi_pool_percentage: 20.0,        // 20% of rewards go to UBI
-    ubi_distribution_interval_s: 3600, // Hourly UBI distribution
+    // UBS distribution
+    ubi_pool_percentage: 20.0,        // 20% of rewards go to UBS
+    ubi_distribution_interval_s: 3600, // Hourly UBS distribution
 };
 ```
 

@@ -1,7 +1,7 @@
 //! ZHTP Identity Management Package
 //! 
 //! Zero-knowledge identity system with quantum-resistant cryptography and privacy-preserving
-//! identity verification. Supports complete citizen onboarding with automatic UBI, DAO governance,
+//! identity verification. Supports complete citizen onboarding with automatic UBS, DAO governance,
 //! and Web4 service access.
 //! 
 //! ## Primary API
@@ -10,7 +10,7 @@
 //! - Soulbound ZK-DID (1:1 per human)
 //! - Quantum-resistant wallets with 20-word seed phrases  
 //! - DAO governance registration
-//! - UBI payout registration
+//! - UBS payout registration
 //! - Web4 service access
 //! - Privacy-preserving credentials
 
@@ -93,7 +93,7 @@ pub use credentials::{
 pub use citizenship::{
     CitizenshipResult,   // ✓ Onboarding results
     DaoRegistration,     // ✓ DAO governance registration
-    UbiRegistration,     // ✓ UBI payout registration
+    UbiRegistration,     // ✓ UBS payout registration
     Web4Access,          // ✓ Web4 service access
     WelcomeBonus,        // ✓ Welcome bonus for new citizens
 };

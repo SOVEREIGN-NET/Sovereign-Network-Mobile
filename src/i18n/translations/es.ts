@@ -168,7 +168,7 @@ export const es: Translation = {
       identityType: 'Tipo de identidad',
       selectType: 'Seleccionar tipo',
       types: {
-        citizen: 'Ciudadano (elegible para UBI)',
+        citizen: 'Ciudadano (elegible para UBS)',
         citizenDescription: 'Ciudadano individual con derecho a voto',
         organization: 'Organización',
         organizationDescription: 'Organización o colectivo',
@@ -362,7 +362,7 @@ export const es: Translation = {
     stats: {
       title: 'Estadísticas',
       votingPower: 'Poder de voto',
-      ubiEarned: 'UBI ganado',
+      ubiEarned: 'UBS ganado',
       wallets: 'Carteras',
     },
     logout: {
@@ -389,8 +389,8 @@ export const es: Translation = {
         show: '🙈 Mostrar',
         hide: '👁️ Ocultar',
       },
-      updateButton: '🔐 Actualizar contraseña',
-      updatingButton: '⏳ Actualizando...',
+      updateButton: 'Actualizar contraseña',
+      updatingButton: 'Actualizando...',
       biometric: {
         title: 'Autenticación biométrica',
         enabled: 'Activada',
@@ -399,13 +399,13 @@ export const es: Translation = {
         enabledButton: '✓ Activada',
       },
       security: {
-        title: '🔐 Recordatorio de seguridad',
+        title: 'Recordatorio de seguridad',
         message: 'Mantén tu contraseña segura y no la compartas con nadie. No podemos recuperar tu identidad si pierdes el acceso.',
       },
       backup: {
         title: 'Respaldo de identidad',
-        createButton: '💾 Crear respaldo',
-        viewButton: '📂 Ver respaldos',
+        createButton: 'Crear respaldo',
+        viewButton: 'Ver respaldos',
       },
       validation: {
         currentPassphraseRequired: 'Se requiere la contraseña actual',
@@ -570,7 +570,7 @@ export const es: Translation = {
       copy: 'Copiar',
       sendZhtp: 'ENVIAR SOV',
       receiveZhtp: 'RECIBIR SOV',
-      claimUbi: 'RECLAMAR UBI',
+      claimUbi: 'RECLAMAR UBS',
       stakeZhtp: 'STAKE DE SOV',
     },
     wallets: {

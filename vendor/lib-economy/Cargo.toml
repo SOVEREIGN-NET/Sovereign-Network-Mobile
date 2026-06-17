@@ -2,7 +2,7 @@
 name = "lib-economy"
 version = "0.1.0"
 edition = "2021"
-description = "ZHTP Economics Engine - Post-scarcity economics, UBI distribution, and ISP replacement incentives"
+description = "ZHTP Economics Engine - Post-scarcity economics, UBS distribution, and ISP replacement incentives"
 authors = ["ZHTP Team"]
 license = "MIT"
 repository = "https://github.com/SOVEREIGN-NETWORK/ZHTPDEV"

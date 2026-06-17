@@ -40,7 +40,7 @@ mod tests {
 
     #[test]
     fn test_fee_exempt_transactions() {
-        // Test UBI distribution (should be fee-free)
+        // Test UBS distribution (should be fee-free)
         let ubi_tx = Transaction::new_ubi_distribution([3u8; 32], 1000).unwrap();
         assert_eq!(ubi_tx.amount, 1000);
         assert_eq!(ubi_tx.dao_fee, 0);
@@ -95,7 +95,7 @@ mod tests {
         let expected_cost = tx.amount + tx.total_fee;
         assert_eq!(tx.total_cost(), expected_cost);
         
-        // Test UBI contribution check
+        // Test UBS contribution check
         assert!(tx.contributes_to_ubi());
         
         // Test DAO distribution check
@@ -131,7 +131,7 @@ mod tests {
         assert_eq!(ubi_tx.total_fee, 0);
         assert_eq!(welfare_tx.total_fee, 0);
         
-        // Neither should contribute to UBI (they come FROM UBI fund)
+        // Neither should contribute to UBS (they come FROM UBS fund)
         assert!(!ubi_tx.contributes_to_ubi());
         assert!(!welfare_tx.contributes_to_ubi());
     }

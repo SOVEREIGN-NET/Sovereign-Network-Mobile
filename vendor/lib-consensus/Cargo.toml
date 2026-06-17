@@ -39,10 +39,10 @@ tracing-subscriber = "0.3"
 
 [features]
 default = ["full"]
-full = ["dao", "byzantine", "rewards", "ubi"]
+full = ["dao", "byzantine", "rewards", "ubs"]
 dao = []
 byzantine = []
 rewards = []
-ubi = []
+ubs = []
 testing = []
 dev-insecure = []

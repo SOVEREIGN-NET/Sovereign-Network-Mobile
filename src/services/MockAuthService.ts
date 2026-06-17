@@ -55,10 +55,10 @@ const MOCK_IDENTITIES: Record<string, Identity> = {
         staked_balance: 0,
         pending_rewards: 0,
       },
-      ubi: {
+      ubs: {
         id: 'wallet_ubi_001',
-        wallet_type: 'UBI',
-        name: 'UBI Wallet',
+        wallet_type: 'UBS',
+        name: 'UBS Wallet',
         balance: 150.5,
         staked_balance: 0,
         pending_rewards: 0,
@@ -97,10 +97,10 @@ const MOCK_IDENTITIES: Record<string, Identity> = {
         staked_balance: 0,
         pending_rewards: 0,
       },
-      ubi: {
+      ubs: {
         id: 'wallet_ubi_002',
-        wallet_type: 'UBI',
-        name: 'UBI Wallet',
+        wallet_type: 'UBS',
+        name: 'UBS Wallet',
         balance: 0,
         staked_balance: 0,
         pending_rewards: 0,
@@ -230,10 +230,10 @@ class MockAuthService {
           staked_balance: 0,
           pending_rewards: 0,
         },
-        ubi: {
+        ubs: {
           id: 'wallet_ubi_' + this.generateMockId(),
-          wallet_type: 'UBI',
-          name: 'UBI Wallet',
+          wallet_type: 'UBS',
+          name: 'UBS Wallet',
           balance: 0,
           staked_balance: 0,
           pending_rewards: 0,

@@ -639,7 +639,7 @@ function selectAlpnProfile(endpoint: string): 'public' | 'control' {
     const publicEndpoints = [
         /\/api\/v1\/identity\/.*/,
         /\/api\/v1\/protocol\/health/,
-        /\/api\/v1\/ubi\/.*/,
+        /\/api\/v1\/ubs\/.*/,
         /\/api\/v1\/dao\/.*/,
         /\/api\/v1\/wallet\/.*/,
         /\/web4\/.*/
@@ -667,7 +667,7 @@ ALPN (Application Layer Protocol Negotiation) allows client and server to agree 
 - Endpoints:
   - `/api/v1/identity/*` - Identity checks, creation
   - `/api/v1/protocol/health` - Node health
-  - `/api/v1/ubi/*` - UBI status checks
+  - `/api/v1/ubs/*` - UBS status checks
   - `/api/v1/dao/*` - DAO proposal queries
   - `/api/v1/wallet/*` - Balance/public info
   - `/web4/*` - Web4 content

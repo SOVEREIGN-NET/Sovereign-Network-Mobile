@@ -24,7 +24,7 @@ pub struct Transaction {
     pub amount: u64,
     /// Network infrastructure fee
     pub base_fee: u64,
-    /// Mandatory DAO fee for UBI/welfare (2% of amount)
+    /// Mandatory DAO fee for UBS/welfare (2% of amount)
     pub dao_fee: u64,
     /// Total fee (base_fee + dao_fee)
     pub total_fee: u64,
@@ -55,7 +55,7 @@ impl Transaction {
         
         // Calculate fees based on transaction type
         let (base_fee, dao_fee, total_fee) = if tx_type.is_fee_exempt() {
-            // UBI and welfare distributions are fee-free
+            // UBS and welfare distributions are fee-free
             (0, 0, 0)
         } else {
             // All other transactions pay full fees including mandatory DAO fee
@@ -95,7 +95,7 @@ impl Transaction {
         Self::new(from, to, amount, TransactionType::Reward, 200, Priority::Normal)
     }
     
-    /// Create a UBI distribution transaction (fee-free)
+    /// Create a UBS distribution transaction (fee-free)
     pub fn new_ubi_distribution(to: [u8; 32], amount: u64) -> Result<Self> {
         let from = [0u8; 32]; // DAO treasury address
         Self::new(from, to, amount, TransactionType::UbiDistribution, 200, Priority::Normal)
@@ -138,7 +138,7 @@ impl Transaction {
         })
     }
     
-    /// Check if this transaction contributes to UBI funding
+    /// Check if this transaction contributes to UBS funding
     pub fn contributes_to_ubi(&self) -> bool {
         self.dao_fee > 0
     }

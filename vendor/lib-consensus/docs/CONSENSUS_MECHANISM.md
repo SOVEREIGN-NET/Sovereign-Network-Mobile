@@ -180,7 +180,7 @@ The consensus system includes integrated DAO governance:
 
 - **Treasury Allocation**: Fund distribution decisions
 - **Protocol Upgrades**: Network parameter changes
-- **UBI Distribution**: Universal Basic Income parameters
+- **UBS Distribution**: Universal Basic Services parameters
 - **Validator Updates**: Validator set modifications
 - **Economic Parameters**: Fee structures and rewards
 - **Emergency Actions**: Critical protocol fixes
@@ -221,7 +221,7 @@ The consensus system includes integrated DAO governance:
 - **Validator rewards**: Distributed based on participation
 - **Delegation rewards**: Shared with delegators after commission
 - **DAO treasury**: Funds governance operations
-- **UBI distribution**: Universal Basic Income for citizens
+- **UBS distribution**: Universal Basic Services for citizens
 
 ## Network Requirements
 

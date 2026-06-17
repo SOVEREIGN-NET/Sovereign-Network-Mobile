@@ -117,7 +117,7 @@ pub struct ServerCapabilities {
     pub isp_bypass_support: bool,
     /// DAO fee processing
     pub dao_fee_support: bool,
-    /// UBI integration
+    /// UBS integration
     pub ubi_support: bool,
     /// Economic incentive processing
     pub economic_support: bool,

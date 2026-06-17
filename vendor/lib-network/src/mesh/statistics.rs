@@ -11,7 +11,7 @@ pub struct MeshProtocolStats {
     pub active_connections: u32,
     /// Total data routed (bytes)
     pub total_data_routed: u64,
-    /// Total tokens distributed as UBI
+    /// Total tokens distributed as UBS
     pub total_ubi_distributed: u64,
     /// Number of long-range relays
     pub long_range_relays: u32,

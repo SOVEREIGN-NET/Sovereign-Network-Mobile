@@ -10,7 +10,10 @@ import {
   LoadingView,
   ScreenLayout,
   ErrorAlert,
-  InfoCard,
+  EyeOpenIcon,
+  EyeClosedIcon,
+  LockIcon,
+  KeyIcon,
 } from '../components';
 import { useAuth } from '../hooks';
 import { useTranslation } from '../i18n';
@@ -23,10 +26,30 @@ const IdentitySettingsScreen = ({ navigation }: any) => {
   const [currentPassphrase, setCurrentPassphrase] = useState('');
   const [newPassphrase, setNewPassphrase] = useState('');
   const [confirmPassphrase, setConfirmPassphrase] = useState('');
-  const [showPassphrase, setShowPassphrase] = useState(false);
+  const [showCurrentPassphrase, setShowCurrentPassphrase] = useState(false);
+  const [showNewPassphrase, setShowNewPassphrase] = useState(false);
+  const [showConfirmPassphrase, setShowConfirmPassphrase] = useState(false);
   const [biometricEnabled] = useState(!!currentIdentity?.biometricHash);
   const [error, setError] = useState<string | null>(null);
   const [isSaving, setIsSaving] = useState(false);
+
+  /** Factory: creates an independent eye toggle for a given field. */
+  const eyeToggle = (
+    visible: boolean,
+    onToggle: () => void,
+  ) => (
+    <Pressable
+      onPress={onToggle}
+      hitSlop={8}
+      style={{ padding: 2 }}
+    >
+      {visible ? (
+        <EyeOpenIcon size={18} color={colors.primary} />
+      ) : (
+        <EyeClosedIcon size={18} color={colors.primary} />
+      )}
+    </Pressable>
+  );
 
   if (!currentIdentity) {
     return <LoadingView />;
@@ -95,9 +118,10 @@ const IdentitySettingsScreen = ({ navigation }: any) => {
                 placeholder={t.identity.settings.currentPassphrasePlaceholder}
                 value={currentPassphrase}
                 onChangeText={setCurrentPassphrase}
-                secureTextEntry={!showPassphrase}
+                secureTextEntry={!showCurrentPassphrase}
                 editable={!isLoading && !isSaving}
                 containerStyle={{ marginBottom: 0 }}
+                rightIcon={eyeToggle(showCurrentPassphrase, () => setShowCurrentPassphrase(prev => !prev))}
               />
 
               <FormField
@@ -105,48 +129,22 @@ const IdentitySettingsScreen = ({ navigation }: any) => {
                 placeholder={t.identity.settings.newPassphrasePlaceholder}
                 value={newPassphrase}
                 onChangeText={setNewPassphrase}
-                secureTextEntry={!showPassphrase}
+                secureTextEntry={!showNewPassphrase}
                 editable={!isLoading && !isSaving}
                 containerStyle={{ marginBottom: 0 }}
+                rightIcon={eyeToggle(showNewPassphrase, () => setShowNewPassphrase(prev => !prev))}
               />
 
-              <View>
-                <Row
-                  style={{
-                    justifyContent: 'space-between',
-                    marginBottom: spacing.sm,
-                  }}
-                >
-                  <Text
-                    style={{
-                      fontSize: typography.size.xs,
-                      fontWeight: typography.weight.semibold,
-                      color: colors.text_primary,
-                    }}
-                  >
-                    {t.identity.settings.confirmPassphrase}
-                  </Text>
-                  <Pressable onPress={() => setShowPassphrase(!showPassphrase)}>
-                    <Text
-                      style={{
-                        fontSize: typography.size.xs,
-                        color: colors.primary,
-                      }}
-                    >
-                      {showPassphrase ? t.identity.settings.showHide.hide : t.identity.settings.showHide.show}
-                    </Text>
-                  </Pressable>
-                </Row>
-                <FormField
-                  label=""
-                  placeholder={t.identity.settings.confirmPassphrasePlaceholder}
-                  value={confirmPassphrase}
-                  onChangeText={setConfirmPassphrase}
-                  secureTextEntry={!showPassphrase}
-                  editable={!isLoading && !isSaving}
-                  containerStyle={{ marginBottom: 0 }}
-                />
-              </View>
+              <FormField
+                label={t.identity.settings.confirmPassphrase}
+                placeholder={t.identity.settings.confirmPassphrasePlaceholder}
+                value={confirmPassphrase}
+                onChangeText={setConfirmPassphrase}
+                secureTextEntry={!showConfirmPassphrase}
+                editable={!isLoading && !isSaving}
+                containerStyle={{ marginBottom: 0 }}
+                rightIcon={eyeToggle(showConfirmPassphrase, () => setShowConfirmPassphrase(prev => !prev))}
+              />
 
               <Button
                 onPress={handleChangePassphrase}
@@ -203,12 +201,36 @@ const IdentitySettingsScreen = ({ navigation }: any) => {
 
           {/* Security Info Card */}
           <View style={{ paddingHorizontal: spacing.lg }}>
-            <InfoCard
-              title={t.identity.settings.security.title}
-              description={t.identity.settings.security.message}
-              type="warning"
-              icon="🔒"
-            />
+            <Card
+              style={{
+                backgroundColor: `${colors.warning}15`,
+                borderColor: colors.warning,
+                borderWidth: 1,
+              }}
+            >
+              <View style={{ padding: spacing.xxs }}>
+                <View
+                  style={{
+                    flexDirection: 'row',
+                    alignItems: 'center',
+                    gap: spacing.sm,
+                    marginBottom: spacing.sm,
+                  }}
+                >
+                  <LockIcon size={18} color={colors.warning} />
+                  <Text
+                    variant="body"
+                    weight="semibold"
+                    color={colors.warning}
+                  >
+                    {t.identity.settings.security.title}
+                  </Text>
+                </View>
+                <Text variant="caption" color={colors.text_secondary}>
+                  {t.identity.settings.security.message}
+                </Text>
+              </View>
+            </Card>
           </View>
 
           {/* Backup Section */}
@@ -229,14 +251,20 @@ const IdentitySettingsScreen = ({ navigation }: any) => {
                 onPress={() => navigation.navigate('BackupIdentity')}
                 disabled={isLoading}
               >
-                {t.identity.settings.backup.createButton}
+                <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
+                  <LockIcon size={16} color={isLoading ? colors.text_tertiary : colors.text_primary} />
+                  <Text>{t.identity.settings.backup.createButton}</Text>
+                </View>
               </Button>
               <Button
                 variant="secondary"
                 onPress={() => navigation.navigate('BackupIdentity')}
                 disabled={isLoading}
               >
-                {t.identity.settings.backup.viewButton}
+                <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
+                  <KeyIcon size={16} color={isLoading ? colors.text_tertiary : colors.text_primary} />
+                  <Text>{t.identity.settings.backup.viewButton}</Text>
+                </View>
               </Button>
             </Column>
           </Card>

@@ -17,6 +17,6 @@ pub struct LongRangeRelay {
     pub cost_per_mb_tokens: u64,
     /// Relay operator's public key
     pub operator: PublicKey,
-    /// Revenue sharing percentage for UBI
+    /// Revenue sharing percentage for UBS
     pub ubi_share_percentage: f32,
 }

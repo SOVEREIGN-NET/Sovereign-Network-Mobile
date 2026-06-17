@@ -155,10 +155,10 @@ impl WalletManager {
         all_transactions
     }
     
-    /// Auto-distribute UBI to UBI wallets
+    /// Auto-distribute UBS to UBS wallets
     pub fn auto_distribute_ubi(&mut self, amount_per_wallet: u64) -> Result<Vec<Hash>> {
         let ubi_wallets: Vec<WalletId> = self.wallets.values()
-            .filter(|wallet| wallet.wallet_type == crate::wallets::WalletType::UBI)
+            .filter(|wallet| wallet.wallet_type == crate::wallets::WalletType::UBS)
             .map(|wallet| wallet.id.clone())
             .collect();
         
@@ -168,7 +168,7 @@ impl WalletManager {
             if let Some(wallet) = self.wallets.get_mut(&wallet_id) {
                 wallet.add_funds(amount_per_wallet);
                 
-                // Generate UBI distribution hash
+                // Generate UBS distribution hash
                 let ubi_data = [
                     wallet_id.as_bytes(),
                     &amount_per_wallet.to_le_bytes(),
@@ -189,7 +189,7 @@ impl WalletManager {
         self.calculate_total_balance();
         
         tracing::info!(
-            "Auto-distributed {} ZHTP to {} UBI wallets",
+            "Auto-distributed {} ZHTP to {} UBS wallets",
             amount_per_wallet,
             distribution_hashes.len()
         );
@@ -197,10 +197,10 @@ impl WalletManager {
         Ok(distribution_hashes)
     }
 
-    /// Process UBI distribution to all eligible wallets
+    /// Process UBS distribution to all eligible wallets
     pub fn process_ubi_distribution(&mut self, total_ubi_pool: u64) -> Result<UbiDistributionResult> {
         let ubi_wallets: Vec<WalletId> = self.wallets.values()
-            .filter(|wallet| wallet.wallet_type == crate::wallets::WalletType::UBI)
+            .filter(|wallet| wallet.wallet_type == crate::wallets::WalletType::UBS)
             .map(|wallet| wallet.id.clone())
             .collect();
         
@@ -417,7 +417,7 @@ pub struct TransactionSummary {
     pub timestamp: u64,
 }
 
-/// Result of UBI distribution process
+/// Result of UBS distribution process
 #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
 pub struct UbiDistributionResult {
     pub total_distributed: u64,
@@ -488,20 +488,20 @@ mod tests {
         let owner_id = Hash([1u8; 32]);
         let mut manager = WalletManager::new(owner_id);
         
-        // Create UBI wallets
+        // Create UBS wallets
         let ubi_wallet1 = manager.create_wallet_for_testing(
-            crate::wallets::WalletType::UBI,
-            "UBI Wallet 1".to_string(),
+            crate::wallets::WalletType::UBS,
+            "UBS Wallet 1".to_string(),
             Some("ubi1".to_string()),
         ).unwrap();
         
         let ubi_wallet2 = manager.create_wallet_for_testing(
-            crate::wallets::WalletType::UBI,
-            "UBI Wallet 2".to_string(),
+            crate::wallets::WalletType::UBS,
+            "UBS Wallet 2".to_string(),
             Some("ubi2".to_string()),
         ).unwrap();
         
-        // Distribute UBI
+        // Distribute UBS
         let result = manager.process_ubi_distribution(1000).unwrap();
         
         assert_eq!(result.total_distributed, 1000);
@@ -563,7 +563,7 @@ mod tests {
         ).unwrap();
         
         let _wallet2 = manager.create_wallet_for_testing(
-            crate::wallets::WalletType::UBI,
+            crate::wallets::WalletType::UBS,
             "Another Healthy Wallet".to_string(),
             None,
         ).unwrap();

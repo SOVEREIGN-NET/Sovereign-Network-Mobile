@@ -4,6 +4,7 @@
  */
 
 import React, { useState } from 'react';
+import Svg, { Path } from 'react-native-svg';
 import {
   View,
   ScrollView,
@@ -12,6 +13,7 @@ import {
   Clipboard,
 } from 'react-native';
 import {
+  ArrowIcon,
   Card,
   Text,
   Button,
@@ -68,7 +70,7 @@ const ProfileScreen = ({ navigation }: any) => {
   // Keep hook order stable without triggering any network requests.
   useAsyncData(async () => null, [currentIdentity?.did]);
 
-  // Fetch UBI data for stats
+  // Fetch UBS data for stats
   const { data: ubiData } = useAsyncData(async () => {
     if (!currentIdentity?.did) {
       return null;
@@ -430,7 +432,13 @@ const ProfileScreen = ({ navigation }: any) => {
                       gap: spacing.md,
                     }}
                   >
-                    <Text style={{ fontSize: typography.size.lg }}>🌐</Text>
+                    <Svg width={22} height={22} viewBox="0 0 24 24" fill="none">
+                      <Path d="M4 4h6v16H4z" stroke={colors.text_primary} strokeWidth={1.5} />
+                      <Path d="M14 4h6v16h-6z" stroke={colors.text_primary} strokeWidth={1.5} />
+                      <Path d="M4 12h16" stroke={colors.text_primary} strokeWidth={1.5} />
+                      <Path d="M8 4V2" stroke={colors.text_primary} strokeWidth={1.5} strokeLinecap="round" />
+                      <Path d="M16 4V2" stroke={colors.text_primary} strokeWidth={1.5} strokeLinecap="round" />
+                    </Svg>
                     <View>
                       <Text
                         style={{
@@ -452,14 +460,7 @@ const ProfileScreen = ({ navigation }: any) => {
                       </Text>
                     </View>
                   </View>
-                  <Text
-                    style={{
-                      fontSize: typography.size.lg,
-                      color: colors.text_secondary,
-                    }}
-                  >
-                    ›
-                  </Text>
+                  <ArrowIcon direction="right" size={18} color={colors.text_secondary} />
                 </TouchableOpacity>
               </Column>
             </Card>

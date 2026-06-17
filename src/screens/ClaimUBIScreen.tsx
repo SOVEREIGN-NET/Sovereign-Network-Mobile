@@ -6,7 +6,7 @@ import { colors, spacing } from '../theme';
 const ClaimUBIScreen = ({ navigation }: any) => {
   const [claimed, setClaimed] = useState(false);
 
-  // Mock UBI data
+  // Mock UBS data
   const monthlyUBI = 100;
   const nextClaimDate = new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toLocaleDateString();
   const claimedThisMonth = 100;
@@ -14,7 +14,7 @@ const ClaimUBIScreen = ({ navigation }: any) => {
   const handleClaim = () => {
     setClaimed(true);
     setTimeout(() => {
-      alert('UBI claimed successfully! 100 SOV has been added to your wallet.');
+      alert('UBS claimed successfully! 100 SOV has been added to your wallet.');
       navigation.goBack();
     }, 1500);
   };
@@ -23,13 +23,13 @@ const ClaimUBIScreen = ({ navigation }: any) => {
     <ScrollView style={{ flex: 1, backgroundColor: colors.bg_dark, padding: spacing.lg }}>
       <Card>
         <Text variant="h2" style={{ marginBottom: spacing.md }}>
-          💰 Universal Basic Income
+          💰 Universal Basic Services
         </Text>
 
         <Column gap="md">
           <Card style={{ backgroundColor: colors.bg_darker }}>
             <Text variant="h3" style={{ color: colors.success, marginBottom: spacing.sm }}>
-              Your Monthly UBI
+              Your Monthly UBS
             </Text>
             <Text variant="h1" style={{ color: colors.primary, marginBottom: spacing.xs }}>
               {monthlyUBI} SOV
@@ -57,9 +57,9 @@ const ClaimUBIScreen = ({ navigation }: any) => {
           </Column>
 
           <Column gap="sm" style={{ marginTop: spacing.lg, padding: spacing.lg, backgroundColor: colors.bg_darker, borderRadius: 8 }}>
-            <Text variant="h3">ℹ️ About UBI</Text>
+            <Text variant="h3">ℹ️ About UBS</Text>
             <Text variant="body" style={{ color: colors.text_secondary }}>
-              Universal Basic Income is automatically distributed to all SOV network participants who meet identity verification requirements.
+              Universal Basic Services is automatically distributed to all SOV network participants who meet identity verification requirements.
             </Text>
             <Text variant="body" style={{ color: colors.text_secondary, marginTop: spacing.sm }}>
               • Distribution: Monthly • Verification: Zero-Knowledge DID • Network-wide: All participants
@@ -71,7 +71,7 @@ const ClaimUBIScreen = ({ navigation }: any) => {
             disabled={claimed}
             style={{ marginTop: spacing.lg }}
           >
-            {claimed ? 'Claiming...' : 'Claim This Month\'s UBI'}
+            {claimed ? 'Claiming...' : 'Claim This Month\'s UBS'}
           </Button>
           <Button onPress={() => navigation.goBack()} variant="outline">
             Back

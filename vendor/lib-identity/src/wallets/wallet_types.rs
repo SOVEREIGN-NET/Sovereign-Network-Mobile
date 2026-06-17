@@ -15,8 +15,8 @@ pub enum WalletType {
     Standard,
     /// Primary wallet for daily transactions
     Primary,
-    /// UBI wallet for automatic Universal Basic Income payouts
-    UBI,
+    /// UBS wallet for automatic Universal Basic Services payouts
+    UBS,
     /// Savings wallet for long-term storage
     Savings,
     /// Business wallet for commercial transactions

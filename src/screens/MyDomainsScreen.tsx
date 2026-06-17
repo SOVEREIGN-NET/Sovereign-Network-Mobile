@@ -4,11 +4,12 @@
  */
 
 import React, { useState } from 'react';
-import { View, ScrollView, TouchableOpacity, Alert } from 'react-native';
+import { View, ScrollView, TouchableOpacity, Alert, Modal } from 'react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useFocusEffect } from '@react-navigation/native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import {
+  Button,
   Card,
   Text,
   LoadingView,
@@ -17,6 +18,7 @@ import {
 } from '../components';
 import { colors, spacing, typography, borderRadius } from '../theme';
 import domainService from '../services/DomainService';
+import DomainRegistrationScreen from './DomainRegistrationScreen';
 
 // Storage keys
 const REGISTERED_DOMAINS_KEY = 'sov:registered_domains';
@@ -38,6 +40,7 @@ const MyDomainsScreen = ({ navigation }: any) => {
   const insets = useSafeAreaInsets();
   const [domains, setDomains] = useState<DomainWithStatus[]>([]);
   const [loading, setLoading] = useState(false);
+  const [domainRegistrationVisible, setDomainRegistrationVisible] = useState(false);
 
   // Load domains from AsyncStorage
   const loadDomains = async () => {
@@ -134,20 +137,29 @@ const MyDomainsScreen = ({ navigation }: any) => {
         >
           My Domains
         </Text>
-        <TouchableOpacity
-          onPress={() => navigation?.goBack()}
-          hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
-        >
-          <Text
-            style={{
-              fontSize: typography.size.lg,
-              color: colors.text_secondary,
-              fontWeight: typography.weight.light,
-            }}
+        <View style={{ flexDirection: 'row', gap: spacing.sm }}>
+          <Button
+            onPress={() => setDomainRegistrationVisible(true)}
+            size="sm"
+            variant="primary"
           >
-            ✕
-          </Text>
-        </TouchableOpacity>
+            + Register
+          </Button>
+          <TouchableOpacity
+            onPress={() => navigation?.goBack()}
+            hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
+          >
+            <Text
+              style={{
+                fontSize: typography.size.lg,
+                color: colors.text_secondary,
+                fontWeight: typography.weight.normal,
+              }}
+            >
+              ✕
+            </Text>
+          </TouchableOpacity>
+        </View>
       </View>
 
       <ScreenLayout paddingTop={spacing.md}>
@@ -359,14 +371,39 @@ const MyDomainsScreen = ({ navigation }: any) => {
                       textAlign: 'center',
                     }}
                   >
-                    Register your first .sov domain in the SID tab
+                    Register your first .sov domain
                   </Text>
+                  <Button
+                    onPress={() => setDomainRegistrationVisible(true)}
+                    variant="primary"
+                    size="sm"
+                    style={{ marginTop: spacing.lg }}
+                  >
+                    Register Domain
+                  </Button>
                 </View>
               </Card>
             )}
           </Column>
         </ScrollView>
       </ScreenLayout>
+
+      {/* Domain Registration Modal */}
+      <Modal
+        visible={domainRegistrationVisible}
+        animationType="slide"
+        presentationStyle="formSheet"
+        onRequestClose={() => setDomainRegistrationVisible(false)}
+      >
+        <View style={{ flex: 1, backgroundColor: colors.bg_darkest }}>
+          <DomainRegistrationScreen
+            onClose={() => {
+              setDomainRegistrationVisible(false);
+              loadDomains();
+            }}
+          />
+        </View>
+      </Modal>
     </View>
   );
 };

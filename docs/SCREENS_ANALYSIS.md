@@ -163,7 +163,7 @@
 #### 3. ClaimUBIScreen
 **Path**: `src/screens/ClaimUBIScreen.tsx`
 **Lines**: 73
-**Purpose**: Claim Universal Basic Income
+**Purpose**: Claim Universal Basic Services
 **Parent**: DashboardStack
 **Navigation**: Part of Dashboard tab
 

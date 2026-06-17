@@ -1,6 +1,6 @@
-//! UBI and reward distribution mechanics module
+//! UBS and reward distribution mechanics module
 //! 
-//! Handles the calculation and distribution of Universal Basic Income
+//! Handles the calculation and distribution of Universal Basic Services
 //! and welfare services based on DAO treasury allocations.
 
 pub mod ubi_calculation;

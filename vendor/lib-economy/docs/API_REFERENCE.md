@@ -45,7 +45,7 @@ pub const MIN_STAKING_AMOUNT: u64 = 1000;
 ### Treasury Allocation Constants
 
 ```rust
-/// UBI allocation percentage (40% of DAO fees)
+/// UBS allocation percentage (40% of DAO fees)
 pub const UBI_ALLOCATION_PERCENTAGE: u64 = 40;
 
 /// Welfare allocation percentage (30% of DAO fees)
@@ -244,27 +244,27 @@ Receive DAO fee from transaction.
 **Returns:** `Result<()>`
 
 ##### `allocate_funds(&mut self) -> Result<()>`
-Allocate received fees to UBI, welfare, and development.
+Allocate received fees to UBS, welfare, and development.
 
 **Returns:** `Result<()>`
 
 **Formula:**
 ```rust
-ubi = received_fees * 40 / 100
+ubs = received_fees * 40 / 100
 welfare = received_fees * 30 / 100
 development = received_fees * 30 / 100
 ```
 
 ##### `calculate_ubi_per_citizen(&self, total_citizens: u64) -> u64`
-Calculate UBI amount per citizen.
+Calculate UBS amount per citizen.
 
 **Parameters:**
 - `total_citizens`: Total number of verified citizens
 
-**Returns:** UBI per citizen in ZHTP
+**Returns:** UBS per citizen in ZHTP
 
 ##### `distribute_ubi(&mut self, amount: u64) -> Result<()>`
-Distribute UBI funds.
+Distribute UBS funds.
 
 **Parameters:**
 - `amount`: Amount to distribute
@@ -419,12 +419,12 @@ Archive a wallet (no more transactions).
 
 #### `calculate_optimal_ubi_per_citizen(treasury: &DaoTreasury, total_citizens: u64, target_monthly_ubi: u64) -> (u64, bool)`
 
-Calculate optimal UBI distribution amount per citizen.
+Calculate optimal UBS distribution amount per citizen.
 
 **Parameters:**
 - `treasury`: DAO treasury reference
 - `total_citizens`: Total number of verified citizens
-- `target_monthly_ubi`: Target UBI amount per citizen per month
+- `target_monthly_ubi`: Target UBS amount per citizen per month
 
 **Returns:** `(actual_ubi_per_citizen, can_meet_target)`
 
@@ -437,9 +437,9 @@ let (ubi_amount, can_meet) = calculate_optimal_ubi_per_citizen(
 );
 
 if can_meet {
-    println!("Can provide full target UBI: {} ZHTP", ubi_amount);
+    println!("Can provide full target UBS: {} ZHTP", ubi_amount);
 } else {
-    println!("Reduced UBI: {} ZHTP", ubi_amount);
+    println!("Reduced UBS: {} ZHTP", ubi_amount);
 }
 ```
 
@@ -451,7 +451,7 @@ Calculate welfare funding efficiency score (0.0 to 1.0).
 
 #### `calculate_ubi_efficiency(treasury: &DaoTreasury) -> f64`
 
-Calculate UBI distribution efficiency score (0.0 to 1.0).
+Calculate UBS distribution efficiency score (0.0 to 1.0).
 
 **Returns:** Efficiency ratio (distributed / expected)
 
@@ -474,7 +474,7 @@ println!("Sustainability: {}", sustainability);
 
 #### `calculate_ubi_funding_gap(treasury: &DaoTreasury, total_citizens: u64, target_monthly_ubi: u64) -> Result<serde_json::Value>`
 
-Calculate funding gap for target UBI amount.
+Calculate funding gap for target UBS amount.
 
 **Returns:** JSON with gap analysis
 
@@ -534,7 +534,7 @@ Create reward transaction (fee-free).
 
 ##### `new_ubi_distribution(to: [u8; 32], amount: u64) -> Result<Self>`
 
-Create UBI distribution transaction (fee-free).
+Create UBS distribution transaction (fee-free).
 
 ##### `new_welfare_distribution(to: [u8; 32], amount: u64) -> Result<Self>`
 

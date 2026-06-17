@@ -263,7 +263,7 @@ let discovery_task = tokio::spawn(async move {
 
 **Analysis:**
 - Cloned for use in spawned task
-- Actually IS used later in line 962, 970 (passed to UBI initialization)
+- Actually IS used later in line 962, 970 (passed to UBS initialization)
 - **FALSE POSITIVE** - This is actually used!
 
 **Action:** This warning is incorrect - variable IS used in the spawned closure

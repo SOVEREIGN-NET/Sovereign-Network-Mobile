@@ -167,7 +167,7 @@ Native QUIC Implementation Plan
 
   - Primary (`wallet_d0717dc43ff9`): 5000 ZHTP (welcome bonus), can vote
   - Savings (`savings_d0717dc43ff9`): 0 ZHTP
-  - UBI (`ubi_d0717dc43ff9`): 0 ZHTP
+  - UBS (`ubi_d0717dc43ff9`): 0 ZHTP
 
   Total balance across all wallets: 5000 ZHTP.
     - Dev mode: Accept self-signed certificates

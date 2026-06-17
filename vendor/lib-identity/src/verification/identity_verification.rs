@@ -385,7 +385,7 @@ impl IdentityVerifier {
 
     /// Verify citizenship status
     async fn verify_citizenship_status(&mut self, identity: &ZhtpIdentity) -> Result<CitizenshipVerificationResult, Box<dyn std::error::Error>> {
-        // Check UBI eligibility as citizenship indicator
+        // Check UBS eligibility as citizenship indicator
         let ubi_eligible = self.integration.verify_ubi_eligibility(&hex::encode(&identity.id.0)).await?;
         
         // In implementation, would check against citizenship registry

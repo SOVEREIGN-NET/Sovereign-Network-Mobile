@@ -63,7 +63,7 @@ pub enum TransactionCategory {
     IspBypass,
     /// Mesh discovery rewards
     MeshDiscovery,
-    /// UBI distributions
+    /// UBS distributions
     UbiDistribution,
     /// Bridge operations
     Bridge,

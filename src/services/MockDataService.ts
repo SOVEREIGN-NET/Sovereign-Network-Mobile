@@ -36,11 +36,11 @@ class MockDataService {
       },
       {
         id: 'wallet-2',
-        name: 'UBI Wallet',
+        name: 'UBS Wallet',
         address: 'zhtp1bcdefghijklmnopqrstuvwxyz',
         balance: 1250.01,
         currency: 'SOV',
-        type: 'ubi',
+        type: 'ubs',
       },
       {
         id: 'wallet-3',
@@ -90,13 +90,13 @@ class MockDataService {
       },
       {
         id: 'tx-004',
-        from: 'ubi.zhtp',
+        from: 'ubs.zhtp',
         to: 'zhtp1acdefghijklmnopqrstuvwxyz',
         amount: 50.02,
         currency: 'SOV',
         timestamp: '2024-10-22T00:00:00Z',
         status: 'confirmed',
-        type: 'ubi',
+        type: 'ubs',
       },
     ];
   }
@@ -199,13 +199,13 @@ class MockDataService {
   }
 
   /**
-   * Simulate claiming UBI
+   * Simulate claiming UBS
    */
   static claimUBI() {
-    console.log('Claiming UBI');
+    console.log('Claiming UBS');
     return {
       success: true,
-      message: 'UBI claimed successfully',
+      message: 'UBS claimed successfully',
       amount: 50.06,
       nextClaimTime: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString(),
     };

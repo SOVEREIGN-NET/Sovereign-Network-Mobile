@@ -1,7 +1,7 @@
 //! Economic integration for ZHTP Identity
 //! 
 //! This module provides integration with the ZHTP economic system,
-//! enabling UBI distribution, DAO governance, and token economics.
+//! enabling UBS distribution, DAO governance, and token economics.
 
 pub mod transaction;
 
@@ -12,7 +12,7 @@ pub use transaction::{Transaction, TransactionType, Priority};
 // This should be replaced with actual lib-economy integration
 #[derive(Debug, Clone)]
 pub struct EconomicModel {
-    /// UBI treasury balance
+    /// UBS treasury balance
     pub ubi_treasury: u64,
     /// DAO treasury balance
     pub dao_treasury: u64,
@@ -28,7 +28,7 @@ impl EconomicModel {
     /// Create a new economic model
     pub fn new() -> Self {
         Self {
-            ubi_treasury: 1_000_000_000, // 1 billion ZHTP for UBI
+            ubi_treasury: 1_000_000_000, // 1 billion ZHTP for UBS
             dao_treasury: 500_000_000,   // 500 million ZHTP for DAO
             welcome_treasury: 100_000_000, // 100 million ZHTP for welcome bonuses
             total_supply: 21_000_000_000, // 21 billion ZHTP total
@@ -36,18 +36,18 @@ impl EconomicModel {
         }
     }
     
-    /// Check if UBI distribution is possible
+    /// Check if UBS distribution is possible
     pub fn can_distribute_ubi(&self, amount: u64) -> bool {
         self.ubi_treasury >= amount
     }
     
-    /// Distribute UBI amount
+    /// Distribute UBS amount
     pub fn distribute_ubi(&mut self, amount: u64) -> Result<(), &'static str> {
         if self.can_distribute_ubi(amount) {
             self.ubi_treasury -= amount;
             Ok(())
         } else {
-            Err("Insufficient UBI treasury funds")
+            Err("Insufficient UBS treasury funds")
         }
     }
     

@@ -96,11 +96,11 @@ Network participation and infrastructure rewards.
 **Status:** Fully implemented
 
 ### 6. Distribution (`src/distribution/`)
-UBI and welfare distribution system.
+UBS and welfare distribution system.
 
 **Files:**
 - `mod.rs` - Module organization
-- `ubi_distribution.rs` - UBI distribution implementation  **STUB**
+- `ubi_distribution.rs` - UBS distribution implementation  **STUB**
 
 **Status:**  STUB - Needs full implementation
 - Current: Single placeholder function `distribute_ubi_to_citizens() -> Result<()> { Ok(()) }`
@@ -250,7 +250,7 @@ Network-specific type definitions.
  testing - Test utilities  
 
 ### Stub/Incomplete Modules: 2/13 (15%)
- distribution - UBI distribution (stub)  
+ distribution - UBS distribution (stub)  
  rewards - Reward calculator (empty)  
 
 ### Total Lines of Code (Estimated)
@@ -307,11 +307,11 @@ lib-economy
 3. `incentives/network_participation.rs` - Calculate participation bonuses
 4.  `rewards/reward_calculator.rs` - **MISSING** - Aggregate and distribute
 
-### UBI Flow
-1. `treasury_economics/` - Calculate optimal UBI amount
+### UBS Flow
+1. `treasury_economics/` - Calculate optimal UBS amount
 2. `treasury_economics/treasury_calculations.rs` - Verify funding
 3.  `distribution/ubi_distribution.rs` - **STUB** - Execute distribution
-4. `transactions/transaction.rs` - Create UBI transactions
+4. `transactions/transaction.rs` - Create UBS transactions
 
 ## Next Steps for Complete Implementation
 
@@ -328,7 +328,7 @@ lib-economy
    - Reward verification and proof generation
 
 3. **Testing**
-   - Integration tests for UBI distribution
+   - Integration tests for UBS distribution
    - Integration tests for reward calculation
    - End-to-end economic flow tests
 

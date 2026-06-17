@@ -34,7 +34,7 @@ A modularized, multi-layered consensus system combining Proof of Stake, Proof of
 - **Multi-Type Rewards**: Rewards for validation, useful work, and participation
 - **Dynamic Multipliers**: Adjustable reward rates for different work types
 - **Delegation Support**: Stake delegation with commission rates
-- **UBI Integration**: Universal Basic Income distribution through governance
+- **UBS Integration**: Universal Basic Services distribution through governance
 
 ### Difficulty Management
 
@@ -185,7 +185,7 @@ println!("Byzantine threshold: {} voting power", threshold);
 ### Proposal Types
 - **Treasury Allocation**: Fund distribution decisions
 - **Protocol Upgrades**: Network parameter changes
-- **UBI Distribution**: Universal Basic Income parameters
+- **UBS Distribution**: Universal Basic Services parameters
 - **Validator Updates**: Validator set modifications
 - **Economic Parameters**: Fee structures and rewards
 - **Emergency Actions**: Critical protocol fixes
@@ -259,7 +259,7 @@ cargo test byzantine::tests
 - `dao`: DAO governance functionality only
 - `byzantine`: Byzantine fault tolerance only
 - `rewards`: Reward calculation system only
-- `ubi`: Universal Basic Income features
+- `ubs`: Universal Basic Services features
 - `testing`: Additional testing utilities
 
 ## Contributing

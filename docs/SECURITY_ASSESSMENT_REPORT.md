@@ -28,7 +28,7 @@ The ZHTP Web4 application implements a decentralized identity and blockchain int
 // CRITICAL: Seed phrases exposed in console logs
 console.log('🔑 seedPhrases object:', identity?.seedPhrases);
 console.log('🔑 primary seeds:', identity?.seedPhrases?.primary);
-console.log('🔑 ubi seeds:', identity?.seedPhrases?.ubi);
+console.log('🔑 ubs seeds:', identity?.seedPhrases?.ubs);
 console.log('🔑 savings seeds:', identity?.seedPhrases?.savings);
 ```
 

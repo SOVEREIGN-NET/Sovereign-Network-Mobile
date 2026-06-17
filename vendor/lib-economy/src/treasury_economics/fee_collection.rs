@@ -1,4 +1,4 @@
-//! DAO Treasury for managing UBI and DAO allocations (economics interface only)
+//! DAO Treasury for managing UBS and DAO allocations (economics interface only)
 //! 
 //! This is the economics calculation interface for treasury operations.
 //! The actual DAO governance logic is centralized in lib-consensus package.
@@ -8,12 +8,12 @@ use serde::{Serialize, Deserialize};
 use crate::transactions::DaoFeeDistribution;
 use crate::wasm::logging::info;
 
-/// DAO Treasury for managing UBI and DAO allocations (economics interface only)
+/// DAO Treasury for managing UBS and DAO allocations (economics interface only)
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct DaoTreasury {
     /// Current treasury balance
     pub treasury_balance: u64,
-    /// Amount allocated for UBI distribution
+    /// Amount allocated for UBS distribution
     pub ubi_allocated: u64,
     /// Amount allocated for sector DAOs
     pub sector_dao_allocated: u64,
@@ -23,7 +23,7 @@ pub struct DaoTreasury {
     pub dev_grants_allocated: u64,
     /// Total DAO fees collected (for accounting)
     pub total_dao_fees_collected: u64,
-    /// Total UBI distributed (for accounting)
+    /// Total UBS distributed (for accounting)
     pub total_ubi_distributed: u64,
     /// Total sector DAO distributions (for accounting)
     pub total_sector_dao_distributed: u64,
@@ -31,7 +31,7 @@ pub struct DaoTreasury {
     pub total_emergency_distributed: u64,
     /// Total development grant distributions (for accounting)
     pub total_dev_grants_distributed: u64,
-    /// Last UBI distribution timestamp
+    /// Last UBS distribution timestamp
     pub last_ubi_distribution: u64,
     /// Last sector DAO distribution timestamp
     pub last_sector_dao_distribution: u64,
@@ -69,7 +69,7 @@ impl DaoTreasury {
         self.treasury_balance = self.treasury_balance.saturating_add(total);
         self.total_dao_fees_collected = self.total_dao_fees_collected.saturating_add(total);
 
-        self.ubi_allocated = self.ubi_allocated.saturating_add(distribution.ubi);
+        self.ubi_allocated = self.ubi_allocated.saturating_add(distribution.ubs);
         self.sector_dao_allocated = self.sector_dao_allocated.saturating_add(distribution.sector_daos);
         self.emergency_allocated = self.emergency_allocated.saturating_add(distribution.emergency_reserve);
         self.dev_grants_allocated = self.dev_grants_allocated.saturating_add(distribution.dev_grants);
@@ -77,9 +77,9 @@ impl DaoTreasury {
         self.assert_accounting_invariant();
 
         info!(
-            " Added {} ZHTP to DAO treasury - UBI: +{}, Sector DAOs: +{}, Emergency: +{}, Dev Grants: +{}, Total: {}",
+            " Added {} ZHTP to DAO treasury - UBS: +{}, Sector DAOs: +{}, Emergency: +{}, Dev Grants: +{}, Total: {}",
             total,
-            distribution.ubi,
+            distribution.ubs,
             distribution.sector_daos,
             distribution.emergency_reserve,
             distribution.dev_grants,
@@ -115,7 +115,7 @@ impl DaoTreasury {
         })
     }
     
-    /// Calculate UBI distribution amount per citizen
+    /// Calculate UBS distribution amount per citizen
     pub fn calculate_ubi_per_citizen(&self, total_citizens: u64) -> u64 {
         if total_citizens > 0 && self.ubi_allocated > 0 {
             self.ubi_allocated / total_citizens
@@ -139,10 +139,10 @@ impl DaoTreasury {
         self.dev_grants_allocated
     }
     
-    /// Record UBI distribution (for accounting)
+    /// Record UBS distribution (for accounting)
     pub fn record_ubi_distribution(&mut self, amount: u64, timestamp: u64) -> Result<()> {
         if amount > self.ubi_allocated {
-            return Err(anyhow::anyhow!("UBI distribution exceeds allocated amount"));
+            return Err(anyhow::anyhow!("UBS distribution exceeds allocated amount"));
         }
         
         self.ubi_allocated -= amount;
@@ -152,7 +152,7 @@ impl DaoTreasury {
         self.assert_accounting_invariant();
         
         info!(
-            "Recorded UBI distribution: {} ZHTP to citizens, remaining allocated: {}",
+            "Recorded UBS distribution: {} ZHTP to citizens, remaining allocated: {}",
             amount, self.ubi_allocated
         );
         

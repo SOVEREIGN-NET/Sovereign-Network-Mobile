@@ -1,7 +1,7 @@
 //! Economics Integration Module
 //! 
 //! Provides economic functions and utilities specifically for ZHTP protocols.
-//! Integrates with the lib-economy package for DAO fees, UBI, and economic models.
+//! Integrates with the lib-economy package for DAO fees, UBS, and economic models.
 
 use lib_economy::{
     EconomicModel, Priority,
@@ -26,7 +26,7 @@ pub struct EconomicConfig {
     pub mandatory_dao_fees: bool,
     /// DAO fee percentage (e.g., 2.0 for 2%)
     pub dao_fee_percentage: f64,
-    /// Enable UBI distribution
+    /// Enable UBS distribution
     pub ubi_enabled: bool,
     /// Minimum transaction value for fees
     pub min_transaction_value: u64,
@@ -38,7 +38,7 @@ impl Default for EconomicConfig {
     fn default() -> Self {
         Self {
             mandatory_dao_fees: true,
-            dao_fee_percentage: 2.0, // 2% for UBI funding
+            dao_fee_percentage: 2.0, // 2% for UBS funding
             ubi_enabled: true,
             min_transaction_value: 1000, // Minimum 1000 units
             fee_method: "dynamic".to_string(),
@@ -51,7 +51,7 @@ impl Default for EconomicConfig {
 pub struct EconomicAssessment {
     /// Base fee for the operation
     pub base_fee: u64,
-    /// DAO fee for UBI funding
+    /// DAO fee for UBS funding
     pub dao_fee: u64,
     /// Network fee for infrastructure
     pub network_fee: u64,
@@ -101,7 +101,7 @@ impl ZhtpEconomics {
 
         let adjusted_base_fee = (base_fee as f64 * priority_multiplier) as u64;
 
-        // Calculate DAO fee for UBI funding
+        // Calculate DAO fee for UBS funding
         let dao_fee = if self.config.mandatory_dao_fees {
             let calculated_dao_fee = (adjusted_base_fee as f64 * self.config.dao_fee_percentage / 100.0) as u64;
             std::cmp::max(calculated_dao_fee, 1) // Minimum 1 unit DAO fee
@@ -132,7 +132,7 @@ impl ZhtpEconomics {
         })
     }
 
-    /// Validate DAO fee payment for UBI funding
+    /// Validate DAO fee payment for UBS funding
     pub fn validate_dao_fee_payment(
         &self,
         expected_fee: u64,
@@ -172,7 +172,7 @@ impl ZhtpEconomics {
         }
     }
 
-    /// Process UBI distribution
+    /// Process UBS distribution
     pub async fn process_ubi_distribution(
         &mut self,
         total_collected_fees: u64,
@@ -182,15 +182,15 @@ impl ZhtpEconomics {
             return Ok(Vec::new());
         }
 
-        // Calculate UBI amount per participant
-        let ubi_pool = (total_collected_fees as f64 * 0.8) as u64; // 80% for UBI
+        // Calculate UBS amount per participant
+        let ubi_pool = (total_collected_fees as f64 * 0.8) as u64; // 80% for UBS
         let per_participant = if participant_count > 0 {
             ubi_pool / participant_count
         } else {
             0
         };
 
-        // Create UBI payments (simplified)
+        // Create UBS payments (simplified)
         let mut payments = Vec::new();
         for i in 0..participant_count {
             payments.push(UBIPayment {
@@ -219,7 +219,7 @@ impl ZhtpEconomics {
         EconomicStats {
             total_fees_collected: base_fee * 100, // Estimate based on activity
             dao_fees_collected: dao_fee * 100,
-            ubi_distributed: (dao_fee * 80) / 100, // 80% of DAO fees for UBI
+            ubi_distributed: (dao_fee * 80) / 100, // 80% of DAO fees for UBS
             active_participants: 1000, // Would be tracked in system
             average_fee_per_operation: base_fee,
             dao_fee_percentage: self.config.dao_fee_percentage,
@@ -227,12 +227,12 @@ impl ZhtpEconomics {
     }
 }
 
-/// UBI payment record
+/// UBS payment record
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct UBIPayment {
-    /// Participant receiving UBI
+    /// Participant receiving UBS
     pub participant_id: String,
-    /// Amount of UBI payment
+    /// Amount of UBS payment
     pub amount: u64,
     /// Timestamp of payment
     pub timestamp: u64,
@@ -243,9 +243,9 @@ pub struct UBIPayment {
 pub struct EconomicStats {
     /// Total fees collected across all operations
     pub total_fees_collected: u64,
-    /// Total DAO fees collected for UBI
+    /// Total DAO fees collected for UBS
     pub dao_fees_collected: u64,
-    /// Total UBI distributed to participants
+    /// Total UBS distributed to participants
     pub ubi_distributed: u64,
     /// Number of active participants
     pub active_participants: u64,

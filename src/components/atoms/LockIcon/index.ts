@@ -1,0 +1,1 @@
+export { LockIcon, default } from './LockIcon';

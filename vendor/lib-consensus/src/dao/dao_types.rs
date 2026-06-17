@@ -33,7 +33,7 @@ pub struct DaoProposal {
     created_at_height: u64,
     /// Execution parameters (if passed)
     execution_params: Option<Vec<u8>>,
-    /// Expected UBI impact (number of beneficiaries)
+    /// Expected UBS impact (number of beneficiaries)
     ubi_impact: Option<u64>,
     /// Expected economic impact metrics
     economic_impact: Option<ImpactMetrics>,
@@ -195,7 +195,7 @@ pub enum GovernanceParameterValue {
 /// Types of DAO proposals
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
 pub enum DaoProposalType {
-    /// Universal Basic Income parameter changes
+    /// Universal Basic Services parameter changes
     UbiDistribution,
     /// Welfare services funding (healthcare, education, public services)
     WelfareAllocation,
@@ -433,7 +433,7 @@ pub enum TreasuryTransactionType {
     Deposit,
     /// Outgoing allocation to approved proposal
     Allocation,
-    /// UBI distribution
+    /// UBS distribution
     UbiDistribution,
     /// Validator rewards
     ValidatorRewards,
@@ -452,7 +452,7 @@ pub struct AnnualBudget {
     pub year: u32,
     /// Total allocated budget
     pub total_allocation: u64,
-    /// UBI allocation
+    /// UBS allocation
     pub ubi_allocation: u64,
     /// Community development allocation
     pub community_allocation: u64,
@@ -624,7 +624,7 @@ pub enum FundingPeriod {
 /// Impact assessment for welfare proposals
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct ImpactMetrics {
-    /// Impact on UBI system (low, medium, high)
+    /// Impact on UBS system (low, medium, high)
     pub ubi_impact: ImpactLevel,
     /// Overall economic impact
     pub economic_impact: ImpactLevel,

@@ -2,7 +2,7 @@
 //! 
 //! Post-scarcity economics system for the quantum-resistant Web4 internet that replaces ISPs.
 //! Provides economic models, rewards calculation, wallet management, transaction 
-//! processing, Universal Basic Income distribution, and incentives.
+//! processing, Universal Basic Services distribution, and incentives.
 //! 
 //! ISP REPLACEMENT ECONOMICS 
 //! 
@@ -12,9 +12,9 @@
 //! - Validate transactions: Earn SOV tokens for network security (replaces authority fees)
 //! - Share internet: Earn SOV tokens for connectivity sharing (crowd-sourced ISP)
 //! 
-//! ALL PARTICIPANTS RECEIVE UBI:
-//! - 2% of all network activity funds Universal Basic Income
-//! - DAO governance distributes UBI to all verified humans
+//! ALL PARTICIPANTS RECEIVE UBS:
+//! - 2% of all network activity funds Universal Basic Services
+//! - DAO governance distributes UBS to all verified humans
 //! - Network growth funds welfare and public services
 //! - Creates a sustainable society where technology serves everyone
 //! 
@@ -69,11 +69,11 @@ pub const MINIMUM_NETWORK_FEE: u64 = 10;
 ///
 /// Example Year 3 projection: $500M monthly volume
 /// - 1% fee collected = $5M
-/// - UBI (45%): $2.25M
+/// - UBS (45%): $2.25M
 /// - Sector DAOs (30%): $1.5M (6% each to Healthcare, Education, Energy, Housing, Food)
 /// - Emergency Reserve (15%): $750K
 /// - Dev Grants (10%): $500K
-pub const UBI_ALLOCATION_PERCENTAGE: u64 = 45; // 45% → Universal Basic Income
+pub const UBI_ALLOCATION_PERCENTAGE: u64 = 45; // 45% → Universal Basic Services
 pub const SECTOR_DAO_ALLOCATION_PERCENTAGE: u64 = 30; // 30% → Sector DAOs (5 DAOs × 6% each)
 #[deprecated(note = "Use SECTOR_DAO_ALLOCATION_PERCENTAGE instead; this constant refers specifically to Sector DAOs.")]
 pub const DAO_ALLOCATION_PERCENTAGE: u64 = SECTOR_DAO_ALLOCATION_PERCENTAGE; // Backwards-compatible alias
@@ -82,8 +82,8 @@ pub const DEV_GRANT_ALLOCATION_PERCENTAGE: u64 = 10; // 10% → Development Gran
 
 /// Phase 1 temporary allocation (kept for compatibility)
 ///
-/// Phase 1 allocation: 45% UBI + 40% Welfare = 85% (15% reserved)
-/// Phase 2+ allocation: 45% UBI + 30% DAOs + 15% Emergency + 10% Dev Grants = 100%
+/// Phase 1 allocation: 45% UBS + 40% Welfare = 85% (15% reserved)
+/// Phase 2+ allocation: 45% UBS + 30% DAOs + 15% Emergency + 10% Dev Grants = 100%
 ///
 /// This constant represents the temporary Phase 1 welfare bucket that will be
 /// split into separate DAOs, Emergency Reserves, and Dev Grants contracts in Phase 2.
@@ -130,7 +130,7 @@ mod invariant_tests {
 
         assert_eq!(
             total, 100,
-            "Fee allocation percentages must sum to 100%, but got: UBI={}% + DAO={}% + EMERGENCY={}% + DEV={}% = {}%",
+            "Fee allocation percentages must sum to 100%, but got: UBS={}% + DAO={}% + EMERGENCY={}% + DEV={}% = {}%",
             UBI_ALLOCATION_PERCENTAGE,
             DAO_ALLOCATION_PERCENTAGE,
             EMERGENCY_ALLOCATION_PERCENTAGE,

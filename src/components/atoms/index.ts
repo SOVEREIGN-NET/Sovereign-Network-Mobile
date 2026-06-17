@@ -41,3 +41,12 @@ export type { RefreshRingProps } from './RefreshRing';
 
 export { Skeleton } from './Skeleton';
 export type { SkeletonProps } from './Skeleton';
+
+export { ArrowIcon } from './ArrowIcon';
+export type { ArrowIconProps, ArrowDirection } from './ArrowIcon';
+
+export { LockIcon } from './LockIcon';
+export { KeyIcon } from './KeyIcon';
+export { EyeOpenIcon } from './EyeOpenIcon';
+export { EyeClosedIcon } from './EyeClosedIcon';
+export { WarningIcon } from './WarningIcon';

@@ -23,8 +23,8 @@ describe('Color Utilities', () => {
       expect(getTransactionColor('stake')).toBe(colors.info);
     });
 
-    it('should return warning color for ubi', () => {
-      expect(getTransactionColor('ubi')).toBe(colors.warning);
+    it('should return warning color for ubs', () => {
+      expect(getTransactionColor('ubs')).toBe(colors.warning);
     });
   });
 
@@ -33,7 +33,7 @@ describe('Color Utilities', () => {
       expect(getTransactionIcon('send')).toBe('📤');
       expect(getTransactionIcon('receive')).toBe('📥');
       expect(getTransactionIcon('stake')).toBe('🔒');
-      expect(getTransactionIcon('ubi')).toBe('💰');
+      expect(getTransactionIcon('ubs')).toBe('💰');
     });
   });
 
@@ -58,7 +58,7 @@ describe('Color Utilities', () => {
   describe('getWalletTypeIcon', () => {
     it('should return correct icons for wallet types', () => {
       expect(getWalletTypeIcon('primary')).toBe('💳');
-      expect(getWalletTypeIcon('ubi')).toBe('💰');
+      expect(getWalletTypeIcon('ubs')).toBe('💰');
       expect(getWalletTypeIcon('savings')).toBe('🏦');
     });
   });

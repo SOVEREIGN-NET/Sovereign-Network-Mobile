@@ -179,7 +179,7 @@ pub struct SessionEconomicConfig {
     pub premium_session_multiplier: f64,
     /// DAO governance session fee percentage
     pub dao_session_fee_percentage: f64,
-    /// UBI session contribution percentage
+    /// UBS session contribution percentage
     pub ubi_session_percentage: f64,
     /// Security level fee multipliers
     pub security_level_multipliers: HashMap<SecurityLevel, f64>,
@@ -263,7 +263,7 @@ pub struct SessionEconomicInfo {
     pub total_fees_paid: u64,
     /// DAO fees contributed
     pub dao_fees_contributed: u64,
-    /// UBI contributions from this session
+    /// UBS contributions from this session
     pub ubi_contributions: u64,
     /// Premium features used
     pub premium_features: Vec<String>,
@@ -846,7 +846,7 @@ pub struct EconomicAssessment {
     pub total_fees: u64,
     /// DAO governance fees
     pub dao_fees: u64,
-    /// UBI contribution amount
+    /// UBS contribution amount
     pub ubi_contribution: u64,
 }
 
