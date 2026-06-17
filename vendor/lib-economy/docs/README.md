@@ -5,13 +5,13 @@
 
 ## Overview
 
-`lib-economy` is the comprehensive economic system for Sovereign Network, implementing a **post-scarcity economic model** for Web4. It replaces traditional ISP revenue models with decentralized infrastructure compensation, supports Universal Basic Income (UBI) distribution, and provides sophisticated multi-wallet management for diverse economic activities.
+`lib-economy` is the comprehensive economic system for Sovereign Network, implementing a **post-scarcity economic model** for Web4. It replaces traditional ISP revenue models with decentralized infrastructure compensation, supports Universal Basic Services (UBS) distribution, and provides sophisticated multi-wallet management for diverse economic activities.
 
 ### Core Philosophy
 
 - **Post-Scarcity Economics**: Unlimited token supply based on utility, not artificial scarcity
 - **ISP Replacement**: Fair compensation for network infrastructure (routing, storage, bandwidth)
-- **DAO-Driven Welfare**: Mandatory 2% DAO fee funds UBI and welfare programs
+- **DAO-Driven Welfare**: Mandatory 2% DAO fee funds UBS and welfare programs
 - **Anti-Speculation**: Token value derived from network utility, not trading speculation
 - **Infrastructure-First**: Rewards genuine network participation over financial games
 
@@ -31,7 +31,7 @@
 
 ### Treasury Economics (`treasury_economics/`)
 - DAO treasury management with transparent fund allocation
-- 40% UBI allocation, 30% welfare allocation, 30% development
+- 40% UBS allocation, 30% welfare allocation, 30% development
 - Treasury sustainability calculations
 - Funding gap analysis and distribution planning
 
@@ -82,8 +82,8 @@
 
 1. **`distribution/ubi_distribution.rs`** - STUB
    - Current: Empty placeholder function
-   - Needed: Full UBI distribution implementation
-   - Impact: UBI cannot be distributed to citizens yet
+   - Needed: Full UBS distribution implementation
+   - Impact: UBS cannot be distributed to citizens yet
 
 2. **`rewards/reward_calculator.rs`** - EMPTY
    - Current: Completely empty file
@@ -93,7 +93,7 @@
 ### Notes
 - The stub modules do not block core functionality
 - Token rewards are calculated in `models/token_reward.rs` (fully implemented)
-- Treasury UBI calculations work in `treasury_economics/` (fully implemented)
+- Treasury UBS calculations work in `treasury_economics/` (fully implemented)
 - Only the distribution execution and aggregation layers are missing
 
 ## Quick Start
@@ -148,7 +148,7 @@ treasury.allocate_funds()?;
 - **[treasury_economics.md](./treasury_economics.md)** - Treasury management and calculations
 - **[transactions.md](./transactions.md)** - Transaction system and fee processing
 - **[incentives.md](./incentives.md)** - Network participation rewards
-- **[distribution.md](./distribution.md)** - UBI and welfare distribution (stub status noted)
+- **[distribution.md](./distribution.md)** - UBS and welfare distribution (stub status noted)
 - **[rewards.md](./rewards.md)** - Reward calculation system (empty status noted)
 - **[supply.md](./supply.md)** - Token supply management
 - **[pricing.md](./pricing.md)** - Dynamic pricing system
@@ -165,7 +165,7 @@ pub const ISP_BYPASS_MESH_RATE: u64 = 1; // 1 ZHTP per MB packets routed
 pub const ISP_BYPASS_UPTIME_BONUS: u64 = 10; // 10 ZHTP per hour uptime
 pub const MESH_CONNECTIVITY_THRESHOLD: u32 = 3; // Minimum peers for rewards
 pub const MIN_STAKING_AMOUNT: u64 = 1000; // 1000 ZHTP minimum stake
-pub const UBI_ALLOCATION_PERCENTAGE: u64 = 40; // 40% of DAO fees to UBI
+pub const UBI_ALLOCATION_PERCENTAGE: u64 = 40; // 40% of DAO fees to UBS
 pub const WELFARE_ALLOCATION_PERCENTAGE: u64 = 30; // 30% to welfare
 pub const DEVELOPMENT_ALLOCATION_PERCENTAGE: u64 = 30; // 30% to development
 ```
@@ -178,14 +178,14 @@ pub const DEVELOPMENT_ALLOCATION_PERCENTAGE: u64 = 30; // 30% to development
 4. **Anti-Sybil Design**: Rewards genuine infrastructure, not node proliferation
 5. **Identity Integration**: Wallets tied to verified identities
 6. **Fee Transparency**: Clear fee breakdown (base + DAO)
-7. **Welfare Priority**: 70% of DAO fees fund UBI and welfare
+7. **Welfare Priority**: 70% of DAO fees fund UBS and welfare
 
 ## Use Cases
 
 - **ISP Replacement**: Earn ZHTP by sharing bandwidth and routing packets
 - **Storage Provider**: Earn ZHTP by providing decentralized storage
 - **Mesh Networking**: Maintain network connectivity for consistent rewards
-- **UBI Recipient**: Receive regular UBI distributions from DAO treasury
+- **UBS Recipient**: Receive regular UBS distributions from DAO treasury
 - **Application Developer**: Build economic applications with multi-wallet support
 - **DAO Participant**: Contribute to and benefit from treasury operations
 

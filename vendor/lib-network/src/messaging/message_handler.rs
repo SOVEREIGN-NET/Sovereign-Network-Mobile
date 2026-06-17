@@ -403,7 +403,7 @@ impl MeshMessageHandler {
         Ok(())
     }
     
-    /// Handle UBI distribution message
+    /// Handle UBS distribution message
     pub async fn handle_ubi_distribution(
         &self,
         recipient: PublicKey,
@@ -411,23 +411,23 @@ impl MeshMessageHandler {
         distribution_round: u64,
         proof: Vec<u8>
     ) -> Result<()> {
-        info!("UBI distribution: {} tokens to recipient (round {})", 
+        info!("UBS distribution: {} tokens to recipient (round {})", 
               amount_tokens, distribution_round);
         
         // Verify ZK proof using lib-proofs
         if proof.is_empty() {
-            warn!(" Empty ZK proof for UBI distribution - rejecting");
-            return Err(anyhow::anyhow!("UBI distribution requires valid ZK proof"));
+            warn!(" Empty ZK proof for UBS distribution - rejecting");
+            return Err(anyhow::anyhow!("UBS distribution requires valid ZK proof"));
         }
         
         // Deserialize and verify the proof
-        // The proof format depends on the UBI distribution circuit implementation
+        // The proof format depends on the UBS distribution circuit implementation
         let verification_result = match bincode::deserialize::<lib_proofs::ZkProof>(&proof) {
             Ok(zk_proof) => {
-                // Use the recursive verifier for chain proofs (UBI is a chain operation)
+                // Use the recursive verifier for chain proofs (UBS is a chain operation)
                 let verifier = lib_proofs::verifiers::RecursiveProofAggregator::new()?;
                 
-                // For UBI distribution, we need to verify:
+                // For UBS distribution, we need to verify:
                 // 1. The recipient is eligible (identity proof)
                 // 2. The amount matches the current round distribution
                 // 3. The distribution round hasn't been claimed before (replay protection)
@@ -472,11 +472,11 @@ impl MeshMessageHandler {
         };
         
         if !verification_result {
-            warn!("Invalid ZK proof for UBI distribution - rejecting");
-            return Err(anyhow::anyhow!("Invalid ZK proof for UBI distribution"));
+            warn!("Invalid ZK proof for UBS distribution - rejecting");
+            return Err(anyhow::anyhow!("Invalid ZK proof for UBS distribution"));
         }
         
-        info!(" ZK proof verified successfully for UBI distribution");
+        info!(" ZK proof verified successfully for UBS distribution");
         
         // Validate distribution round to prevent replay attacks
         let mut pools = self.revenue_pools.write().await;
@@ -484,18 +484,18 @@ impl MeshMessageHandler {
         let last_round = pools.get(&last_round_key).unwrap_or(&0);
         
         if distribution_round <= *last_round {
-            warn!("UBI distribution round {} already processed for recipient", distribution_round);
-            return Err(anyhow::anyhow!("UBI distribution round already processed"));
+            warn!("UBS distribution round {} already processed for recipient", distribution_round);
+            return Err(anyhow::anyhow!("UBS distribution round already processed"));
         }
         
-        // Update recipient's UBI balance and track distribution
+        // Update recipient's UBS balance and track distribution
         *pools.entry("ubi_total".to_string()).or_insert(0) += amount_tokens;
         *pools.entry(last_round_key).or_insert(0) = distribution_round;
         
         let recipient_balance_key = format!("ubi_balance_{}", hex::encode(&recipient.key_id[0..8]));
         *pools.entry(recipient_balance_key).or_insert(0) += amount_tokens;
         
-        info!("UBI distribution completed: {} tokens distributed (round {})", 
+        info!("UBS distribution completed: {} tokens distributed (round {})", 
               amount_tokens, distribution_round);
         
         Ok(())

@@ -115,7 +115,7 @@ impl DaoEngine {
             DaoProposalType::TreasuryAllocation => 25, // 25% quorum for treasury spending
             DaoProposalType::WelfareAllocation => 22,  // 22% quorum for welfare services
             DaoProposalType::ProtocolUpgrade => 30,    // 30% quorum for protocol changes
-            DaoProposalType::UbiDistribution => 20,    // 20% quorum for UBI changes
+            DaoProposalType::UbiDistribution => 20,    // 20% quorum for UBS changes
             DaoProposalType::DifficultyParameterUpdate => 30, // 30% quorum for difficulty changes (affects consensus)
             _ => 10,                                   // 10% quorum for general governance
         };

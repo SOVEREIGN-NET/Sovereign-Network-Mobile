@@ -18,6 +18,9 @@ import {
   ActionButtons,
   InfoCard,
   OptionCardGroup,
+  WarningIcon,
+  EyeOpenIcon,
+  EyeClosedIcon,
 } from '../components';
 import { useAuth } from '../hooks';
 import { useTranslation } from '../i18n';
@@ -191,12 +194,36 @@ const BackupIdentityScreen = ({ navigation }: BackupIdentityScreenProps) => {
 
         {/* Security Warning */}
         <View style={{ paddingHorizontal: spacing.lg, marginBottom: spacing.lg }}>
-          <InfoCard
-            title={t.auth.backup.securityTitle}
-            description={t.auth.backup.securityWarning}
-            type="error"
-            icon="⚠️"
-          />
+          <Card
+            style={{
+              backgroundColor: `${colors.error}15`,
+              borderColor: colors.error,
+              borderWidth: 1,
+            }}
+          >
+            <View style={{ padding: spacing.xxs }}>
+              <View
+                style={{
+                  flexDirection: 'row',
+                  alignItems: 'center',
+                  gap: spacing.sm,
+                  marginBottom: spacing.sm,
+                }}
+              >
+                <WarningIcon size={20} color={colors.error} />
+                <Text
+                  variant="body"
+                  weight="semibold"
+                  color={colors.error}
+                >
+                  {t.auth.backup.securityTitle}
+                </Text>
+              </View>
+              <Text variant="caption" color={colors.text_secondary}>
+                {t.auth.backup.securityWarning}
+              </Text>
+            </View>
+          </Card>
         </View>
 
         {/* Backup Method Selection */}
@@ -293,13 +320,22 @@ const BackupIdentityScreen = ({ navigation }: BackupIdentityScreenProps) => {
                       minHeight: 120,
                     }}
                   >
-                    <Text
-                      variant="body"
-                      color={colors.text_secondary}
-                      style={{ textAlign: 'center' }}
+                    <View
+                      style={{
+                        flexDirection: 'row',
+                        alignItems: 'center',
+                        gap: spacing.sm,
+                      }}
                     >
-                      👁️ Tap to reveal
-                    </Text>
+                      <EyeOpenIcon size={20} color={colors.text_secondary} />
+                      <Text
+                        variant="body"
+                        color={colors.text_secondary}
+                        style={{ textAlign: 'center' }}
+                      >
+                        Tap to reveal
+                      </Text>
+                    </View>
                   </Pressable>
                 )}
               </View>
@@ -417,19 +453,32 @@ const BackupIdentityScreen = ({ navigation }: BackupIdentityScreenProps) => {
                       editable={!backupCreated}
                       helperText="Minimum 8 characters"
                       containerStyle={{ marginBottom: spacing.md }}
+                      rightIcon={
+                        <Pressable
+                          onPress={() => setShowPassword(prev => !prev)}
+                          hitSlop={8}
+                          style={{ padding: 2 }}
+                        >
+                          {showPassword ? (
+                            <EyeOpenIcon size={18} color={colors.primary} />
+                          ) : (
+                            <EyeClosedIcon size={18} color={colors.primary} />
+                          )}
+                        </Pressable>
+                      }
                     />
 
                     <View style={{ marginBottom: spacing.md }}>
-                      <View style={{ flexDirection: 'row', justifyContent: 'space-between', marginBottom: spacing.sm }}>
-                        <Text style={{ fontSize: 12, fontWeight: '600', color: colors.text_primary }}>
-                          Confirm Password
-                        </Text>
-                        <Pressable onPress={() => setShowPassword(!showPassword)}>
-                          <Text style={{ fontSize: 12, color: colors.primary }}>
-                            {showPassword ? 'Hide' : 'Show'}
-                          </Text>
-                        </Pressable>
-                      </View>
+                      <Text
+                        style={{
+                          fontSize: 12,
+                          fontWeight: '600',
+                          color: colors.text_primary,
+                          marginBottom: spacing.sm,
+                        }}
+                      >
+                        Confirm Password
+                      </Text>
                       <FormField
                         label=""
                         placeholder="Confirm your password"
@@ -438,6 +487,19 @@ const BackupIdentityScreen = ({ navigation }: BackupIdentityScreenProps) => {
                         secureTextEntry={!showPassword}
                         editable={!backupCreated}
                         containerStyle={{ marginBottom: 0 }}
+                        rightIcon={
+                          <Pressable
+                            onPress={() => setShowPassword(prev => !prev)}
+                            hitSlop={8}
+                            style={{ padding: 2 }}
+                          >
+                            {showPassword ? (
+                              <EyeOpenIcon size={18} color={colors.primary} />
+                            ) : (
+                              <EyeClosedIcon size={18} color={colors.primary} />
+                            )}
+                          </Pressable>
+                        }
                       />
                     </View>
 

@@ -192,9 +192,9 @@ export const API_ENDPOINTS = {
     },
   },
 
-  // UBI endpoints
-  ubi: {
-    claim: '/api/v1/ubi/claim',
+  // UBS endpoints
+  ubs: {
+    claim: '/api/v1/ubs/claim',
   },
 
   // Network/Protocol endpoints

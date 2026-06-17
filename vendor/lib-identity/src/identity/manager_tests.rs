@@ -70,7 +70,7 @@ mod tests {
         assert!(citizenship_result.dao_registration.proposal_eligibility);
         assert!(!citizenship_result.dao_registration.membership_proof.is_empty());
         
-        // Verify UBI registration
+        // Verify UBS registration
         assert_eq!(citizenship_result.ubi_registration.monthly_amount, 1000);
         assert!(citizenship_result.ubi_registration.daily_amount > 0);
         assert!(citizenship_result.ubi_registration.daily_amount <= 35); // Roughly 1000/30
@@ -376,7 +376,7 @@ mod tests {
         
         // Test wallet access by alias
         assert!(identity.get_wallet("primary").is_some());
-        assert!(identity.get_wallet("ubi").is_some());
+        assert!(identity.get_wallet("ubs").is_some());
         assert!(identity.get_wallet("savings").is_some());
         
         // Test wallet listing

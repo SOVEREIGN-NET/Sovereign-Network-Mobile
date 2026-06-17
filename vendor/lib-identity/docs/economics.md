@@ -1,10 +1,10 @@
 # Economics Integration Module
 
-Economic integration system connecting ZHTP Identity with UBI distribution, DAO governance, and token economics.
+Economic integration system connecting ZHTP Identity with UBS distribution, DAO governance, and token economics.
 
 ## Overview
 
-The economics module provides seamless integration between the ZHTP identity system and the broader economic ecosystem. It handles UBI distribution, DAO governance participation, welcome bonuses, and token economics for citizen identities.
+The economics module provides seamless integration between the ZHTP identity system and the broader economic ecosystem. It handles UBS distribution, DAO governance participation, welcome bonuses, and token economics for citizen identities.
 
 ## Core Components
 
@@ -14,7 +14,7 @@ Central economic state management for ZHTP ecosystem integration.
 
 ```rust
 pub struct EconomicModel {
-    pub ubi_treasury: u64,          // UBI distribution pool
+    pub ubi_treasury: u64,          // UBS distribution pool
     pub dao_treasury: u64,          // DAO governance funds
     pub welcome_treasury: u64,      // Welcome bonus pool
     pub total_supply: u64,          // Total ZHTP token supply
@@ -24,7 +24,7 @@ pub struct EconomicModel {
 
 **Features:**
 - Treasury management for different economic functions
-- UBI distribution tracking and validation
+- UBS distribution tracking and validation
 - DAO governance fund allocation
 - Welcome bonus distribution for new citizens
 - Integration with lib-economy for advanced features
@@ -51,9 +51,9 @@ pub enum TransactionType {
 }
 ```
 
-## UBI Distribution
+## UBS Distribution
 
-### Automatic UBI Setup
+### Automatic UBS Setup
 
 ```rust
 use lib_identity::economics::{EconomicModel, Transaction, TransactionType};
@@ -89,10 +89,10 @@ impl UbiDistributionSystem {
     ) -> Result<UbiAccount, String> {
         let identity_id = &citizenship_result.identity_id;
         
-        // Calculate UBI amount based on citizenship tier
+        // Calculate UBS amount based on citizenship tier
         let monthly_amount = self.calculate_ubi_amount(&citizenship_result.citizenship_tier);
         
-        // Create UBI account
+        // Create UBS account
         let ubi_account = UbiAccount {
             identity_id: identity_id.clone(),
             monthly_amount,
@@ -103,13 +103,13 @@ impl UbiDistributionSystem {
         
         // Check treasury availability
         if !self.economic_model.can_distribute_ubi(monthly_amount * 12) {
-            return Err("Insufficient UBI treasury funds for annual commitment".to_string());
+            return Err("Insufficient UBS treasury funds for annual commitment".to_string());
         }
         
-        // Enroll in UBI system
+        // Enroll in UBS system
         self.ubi_recipients.insert(identity_id.clone(), ubi_account.clone());
         
-        println!("Citizen {} enrolled for UBI: {} ZHTP/month", 
+        println!("Citizen {} enrolled for UBS: {} ZHTP/month", 
             identity_id.0, monthly_amount);
         
         Ok(ubi_account)
@@ -122,7 +122,7 @@ impl UbiDistributionSystem {
         for (identity_id, ubi_account) in &mut self.ubi_recipients {
             // Check if distribution is due
             if self.is_distribution_due(ubi_account, current_time) {
-                // Distribute UBI
+                // Distribute UBS
                 match self.economic_model.distribute_ubi(ubi_account.monthly_amount) {
                     Ok(()) => {
                         // Create transaction record
@@ -142,11 +142,11 @@ impl UbiDistributionSystem {
                         
                         transactions.push(transaction);
                         
-                        println!("UBI distributed: {} ZHTP to {}", 
+                        println!("UBS distributed: {} ZHTP to {}", 
                             ubi_account.monthly_amount, identity_id.0);
                     },
                     Err(e) => {
-                        println!("UBI distribution failed for {}: {}", identity_id.0, e);
+                        println!("UBS distribution failed for {}: {}", identity_id.0, e);
                     }
                 }
             }
@@ -186,7 +186,7 @@ impl UbiSchedule {
 }
 ```
 
-### UBI Analytics and Reporting
+### UBS Analytics and Reporting
 
 ```rust
 impl UbiDistributionSystem {
@@ -921,11 +921,11 @@ mod tests {
             web4_access: true,
         };
         
-        // Enroll citizen for UBI
+        // Enroll citizen for UBS
         let ubi_account = ubi_system.enroll_citizen_for_ubi(&citizenship_result).unwrap();
         assert_eq!(ubi_account.monthly_amount, 1500); // Verified tier amount
         
-        // Test UBI distribution
+        // Test UBS distribution
         let transactions = ubi_system.distribute_monthly_ubi().unwrap();
         assert_eq!(transactions.len(), 1);
         assert_eq!(transactions[0].amount, 1500);
@@ -991,7 +991,7 @@ mod tests {
     fn test_economic_model() {
         let mut economic_model = EconomicModel::new();
         
-        // Test UBI distribution
+        // Test UBS distribution
         assert!(economic_model.can_distribute_ubi(1000));
         assert!(economic_model.distribute_ubi(1000).is_ok());
         assert_eq!(economic_model.ubi_treasury, 1_000_000_000 - 1000);
@@ -1006,7 +1006,7 @@ mod tests {
 
 ## Performance Considerations
 
-- **Batch Processing**: UBI distributions processed in batches for efficiency
+- **Batch Processing**: UBS distributions processed in batches for efficiency
 - **Caching**: Economic state cached for fast queries
 - **Async Operations**: All external integrations use async/await
 - **Memory Management**: Efficient data structures for large-scale operations
@@ -1020,4 +1020,4 @@ mod tests {
 - **Rate Limiting**: Prevents abuse of economic incentives
 - **Access Controls**: Role-based permissions for economic operations
 
-This economics integration module provides a complete foundation for connecting ZHTP Identity with the broader economic ecosystem, enabling UBI distribution, DAO governance, and comprehensive economic management.
+This economics integration module provides a complete foundation for connecting ZHTP Identity with the broader economic ecosystem, enabling UBS distribution, DAO governance, and comprehensive economic management.

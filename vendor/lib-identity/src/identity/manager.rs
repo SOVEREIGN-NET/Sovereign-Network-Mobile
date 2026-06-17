@@ -50,7 +50,7 @@ impl IdentityManager {
     /// Creates a ZK-DID and automatically:
     /// 1. Creates soulbound ZK-DID (1:1 per human)
     /// 2. Creates quantum-resistant wallets with seed phrases
-    /// 3. Registers for DAO governance and UBI payouts
+    /// 3. Registers for DAO governance and UBS payouts
     /// 4. Grants access to all Web4 services
     /// 5. Sets up privacy-preserving credentials
     /// 6. Provides welcome bonus
@@ -94,10 +94,10 @@ impl IdentityManager {
             None
         ).await?;
         
-        // Create UBI receiving wallet with seed phrase
+        // Create UBS receiving wallet with seed phrase
         let (ubi_wallet_id, ubi_seed_phrase) = wallet_manager.create_wallet_with_seed_phrase(
-            WalletType::UBI,
-            "UBI Wallet".to_string(),
+            WalletType::UBS,
+            "UBS Wallet".to_string(),
             None
         ).await?;
         
@@ -135,7 +135,7 @@ impl IdentityManager {
         // Register for DAO governance
         let dao_registration = crate::citizenship::DaoRegistration::register_for_dao_governance(&id, economic_model).await?;
         
-        // Register for UBI payouts
+        // Register for UBS payouts
         let ubi_registration = crate::citizenship::UbiRegistration::register_for_ubi_payouts(&id, &ubi_wallet_id, economic_model).await?;
         
         // Grant Web4 access
@@ -176,7 +176,7 @@ impl IdentityManager {
         self.password_manager.mark_identity_imported(&id);
 
         tracing::info!(
-            " NEW CITIZEN ONBOARDED: {} ({}) - Full Web4 access granted with UBI eligibility",
+            " NEW CITIZEN ONBOARDED: {} ({}) - Full Web4 access granted with UBS eligibility",
             display_name,
             hex::encode(&id.0[..8])
         );
@@ -325,8 +325,8 @@ impl IdentityManager {
         ).await?;
 
         let (ubi_wallet_id, ubi_seed_phrase) = identity.wallet_manager.create_wallet_with_seed_phrase(
-            WalletType::UBI,
-            "UBI Wallet".to_string(),
+            WalletType::UBS,
+            "UBS Wallet".to_string(),
             None
         ).await?;
 
@@ -339,7 +339,7 @@ impl IdentityManager {
         // Register for DAO governance
         let dao_registration = crate::citizenship::DaoRegistration::register_for_dao_governance(&id, economic_model).await?;
 
-        // Register for UBI payouts
+        // Register for UBS payouts
         let ubi_registration = crate::citizenship::UbiRegistration::register_for_ubi_payouts(&id, &ubi_wallet_id, economic_model).await?;
 
         // Grant Web4 access

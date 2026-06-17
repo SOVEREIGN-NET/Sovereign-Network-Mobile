@@ -10,8 +10,10 @@ import {
   NativeScrollEvent,
   NativeSyntheticEvent,
 } from 'react-native';
+import Svg, { Path, Circle, Rect } from 'react-native-svg';
 import { useFocusEffect } from '@react-navigation/native';
 import {
+  ArrowIcon,
   Card,
   Text,
   Button,
@@ -39,7 +41,6 @@ import type { DaoStake } from '../hooks/useDaoStakes';
 import { WELFARE_DAOS } from '../constants';
 import { useTranslation } from '../i18n';
 import { colors, spacing, typography, borderRadius } from '../theme';
-import DomainRegistrationScreen from './DomainRegistrationScreen';
 import appService, {
   WalletTransaction,
   WalletTransactionsResponse,
@@ -99,7 +100,7 @@ const resolveTxDecimals = (
 };
 
 const FIXED_TAB_PANEL_HEIGHT = 320;
-const CORE_SYMBOLS = new Set(['SOV', 'UBI', 'SAVINGS']);
+const CORE_SYMBOLS = new Set(['SOV', 'UBS', 'SAVINGS']);
 
 // ---------------------------------------------------------------------------
 // WalletOptionsSheet: bottom-anchored settings list for the wallet card.
@@ -110,23 +111,37 @@ const CORE_SYMBOLS = new Set(['SOV', 'UBI', 'SAVINGS']);
 interface WalletOptionsSheetProps {
   visible: boolean;
   onClose: () => void;
-  onSelectDomains: () => void;
   onSelectProfile: () => void;
   onSelectSettings: () => void;
 }
 
 interface WalletOptionRow {
-  id: 'domains' | 'profile' | 'settings';
-  icon: string;
+  id: 'profile' | 'settings';
+  icon: React.ReactNode;
   title: string;
   subtitle: string;
   onPress: () => void;
 }
 
+/** SVG icon: person / profile */
+const ProfileIcon = () => (
+  <Svg width={22} height={22} viewBox="0 0 24 24" fill="none">
+    <Circle cx="12" cy="8" r="4" stroke={colors.text_primary} strokeWidth={1.5} />
+    <Path d="M4 20c0-4 3.6-7 8-7s8 3 8 7" stroke={colors.text_primary} strokeWidth={1.5} strokeLinecap="round" />
+  </Svg>
+);
+
+/** SVG icon: gear / settings */
+const SettingsIcon = () => (
+  <Svg width={22} height={22} viewBox="0 0 24 24" fill="none">
+    <Circle cx="12" cy="12" r="3" stroke={colors.text_primary} strokeWidth={1.5} />
+    <Path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z" stroke={colors.text_primary} strokeWidth={1.5} />
+  </Svg>
+);
+
 const WalletOptionsSheet = ({
   visible,
   onClose,
-  onSelectDomains,
   onSelectProfile,
   onSelectSettings,
 }: WalletOptionsSheetProps) => {
@@ -134,22 +149,15 @@ const WalletOptionsSheet = ({
   const sheet = t.sidScreen.walletOptionsSheet;
   const rows: WalletOptionRow[] = [
     {
-      id: 'domains',
-      icon: '🌐',
-      title: sheet.rows.domainsTitle,
-      subtitle: sheet.rows.domainsSubtitle,
-      onPress: onSelectDomains,
-    },
-    {
       id: 'profile',
-      icon: '👤',
+      icon: <ProfileIcon />,
       title: sheet.rows.profileTitle,
       subtitle: sheet.rows.profileSubtitle,
       onPress: onSelectProfile,
     },
     {
       id: 'settings',
-      icon: '⚙️',
+      icon: <SettingsIcon />,
       title: sheet.rows.settingsTitle,
       subtitle: sheet.rows.settingsSubtitle,
       onPress: onSelectSettings,
@@ -257,7 +265,7 @@ const WalletOptionsSheet = ({
                   borderColor: colors.border,
                 }}
               >
-                <Text style={{ fontSize: typography.size.lg }}>{row.icon}</Text>
+                {row.icon}
               </View>
               <View style={{ flex: 1 }}>
                 <Text
@@ -280,15 +288,12 @@ const WalletOptionsSheet = ({
                   {row.subtitle}
                 </Text>
               </View>
-              <Text
-                style={{
-                  fontSize: typography.size.lg,
-                  color: colors.text_tertiary,
-                  marginLeft: spacing.sm,
-                }}
-              >
-                ›
-              </Text>
+              <ArrowIcon
+                direction="right"
+                size={18}
+                color={colors.text_tertiary}
+                style={{ marginLeft: spacing.sm }}
+              />
             </TouchableOpacity>
           ))}
 
@@ -602,8 +607,6 @@ const SIDScreen = ({ navigation, route }: any) => {
   const [activeBalanceCardIndex, setActiveBalanceCardIndex] = useState(0);
   const balanceScrollRef = useRef<ScrollView>(null);
   const [walletOptionsVisible, setWalletOptionsVisible] = useState(false);
-  const [domainRegistrationModalVisible, setDomainRegistrationModalVisible] =
-    useState(false);
 
   const identityHex = useMemo(() => {
     const did = currentIdentity?.did;
@@ -639,7 +642,7 @@ const SIDScreen = ({ navigation, route }: any) => {
   }, [tokens]);
 
   // Ordered balance cards for the swipeable wallet carousel:
-  // SOV first, CBE second, then wallet-type cards (Savings, UBI),
+  // SOV first, CBE second, then wallet-type cards (Savings, UBS),
   // then remaining tokens alphabetical. All shown even at zero balance.
   const balanceCards = useMemo(() => {
     const rank = (symbol: string) => {
@@ -647,15 +650,15 @@ const SIDScreen = ({ navigation, route }: any) => {
       if (s === 'SOV') return 0;
       if (s === 'CBE') return 1;
       if (s === 'SAVINGS') return 3;
-      if (s === 'UBI') return 4;
+      if (s === 'UBS') return 4;
       return 2;
     };
 
-    // Build wallet-type cards for Savings and UBI from the wallet list.
+    // Build wallet-type cards for Savings and UBS from the wallet list.
     const walletCards: typeof tokens = (wallets ?? [])
       .filter(w => {
         const t = (w.wallet_type || '').toLowerCase();
-        return t === 'savings' || t === 'ubi';
+        return t === 'savings' || t === 'ubs';
       })
       .map(w => ({
         token_id: `wallet:${w.id}`,
@@ -759,7 +762,7 @@ const SIDScreen = ({ navigation, route }: any) => {
     }, [refresh, refreshTokens, refreshActivity]),
   );
 
-  // UBI data from identity
+  // UBS data from identity
   const { data: ubiData } = useAsyncData(async () => {
     if (!currentIdentity?.did) {
       return null;
@@ -1008,7 +1011,10 @@ const SIDScreen = ({ navigation, route }: any) => {
                   onPress={() => setWalletOptionsVisible(true)}
                   accessibilityLabel="Wallet options"
                 >
-                  <Text style={{ fontSize: typography.size.xl }}>⚙️</Text>
+                  <Svg width={22} height={22} viewBox="0 0 24 24" fill="none">
+                    <Circle cx="12" cy="12" r="3" stroke={colors.text_primary} strokeWidth={1.5} />
+                    <Path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z" stroke={colors.text_primary} strokeWidth={1.5} />
+                  </Svg>
                 </TouchableOpacity>
               </View>
             </View>
@@ -1113,7 +1119,7 @@ const SIDScreen = ({ navigation, route }: any) => {
                 // verification path for non-SOV wallet transfers isn't ready
                 // yet. Mirrors the in-screen lockout in SendTokensScreen.
                 const activeSymbol = (activeCardToken?.symbol || '').toUpperCase();
-                const isWalletCard = activeSymbol === 'SAVINGS' || activeSymbol === 'UBI';
+                const isWalletCard = activeSymbol === 'SAVINGS' || activeSymbol === 'UBS';
                 const sendDisabled =
                   isLoading ||
                   !nodeConnected ||
@@ -1139,23 +1145,32 @@ const SIDScreen = ({ navigation, route }: any) => {
                     }
                     disabled={sendDisabled}
                   >
-                    <Text
+                    <View
                       style={{
-                        fontSize: typography.size.md,
-                        fontWeight: typography.weight.semibold,
-                        color: sendDisabled ? colors.text_tertiary : colors.text_primary,
+                        flexDirection: 'row',
+                        alignItems: 'center',
+                        gap: 4,
                       }}
                     >
-                      ↑ {t.wallet.actions.send}
-                      {activeCardToken ? ` ${activeCardToken.symbol}` : ''}
-                    </Text>
+                      <ArrowIcon direction="up" size={14} color={sendDisabled ? colors.text_tertiary : colors.text_primary} />
+                      <Text
+                        style={{
+                          fontSize: typography.size.md,
+                          fontWeight: typography.weight.semibold,
+                          color: sendDisabled ? colors.text_tertiary : colors.text_primary,
+                        }}
+                      >
+                        {t.wallet.actions.send}
+                        {activeCardToken ? ` ${activeCardToken.symbol}` : ''}
+                      </Text>
+                    </View>
                   </TouchableOpacity>
                 );
               })()}
 
               {(() => {
                 const activeSymbolR = (activeCardToken?.symbol || '').toUpperCase();
-                const isWalletCardR = activeSymbolR === 'SAVINGS' || activeSymbolR === 'UBI';
+                const isWalletCardR = activeSymbolR === 'SAVINGS' || activeSymbolR === 'UBS';
                 const receiveDisabled = isLoading || isWalletCardR;
                 return (
                   <TouchableOpacity
@@ -1177,16 +1192,25 @@ const SIDScreen = ({ navigation, route }: any) => {
                     }
                     disabled={receiveDisabled}
                   >
-                    <Text
+                    <View
                       style={{
-                        fontSize: typography.size.md,
-                        fontWeight: typography.weight.semibold,
-                        color: receiveDisabled ? colors.text_tertiary : colors.text_primary,
+                        flexDirection: 'row',
+                        alignItems: 'center',
+                        gap: 4,
                       }}
                     >
-                      ↓ {t.wallet.actions.receive}
-                      {activeCardToken ? ` ${activeCardToken.symbol}` : ''}
-                    </Text>
+                      <ArrowIcon direction="down" size={14} color={receiveDisabled ? colors.text_tertiary : colors.text_primary} />
+                      <Text
+                        style={{
+                          fontSize: typography.size.md,
+                          fontWeight: typography.weight.semibold,
+                          color: receiveDisabled ? colors.text_tertiary : colors.text_primary,
+                        }}
+                      >
+                        {t.wallet.actions.receive}
+                        {activeCardToken ? ` ${activeCardToken.symbol}` : ''}
+                      </Text>
+                    </View>
                   </TouchableOpacity>
                 );
               })()}
@@ -1636,7 +1660,7 @@ const SIDScreen = ({ navigation, route }: any) => {
               </View>
             </View>
 
-            {/* UBI Status Card */}
+            {/* UBS Status Card */}
             {ubiData && (
               <View style={{ paddingHorizontal: spacing.sm }}>
                 <Card
@@ -1649,7 +1673,7 @@ const SIDScreen = ({ navigation, route }: any) => {
                 >
                   <Column gap="xs">
                     <Row style={{ alignItems: 'center', gap: spacing.sm }}>
-                      <Text style={{ fontSize: typography.size.xl }}>🌱</Text>
+                      
                       <Text
                         style={{
                           fontSize: typography.size.base,
@@ -1657,7 +1681,7 @@ const SIDScreen = ({ navigation, route }: any) => {
                           color: colors.success,
                         }}
                       >
-                        Universal Basic Income
+                        Universal Basic Services
                       </Text>
                     </Row>
                     <Row style={{ alignItems: 'center', gap: spacing.sm }}>
@@ -1688,7 +1712,7 @@ const SIDScreen = ({ navigation, route }: any) => {
                         lineHeight: 16,
                       }}
                     >
-                      UBI is calculated as an equal per-citizen share of 45% of
+                      UBS is calculated as an equal per-citizen share of 45% of
                       all protocol transaction fees collected during the
                       distribution period.
                     </Text>
@@ -1700,25 +1724,9 @@ const SIDScreen = ({ navigation, route }: any) => {
         </ScrollView>
       </ScreenLayout>
 
-      <Modal
-        visible={domainRegistrationModalVisible}
-        animationType="slide"
-        presentationStyle="formSheet"
-      >
-        <View style={{ flex: 1, backgroundColor: colors.bg_darkest }}>
-          <DomainRegistrationScreen
-            onClose={() => setDomainRegistrationModalVisible(false)}
-          />
-        </View>
-      </Modal>
-
       <WalletOptionsSheet
         visible={walletOptionsVisible}
         onClose={() => setWalletOptionsVisible(false)}
-        onSelectDomains={() => {
-          setWalletOptionsVisible(false);
-          setDomainRegistrationModalVisible(true);
-        }}
         onSelectProfile={() => {
           setWalletOptionsVisible(false);
           navigation?.navigate('Profile');

@@ -112,7 +112,7 @@ const ExplorerDashboardScreen: React.FC<any> = ({ navigation }) => {
               <StatRow label="Height" value={String(stats.data.latest_height)} />
               <StatRow label="Total TX" value={String(stats.data.total_transactions)} />
               <StatRow label="Supply" value={String(stats.data.total_supply)} />
-              <StatRow label="UBI Distributed" value={String(stats.data.total_ubi_distributed)} />
+              <StatRow label="UBS Distributed" value={String(stats.data.total_ubi_distributed)} />
               <StatRow label="Validators" value={String(stats.data.active_validators)} />
               <StatRow label="Mempool" value={String(stats.data.mempool_size)} />
               <StatRow label="Avg Block Time" value={`${stats.data.avg_block_time_secs ?? 0}s`} />

@@ -82,7 +82,7 @@ describe('MockDataService', () => {
 
     it('should return wallets with valid types', () => {
       const wallets = MockDataService.getWallets();
-      const validTypes = ['primary', 'ubi', 'savings'];
+      const validTypes = ['primary', 'ubs', 'savings'];
 
       wallets.forEach(wallet => {
         expect(validTypes).toContain(wallet.type);
@@ -132,7 +132,7 @@ describe('MockDataService', () => {
 
     it('should return transactions with valid types', () => {
       const transactions = MockDataService.getTransactions();
-      const validTypes = ['send', 'receive', 'stake', 'ubi'];
+      const validTypes = ['send', 'receive', 'stake', 'ubs'];
 
       transactions.forEach(tx => {
         expect(validTypes).toContain(tx.type);
@@ -364,7 +364,7 @@ describe('MockDataService', () => {
   });
 
   describe('claimUBI', () => {
-    it('should return success response for UBI claim', () => {
+    it('should return success response for UBS claim', () => {
       const response = MockDataService.claimUBI();
 
       expect(response).toBeDefined();

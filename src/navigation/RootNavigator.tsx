@@ -1,4 +1,5 @@
 import React, { useEffect, useMemo, useRef } from 'react';
+import { useAuth } from '../hooks/useAuth';
 import {
   NavigationContainer,
   NavigationContainerRef,
@@ -16,6 +17,7 @@ import { RootStackParamList } from '../types/navigation';
 
 // Screens
 import DashboardScreen from '../screens/DashboardScreen';
+import DappsScreen from '../screens/DappsScreen';
 import ProfileEditScreen from '../screens/ProfileEditScreen';
 import IdentitySettingsScreen from '../screens/IdentitySettingsScreen';
 import WalletSettingsScreen from '../screens/WalletSettingsScreen';
@@ -107,13 +109,18 @@ const DashboardStack = () => {
         name="ClaimUBI"
         component={ClaimUBIScreen}
         options={{
-          title: 'Claim UBI',
+          title: 'Claim UBS',
           headerBackTitle: 'Back',
         }}
       />
       <Stack.Screen
         name="ExplorerDashboard"
         component={ExplorerDashboardScreen}
+        options={{ headerShown: false }}
+      />
+      <Stack.Screen
+        name="Dapps"
+        component={DappsScreen}
         options={{ headerShown: false }}
       />
       <Stack.Screen
@@ -754,8 +761,11 @@ const RootNavigator = () => {
 };
 
 const MainTabs = () => {
+  const { currentIdentity } = useAuth();
+  const isSignedIn = currentIdentity !== null;
   return (
     <Tab.Navigator
+      initialRouteName={isSignedIn ? undefined : 'SIDTab'}
       screenOptions={
         {
           headerShown: false,

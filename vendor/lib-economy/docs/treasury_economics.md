@@ -6,7 +6,7 @@ Complete documentation for DAO treasury management and welfare fund operations.
 
 The `treasury_economics` module manages the DAO treasury, handling:
 - DAO fee collection and allocation
-- UBI distribution calculations
+- UBS distribution calculations
 - Welfare fund management
 - Treasury sustainability analysis
 - Efficiency tracking
@@ -24,11 +24,11 @@ treasury_economics/
 ```rust
 pub struct DaoTreasury {
     pub treasury_balance: u64,              // Current total balance
-    pub ubi_allocated: u64,                 // Allocated for UBI (40%)
+    pub ubi_allocated: u64,                 // Allocated for UBS (40%)
     pub welfare_allocated: u64,             // Allocated for welfare (30%)
     pub development_allocated: u64,         // Allocated for development (30%)
     pub total_dao_fees_collected: u64,      // Lifetime fees collected
-    pub total_ubi_distributed: u64,         // Lifetime UBI distributed
+    pub total_ubi_distributed: u64,         // Lifetime UBS distributed
     pub total_welfare_distributed: u64,     // Lifetime welfare distributed
     pub total_development_spent: u64,       // Lifetime development spent
 }
@@ -39,7 +39,7 @@ pub struct DaoTreasury {
 Every DAO fee received is automatically allocated:
 
 ```rust
-UBI:         40% of DAO fees
+UBS:         40% of DAO fees
 Welfare:     30% of DAO fees
 Development: 30% of DAO fees
 ```
@@ -47,7 +47,7 @@ Development: 30% of DAO fees
 ### Example
 ```
 DAO fee received: 1000 ZHTP
-    → UBI allocated:    400 ZHTP
+    → UBS allocated:    400 ZHTP
     → Welfare allocated: 300 ZHTP
     → Development:      300 ZHTP
 ```
@@ -59,10 +59,10 @@ DAO fee received: 1000 ZHTP
 ```rust
 let mut treasury = DaoTreasury::new();
 treasury.receive_dao_fee(200)?; // Receive 200 ZHTP from transaction
-treasury.allocate_funds()?;      // Allocate to UBI/welfare/dev
+treasury.allocate_funds()?;      // Allocate to UBS/welfare/dev
 ```
 
-### Calculating UBI
+### Calculating UBS
 
 ```rust
 use lib_economy::treasury_economics::calculate_optimal_ubi_per_citizen;
@@ -77,9 +77,9 @@ let (actual_ubi, can_meet_target) = calculate_optimal_ubi_per_citizen(
 );
 
 if can_meet_target {
-    println!(" Full target UBI: {} ZHTP", actual_ubi);
+    println!(" Full target UBS: {} ZHTP", actual_ubi);
 } else {
-    println!("⚠ Reduced UBI: {} ZHTP (insufficient funds)", actual_ubi);
+    println!("⚠ Reduced UBS: {} ZHTP (insufficient funds)", actual_ubi);
 }
 ```
 
@@ -94,7 +94,7 @@ use lib_economy::treasury_economics::{
 let ubi_efficiency = calculate_ubi_efficiency(&treasury);
 let welfare_efficiency = calculate_welfare_efficiency(&treasury);
 
-println!("UBI efficiency: {:.1}%", ubi_efficiency * 100.0);
+println!("UBS efficiency: {:.1}%", ubi_efficiency * 100.0);
 println!("Welfare efficiency: {:.1}%", welfare_efficiency * 100.0);
 ```
 
@@ -122,7 +122,7 @@ pub fn calculate_optimal_ubi_per_citizen(
 ) -> (u64, bool)
 ```
 
-Calculates the optimal UBI amount per citizen given current treasury state.
+Calculates the optimal UBS amount per citizen given current treasury state.
 
 **Returns**: `(actual_ubi_per_citizen, can_meet_target)`
 
@@ -142,7 +142,7 @@ Returns 0.0 to 1.0 (0% to 100%)
 pub fn calculate_ubi_efficiency(treasury: &DaoTreasury) -> f64
 ```
 
-Calculates UBI distribution efficiency ratio.
+Calculates UBS distribution efficiency ratio.
 
 ### `calculate_treasury_sustainability()`
 
@@ -196,7 +196,7 @@ fn monthly_treasury_cycle() -> anyhow::Result<()> {
     treasury.allocate_funds()?;
     println!("Week 2: {} ZHTP total collected", treasury.total_dao_fees_collected);
     
-    // Calculate UBI distribution
+    // Calculate UBS distribution
     let citizens = 1000;
     let target_ubi = 1000;
     let (ubi_amount, can_meet) = calculate_optimal_ubi_per_citizen(
@@ -207,25 +207,25 @@ fn monthly_treasury_cycle() -> anyhow::Result<()> {
     
     println!("\n=== Month End Summary ===");
     println!("Total collected: {} ZHTP", treasury.total_dao_fees_collected);
-    println!("UBI allocated (40%): {} ZHTP", treasury.ubi_allocated);
+    println!("UBS allocated (40%): {} ZHTP", treasury.ubi_allocated);
     println!("Welfare allocated (30%): {} ZHTP", treasury.welfare_allocated);
     println!("Development (30%): {} ZHTP", treasury.development_allocated);
     
     if can_meet {
-        println!("\n Can provide full target UBI");
-        println!("UBI per citizen ({} citizens): {} ZHTP", citizens, ubi_amount);
+        println!("\n Can provide full target UBS");
+        println!("UBS per citizen ({} citizens): {} ZHTP", citizens, ubi_amount);
     } else {
-        println!("\n⚠ Reduced UBI");
-        println!("UBI per citizen ({} citizens): {} ZHTP", citizens, ubi_amount);
+        println!("\n⚠ Reduced UBS");
+        println!("UBS per citizen ({} citizens): {} ZHTP", citizens, ubi_amount);
     }
     
-    // Distribute UBI
+    // Distribute UBS
     for _ in 0..citizens {
         treasury.distribute_ubi(ubi_amount)?;
     }
     
-    println!("\n UBI distributed to {} citizens", citizens);
-    println!("Remaining UBI allocation: {} ZHTP", treasury.ubi_allocated);
+    println!("\n UBS distributed to {} citizens", citizens);
+    println!("Remaining UBS allocation: {} ZHTP", treasury.ubi_allocated);
     
     // Check sustainability
     let sustainability = calculate_treasury_sustainability(&treasury, 100000);
@@ -240,23 +240,23 @@ fn monthly_treasury_cycle() -> anyhow::Result<()> {
 ### Healthy Treasury
 - Months sustainable ≥ 12
 - Efficiency ratios > 0.8
-- Can meet target UBI
+- Can meet target UBS
 
 ### Moderate Treasury
 - Months sustainable 6-12
 - Efficiency ratios 0.5-0.8
-- May need reduced UBI
+- May need reduced UBS
 
 ### Concerning Treasury
 - Months sustainable < 6
 - Efficiency ratios < 0.5
-- Cannot meet target UBI
+- Cannot meet target UBS
 
 ## Best Practices
 
 1. **Regular Allocation**: Call `allocate_funds()` after every `receive_dao_fee()`
 2. **Monitor Sustainability**: Check sustainability metrics monthly
-3. **Adjust UBI**: Reduce UBI target if treasury becomes concerning
+3. **Adjust UBS**: Reduce UBS target if treasury becomes concerning
 4. **Track Efficiency**: Monitor efficiency ratios to ensure proper distribution
 5. **Audit Regularly**: Verify allocation percentages match expectations
 

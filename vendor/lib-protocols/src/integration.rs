@@ -544,7 +544,7 @@ impl ZhtpIntegration {
             .build(&keypair.private_key)
             .map_err(|e| ProtocolError::InternalError(format!("Failed to create transaction: {}", e)))?;
         
-        // Add DAO fee output for UBI distribution
+        // Add DAO fee output for UBS distribution
         let transaction_with_dao = transaction;
         
         // Validate the transaction thoroughly
@@ -714,7 +714,7 @@ impl ZhtpIntegration {
 pub struct EconomicAssessment {
     /// Total fee required
     pub total_fee: u64,
-    /// DAO fee for UBI
+    /// DAO fee for UBS
     pub dao_fee: u64,
     /// Network fee
     pub network_fee: u64,

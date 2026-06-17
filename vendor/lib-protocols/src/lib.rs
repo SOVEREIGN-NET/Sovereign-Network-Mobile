@@ -9,7 +9,7 @@
 //! - Zero-knowledge proof validation at transport layer
 //! - Post-quantum cryptographic security built-in
 //! - Economic incentives embedded in protocol headers
-//! - Mandatory DAO fees for Universal Basic Income funding
+//! - Mandatory DAO fees for Universal Basic Services funding
 //! - Quantum-resistant mesh routing with  capability
 //! - Native support for .zhtp domains and Web4 addressing
 //! - Proof-of-Useful-Work consensus for free internet access
@@ -30,7 +30,7 @@
 //! 3. **HTTP/HTTPS**: Native ZHTP protocol with built-in privacy
 //! 4. **TLS**: Post-quantum encryption by default
 //! 5. **CDNs**: Distributed content with economic rewards
-//! 6. **Governments**: DAO governance with UBI for all participants
+//! 6. **Governments**: DAO governance with UBS for all participants
 //! 
 //! The result: **A free internet that pays users to participate**
 //! 
@@ -40,7 +40,7 @@
 //! - HTTP replacement with built-in economics
 //! - Zero-knowledge proof validation
 //! - Post-quantum cryptography (CRYSTALS-Dilithium, CRYSTALS-Kyber)
-//! - Mandatory 2% DAO fees for UBI funding
+//! - Mandatory 2% DAO fees for UBS funding
 //! - Complete  capability
 //! 
 //! ### ZDNS v1.0 System
@@ -206,7 +206,7 @@ pub type ProtocolResult<T> = anyhow::Result<T>;
 pub async fn initialize() -> ProtocolResult<()> {
     tracing::info!(" Initializing ZHTP Protocol Stack v{}", ZHTP_VERSION);
     tracing::info!("Web4 Internet Infrastructure Ready");
-    tracing::info!("DAO fee system active for UBI funding");
+    tracing::info!("DAO fee system active for UBS funding");
     tracing::info!("Post-quantum cryptography enabled");
     tracing::info!("Mesh networking ready for ");
     Ok(())

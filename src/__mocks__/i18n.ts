@@ -50,7 +50,7 @@ const translations = {
     createIdentity: {
       identityType: 'Identity Type',
       types: {
-        citizen: 'Citizen (UBI Eligible)',
+        citizen: 'Citizen (UBS Eligible)',
         citizenDescription: 'Individual citizen with voting rights',
         organization: 'Organization',
         organizationDescription: 'Organization or collective',

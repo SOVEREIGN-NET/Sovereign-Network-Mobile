@@ -73,14 +73,14 @@ mod tests {
     #[test]
     fn test_ubi_per_citizen_calculation() {
         let mut treasury = DaoTreasury::new();
-        treasury.apply_fee_distribution(calculate_dao_fee_distribution(1000)).unwrap(); // This allocates 450 to UBI (45% of 1000)
+        treasury.apply_fee_distribution(calculate_dao_fee_distribution(1000)).unwrap(); // This allocates 450 to UBS (45% of 1000)
 
         // Test with different citizen counts
         assert_eq!(treasury.calculate_ubi_per_citizen(100), 4); // 450 / 100
         assert_eq!(treasury.calculate_ubi_per_citizen(225), 2); // 450 / 225
         assert_eq!(treasury.calculate_ubi_per_citizen(0), 0); // Division by zero protection
 
-        // Test with no UBI allocated
+        // Test with no UBS allocated
         let empty_treasury = DaoTreasury::new();
         assert_eq!(empty_treasury.calculate_ubi_per_citizen(100), 0);
     }
@@ -104,10 +104,10 @@ mod tests {
     #[test]
     fn test_ubi_distribution_recording() {
         let mut treasury = DaoTreasury::new();
-        treasury.apply_fee_distribution(calculate_dao_fee_distribution(1000)).unwrap(); // Allocates 450 to UBI (45% of 1000)
+        treasury.apply_fee_distribution(calculate_dao_fee_distribution(1000)).unwrap(); // Allocates 450 to UBS (45% of 1000)
         let timestamp = current_timestamp().unwrap();
 
-        // Record UBI distribution
+        // Record UBS distribution
         treasury.record_ubi_distribution(225, timestamp).unwrap();
 
         assert_eq!(treasury.ubi_allocated, 225); // 450 - 225
@@ -190,7 +190,7 @@ mod tests {
 
         let efficiency = treasury.get_allocation_efficiency();
 
-        // UBI efficiency: 225 / 1000 = 22.5%
+        // UBS efficiency: 225 / 1000 = 22.5%
         assert_eq!(efficiency["ubi_distribution_efficiency"], 22.5);
 
         assert_eq!(efficiency["sector_dao_distribution_efficiency"], 15.0);
@@ -227,7 +227,7 @@ mod tests {
     #[test]
     fn test_allocation_percentage_constants() {
         // Verify the allocation percentages add up to 100%
-        // NEW ALLOCATION (45/30/15/10): UBI / DAOs / Emergency / Dev Grants
+        // NEW ALLOCATION (45/30/15/10): UBS / DAOs / Emergency / Dev Grants
         assert_eq!(crate::UBI_ALLOCATION_PERCENTAGE, 45);
         assert_eq!(crate::DAO_ALLOCATION_PERCENTAGE, 30);
         assert_eq!(crate::EMERGENCY_ALLOCATION_PERCENTAGE, 15);
@@ -284,7 +284,7 @@ mod tests {
 
         treasury.apply_fee_distribution(distribution).unwrap();
 
-        assert_eq!(treasury.ubi_allocated, distribution.ubi);
+        assert_eq!(treasury.ubi_allocated, distribution.ubs);
         assert_eq!(treasury.sector_dao_allocated, distribution.sector_daos);
         assert_eq!(treasury.emergency_allocated, distribution.emergency_reserve);
         assert_eq!(treasury.dev_grants_allocated, distribution.dev_grants);

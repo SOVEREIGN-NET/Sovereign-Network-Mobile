@@ -31,7 +31,7 @@ pub struct EconomicModel {
     pub current_supply: u64,
     /// Token burn rate (zero for utility focus)
     pub burn_rate: f64,
-    /// DAO treasury for UBI and DAO allocations (economics interface only)
+    /// DAO treasury for UBS and DAO allocations (economics interface only)
     pub dao_treasury: DaoTreasury,
 }
 
@@ -43,7 +43,7 @@ impl EconomicModel {
         // Initialize treasury with collected fees for demonstration
         dao_treasury.treasury_balance = 2_500_000; // 2.5M ZHTP
         dao_treasury.total_dao_fees_collected = 5_000_000; // 5M ZHTP collected
-        dao_treasury.ubi_allocated = 1_500_000; // 1.5M allocated to UBI
+        dao_treasury.ubi_allocated = 1_500_000; // 1.5M allocated to UBS
         dao_treasury.sector_dao_allocated = 600_000; // 0.6M allocated to sector DAOs
         dao_treasury.emergency_allocated = 250_000; // 0.25M allocated to emergency reserves
         dao_treasury.dev_grants_allocated = 150_000; // 0.15M allocated to dev grants
@@ -118,7 +118,7 @@ impl EconomicModel {
         Ok(())
     }
     
-    /// Calculate transaction fees including mandatory DAO fee for UBI/DAO allocations
+    /// Calculate transaction fees including mandatory DAO fee for UBS/DAO allocations
     pub fn calculate_fee(&self, tx_size: u64, amount: u64, priority: Priority) -> (u64, u64, u64) {
         // NETWORK INFRASTRUCTURE FEE (covers bandwidth, storage, compute)
         let base_fee = tx_size * 1; // 1 token per byte (minimal infrastructure cost)
@@ -128,8 +128,8 @@ impl EconomicModel {
         let network_fee = ((base_fee as f64) * priority_multiplier) as u64;
         let network_fee = network_fee.max(crate::MINIMUM_NETWORK_FEE); // Minimum network fee
         
-        // MANDATORY DAO FEE FOR UNIVERSAL BASIC INCOME & DAO ALLOCATIONS
-        // 1% of transaction amount goes to DAO treasury for UBI/DAO services
+        // MANDATORY DAO FEE FOR UNIVERSAL BASIC SERVICES & DAO ALLOCATIONS
+        // 1% of transaction amount goes to DAO treasury for UBS/DAO services
         let dao_fee = (amount * crate::DEFAULT_DAO_FEE_RATE) / 10000; // 1.00% mandatory DAO fee
         let dao_fee = dao_fee.max(crate::MINIMUM_DAO_FEE); // Minimum DAO fee
         
@@ -149,7 +149,7 @@ impl EconomicModel {
         Ok(total_fees) // All fees stay in circulation for infrastructure
     }
     
-    /// Process DAO fees for Universal Basic Income and DAO allocations
+    /// Process DAO fees for Universal Basic Services and DAO allocations
     pub fn process_dao_fees(&mut self, dao_fees: u64) -> Result<u64> {
         let distribution = calculate_dao_fee_distribution(dao_fees);
         self.dao_treasury.apply_fee_distribution(distribution)?;
@@ -159,7 +159,7 @@ impl EconomicModel {
             dao_fees, self.dao_treasury.treasury_balance
         );
         
-        Ok(dao_fees) // DAO fees go to UBI/welfare treasury
+        Ok(dao_fees) // DAO fees go to UBS/welfare treasury
     }
     
     /// Mint tokens for network operations (like issuing bandwidth credits)

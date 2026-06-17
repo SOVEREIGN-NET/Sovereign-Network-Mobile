@@ -27,7 +27,7 @@ export type { WalletListData, WalletDisplay } from './useWalletList';
 export { useTrendingTokens, formatTokenPrice, formatChange } from './useTrendingTokens';
 export type { TokenData } from './useTrendingTokens';
 
-export { useTrendingDapps, formatUserCount, getActivityColor } from './useTrendingDapps';
+export { useTrendingDapps, getActivityColor } from './useTrendingDapps';
 export type { DappData } from './useTrendingDapps';
 
 export { useRewardCounter } from './useRewardCounter';

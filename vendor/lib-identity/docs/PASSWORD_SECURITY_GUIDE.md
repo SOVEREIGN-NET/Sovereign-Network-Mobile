@@ -288,7 +288,7 @@ async fn complete_security_setup() -> Result<()> {
     // 4. Add passwords to important wallets
     let wallets_to_protect = [
         (result.wallet_info.savings_wallet_id, "savings"),
-        (result.wallet_info.ubi_wallet_id, "ubi"),
+        (result.wallet_info.ubi_wallet_id, "ubs"),
     ];
     
     for (wallet_id, name) in wallets_to_protect {

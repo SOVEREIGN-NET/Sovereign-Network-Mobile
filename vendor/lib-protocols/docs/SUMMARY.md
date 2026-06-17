@@ -110,7 +110,7 @@ All documentation for `lib-protocols` has been fully analyzed, documented, and o
 - **ZDNS v1.0**: Censorship-resistant DNS
 - **Post-Quantum Security**: CRYSTALS-Dilithium, CRYSTALS-Kyber
 - **Zero-Knowledge Proofs**: Privacy-preserving validation
-- **Economic Incentives**: 2% DAO fees for UBI
+- **Economic Incentives**: 2% DAO fees for UBS
 - ****: Mesh networking capability
 
 ### Technical Features

@@ -14,7 +14,7 @@ ZHTP Economics enables the transition from Web3 to Web4 by creating economic inc
 
 - **ISP Replacement**: Participants earn tokens for sharing internet connectivity
 - **Mesh Networking**: Rewards for packet routing and network infrastructure
-- **Universal Basic Income**: 2% of all network activity funds UBI for all verified humans
+- **Universal Basic Services**: 2% of all network activity funds UBS for all verified humans
 - ** DAO Governance**: Community-driven economic policy and welfare distribution
 - ** Quantum-Safe Finance**: Post-quantum cryptographic economic primitives
 
@@ -26,7 +26,7 @@ ZHTP Economics enables the transition from Web3 to Web4 by creating economic inc
 ├─────────────────────────────────────────────────────────────────┤
 │  Economic Model    │  Treasury      │  Incentives   │  Wallets   │
 │  ┌─────────────┐   │  ┌──────────┐  │  ┌─────────┐  │ ┌────────┐ │
-│  │ Fee Calc    │   │  │ UBI Dist │  │  │ ISP     │  │ │ Multi  │ │
+│  │ Fee Calc    │   │  │ UBS Dist │  │  │ ISP     │  │ │ Multi  │ │
 │  │ Rewards     │   │  │ Welfare  │  │  │ Bypass  │  │ │ Wallet │ │
 │  │ Supply Mgmt │   │  │ DAO Fees │  │  │ Mesh    │  │ │ System │ │
 │  └─────────────┘   │  └──────────┘  │  └─────────┘  │ └────────┘ │
@@ -56,9 +56,9 @@ ISP Traditional Revenue → ZHTP Token Rewards
 └── Infrastructure → Quality bonuses (up to 50% multiplier)
 ```
 
-### **Universal Basic Income Integration**
-- **Mandatory DAO Fee**: 2% of all transactions fund UBI and welfare
-- **Automatic Distribution**: 60% to UBI, 40% to welfare services
+### **Universal Basic Services Integration**
+- **Mandatory DAO Fee**: 2% of all transactions fund UBS and welfare
+- **Automatic Distribution**: 60% to UBS, 40% to welfare services
 - **Human Verification**: Integration with ZHTP Identity system for citizen verification
 - **Sustainable Funding**: Network growth directly funds social services
 
@@ -130,7 +130,7 @@ pub fn calculate_fee(tx_size: u64, amount: u64, priority: Priority) -> (u64, u64
     // Network infrastructure fee (covers bandwidth, storage, compute)
     let network_fee = tx_size * priority.fee_multiplier();
     
-    // Mandatory DAO fee for UBI/welfare (2% of transaction amount)
+    // Mandatory DAO fee for UBS/welfare (2% of transaction amount)
     let dao_fee = (amount * 200) / 10_000; // 2.00%
     
     (network_fee, dao_fee, network_fee + dao_fee)
@@ -151,7 +151,7 @@ Economic rewards are calculated based on actual infrastructure contribution:
 ```rust
 pub struct DaoTreasury {
     pub treasury_balance: u64,        // Total available funds
-    pub ubi_allocated: u64,           // 45% allocation to UBI
+    pub ubi_allocated: u64,           // 45% allocation to UBS
     pub sector_dao_allocated: u64,    // 30% allocation to sector DAOs
     pub emergency_allocated: u64,     // 15% allocation to emergency reserves
     pub dev_grants_allocated: u64,    // 10% allocation to dev grants
@@ -161,7 +161,7 @@ pub struct DaoTreasury {
 impl DaoTreasury {
     pub fn apply_fee_distribution(&mut self, dist: DaoFeeDistribution) -> Result<()> {
         self.treasury_balance += dist.total();
-        self.ubi_allocated += dist.ubi;
+        self.ubi_allocated += dist.ubs;
         self.sector_dao_allocated += dist.sector_daos;
         self.emergency_allocated += dist.emergency_reserve;
         self.dev_grants_allocated += dist.dev_grants;
@@ -198,7 +198,7 @@ pub enum WalletType {
     MeshDiscoveryRewards,      // Mesh discovery rewards
     Staking,                   // Infrastructure investment
     Governance,                // DAO voting and governance
-    UbiDistribution,           // UBI receiving
+    UbiDistribution,           // UBS receiving
     Infrastructure,            // Infrastructure provider rewards
     Bridge,                    // Cross-chain operations
     SmartContract,             // Contract interactions
@@ -239,7 +239,7 @@ economic_model.adjust_parameters(&network_stats)?;
 ```rust
 use lib_economy::wasm::IdentityId;
 
-// Verify UBI eligibility through identity system
+// Verify UBS eligibility through identity system
 let verified_citizens = verify_ubi_eligibility(&citizen_identities);
 let ubi_amount = calculate_ubi_amount(&dao_treasury, &verified_citizens)?;
 ```
@@ -270,7 +270,7 @@ fn calculate_quality_bonus(&self, base_reward: u64) -> u64 {
 }
 ```
 
-### **UBI Distribution Formula**
+### **UBS Distribution Formula**
 ```rust
 fn calculate_ubi_per_citizen(&self, citizen_count: u64) -> u64 {
     if citizen_count == 0 { return 0; }
@@ -324,7 +324,7 @@ wasm-pack build --target web --features wasm
 // Core economic parameters
 pub const DEFAULT_DAO_FEE_RATE: u64 = 200;                    // 2.00% DAO fee
 pub const MINIMUM_DAO_FEE: u64 = 5;                           // 5 ZHTP minimum
-pub const UBI_ALLOCATION_PERCENTAGE: u64 = 60;                // 60% to UBI
+pub const UBI_ALLOCATION_PERCENTAGE: u64 = 60;                // 60% to UBS
 pub const WELFARE_ALLOCATION_PERCENTAGE: u64 = 40;            // 40% to welfare
 
 // Infrastructure reward rates
@@ -376,13 +376,13 @@ let monthly_rewards = isp_incentives.calculate_rewards(&bypass_work);
 // Equivalent to traditional ISP profit margins
 ```
 
-### **3. UBI Recipient**
+### **3. UBS Recipient**
 ```rust
-// Check UBI eligibility and amount
+// Check UBS eligibility and amount
 let verified_citizens = vec![citizen_identity_1, citizen_identity_2, /* ... */];
 let ubi_amount = calculate_ubi_amount(&dao_treasury, &verified_citizens)?;
 
-// Monthly UBI distribution
+// Monthly UBS distribution
 let ubi_tx = Transaction::new_ubi_distribution(citizen_wallet, ubi_amount)?;
 // Typical result: 500-2,000 ZHTP tokens per month per citizen
 ```
@@ -393,7 +393,7 @@ let ubi_tx = Transaction::new_ubi_distribution(citizen_wallet, ubi_amount)?;
 - Basic fee and reward system
 - Multi-wallet architecture
 -  economics
-- UBI distribution mechanics
+- UBS distribution mechanics
 
 ### **Phase 2: Advanced Economics (Q4 2025)**
 - 🔲 Dynamic economic parameter adjustment
@@ -410,7 +410,7 @@ let ubi_tx = Transaction::new_ubi_distribution(citizen_wallet, ubi_amount)?;
 ### **Phase 4: Global Scale (Q2 2026)**
 - 🔲 Multi-currency integration
 - 🔲 Central bank digital currency (CBDC) bridges
-- 🔲 Global UBI coordination
+- 🔲 Global UBS coordination
 - 🔲 Economic sovereignty tools
 
 ## **Contributing**
@@ -440,7 +440,7 @@ cargo clippy
 We especially welcome contributions in:
 - Economic modeling and simulation
 - Anti-speculation mechanism design
-- UBI distribution optimization
+- UBS distribution optimization
 - Cross-cultural economic adaptation
 - Economic attack vector analysis
 
@@ -452,7 +452,7 @@ This project is licensed under the MIT License - see the [LICENSE](LICENSE) file
 
 - **Post-Scarcity Economics Theory**: Inspired by abundance economics principles
 - **Mesh Networking Research**: Building on decades of decentralized networking research
-- **Universal Basic Income**: Implementing economic research on UBI sustainability
+- **Universal Basic Services**: Implementing economic research on UBS sustainability
 - **Quantum-Resistant Cryptography**: Leveraging NIST-standardized post-quantum algorithms
 
 ## 📞 **Support**

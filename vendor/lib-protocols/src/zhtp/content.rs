@@ -141,7 +141,7 @@ pub struct EconomicIncentives {
     pub bandwidth_incentive_per_byte: u64,
     /// DAO content governance fee percentage
     pub dao_governance_fee_percentage: f64,
-    /// UBI content contribution percentage
+    /// UBS content contribution percentage
     pub ubi_content_percentage: f64,
 }
 
@@ -271,7 +271,7 @@ pub struct EconomicStats {
     pub incentives_distributed: u64,
     /// Total DAO fees from content
     pub dao_fees: u64,
-    /// Total UBI contributions from content
+    /// Total UBS contributions from content
     pub ubi_contributions: u64,
 }
 
@@ -768,7 +768,7 @@ pub struct EconomicAssessment {
     pub total_fees: u64,
     /// DAO governance fees
     pub dao_fees: u64,
-    /// UBI contribution amount
+    /// UBS contribution amount
     pub ubi_contribution: u64,
 }
 
@@ -811,7 +811,7 @@ impl Default for ContentConfig {
                 replication_incentive_per_replica_per_day: 1000, // 1000 wei per replica per day
                 bandwidth_incentive_per_byte: 5, // 5 wei per byte transferred
                 dao_governance_fee_percentage: 0.02, // 2%
-                ubi_content_percentage: 0.8, // 80% to UBI
+                ubi_content_percentage: 0.8, // 80% to UBS
             },
         }
     }

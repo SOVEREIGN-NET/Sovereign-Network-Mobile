@@ -12,7 +12,7 @@ export interface Wallet {
   address: string;
   balance: number;
   currency: string;
-  type: 'primary' | 'ubi' | 'savings';
+  type: 'primary' | 'ubs' | 'savings';
 }
 
 // Transaction
@@ -24,7 +24,7 @@ export interface Transaction {
   currency: string;
   timestamp: string;
   status: 'confirmed' | 'pending' | 'failed';
-  type: 'send' | 'receive' | 'stake' | 'ubi';
+  type: 'send' | 'receive' | 'stake' | 'ubs';
 }
 
 // DAO Proposal

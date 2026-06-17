@@ -207,12 +207,12 @@ fn create_service_endpoints(
         service_endpoint: format!("{}/credentials/{}", base_url, hex::encode(&identity.id.0)),
     });
     
-    // UBI service endpoint (if citizen)
+    // UBS service endpoint (if citizen)
     if identity.access_level.to_string().contains("Citizen") {
         services.push(ServiceEndpoint {
-            id: format!("{}#ubi", did),
+            id: format!("{}#ubs", did),
             service_type: "ZhtpUBIService".to_string(),
-            service_endpoint: format!("{}/ubi/{}", base_url, hex::encode(&identity.id.0)),
+            service_endpoint: format!("{}/ubs/{}", base_url, hex::encode(&identity.id.0)),
         });
     }
     

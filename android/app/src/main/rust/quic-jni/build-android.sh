@@ -3,6 +3,11 @@
 # This builds the quic-jni JNI wrapper which uses lib-client from The-Sovereign-Network
 # Requires: Rust nightly with Android targets, Android NDK
 #
+# Set ANDROID_NDK_HOME to your NDK installation path, e.g.:
+#   macOS:     export ANDROID_NDK_HOME=$HOME/Library/Android/sdk/ndk/27.1.12297006
+#   Windows:   set ANDROID_NDK_HOME=C:\Users\<USER>\AppData\Local\Android\Sdk\ndk\27.1.12297006
+#   Linux:     export ANDROID_NDK_HOME=$HOME/Android/Sdk/ndk/27.1.12297006
+#
 # lib-client (pulled in via path dep) pins its workspace to nightly in
 # `../../../../../../../The-Sovereign-Network/rust-toolchain.toml` because
 # transitive deps (e.g. plonky2_field via neural-mesh-compression) use
@@ -28,30 +33,63 @@ export PATH="$HOME/.cargo/bin:$PATH"
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 cd "$SCRIPT_DIR"
 
-# Android NDK path
-NDK_HOME="${ANDROID_NDK_HOME:-$HOME/Library/Android/sdk/ndk/27.1.12297006}"
+# Android NDK path — must be set explicitly. We no longer fall back to a
+# hardcoded macOS path. Provide a helpful error if unset.
+NDK_HOME="${ANDROID_NDK_HOME:-}"
+if [[ -z "$NDK_HOME" ]]; then
+    echo "Error: ANDROID_NDK_HOME is not set." >&2
+    echo "Please set it to your NDK installation directory, e.g.:" >&2
+    echo "  macOS:   export ANDROID_NDK_HOME=\$HOME/Library/Android/sdk/ndk/27.1.12297006" >&2
+    echo "  Windows: setx ANDROID_NDK_HOME C:\\Users\\<USER>\\AppData\\Local\\Android\\Sdk\\ndk\\27.1.12297006" >&2
+    echo "  Linux:   export ANDROID_NDK_HOME=\$HOME/Android/Sdk/ndk/27.1.12297006" >&2
+    exit 1
+fi
+
+if [[ ! -d "$NDK_HOME" ]]; then
+    echo "Error: ANDROID_NDK_HOME directory does not exist: $NDK_HOME" >&2
+    exit 1
+fi
+
+# Detect host tag for NDK prebuilt toolchain directory
 HOST_TAG="${ANDROID_NDK_HOST_TAG:-}"
 if [[ -z "$HOST_TAG" ]]; then
-    ARCH="$(uname -m)"
-    if [[ "$ARCH" = "arm64" ]]; then
-        HOST_TAG="darwin-arm64"
-    else
-        HOST_TAG="darwin-x86_64"
-    fi
+    case "$(uname -s)" in
+        Darwin)
+            case "$(uname -m)" in
+                arm64|aarch64) HOST_TAG="darwin-arm64" ;;
+                *)             HOST_TAG="darwin-x86_64" ;;
+            esac
+            ;;
+        Linux)
+            HOST_TAG="linux-x86_64"
+            ;;
+        MINGW*|MSYS*|CYGWIN*)
+            HOST_TAG="windows-x86_64"
+            ;;
+        *)
+            echo "Error: Unknown OS '$(uname -s)' — set ANDROID_NDK_HOST_TAG manually" >&2
+            exit 1
+            ;;
+    esac
 fi
+
 TOOLCHAIN="$NDK_HOME/toolchains/llvm/prebuilt/$HOST_TAG"
 if [[ ! -d "$TOOLCHAIN" ]]; then
-    if [[ -d "$NDK_HOME/toolchains/llvm/prebuilt/darwin-x86_64" ]]; then
-        HOST_TAG="darwin-x86_64"
-    elif [[ -d "$NDK_HOME/toolchains/llvm/prebuilt/darwin-arm64" ]]; then
-        HOST_TAG="darwin-arm64"
-    fi
-    TOOLCHAIN="$NDK_HOME/toolchains/llvm/prebuilt/$HOST_TAG"
+    # Fallback: try common host tags
+    for tag in darwin-x86_64 darwin-arm64 linux-x86_64 windows-x86_64; do
+        if [[ -d "$NDK_HOME/toolchains/llvm/prebuilt/$tag" ]]; then
+            HOST_TAG="$tag"
+            TOOLCHAIN="$NDK_HOME/toolchains/llvm/prebuilt/$tag"
+            echo "  (auto-detected NDK host tag: $tag)"
+            break
+        fi
+    done
 fi
 
 if [[ ! -d "$TOOLCHAIN" ]]; then
-    echo "Error: NDK toolchain not found at $TOOLCHAIN"
-    echo "Set ANDROID_NDK_HOME or NDK_HOME environment variable"
+    echo "Error: NDK toolchain not found at $TOOLCHAIN" >&2
+    echo "Checked ANDROID_NDK_HOME=$NDK_HOME" >&2
+    echo "Set ANDROID_NDK_HOME to the correct NDK installation path" >&2
     exit 1
 fi
 
@@ -67,6 +105,7 @@ TARGETS=(
 
 echo "📱 Building quic-jni for Android"
 echo "   NDK: $NDK_HOME"
+echo "   Host tag: $HOST_TAG"
 echo "   Output: $OUTPUT_DIR"
 echo ""
 
@@ -97,6 +136,13 @@ for target_info in "${TARGETS[@]}"; do
     export CARGO_TARGET_AARCH64_LINUX_ANDROID_LINKER="$TOOLCHAIN/bin/${clang_prefix}${api_level}-clang"
     export CARGO_TARGET_ARMV7_LINUX_ANDROIDEABI_LINKER="$TOOLCHAIN/bin/${clang_prefix}${api_level}-clang"
     export CARGO_TARGET_X86_64_LINUX_ANDROID_LINKER="$TOOLCHAIN/bin/${clang_prefix}${api_level}-clang"
+
+    # Export linker paths for .cargo/config.toml environment variable references.
+    # These match the { env = "NDK_..." } entries in .cargo/config.toml.
+    export NDK_AARCH64_LINKER="$TOOLCHAIN/bin/aarch64-linux-android${api_level}-clang"
+    export NDK_ARMV7_LINKER="$TOOLCHAIN/bin/armv7a-linux-androideabi${api_level}-clang"
+    export NDK_X86_64_LINKER="$TOOLCHAIN/bin/x86_64-linux-android${api_level}-clang"
+    export NDK_I686_LINKER="$TOOLCHAIN/bin/i686-linux-android${api_level}-clang"
 
     # Build quic-jni (which depends on lib-client from node code).
     # Keep the console quiet on success (tail), but on failure dump the

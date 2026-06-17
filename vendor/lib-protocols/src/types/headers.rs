@@ -90,11 +90,11 @@ pub struct ZhtpHeaders {
     // Web4 Economic Extensions
     /// Network operation fee (covers bandwidth, storage, compute)
     pub network_fee: Option<u64>,
-    /// Mandatory DAO fee for Universal Basic Income and welfare (1% of transaction value)
+    /// Mandatory DAO fee for Universal Basic Services and welfare (1% of transaction value)
     pub dao_fee: u64,
     /// Total transaction fees (network_fee + dao_fee)
     pub total_fees: u64,
-    /// DAO fee payment proof (validates UBI contribution)
+    /// DAO fee payment proof (validates UBS contribution)
     pub dao_fee_proof: Option<[u8; 32]>,
     /// Transaction priority for network QoS
     pub priority: Option<Priority>,
@@ -102,7 +102,7 @@ pub struct ZhtpHeaders {
     pub transaction_id: Option<String>,
     /// Fee tier for pricing
     pub fee_tier: Option<String>,
-    /// UBI contribution tracking
+    /// UBS contribution tracking
     pub ubi_contribution: Option<u64>,
     /// Economic validation proof
     pub economic_proof: Option<Vec<u8>>,

@@ -21,7 +21,7 @@ import {
   TouchableOpacity,
   View,
 } from 'react-native';
-import { ScreenLayout } from '../../components';
+import { ArrowIcon, ScreenLayout } from '../../components';
 import { borderRadius, colors, spacing, typography } from '../../theme';
 import {
   getContacts,
@@ -123,9 +123,25 @@ const NewChatScreen: React.FC<Props> = ({ navigation }) => {
       paddingTop={spacing.md}
       paddingHorizontal={0}
       safeAreaEdges={['top', 'bottom']}
-      onBack={() => navigation.goBack()}
-      backLabel="Messages"
     >
+      <Pressable
+        onPress={() => navigation.goBack()}
+        hitSlop={12}
+        style={{
+          flexDirection: 'row',
+          alignItems: 'center',
+          gap: spacing.xs,
+          paddingHorizontal: spacing.lg,
+          paddingBottom: spacing.sm,
+        }}
+        accessibilityRole="button"
+        accessibilityLabel="Messages"
+      >
+        <ArrowIcon direction="left" size={18} color={colors.primary} />
+        <Text style={{ color: colors.primary, fontSize: typography.size.md, fontWeight: typography.weight.medium }}>
+          Messages
+        </Text>
+      </Pressable>
       <View style={styles.header}>
         <Text style={styles.title}>New message</Text>
         <Text style={styles.subtitle}>
@@ -191,7 +207,7 @@ const NewChatScreen: React.FC<Props> = ({ navigation }) => {
                 @{contact.username}
               </Text>
             </View>
-            <Text style={styles.rowChevron}>›</Text>
+            <ArrowIcon direction="right" size={16} color={colors.text_tertiary} />
           </Pressable>
         ))
       )}
@@ -321,10 +337,6 @@ const styles = StyleSheet.create({
     fontSize: typography.size.sm,
     color: colors.text_secondary,
     marginTop: 2,
-  },
-  rowChevron: {
-    color: colors.text_tertiary,
-    fontSize: typography.size.xl,
   },
   empty: {
     paddingHorizontal: spacing.xl,
