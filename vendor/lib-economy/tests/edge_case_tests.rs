@@ -111,7 +111,7 @@ mod edge_case_tests {
             .unwrap();
         assert_eq!(treasury.treasury_balance, max_fees);
         
-        // Test UBS calculation with zero citizens
+        // Test UBI calculation with zero citizens
         let ubi_per_citizen = treasury.calculate_ubi_per_citizen(0);
         assert_eq!(ubi_per_citizen, 0); // Should handle division by zero
         

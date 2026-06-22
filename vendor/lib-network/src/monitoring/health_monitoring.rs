@@ -127,7 +127,7 @@ impl HealthMonitor {
                 network_stats.people_with_free_internet = 
                     (network_stats.coverage_area_km2 * 100.0) as u32;
                 
-                // Calculate total UBS distributed through mesh networking (Ticket #149: using peer_registry)
+                // Calculate total UBI distributed through mesh networking (Ticket #149: using peer_registry)
                 let registry_read = registry.all_peers().collect::<Vec<_>>();
                 network_stats.total_ubi_distributed = registry_read.iter()
                     .map(|entry| entry.get_data_transferred())
@@ -141,7 +141,7 @@ impl HealthMonitor {
                 info!("   Average latency: {} ms", network_stats.average_latency_ms);
                 info!("   Coverage area: {:.0} km²", network_stats.coverage_area_km2);
                 info!("   People with free internet: {}", network_stats.people_with_free_internet);
-                info!("   UBS distributed: {} tokens", network_stats.total_ubi_distributed);
+                info!("   UBI distributed: {} tokens", network_stats.total_ubi_distributed);
             }
         });
         

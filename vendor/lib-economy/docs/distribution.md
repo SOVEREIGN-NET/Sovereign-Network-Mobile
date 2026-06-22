@@ -11,7 +11,7 @@ The distribution module is currently a **stub** with only placeholder implementa
 ```
 distribution/
 ├── mod.rs                - Module organization
-└── ubi_distribution.rs   - UBS distribution (STUB - 3 lines only)
+└── ubi_distribution.rs   - UBI distribution (STUB - 3 lines only)
 ```
 
 ## Current Implementation
@@ -28,12 +28,12 @@ pub fn distribute_ubi_to_citizens() -> anyhow::Result<()> {
 
 ## What Exists Elsewhere
 
-###  UBS Calculation (Fully Implemented)
+###  UBI Calculation (Fully Implemented)
 
 **Location:** `treasury_economics/treasury_calculations.rs`
 
 ```rust
-// Calculate optimal UBS amount per citizen
+// Calculate optimal UBI amount per citizen
 pub fn calculate_optimal_ubi_per_citizen(
     treasury: &DaoTreasury,
     total_citizens: u64,
@@ -52,7 +52,7 @@ impl DaoTreasury {
 }
 ```
 
-###  UBS Transaction Type (Fully Implemented)
+###  UBI Transaction Type (Fully Implemented)
 
 **Location:** `transactions/transaction.rs`
 
@@ -62,9 +62,9 @@ impl Transaction {
 }
 ```
 
-## Workaround: Manual UBS Distribution
+## Workaround: Manual UBI Distribution
 
-Until the stub is fully implemented, UBS can be distributed manually:
+Until the stub is fully implemented, UBI can be distributed manually:
 
 ```rust
 use lib_economy::{DaoTreasury, Transaction};
@@ -73,14 +73,14 @@ fn manual_ubi_distribution(
     treasury: &mut DaoTreasury,
     citizens: Vec<[u8; 32]>,
 ) -> anyhow::Result<()> {
-    // 1. Calculate UBS per citizen
+    // 1. Calculate UBI per citizen
     let ubi_amount = treasury.calculate_ubi_per_citizen(citizens.len() as u64);
     
     println!("Distributing {} ZHTP to {} citizens", ubi_amount, citizens.len());
     
-    // 2. Create and process UBS transaction for each citizen
+    // 2. Create and process UBI transaction for each citizen
     for citizen_address in citizens {
-        // Create fee-free UBS transaction
+        // Create fee-free UBI transaction
         let tx = Transaction::new_ubi_distribution(citizen_address, ubi_amount)?;
         
         // Record distribution in treasury
@@ -95,7 +95,7 @@ fn manual_ubi_distribution(
         );
     }
     
-    println!(" UBS distribution complete");
+    println!(" UBI distribution complete");
     Ok(())
 }
 ```
@@ -164,13 +164,13 @@ pub async fn distribute_ubi_to_citizens(
     // 1. Get list of eligible citizens
     let eligible_citizens = citizen_registry.get_eligible_citizens()?;
     
-    // 2. Calculate UBS amount
+    // 2. Calculate UBI amount
     let ubi_amount = treasury.calculate_ubi_per_citizen(eligible_citizens.len() as u64);
     
     // 3. Validate sufficient treasury funds
     let required_total = ubi_amount * eligible_citizens.len() as u64;
     if treasury.ubi_allocated < required_total {
-        return Err(anyhow::anyhow!("Insufficient UBS funds"));
+        return Err(anyhow::anyhow!("Insufficient UBI funds"));
     }
     
     // 4. Distribute to each citizen
@@ -184,7 +184,7 @@ pub async fn distribute_ubi_to_citizens(
             continue;
         }
         
-        // Create UBS transaction
+        // Create UBI transaction
         let tx = Transaction::new_ubi_distribution(
             citizen.identity_address,
             ubi_amount,
@@ -254,9 +254,9 @@ pub struct DistributionHistory {
 ## Impact of Stub Status
 
 ### What Works 
-- UBS calculation (fully functional)
+- UBI calculation (fully functional)
 - Treasury fund allocation (fully functional)
-- UBS transaction creation (fully functional)
+- UBI transaction creation (fully functional)
 - Manual distribution possible (workaround provided)
 
 ### What's Missing 
@@ -267,21 +267,21 @@ pub struct DistributionHistory {
 - Distribution history tracking
 
 ### Severity
-**Minor** - Core UBS economics work perfectly. Only automation and convenience features are missing. Manual distribution using existing functions is a viable workaround.
+**Minor** - Core UBI economics work perfectly. Only automation and convenience features are missing. Manual distribution using existing functions is a viable workaround.
 
 ## Temporary Solution
 
 Until full implementation, use the manual distribution pattern:
 
 ```rust
-// Monthly UBS distribution process
+// Monthly UBI distribution process
 fn monthly_ubi_process(
     treasury: &mut DaoTreasury,
     verified_citizens: Vec<[u8; 32]>,
 ) -> anyhow::Result<()> {
     let ubi_amount = treasury.calculate_ubi_per_citizen(verified_citizens.len() as u64);
     
-    println!("=== Monthly UBS Distribution ===");
+    println!("=== Monthly UBI Distribution ===");
     println!("Citizens: {}", verified_citizens.len());
     println!("Amount per citizen: {} ZHTP", ubi_amount);
     
@@ -298,8 +298,8 @@ fn monthly_ubi_process(
 
 ## Related Documentation
 
-- [Treasury Economics](./treasury_economics.md) - UBS calculation functions
-- [Transactions](./transactions.md) - UBS transaction creation
+- [Treasury Economics](./treasury_economics.md) - UBI calculation functions
+- [Transactions](./transactions.md) - UBI transaction creation
 - [Models](./models.md) - DaoTreasury implementation
 - [IMPLEMENTATION_STATUS](./IMPLEMENTATION_STATUS.md) - Overall status
 

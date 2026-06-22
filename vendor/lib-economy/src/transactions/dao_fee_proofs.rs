@@ -21,7 +21,7 @@ pub fn verify_dao_fee_proof(
     proof == &expected_proof
 }
 
-/// Generate UBS transparency proof
+/// Generate UBI transparency proof
 pub fn generate_ubi_transparency_proof(
     total_dao_fees: u64,
     ubi_distributed: u64,
@@ -32,7 +32,7 @@ pub fn generate_ubi_transparency_proof(
     hash_blake3(proof_data.as_bytes())
 }
 
-/// Verify UBS distribution transparency
+/// Verify UBI distribution transparency
 pub fn verify_ubi_distribution_proof(
     proof: &[u8; 32],
     total_dao_fees: u64,

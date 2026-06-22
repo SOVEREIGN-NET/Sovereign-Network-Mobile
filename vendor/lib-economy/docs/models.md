@@ -300,7 +300,7 @@ reward1.combine(&reward2);
 
 Manage DAO treasury operations including:
 - Receiving DAO fees from transactions
-- Allocating funds (40% UBS, 30% welfare, 30% development)
+- Allocating funds (40% UBI, 30% welfare, 30% development)
 - Tracking distributions
 - Calculating sustainability metrics
 
@@ -309,11 +309,11 @@ Manage DAO treasury operations including:
 ```rust
 pub struct DaoTreasury {
     pub treasury_balance: u64,              // Current balance
-    pub ubi_allocated: u64,                 // Allocated for UBS
+    pub ubi_allocated: u64,                 // Allocated for UBI
     pub welfare_allocated: u64,             // Allocated for welfare
     pub development_allocated: u64,         // Allocated for development
     pub total_dao_fees_collected: u64,      // Total fees collected
-    pub total_ubi_distributed: u64,         // Total UBS distributed
+    pub total_ubi_distributed: u64,         // Total UBI distributed
     pub total_welfare_distributed: u64,     // Total welfare distributed
     pub total_development_spent: u64,       // Total development spent
 }
@@ -347,7 +347,7 @@ treasury.receive_dao_fee(200)?;
 Allocate received fees according to allocation percentages.
 
 **Allocation:**
-- 40% to UBS
+- 40% to UBI
 - 30% to Welfare
 - 30% to Development
 
@@ -363,18 +363,18 @@ treasury.allocate_funds()?;
 
 #### `calculate_ubi_per_citizen(&self, total_citizens: u64) -> u64`
 
-Calculate UBS amount per citizen.
+Calculate UBI amount per citizen.
 
 ```rust
 let treasury = DaoTreasury::new();
 // ... receive and allocate fees ...
-let ubs = treasury.calculate_ubi_per_citizen(1000);
-// If ubi_allocated = 10000, ubs = 10 ZHTP per citizen
+let ubi = treasury.calculate_ubi_per_citizen(1000);
+// If ubi_allocated = 10000, ubi = 10 ZHTP per citizen
 ```
 
 #### `distribute_ubi(&mut self, amount: u64) -> Result<()>`
 
-Record UBS distribution.
+Record UBI distribution.
 
 ```rust
 treasury.distribute_ubi(1000)?;

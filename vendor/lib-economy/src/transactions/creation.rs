@@ -24,7 +24,7 @@ pub fn create_reward_transaction(recipient: [u8; 32], amount: u64) -> Result<Tra
     Transaction::new_reward(recipient, amount)
 }
 
-/// Create multiple UBS distribution transactions
+/// Create multiple UBI distribution transactions
 pub fn create_ubi_distributions(citizens: &[(IdentityId, u64)]) -> Result<Vec<Transaction>> {
     let mut distributions = Vec::new();
     

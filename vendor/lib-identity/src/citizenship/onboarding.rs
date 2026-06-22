@@ -14,7 +14,7 @@ pub struct CitizenshipResult {
     pub identity_id: IdentityId,
     /// Primary wallet for daily transactions
     pub primary_wallet_id: WalletId,
-    /// UBS wallet for automatic Universal Basic Services payouts
+    /// UBI wallet for automatic Universal Basic Income payouts
     pub ubi_wallet_id: WalletId,
     /// Savings wallet for long-term storage
     pub savings_wallet_id: WalletId,
@@ -22,7 +22,7 @@ pub struct CitizenshipResult {
     pub wallet_seed_phrases: WalletSeedPhrases,
     /// DAO governance registration
     pub dao_registration: DaoRegistration,
-    /// UBS payout registration
+    /// UBI payout registration
     pub ubi_registration: UbiRegistration,
     /// Web4 service access grants
     pub web4_access: Web4Access,
@@ -37,7 +37,7 @@ pub struct CitizenshipResult {
 pub struct WalletSeedPhrases {
     /// Primary wallet 20-word seed phrase
     pub primary_wallet_seeds: crate::recovery::RecoveryPhrase,
-    /// UBS wallet 20-word seed phrase
+    /// UBI wallet 20-word seed phrase
     pub ubi_wallet_seeds: crate::recovery::RecoveryPhrase,
     /// Savings wallet 20-word seed phrase
     pub savings_wallet_seeds: crate::recovery::RecoveryPhrase,
@@ -88,7 +88,7 @@ impl CitizenshipResult {
     pub fn get_benefits_summary(&self) -> CitizenBenefitsSummary {
         CitizenBenefitsSummary {
             identity_id: self.identity_id.clone(),
-            wallet_count: 3, // Primary, UBS, Savings
+            wallet_count: 3, // Primary, UBI, Savings
             monthly_ubi_amount: self.ubi_registration.monthly_amount,
             daily_ubi_amount: self.ubi_registration.daily_amount,
             welcome_bonus_amount: self.welcome_bonus.bonus_amount,

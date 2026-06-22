@@ -238,7 +238,7 @@ pub struct ZhtpMeshServer {
     /// Long-range relay nodes (LoRaWAN gateways, satellite uplinks)
     pub long_range_relays: Arc<RwLock<HashMap<String, LongRangeRelay>>>,
 
-    /// Revenue sharing pools for UBS distribution
+    /// Revenue sharing pools for UBI distribution
     pub revenue_pools: Arc<RwLock<HashMap<String, u64>>>,
     /// Mesh protocol statistics
     pub stats: Arc<RwLock<MeshProtocolStats>>,
@@ -971,7 +971,7 @@ impl ZhtpMeshServer {
         let revenue_pools = Arc::new(RwLock::new(HashMap::new()));
         let stats = Arc::new(RwLock::new(MeshProtocolStats::default()));
 
-        // Create participant tracking for UBS
+        // Create participant tracking for UBI
         let ubi_participants = Arc::new(RwLock::new(HashMap::<String, String>::new()));
 
         // Initialize health monitor (Ticket #149: update to use peer_registry)
@@ -1345,7 +1345,7 @@ impl ZhtpMeshServer {
         self.stats.read().await.clone()
     }
     
-    /// Get revenue pools (for UBS distribution)
+    /// Get revenue pools (for UBI distribution)
     pub async fn get_revenue_pools(&self) -> HashMap<String, u64> {
         self.revenue_pools.read().await.clone()
     }

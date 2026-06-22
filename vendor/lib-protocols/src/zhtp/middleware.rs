@@ -69,7 +69,7 @@ pub struct MiddlewareContext {
 pub struct EconomicValidationResult {
     /// DAO fee amount
     pub dao_fee: u64,
-    /// UBS allocation
+    /// UBI allocation
     pub ubi_allocation: u64,
     /// Payment method
     pub payment_method: String,
@@ -140,7 +140,7 @@ impl CorsMiddleware {
             ],
             exposed_headers: vec![
                 "X-DAO-Fee-Collected".to_string(),
-                "X-UBS-Distributed".to_string(),
+                "X-UBI-Distributed".to_string(),
                 "X-Economic-Impact".to_string(),
                 "X-Mesh-Route".to_string(),
             ],
@@ -375,7 +375,7 @@ pub struct EconomicMiddleware {
     min_dao_fee: u64,
     /// DAO fee percentage
     dao_fee_percentage: f64,
-    /// UBS distribution percentage
+    /// UBI distribution percentage
     ubi_percentage: f64,
     /// Economic validation enabled
     enabled: bool,
@@ -423,7 +423,7 @@ impl ZhtpMiddleware for EconomicMiddleware {
             ));
         }
         
-        // Calculate UBS allocation
+        // Calculate UBI allocation
         let ubi_allocation = (dao_fee as f64 * self.ubi_percentage) as u64;
         
         // Calculate economic impact score
@@ -431,11 +431,11 @@ impl ZhtpMiddleware for EconomicMiddleware {
         
         // Add economic context to request
         request.headers.set("X-Required-DAO-Fee", required_fee.to_string());
-        request.headers.set("X-UBS-Allocation", ubi_allocation.to_string());
+        request.headers.set("X-UBI-Allocation", ubi_allocation.to_string());
         request.headers.set("X-Economic-Impact", impact_score.to_string());
         request.headers.set("X-Economic-Validated", "true".to_string());
         
-        tracing::info!("Economic validation: fee={} wei, UBS={} wei, impact={}",
+        tracing::info!("Economic validation: fee={} wei, UBI={} wei, impact={}",
                       dao_fee, ubi_allocation, impact_score);
         
         Ok(())
@@ -453,7 +453,7 @@ impl ZhtpMiddleware for EconomicMiddleware {
         );
         
         response.headers.set(
-            "X-UBS-System",
+            "X-UBI-System",
             "enabled".to_string(),
         );
         

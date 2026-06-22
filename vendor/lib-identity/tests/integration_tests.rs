@@ -37,7 +37,7 @@ async fn test_complete_citizen_onboarding_flow() {
     assert!(citizenship_result.dao_registration.voting_eligibility);
     assert!(citizenship_result.dao_registration.proposal_eligibility);
     
-    // Verify UBS registration
+    // Verify UBI registration
     assert_eq!(citizenship_result.ubi_registration.monthly_amount, 1000);
     assert!(citizenship_result.ubi_registration.daily_amount > 0);
     
@@ -253,10 +253,10 @@ async fn test_wallet_integration() {
     ).await.expect("Failed to create primary wallet");
 
     let (ubi_wallet, _seed2) = wallet_manager.create_wallet_with_seed_phrase(
-        WalletType::UBS,
-        "UBS Wallet".to_string(),
-        Some("ubs".to_string()),
-    ).await.expect("Failed to create UBS wallet");
+        WalletType::UBI,
+        "UBI Wallet".to_string(),
+        Some("ubi".to_string()),
+    ).await.expect("Failed to create UBI wallet");
 
     let (savings_wallet, _seed3) = wallet_manager.create_wallet_with_seed_phrase(
         WalletType::Savings,
@@ -267,7 +267,7 @@ async fn test_wallet_integration() {
     // Test wallet retrieval
     assert!(wallet_manager.get_wallet(&primary_wallet).is_some());
     assert!(wallet_manager.get_wallet_by_alias("primary").is_some());
-    assert!(wallet_manager.get_wallet_by_alias("ubs").is_some());
+    assert!(wallet_manager.get_wallet_by_alias("ubi").is_some());
     assert!(wallet_manager.get_wallet_by_alias("savings").is_some());
     
     // Test wallet listing
@@ -282,7 +282,7 @@ async fn test_wallet_integration() {
     let primary_wallets = wallet_manager.get_wallets_by_type(&WalletType::Primary);
     assert_eq!(primary_wallets.len(), 1);
     
-    let ubi_wallets = wallet_manager.get_wallets_by_type(&WalletType::UBS);
+    let ubi_wallets = wallet_manager.get_wallets_by_type(&WalletType::UBI);
     assert_eq!(ubi_wallets.len(), 1);
     
     println!("Wallet integration test passed!");

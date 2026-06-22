@@ -35,11 +35,11 @@
 - ✅ Wallet balance display
 - ✅ Wallet address with truncation
 - ✅ Transaction history with sorting
-- ✅ Transaction type icons (send, receive, stake, UBS)
+- ✅ Transaction type icons (send, receive, stake, UBI)
 - ✅ Transaction status indicators
 - ⚠️ "Send ZHTP" button exists but **NOT FUNCTIONAL**
 - ⚠️ "Receive ZHTP" button exists but **NOT FUNCTIONAL**
-- ⚠️ "Claim UBS" button exists but **NOT FUNCTIONAL**
+- ⚠️ "Claim UBI" button exists but **NOT FUNCTIONAL**
 - ⚠️ "Stake ZHTP" button exists but **NOT FUNCTIONAL**
 
 #### Identity Screen (ZK-DID Management)
@@ -58,7 +58,7 @@
 - ✅ Mesh health visualization with progress bar
 - ✅ DAO statistics grid (members, proposals, treasury)
 - ⚠️ "Send ZHTP" button exists but **NOT FUNCTIONAL**
-- ⚠️ "Claim UBS" button exists but **NOT FUNCTIONAL**
+- ⚠️ "Claim UBI" button exists but **NOT FUNCTIONAL**
 - ⚠️ "Vote on Proposal" button exists but **NOT FUNCTIONAL**
 - ⚠️ "Create Proposal" button exists but **NOT FUNCTIONAL**
 

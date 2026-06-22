@@ -1,6 +1,6 @@
 //! Automated payout system for recurring distributions
 //! 
-//! Handles scheduled UBS distributions, infrastructure rewards,
+//! Handles scheduled UBI distributions, infrastructure rewards,
 //! and other automated economic operations.
 
 use anyhow::Result;
@@ -66,19 +66,19 @@ impl PayoutSchedule {
     }
 }
 
-/// Automated UBS distribution system
+/// Automated UBI distribution system
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct AutomatedUBI {
-    /// UBS payout schedule
+    /// UBI payout schedule
     pub schedule: PayoutSchedule,
-    /// Registered UBS recipients
+    /// Registered UBI recipients
     pub recipients: HashMap<String, [u8; 32]>, // citizen_id -> wallet_address
-    /// UBS amount per recipient
+    /// UBI amount per recipient
     pub ubi_per_recipient: u64,
 }
 
 impl AutomatedUBI {
-    /// Create new automated UBS system
+    /// Create new automated UBI system
     pub fn new(monthly_ubi_amount: u64) -> Self {
         let monthly_frequency = 30 * 24 * 3600; // 30 days in seconds
         
@@ -89,12 +89,12 @@ impl AutomatedUBI {
         }
     }
     
-    /// Register UBS recipient
+    /// Register UBI recipient
     pub fn register_recipient(&mut self, citizen_id: String, wallet_address: [u8; 32]) -> Result<()> {
         self.recipients.insert(citizen_id.clone(), wallet_address);
         
         info!(
-            "Registered UBS recipient: {} -> {}",
+            "Registered UBI recipient: {} -> {}",
             citizen_id,
             hex::encode(wallet_address)
         );
@@ -102,7 +102,7 @@ impl AutomatedUBI {
         Ok(())
     }
     
-    /// Process UBS distribution with state synchronization to registrations.
+    /// Process UBI distribution with state synchronization to registrations.
     ///
     /// # Thread safety
     ///
@@ -130,14 +130,14 @@ impl AutomatedUBI {
         let ubi_per_citizen = treasury.calculate_ubi_per_citizen(total_recipients);
 
         if ubi_per_citizen == 0 {
-            info!("No UBS funds available for distribution");
+            info!("No UBI funds available for distribution");
             return Ok(0);
         }
 
         let total_distribution = match ubi_per_citizen.checked_mul(total_recipients) {
             Some(amount) => amount,
             None => {
-                info!("UBS distribution overflow: ubi_per_citizen ({}) * recipients ({}) exceeds u64::MAX", ubi_per_citizen, total_recipients);
+                info!("UBI distribution overflow: ubi_per_citizen ({}) * recipients ({}) exceeds u64::MAX", ubi_per_citizen, total_recipients);
                 return Ok(0);
             }
         };
@@ -162,7 +162,7 @@ impl AutomatedUBI {
                     // Log warning if registration is missing - indicates data inconsistency
                     // This suggests the citizen is in the recipients list but not in registrations
                     info!(
-                        "WARN: Registration not found for citizen {} (wallet: {}) during UBS distribution at block {}. \
+                        "WARN: Registration not found for citizen {} (wallet: {}) during UBI distribution at block {}. \
                         Data inconsistency detected between recipients list and registrations.",
                         citizen_id,
                         hex::encode(wallet_address),
@@ -178,7 +178,7 @@ impl AutomatedUBI {
                 }
 
                 info!(
-                    "Distributed {} ZHTP UBS to citizen {} (wallet: {}) at block {}",
+                    "Distributed {} ZHTP UBI to citizen {} (wallet: {}) at block {}",
                     ubi_per_citizen,
                     citizen_id,
                     hex::encode(wallet_address),
@@ -192,14 +192,14 @@ impl AutomatedUBI {
         self.schedule.process_payout()?;
         
         info!(
-            "Completed UBS distribution: {} ZHTP to {} recipients",
+            "Completed UBI distribution: {} ZHTP to {} recipients",
             total_distribution, successful_distributions
         );
         
         Ok(total_distribution)
     }
     
-    /// Get UBS statistics
+    /// Get UBI statistics
     pub fn get_ubi_stats(&self) -> serde_json::Value {
         serde_json::json!({
             "total_recipients": self.recipients.len(),
@@ -310,7 +310,7 @@ impl AutomatedInfrastructureRewards {
 /// Main automated payout processor
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct AutomatedPayoutProcessor {
-    /// UBS distribution system
+    /// UBI distribution system
     pub ubi_system: AutomatedUBI,
     /// Infrastructure rewards system
     pub infrastructure_system: AutomatedInfrastructureRewards,
@@ -361,7 +361,7 @@ pub fn process_automated_payouts(
 
     if ubi_distributed > 0 || infrastructure_distributed > 0 {
         info!(
-            " Automated payouts completed: {} UBS + {} infrastructure = {} total ZHTP at block {}",
+            " Automated payouts completed: {} UBI + {} infrastructure = {} total ZHTP at block {}",
             ubi_distributed, infrastructure_distributed, ubi_distributed + infrastructure_distributed, current_block
         );
     }
@@ -371,6 +371,6 @@ pub fn process_automated_payouts(
 
 impl Default for AutomatedPayoutProcessor {
     fn default() -> Self {
-        Self::new(1000, 10000) // Default: 1000 ZHTP monthly UBS, 10000 ZHTP daily infrastructure
+        Self::new(1000, 10000) // Default: 1000 ZHTP monthly UBI, 10000 ZHTP daily infrastructure
     }
 }

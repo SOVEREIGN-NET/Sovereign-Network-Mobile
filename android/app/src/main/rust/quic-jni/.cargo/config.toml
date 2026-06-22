@@ -1,14 +1,5 @@
 # Android NDK cross-compilation configuration
-# Uses NDK 27.1 toolchain — paths are set via environment variables.
-#
-# IMPORTANT: The linker paths are configured by build-android.sh at runtime.
-# Set ANDROID_NDK_HOME to your NDK installation path, e.g.:
-#   macOS:     export ANDROID_NDK_HOME=$HOME/Library/Android/sdk/ndk/27.1.12297006
-#   Windows:   set ANDROID_NDK_HOME=C:\Users\<USER>\AppData\Local\Android\Sdk\ndk\27.1.12297006
-#   Linux:     export ANDROID_NDK_HOME=$HOME/Android/Sdk/ndk/27.1.12297006
-#
-# The linker executables below use the $NDK_TOOLCHAIN_BIN env variable
-# which is set by build-android.sh before invoking cargo.
+# Uses NDK 27.1 toolchain
 
 # Each target adds the linker flag `-Wl,-z,max-page-size=16384` so the
 # resulting .so segments are aligned to 16 KB instead of 4 KB. Android
@@ -19,17 +10,17 @@
 # fine), so it's the right default for every Android target.
 
 [target.aarch64-linux-android]
-linker = { env = "NDK_AARCH64_LINKER", error = "NDK_AARCH64_LINKER not set — run build-android.sh" }
+linker = "/Users/supertramp/Library/Android/sdk/ndk/27.1.12297006/toolchains/llvm/prebuilt/darwin-x86_64/bin/aarch64-linux-android24-clang"
 rustflags = ["-C", "link-arg=-Wl,-z,max-page-size=16384"]
 
 [target.armv7-linux-androideabi]
-linker = { env = "NDK_ARMV7_LINKER", error = "NDK_ARMV7_LINKER not set — run build-android.sh" }
+linker = "/Users/supertramp/Library/Android/sdk/ndk/27.1.12297006/toolchains/llvm/prebuilt/darwin-x86_64/bin/armv7a-linux-androideabi24-clang"
 rustflags = ["-C", "link-arg=-Wl,-z,max-page-size=16384"]
 
 [target.x86_64-linux-android]
-linker = { env = "NDK_X86_64_LINKER", error = "NDK_X86_64_LINKER not set — run build-android.sh" }
+linker = "/Users/supertramp/Library/Android/sdk/ndk/27.1.12297006/toolchains/llvm/prebuilt/darwin-x86_64/bin/x86_64-linux-android24-clang"
 rustflags = ["-C", "link-arg=-Wl,-z,max-page-size=16384"]
 
 [target.i686-linux-android]
-linker = { env = "NDK_I686_LINKER", error = "NDK_I686_LINKER not set — run build-android.sh" }
+linker = "/Users/supertramp/Library/Android/sdk/ndk/27.1.12297006/toolchains/llvm/prebuilt/darwin-x86_64/bin/i686-linux-android24-clang"
 rustflags = ["-C", "link-arg=-Wl,-z,max-page-size=16384"]

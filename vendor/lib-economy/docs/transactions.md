@@ -43,7 +43,7 @@ pub struct Transaction {
 pub enum TransactionType {
     Payment,                    // Regular payment (with fees)
     Reward,                     // Infrastructure reward (fee-free)
-    UbiDistribution,           // UBS payment (fee-free)
+    UbiDistribution,           // UBI payment (fee-free)
     WelfareDistribution,       // Welfare payment (fee-free)
     Staking,                   // Network staking (with fees)
     InfrastructureService,     // Service payment (with fees)
@@ -99,13 +99,13 @@ assert_eq!(tx.dao_fee, 0);
 assert_eq!(tx.total_fee, 0);
 ```
 
-### UBS Distribution
+### UBI Distribution
 
 ```rust
-// Create UBS distribution (fee-free)
+// Create UBI distribution (fee-free)
 let tx = Transaction::new_ubi_distribution(
     citizen_address,
-    1000,  // 1000 ZHTP UBS
+    1000,  // 1000 ZHTP UBI
 )?;
 
 assert_eq!(tx.tx_type, TransactionType::UbiDistribution);

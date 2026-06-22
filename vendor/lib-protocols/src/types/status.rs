@@ -89,7 +89,7 @@ pub enum ZhtpStatus {
     DaoFeeProofInvalid = 702,
     /// Economic validation failed
     EconomicValidationFailed = 703,
-    /// UBS funding requirements not met
+    /// UBI funding requirements not met
     UbiFundingRequired = 704,
     /// Network fee insufficient
     NetworkFeeInsufficient = 705,
@@ -178,7 +178,7 @@ impl ZhtpStatus {
             ZhtpStatus::DaoFeeInsufficient => "DAO Fee Insufficient",
             ZhtpStatus::DaoFeeProofInvalid => "DAO Fee Proof Invalid",
             ZhtpStatus::EconomicValidationFailed => "Economic Validation Failed",
-            ZhtpStatus::UbiFundingRequired => "UBS Funding Requirements Not Met",
+            ZhtpStatus::UbiFundingRequired => "UBI Funding Requirements Not Met",
             ZhtpStatus::NetworkFeeInsufficient => "Network Fee Insufficient",
 
             // 8xx Web4 Mesh Network Errors

@@ -35,7 +35,7 @@ src/
 - SendTokensScreen (Wallet → Send)
 - ReceiveTokensScreen (Wallet → Receive)
 - StakeTokensScreen (Wallet → Stake)
-- ClaimUBIScreen (Dashboard → Claim UBS)
+- ClaimUBIScreen (Dashboard → Claim UBI)
 - ProposalDetailScreen (DAO → Vote on Proposal)
 
 ## Component Architecture

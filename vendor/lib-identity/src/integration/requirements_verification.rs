@@ -279,7 +279,7 @@ impl RequirementsVerifier {
         requirements.insert("citizenship_verification".to_string(), VerificationRequirement {
             requirement_id: "citizenship_verification".to_string(),
             name: "Citizenship Verification".to_string(),
-            description: "Verify citizen status for UBS and DAO participation".to_string(),
+            description: "Verify citizen status for UBI and DAO participation".to_string(),
             required_proofs: vec![
                 ProofRequirement {
                     proof_type: "citizenship_proof".to_string(),

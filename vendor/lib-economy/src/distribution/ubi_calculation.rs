@@ -1,13 +1,13 @@
-//! UBS amount calculation based on treasury allocation
+//! UBI amount calculation based on treasury allocation
 //! 
-//! Calculates Universal Basic Services amounts based on available
+//! Calculates Universal Basic Income amounts based on available
 //! treasury funds and citizen eligibility.
 
 use anyhow::Result;
 use crate::wasm::IdentityId;
 use crate::treasury_economics::DaoTreasury;
 
-/// Calculate UBS amount per citizen
+/// Calculate UBI amount per citizen
 pub fn calculate_ubi_amount(
     treasury: &DaoTreasury,
     verified_citizens: &[IdentityId],
@@ -20,7 +20,7 @@ pub fn calculate_ubi_amount(
     Ok(treasury.ubi_allocated / verified_citizens.len() as u64)
 }
 
-/// Calculate total UBS distribution required
+/// Calculate total UBI distribution required
 pub fn calculate_total_ubi_distribution(
     ubi_per_citizen: u64,
     citizen_count: u64,
@@ -28,7 +28,7 @@ pub fn calculate_total_ubi_distribution(
     ubi_per_citizen * citizen_count
 }
 
-/// Verify UBS eligibility for citizens
+/// Verify UBI eligibility for citizens
 pub fn verify_ubi_eligibility(citizens: &[IdentityId]) -> Vec<IdentityId> {
     // In implementation, this would check identity verification status
     // For now, assume all provided citizens are verified

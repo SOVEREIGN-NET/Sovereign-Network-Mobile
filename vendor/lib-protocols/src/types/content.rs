@@ -225,7 +225,7 @@ pub struct ContentEconomicInfo {
     pub total_revenue: u64,
     /// DAO fee contribution
     pub dao_contribution: u64,
-    /// UBS funding contribution
+    /// UBI funding contribution
     pub ubi_contribution: u64,
     /// Storage cost per day
     pub storage_cost: u64,

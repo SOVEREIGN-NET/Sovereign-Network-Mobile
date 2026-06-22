@@ -38,7 +38,7 @@ pub struct BlockchainOutput {
 /// Convert economics transaction to blockchain-compatible data
 /// 
 /// This creates a data structure that lib-blockchain can convert into its Transaction type.
-/// System transactions (UBS, rewards) don't spend UTXOs - they create new money from protocol rules.
+/// System transactions (UBI, rewards) don't spend UTXOs - they create new money from protocol rules.
 /// 
 /// # Arguments
 /// * `economics_tx` - The economy transaction to convert
@@ -111,10 +111,10 @@ pub fn to_blockchain_data(
     })
 }
 
-/// Create UBS distribution as blockchain-compatible data
+/// Create UBI distribution as blockchain-compatible data
 /// 
 /// # Arguments
-/// * `citizen_id` - Identity of the citizen receiving UBS
+/// * `citizen_id` - Identity of the citizen receiving UBI
 /// * `amount` - Amount of SOV tokens to distribute
 /// * `chain_id` - The blockchain chain ID
 /// * `system_keypair` - Keypair for signing system transactions
@@ -126,11 +126,11 @@ pub fn create_ubi_blockchain_data(
 ) -> Result<BlockchainTransactionData> {
     use crate::transactions::creation::create_ubi_distributions;
     
-    // Create UBS distributions using economics package
+    // Create UBI distributions using economics package
     let ubi_distributions = create_ubi_distributions(&[(citizen_id, amount)])?;
     
     if ubi_distributions.is_empty() {
-        return Err(anyhow::anyhow!("No UBS distributions created"));
+        return Err(anyhow::anyhow!("No UBI distributions created"));
     }
     
     // Convert economics transaction to blockchain data

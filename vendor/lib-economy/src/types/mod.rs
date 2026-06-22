@@ -87,7 +87,7 @@ mod tests {
     fn test_transaction_type_descriptions() {
         assert_eq!(TransactionType::Payment.description(), "User payment");
         assert_eq!(TransactionType::Reward.description(), "Network service reward");
-        assert_eq!(TransactionType::UbiDistribution.description(), "Universal Basic Services");
+        assert_eq!(TransactionType::UbiDistribution.description(), "Universal Basic Income");
         assert_eq!(TransactionType::WelfareDistribution.description(), "Welfare service funding");
         assert_eq!(TransactionType::ProposalVote.description(), "DAO proposal vote");
     }

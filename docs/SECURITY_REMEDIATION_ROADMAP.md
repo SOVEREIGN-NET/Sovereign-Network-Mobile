@@ -44,7 +44,7 @@
 ```typescript
 console.log('🔑 seedPhrases object:', identity?.seedPhrases);
 console.log('🔑 primary seeds:', identity?.seedPhrases?.primary);
-console.log('🔑 ubs seeds:', identity?.seedPhrases?.ubs);
+console.log('🔑 ubi seeds:', identity?.seedPhrases?.ubi);
 console.log('🔑 savings seeds:', identity?.seedPhrases?.savings);
 ```
 

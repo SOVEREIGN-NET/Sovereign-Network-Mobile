@@ -40,7 +40,7 @@ This document provides a comprehensive technical overview of the lib-network arc
     │  lib-crypto    │    │  lib-economy    │    │  lib-storage    │
     │                │    │                 │    │                 │
     │ • Post-Quantum │    │ • Routing Rewards│   │ • Content Store │
-    │ • Dilithium2   │    │ • UBS Payments  │    │ • Blockchain    │
+    │ • Dilithium2   │    │ • UBI Payments  │    │ • Blockchain    │
     │ • Kyber KEM    │    │ • Token Economy │    │ • Replication   │
     └────────────────┘    └─────────────────┘    └─────────────────┘
 ```
@@ -273,7 +273,7 @@ Automated token rewards for network participation, creating sustainable mesh eco
 - **Routing Rewards**: 10 tokens base + 1 token/KB + 5 tokens/hop
 - **Storage Rewards**: 100 tokens per GB-day stored
 - **Relay Rewards**: Variable based on traffic relayed
-- **UBS Distribution**: 20% of all rewards distributed as Universal Basic Services
+- **UBI Distribution**: 20% of all rewards distributed as Universal Basic Income
 
 ```rust
 // Automatic reward calculation
@@ -418,7 +418,7 @@ sequenceDiagram
     MeshNode->>RoutingWallet: Credit 15 tokens
     MeshNode->>UBIPool: Contribute 3 tokens (20%)
     
-    UBIPool->>UserB: Distribute UBS rewards
+    UBIPool->>UserB: Distribute UBI rewards
     RoutingWallet->>UserA: Available for withdrawal
 ```
 

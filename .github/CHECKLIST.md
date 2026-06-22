@@ -16,7 +16,7 @@
 
 ### Option 1: Automated Setup (Recommended)
 ```bash
-cd /path/to/SovereignNetworkMobile
+cd /Users/supertramp/Dev/SovereignNetworkMobile
 ./.github/setup-secrets.sh
 ```
 

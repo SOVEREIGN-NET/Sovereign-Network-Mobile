@@ -63,7 +63,7 @@ pub struct ServerStats {
     pub bytes_sent: u64,
     /// Total DAO fees collected
     pub dao_fees_collected: u64,
-    /// Total UBS distributed
+    /// Total UBI distributed
     pub ubi_distributed: u64,
     /// Error count by type
     pub errors: HashMap<String, u64>,
@@ -108,7 +108,7 @@ impl ServerStats {
         self.dao_fees_collected += amount;
     }
     
-    /// Record UBS distribution
+    /// Record UBI distribution
     pub fn record_ubi_distribution(&mut self, amount: u64) {
         self.ubi_distributed += amount;
     }

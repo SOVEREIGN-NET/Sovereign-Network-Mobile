@@ -19,7 +19,7 @@ ISP_MESH_RATE = 1 ZHTP/MB               // Packet routing reward
 ISP_UPTIME = 10 ZHTP/hour               // Uptime bonus
 MESH_THRESHOLD = 3 peers                 // Min peers for rewards
 MIN_STAKING = 1000 ZHTP                  // Minimum stake
-UBI_ALLOCATION = 40%                     // UBS from DAO fees
+UBI_ALLOCATION = 40%                     // UBI from DAO fees
 WELFARE_ALLOCATION = 30%                 // Welfare from DAO fees
 DEVELOPMENT_ALLOCATION = 30%             // Dev from DAO fees
 ```
@@ -51,7 +51,7 @@ let rewards = TokenReward::calculate(&work_metrics, &model)?;
 |------|-----------|----------|
 | `Payment` |  | Regular transfers |
 | `Reward` |  | Infrastructure rewards |
-| `UbiDistribution` |  | UBS payments |
+| `UbiDistribution` |  | UBI payments |
 | `WelfareDistribution` |  | Welfare payments |
 | `Staking` |  | Network staking |
 | `InfrastructureService` |  | Service payments |
@@ -137,7 +137,7 @@ Every transaction pays 2% DAO fee
 Treasury receives fees
     ↓
 Automatic allocation:
-    → 40% to UBS fund
+    → 40% to UBI fund
     → 30% to Welfare fund
     → 30% to Development fund
 ```
@@ -145,7 +145,7 @@ Automatic allocation:
 ### Example: 1000 ZHTP DAO fee
 
 ```
-UBS:         400 ZHTP (40%)
+UBI:         400 ZHTP (40%)
 Welfare:     300 ZHTP (30%)
 Development: 300 ZHTP (30%)
 ```
@@ -191,10 +191,10 @@ treasury.receive_dao_fee(fee)?;
 treasury.allocate_funds()?;
 ```
 
-### Calculate UBS
+### Calculate UBI
 
 ```rust
-let ubs = treasury.calculate_ubi_per_citizen(total_citizens);
+let ubi = treasury.calculate_ubi_per_citizen(total_citizens);
 ```
 
 ---
@@ -243,7 +243,7 @@ pub enum Priority {
 
 ###  Stub/Empty (15%)
 
--  **UBS Distribution** (stub) - `distribution/ubi_distribution.rs`
+-  **UBI Distribution** (stub) - `distribution/ubi_distribution.rs`
   - Current: Placeholder function
   - Needed: Full citizen tracking and distribution logic
 
@@ -343,7 +343,7 @@ let total = amount + tx.total_fee;
 
 ## 📐 Formulas Reference
 
-### Monthly UBS Calculation
+### Monthly UBI Calculation
 
 ```
 ubi_per_citizen = ubi_allocated / total_citizens
@@ -390,7 +390,7 @@ lib-economy
 | **treasury_economics** | DAO treasury |  Complete | [treasury_economics.md](./treasury_economics.md) |
 | **transactions** | Transaction system |  Complete | [transactions.md](./transactions.md) |
 | **incentives** | Network rewards |  Complete | [incentives.md](./incentives.md) |
-| **distribution** | UBS distribution |  Stub | [distribution.md](./distribution.md) |
+| **distribution** | UBI distribution |  Stub | [distribution.md](./distribution.md) |
 | **rewards** | Reward calculator |  Empty | [rewards.md](./rewards.md) |
 | **supply** | Supply management |  Complete | [supply.md](./supply.md) |
 | **pricing** | Dynamic pricing |  Complete | [pricing.md](./pricing.md) |
@@ -404,7 +404,7 @@ lib-economy
 
 1. **Post-Scarcity**: Unlimited tokens minted based on utility
 2. **ISP Replacement**: Fair compensation for infrastructure
-3. **DAO Welfare**: 2% of all transactions fund UBS/welfare
+3. **DAO Welfare**: 2% of all transactions fund UBI/welfare
 4. **10 Wallet Types**: Specialized wallets for different activities
 5. **Anti-Sybil**: Rewards quality infrastructure, not node count
 6. **Fee Transparency**: Clear breakdown (base + DAO)

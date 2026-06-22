@@ -25,7 +25,7 @@ if [[ -f "$VAULT_FILE" ]]; then
   source "$VAULT_FILE"
 fi
 
-SERVICE_ACCOUNT_JSON="${GOOGLE_PLAY_SERVICE_ACCOUNT_JSON_PATH:?GOOGLE_PLAY_SERVICE_ACCOUNT_JSON_PATH must be set to the path of your service account JSON file}"
+SERVICE_ACCOUNT_JSON="${GOOGLE_PLAY_SERVICE_ACCOUNT_JSON_PATH:-/Users/supertramp/Downloads/sovereign-network-mobile-906a1-a6a74897ca20.json}"
 RELEASE_KEYSTORE="android/app/release.keystore"
 KEYSTORE_PASSWORD="${RELEASE_KEYSTORE_PASSWORD:?RELEASE_KEYSTORE_PASSWORD is not set. See android/vault/release-keystore-credentials.txt}"
 RELEASE_KEY_ALIAS="${RELEASE_KEY_ALIAS:-release-key}"
