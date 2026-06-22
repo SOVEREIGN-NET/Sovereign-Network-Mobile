@@ -7,7 +7,15 @@
  * - ios/GeneratedConfig.swift for iOS native modules
  * - android/app/src/main/java/com/sovereignnetworkmobile/config/GeneratedConfig.kt for Android
  *
- * This ensures .env is the SINGLE SOURCE OF TRUTH for all platforms
+ * This ensures .env is the SINGLE SOURCE OF TRUTH for all platforms.
+ *
+ * UHP-v2 / DID-based identity:
+ *   - There is no per-host TLS SPKI pin anymore.
+ *   - Each bootstrap gateway carries an on-chain Dilithium DID. The native
+ *     QUIC layer accepts any peer cert (TLS is just transport) and the
+ *     UHP-v2 handshake's `peer_did` is matched against the configured
+ *     `BOOTSTRAP_GATEWAY[_2]_DID`. Mismatch = reject (likely MITM).
+ *   - Cert rotation is therefore a no-op for the app.
  */
 
 const fs = require('fs');
@@ -61,20 +69,18 @@ function parseNodeUrl(url) {
     if (match) {
       return { host: match[1], port: Number.parseInt(match[2], 10) || 9334 };
     }
-    return { host: 'g1.thesovereignnetwork.org', port: 9334 };
+    return { host: 'zhtp-gateway.thesovereignnetwork.org', port: 9334 };
   }
 }
 
-// Parse node registry: "host:port:pin_hex,host:port:pin_hex,..."
-// Returns array of { host, port, pin } objects
-function parseNodeRegistry(registryStr) {
-  if (!registryStr) return [];
-  return registryStr.split(',').map(entry => {
-    const parts = entry.trim().split(':');
-    if (parts.length < 2) return null;
-    // parts: [host, port, pin_hex (optional)]
-    return { host: parts[0], port: Number.parseInt(parts[1], 10), pin: parts[2] || '' };
-  }).filter(Boolean);
+// Bootstrap gateway entry — host, IP, on-chain DID. SPKI pin is intentionally
+// absent: identity is verified by the UHP-v2 handshake, not by TLS pinning.
+function readBootstrapGateway(envConfig, suffix) {
+  const host = envConfig[`BOOTSTRAP_GATEWAY${suffix}_HOST`];
+  const ip = envConfig[`BOOTSTRAP_GATEWAY${suffix}_IP`];
+  const did = envConfig[`BOOTSTRAP_GATEWAY${suffix}_DID`];
+  if (!host || !did) return null;
+  return { host, ip: ip || '', did };
 }
 
 // Extract Android version info from build.gradle
@@ -142,14 +148,20 @@ const buildInfo = {
 
 // Generate config
 const envConfig = parseEnv(envPath);
-const nodeUrl = envConfig.ZHTP_NODE_URL || 'http://g1.thesovereignnetwork.org:9334';
+const nodeUrl = envConfig.ZHTP_NODE_URL || 'http://zhtp-gateway.thesovereignnetwork.org:9334';
 const { host: nodeHost, port: nodePort } = parseNodeUrl(nodeUrl);
 const sovTokenId = envConfig.SOV_TOKEN_ID || null;
-const chainId = envConfig.CHAIN_ID || '2';
-const nodeRegistry = parseNodeRegistry(envConfig.ZHTP_NODE_REGISTRY);
-// Control plane pin = pin for the primary node host
-const controlNodeEntry = nodeRegistry.find(n => n.host === nodeHost) || nodeRegistry[0];
-const certificatePin = controlNodeEntry?.pin || '';
+const chainId = envConfig.CHAIN_ID || '3';
+
+const bootstrapPrimary = readBootstrapGateway(envConfig, '');
+const bootstrapFallback = readBootstrapGateway(envConfig, '_2');
+if (!bootstrapPrimary) {
+  throw new Error(
+    'CRITICAL: BOOTSTRAP_GATEWAY_HOST / BOOTSTRAP_GATEWAY_DID missing in .env — ' +
+      'the app cannot bootstrap without a known gateway DID to verify against.',
+  );
+}
+const bootstrapGateways = [bootstrapPrimary, bootstrapFallback].filter(Boolean);
 
 // ZDNS bootstrap config — A-record of `directory.sov` on the ZDNS server
 // seeds the validator list. Overridable via .env for staging/custom topologies.
@@ -163,10 +175,9 @@ const generatedConfig = {
   ZHTP_NODE_URL: nodeUrl,
   ZHTP_NODE_HOST: nodeHost,
   ZHTP_NODE_PORT: nodePort,
-  CERTIFICATE_PIN: certificatePin, // empty = system CA trust
   SOV_TOKEN_ID: sovTokenId,
   CHAIN_ID: chainId,
-  NODE_REGISTRY: nodeRegistry,
+  BOOTSTRAP_GATEWAYS: bootstrapGateways,
   ZDNS_HOST: zdnsHost,
   ZDNS_PORT: zdnsPort,
   ZDNS_DIRECTORY_NAME: zdnsDirectoryName,
@@ -184,22 +195,39 @@ console.log(`✓ Generated React Native config at ${generatedJsonPath}`);
 console.log(`  ZHTP_NODE_URL: ${generatedConfig.ZHTP_NODE_URL}`);
 console.log(`  ZHTP_NODE_HOST: ${generatedConfig.ZHTP_NODE_HOST}`);
 console.log(`  ZHTP_NODE_PORT: ${generatedConfig.ZHTP_NODE_PORT}`);
-console.log(`  CERTIFICATE_PIN: ${certificatePin || '(none — system CA trust)'}`);
 console.log(`  SOV_TOKEN_ID: ${sovTokenId || '(not set)'}`);
 console.log(`  CHAIN_ID: ${chainId}`);
+bootstrapGateways.forEach((g, i) => {
+  console.log(
+    `  BOOTSTRAP_GATEWAY${i === 0 ? '' : '_' + (i + 1)}: ${g.host} (${g.ip}) → ${g.did.substring(0, 24)}…`,
+  );
+});
 console.log(
   `  BUILD_INFO: ios=${iosBuild.version} (${iosBuild.build}), android=${androidBuild.version} (${androidBuild.build}), git=${gitInfo.commit}${gitInfo.dirty ? '-dirty' : ''} @ ${gitInfo.branch}`,
 );
 
 // 2. Generate iOS Swift config
-const iosSpkiEntries = nodeRegistry.map(n => `        "${n.host}": "${n.pin}",`).join('\n');
+const iosBootstrapEntries = bootstrapGateways
+  .map(
+    g =>
+      `        BootstrapGateway(host: "${g.host}", ip: "${g.ip}", did: "${g.did}"),`,
+  )
+  .join('\n');
 const iosConfig = `import Foundation
 
 /**
  * AUTO-GENERATED FILE - Do not edit manually
  * Generated by scripts/generate-config.js from .env file
  * Single source of truth: .env file
+ *
+ * Identity is verified by UHP-v2 DID, not by TLS SPKI pinning.
  */
+
+struct BootstrapGateway {
+    let host: String
+    let ip: String
+    let did: String
+}
 
 struct GeneratedConfig {
     // Node/Server Configuration
@@ -207,23 +235,12 @@ struct GeneratedConfig {
     static let nodeHost = "${nodeHost}"
     static let nodePort: UInt16 = ${nodePort}
 
-    // QUIC Control Plane (used by NativeQuicModule for authenticated requests)
-    static let quinnControlPlaneHost = "${nodeHost}"
-    static let quinnControlPlanePort: UInt16 = ${nodePort}
-    // Empty = use hostname as SNI
-    static let quinnControlPlaneServerName = ""
-
-    // SPKI pin for the control plane node (SHA-256 of SubjectPublicKeyInfo, hex-encoded)
-    static let quinnSpkiPinHex = "${certificatePin}"
-
-    // Per-host SPKI pins — generated from ZHTP_NODE_REGISTRY in .env
-    private static let spkiPins: [String: String] = [
-${iosSpkiEntries}
+    // Bootstrap gateways — first entry is primary, second is fallback.
+    // The app dials these, then verifies the UHP-v2 handshake's peer_did
+    // matches the configured did field. Mismatch is treated as MITM.
+    static let bootstrapGateways: [BootstrapGateway] = [
+${iosBootstrapEntries}
     ]
-
-    static func spkiPin(for host: String) -> String {
-        return spkiPins[host] ?? quinnSpkiPinHex
-    }
 }
 `;
 
@@ -237,14 +254,27 @@ fs.writeFileSync(iosConfigPath, iosConfig, 'utf8');
 console.log(`✓ Generated iOS config at ${iosConfigPath}`);
 
 // 3. Generate Android Kotlin config
-const androidSpkiEntries = nodeRegistry.map(n => `        "${n.host}" to "${n.pin}",`).join('\n');
+const androidBootstrapEntries = bootstrapGateways
+  .map(
+    g =>
+      `        BootstrapGateway(host = "${g.host}", ip = "${g.ip}", did = "${g.did}"),`,
+  )
+  .join('\n');
 const androidConfig = `package com.sovereignnetworkmobile.config
 
 /**
  * AUTO-GENERATED FILE - Do not edit manually
  * Generated by scripts/generate-config.js from .env file
  * Single source of truth: .env file
+ *
+ * Identity is verified by UHP-v2 DID, not by TLS SPKI pinning.
  */
+
+data class BootstrapGateway(
+    val host: String,
+    val ip: String,
+    val did: String,
+)
 
 object GeneratedConfig {
     // Node/Server Configuration
@@ -252,21 +282,12 @@ object GeneratedConfig {
     const val NODE_HOST = "${nodeHost}"
     const val NODE_PORT = ${nodePort}
 
-    // QUIC Control Plane (used by NativeQuicModule for authenticated requests)
-    const val QUINN_CONTROL_PLANE_HOST = "${nodeHost}"
-    const val QUINN_CONTROL_PLANE_PORT = ${nodePort}
-    // Empty = use hostname as SNI
-    const val QUINN_CONTROL_PLANE_SERVER_NAME = ""
-
-    // SPKI pin for the control plane node (SHA-256 of SubjectPublicKeyInfo, hex-encoded)
-    const val QUINN_SPKI_PIN_HEX = "${certificatePin}"
-
-    // Per-host SPKI pins — generated from ZHTP_NODE_REGISTRY in .env
-    private val SPKI_PINS: Map<String, String> = mapOf(
-${androidSpkiEntries}
+    // Bootstrap gateways — first entry is primary, second is fallback.
+    // The app dials these, then verifies the UHP-v2 handshake's peer_did
+    // matches the configured did field. Mismatch is treated as MITM.
+    val BOOTSTRAP_GATEWAYS: List<BootstrapGateway> = listOf(
+${androidBootstrapEntries}
     )
-
-    fun spkiPinFor(host: String): String = SPKI_PINS[host] ?: QUINN_SPKI_PIN_HEX
 }
 `;
 

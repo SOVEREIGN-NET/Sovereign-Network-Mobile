@@ -24,7 +24,8 @@ RCT_EXTERN_METHOD(cancelAll:(RCTPromiseResolveBlock)resolve
 
 RCT_EXTERN_METHOD(setActiveValidator:(NSString *)host
                   port:(NSInteger)port
-                  pinHex:(NSString *)pinHex
+                  expectedDid:(NSString *)expectedDid
+                  sni:(NSString *)sni
                   resolve:(RCTPromiseResolveBlock)resolve
                   reject:(RCTPromiseRejectBlock)reject)
 

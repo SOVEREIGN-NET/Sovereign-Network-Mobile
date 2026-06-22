@@ -310,12 +310,11 @@ pub extern "system" fn Java_com_sovereignnetworkmobile_NativeQuicBridge_nativeUh
         }
     };
 
+    // SPKI pin is optional now. Empty string → AcceptAnyVerifier; identity
+    // is verified post-handshake against the expected DID at the JS layer.
     let spki_hex: String = match env.get_string(&spki_pin_hex) {
         Ok(s) => s.into(),
-        Err(e) => {
-            log::error!("Failed to get SPKI pin string: {}", e);
-            return std::ptr::null_mut();
-        }
+        Err(_) => String::new(),
     };
 
     let identity_json_str: String = match env.get_string(&identity_json) {
@@ -330,18 +329,22 @@ pub extern "system" fn Java_com_sovereignnetworkmobile_NativeQuicBridge_nativeUh
     let kyber_sk_vec = env.convert_byte_array(&kyber_sk).unwrap_or_default();
     let master_seed_vec = env.convert_byte_array(&master_seed).unwrap_or_default();
 
-    let spki_bytes = match hex::decode(&spki_hex) {
-        Ok(bytes) => bytes,
-        Err(e) => {
-            return create_error_map(&mut env, format!("Invalid SPKI pin hex: {}", e));
+    let spki_pin: Option<[u8; 32]> = if spki_hex.is_empty() {
+        None
+    } else {
+        let spki_bytes = match hex::decode(&spki_hex) {
+            Ok(bytes) => bytes,
+            Err(e) => {
+                return create_error_map(&mut env, format!("Invalid SPKI pin hex: {}", e));
+            }
+        };
+        if spki_bytes.len() != 32 {
+            return create_error_map(&mut env, "SPKI pin must be 32 bytes".to_string());
         }
+        let mut arr = [0u8; 32];
+        arr.copy_from_slice(&spki_bytes);
+        Some(arr)
     };
-    if spki_bytes.len() != 32 {
-        return create_error_map(&mut env, "SPKI pin must be 32 bytes".to_string());
-    }
-
-    let mut spki_pin = [0u8; 32];
-    spki_pin.copy_from_slice(&spki_bytes);
 
     let key_bytes = uhp_quinn::UhpPrivateKeyBytes {
         dilithium_sk: dilithium_sk_vec,

@@ -8,23 +8,15 @@
  * `bootstrapReady`), we go straight to the native bridge instead of
  * through `publicQuicRequest`.
  *
- * Response shape: the nested contract from 2026-04-24 — see
- * `src/types/networkTopology.ts` for the full typed interface. In
- * short:
- *
- *   { network_id, chain_height, timestamp,
- *     this_node: { did, role, spki_pin },
- *     topology: { validators[], gateways[],
- *                 total_validators, total_gateways,
- *                 connected_peers } }
+ * Identity model: the response carries `this_node.did` (and a `spki_pin`
+ * field which we IGNORE for verification — pins are dead weight under
+ * UHP-v2). DID is the canonical identity used by subsequent connects.
  *
  * Callers get back a simplified `DirectoryValidator` view (host + port
- * + did + stake + status) that matches what the bootstrap path
- * actually needs. Per-validator SPKI pins are NOT carried on the wire
- * anymore — the only pin we get is `this_node.spki_pin` for whichever
- * node answered. That limits runtime validator switching to "this
- * node or keep-current"; any cross-validator swap has to wait for
- * pins to come back into the contract (or system CA trust to land).
+ * + did + stake + status). Switching the active validator is gated on
+ * the directory entry's `did` matching the answering node's
+ * `this_node.did` (only the node that answered can be safely promoted —
+ * any other entry's DID hasn't been verified yet against a handshake).
  */
 
 import { NativeModules } from 'react-native';
@@ -48,16 +40,16 @@ export interface DirectoryValidator {
 }
 
 /**
- * Bootstrap-friendly view of the directory. Callers use
- * `local_spki_pin` to pin the node they're already connected to; the
- * validator list is informational for ranking and for the Explorer UI.
+ * Bootstrap-friendly view of the directory. Callers use `local_did` to
+ * confirm which directory entry corresponds to the answering node — that
+ * is the only entry whose identity has been cryptographically verified
+ * this round. The validator list is informational for ranking and the
+ * Explorer UI.
  */
 export interface DirectoryView {
   validators: DirectoryValidator[];
-  /** SPKI pin of the node that answered the request (this_node). */
-  local_spki_pin?: string;
   chain_height?: number;
-  /** DID of the node that answered, for display. */
+  /** DID of the node that answered, for display + handshake-verified swap policy. */
   local_did?: string;
 }
 
@@ -99,7 +91,7 @@ class NetworkDirectoryService {
    * to the hardcoded `DEFAULT_NODE_HOST:DEFAULT_NODE_PORT`.
    */
   async fetchDirectory(
-    target?: { host: string; port: number },
+    target?: { host: string; port: number; sni?: string },
   ): Promise<DirectoryView | null> {
     if (!NativeQuic?.request) {
       console.warn('[NetworkDirectory] native bridge unavailable');
@@ -108,10 +100,17 @@ class NetworkDirectoryService {
     const host = target?.host ?? DEFAULT_NODE_HOST;
     const port = target?.port ?? DEFAULT_NODE_PORT;
     const url = `quic://${host}:${port}${DIRECTORY_PATH}`;
+    // SNI is sent as `x-zhtp-sni` so the native QUIC layer picks it up
+    // fresh per request — no implicit dependency on global active-validator
+    // state, no SNI bleed between back-to-back dials.
+    const headers: Record<string, string> = {};
+    if (target?.sni && target.sni !== host) {
+      headers['x-zhtp-sni'] = target.sni;
+    }
     try {
       const raw = await NativeQuic.request(url, {
         method: 'GET',
-        headers: {},
+        headers,
         alpn: 'public',
         timeout: QUIC_CONFIG.defaultTimeout,
       });
@@ -136,10 +135,6 @@ class NetworkDirectoryService {
         .filter((v): v is DirectoryValidator => v !== null);
       const view: DirectoryView = {
         validators,
-        local_spki_pin:
-          typeof parsed.this_node?.spki_pin === 'string'
-            ? parsed.this_node.spki_pin
-            : undefined,
         local_did:
           typeof parsed.this_node?.did === 'string'
             ? parsed.this_node.did
@@ -150,7 +145,7 @@ class NetworkDirectoryService {
       console.log(
         `[NetworkDirectory] got ${view.validators.length} validator(s), ` +
           `chain_height=${view.chain_height ?? 'n/a'} ` +
-          `this_node_pin=${view.local_spki_pin ? 'present' : 'missing'}`,
+          `this_node_did=${view.local_did ? view.local_did.substring(0, 20) + '…' : 'missing'}`,
       );
       return view;
     } catch (err) {

@@ -28,6 +28,7 @@ import {
   ingestEnvelopes,
   probeMessagingWire,
   receivePending,
+  registerInboundConsumer,
   subscribe,
   type WireProbeResult,
 } from '../../services/MessagingService';
@@ -77,6 +78,18 @@ const MessagesScreen: React.FC<Props> = ({ navigation }) => {
     return () => {
       unsub();
     };
+  }, []);
+
+  // Tell the messaging service this screen wants real-time inbound
+  // delivery. First consumer to register kicks the persistent push
+  // subscription; the service caps reopen retries when the upstream
+  // session FFI keeps failing, so an unmounted messaging UI doesn't
+  // spam `getSession failed` while Bug 1 (handshake divergence) is
+  // unresolved server-side. The startup deposit drain in AuthContext
+  // remains the safety net for queued messages.
+  useEffect(() => {
+    const unregister = registerInboundConsumer();
+    return unregister;
   }, []);
 
   // The 'inactive' phase fires *before* the OS snapshots the screen for

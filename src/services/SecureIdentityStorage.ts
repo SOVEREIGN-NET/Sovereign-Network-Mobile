@@ -298,7 +298,10 @@ export const SecureIdentityStorage = {
         console.warn('[SecureIdentityStorage] ⚠️ No cached identity ID found');
         return null;
       }
-      console.log('[SecureIdentityStorage] ✓ Retrieved identity_id for authenticated request (cached, no biometric needed)');
+      // Intentionally silent on the hot path. This fires once per
+      // authenticated request — leaving a `console.log` here drowned the
+      // useful events. Errors / missing-cache are still logged above and
+      // in the `catch` below.
       return cachedDid;
     } catch (error) {
       console.error('[SecureIdentityStorage] ❌ Failed to get identity ID:', error);

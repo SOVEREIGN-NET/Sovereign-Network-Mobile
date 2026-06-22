@@ -38,6 +38,9 @@ export type { UseTokenOperationsReturn, TokenOperationState } from './useTokenOp
 export { useUserTokenBalances } from './useUserTokenBalances';
 export type { UserTokenBalancesData, TokenDisplay } from './useUserTokenBalances';
 
+export { useRemoteAnnouncement } from './useRemoteAnnouncement';
+export type { UseRemoteAnnouncementResult } from './useRemoteAnnouncement';
+
 export { useTokenRegistry, getTokenRegistry, resolveTokenBySymbol } from './useTokenRegistry';
 export type { TokenRegistry } from './useTokenRegistry';
 

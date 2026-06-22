@@ -1679,8 +1679,15 @@ class NativeIdentityProvisioning: NSObject, UIDocumentPickerDelegate {
                         reject("INVALID_PARAMS", "Missing domain parameter", nil)
                         return
                     }
+                    guard let feePaymentTxHex = params["feePaymentTxHex"] as? String, !feePaymentTxHex.isEmpty else {
+                        reject("INVALID_PARAMS", "Missing feePaymentTxHex (build via signDomainFeePaymentTx first)", nil)
+                        return
+                    }
+                    let contentMappingsJson = params["contentMappingsJson"] as? String
                     requestJson = try ZhtpClient.buildDomainRegisterRequest(
                         domain: domain,
+                        contentMappingsJson: contentMappingsJson,
+                        feePaymentTxHex: feePaymentTxHex,
                         using: identity
                     )
 
@@ -1734,6 +1741,100 @@ class NativeIdentityProvisioning: NSObject, UIDocumentPickerDelegate {
         reject: @escaping RCTPromiseRejectBlock
     ) {
         self.signDomainRequest("domain_register", params: params, resolve: resolve, reject: reject)
+    }
+
+    /// Build the signed 10 SOV fee payment TokenTransfer for a domain registration.
+    /// Params: { senderWalletIdHex: hex(32B), treasuryWalletIdHex?: hex(32B), amountAtoms: u128 decimal string,
+    ///           nonce: number|string, chainId?: number|string }
+    /// Returns: { fee_payment_tx_hex: String }
+    @objc
+    func signDomainFeePaymentTx(
+        _ params: NSDictionary,
+        resolve: @escaping RCTPromiseResolveBlock,
+        reject: @escaping RCTPromiseRejectBlock
+    ) {
+        queue.async {
+            do {
+                guard let senderHex = params["senderWalletIdHex"] as? String else {
+                    reject("INVALID_PARAMS", "Missing senderWalletIdHex", nil)
+                    return
+                }
+                guard let senderWalletId = Data(fromHexString: senderHex), senderWalletId.count == 32 else {
+                    reject("INVALID_PARAMS", "senderWalletIdHex must be 64 hex characters (32 bytes)", nil)
+                    return
+                }
+
+                var treasuryWalletId: Data? = nil
+                if let treasuryHex = params["treasuryWalletIdHex"] as? String, !treasuryHex.isEmpty {
+                    guard let parsed = Data(fromHexString: treasuryHex), parsed.count == 32 else {
+                        reject("INVALID_PARAMS", "treasuryWalletIdHex must be 64 hex characters (32 bytes) when provided", nil)
+                        return
+                    }
+                    treasuryWalletId = parsed
+                }
+
+                let amountAtoms: String
+                if let s = params["amountAtoms"] as? String {
+                    amountAtoms = s
+                } else if let n = params["amountAtoms"] as? NSNumber {
+                    let d = n.doubleValue
+                    if !d.isFinite || d < 0 || d != d.rounded() || d > Double(UInt64.max) {
+                        reject("INVALID_PARAMS", "amountAtoms NSNumber \(d) is not a non-negative safe integer — pass atoms as a decimal string", nil)
+                        return
+                    }
+                    amountAtoms = n.stringValue
+                } else {
+                    reject("INVALID_PARAMS", "amountAtoms must be a decimal u128 string (or integer number)", nil)
+                    return
+                }
+                guard parseU128Halves(amountAtoms) != nil else {
+                    reject("INVALID_PARAMS", "amountAtoms \"\(amountAtoms)\" is not a valid non-negative u128", nil)
+                    return
+                }
+
+                var nonceValue: UInt64 = 0
+                if let nonceStr = params["nonce"] as? String {
+                    guard let parsed = UInt64(nonceStr) else {
+                        reject("INVALID_PARAMS", "nonce must be a valid integer string", nil)
+                        return
+                    }
+                    nonceValue = parsed
+                } else if let nonceNum = params["nonce"] as? NSNumber {
+                    nonceValue = nonceNum.uint64Value
+                } else {
+                    reject("INVALID_PARAMS", "nonce is required (string or number)", nil)
+                    return
+                }
+
+                var chainId: UInt8 = 0x03
+                if let chainIdNum = params["chainId"] as? NSNumber {
+                    chainId = UInt8(truncating: chainIdNum)
+                } else if let chainIdStr = params["chainId"] as? String,
+                          let parsedChainId = UInt8(chainIdStr) {
+                    chainId = parsedChainId
+                }
+
+                guard let identityAny = IdentityHandleStore.shared.getLatestIdentity(),
+                      let identity = identityAny as? Identity else {
+                    reject("NO_IDENTITY", "No active identity for signing", nil)
+                    return
+                }
+
+                let hex = try ZhtpClient.buildDomainFeePaymentTx(
+                    senderWalletId: senderWalletId,
+                    treasuryWalletId: treasuryWalletId,
+                    amountAtoms: amountAtoms,
+                    nonce: nonceValue,
+                    using: identity,
+                    chainId: chainId
+                )
+
+                resolve(["fee_payment_tx_hex": hex])
+            } catch {
+                print("[NativeIdentityProvisioning] ❌ signDomainFeePaymentTx failed: \(error)")
+                reject("SIGNING_ERROR", "Failed to build domain fee payment tx: \(error)", nil)
+            }
+        }
     }
 
     /// Build domain update request (RN)

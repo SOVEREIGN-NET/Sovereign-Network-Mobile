@@ -47,6 +47,34 @@ static RUNTIME: once_cell::sync::Lazy<Runtime> = once_cell::sync::Lazy::new(|| {
 });
 static CRYPTO_PROVIDER: Once = Once::new();
 
+/// Process-wide singleton client `Endpoint`. See the iOS quinn-ffi
+/// equivalent comment for the full rationale — same fix-shape, same reason
+/// (EPERM under socket churn). Endpoint's I/O driver runs on `RUNTIME`
+/// (long-lived multi-thread) so it outlives any FFI-call-local scope.
+static CLIENT_ENDPOINT: once_cell::sync::OnceCell<Endpoint> = once_cell::sync::OnceCell::new();
+static CLIENT_ENDPOINT_MUTEX: Mutex<()> = Mutex::new(());
+
+fn shared_client_endpoint() -> Result<Endpoint> {
+    if let Some(ep) = CLIENT_ENDPOINT.get() {
+        return Ok(ep.clone());
+    }
+    let _guard = CLIENT_ENDPOINT_MUTEX
+        .lock()
+        .map_err(|_| anyhow::anyhow!("client endpoint init mutex poisoned"))?;
+    if let Some(ep) = CLIENT_ENDPOINT.get() {
+        return Ok(ep.clone());
+    }
+    let rt = runtime();
+    let _enter = rt.enter();
+    let bind_addr: std::net::SocketAddr = "[::]:0"
+        .parse()
+        .map_err(|e| anyhow::anyhow!("Failed to parse default bind address: {e}"))?;
+    let ep = Endpoint::client(bind_addr)
+        .map_err(|e| anyhow::anyhow!("Failed to create shared QUIC endpoint: {e}"))?;
+    let _ = CLIENT_ENDPOINT.set(ep.clone());
+    Ok(ep)
+}
+
 pub const QUINN_FFI_VERSION: &str = "quinn-ffi-v1.0.0-android";
 
 pub fn uhp_quinn_init() {
@@ -127,6 +155,51 @@ impl ServerCertVerifier for SpkiPinVerifier {
         } else {
             Err(TlsError::InvalidCertificate(CertificateError::UnknownIssuer))
         }
+    }
+
+    fn verify_tls12_signature(
+        &self,
+        _message: &[u8],
+        _cert: &CertificateDer<'_>,
+        _dss: &rustls::DigitallySignedStruct,
+    ) -> Result<HandshakeSignatureValid, TlsError> {
+        Err(TlsError::General("TLS1.2 not supported".into()))
+    }
+
+    fn verify_tls13_signature(
+        &self,
+        _message: &[u8],
+        _cert: &CertificateDer<'_>,
+        _dss: &rustls::DigitallySignedStruct,
+    ) -> Result<HandshakeSignatureValid, TlsError> {
+        Ok(HandshakeSignatureValid::assertion())
+    }
+
+    fn supported_verify_schemes(&self) -> Vec<SignatureScheme> {
+        vec![
+            SignatureScheme::ECDSA_NISTP256_SHA256,
+            SignatureScheme::ED25519,
+            SignatureScheme::RSA_PSS_SHA256,
+        ]
+    }
+}
+
+/// Accept-any TLS cert verifier. Identity is verified post-handshake by
+/// matching `result.peer_identity.did` against the caller-supplied expected
+/// DID — no TLS pinning, so cert rotation doesn't require a client rebuild.
+#[derive(Debug)]
+struct AcceptAnyVerifier;
+
+impl ServerCertVerifier for AcceptAnyVerifier {
+    fn verify_server_cert(
+        &self,
+        _end_entity: &CertificateDer<'_>,
+        _intermediates: &[CertificateDer<'_>],
+        _server_name: &ServerName<'_>,
+        _ocsp: &[u8],
+        _now: UnixTime,
+    ) -> Result<ServerCertVerified, TlsError> {
+        Ok(ServerCertVerified::assertion())
     }
 
     fn verify_tls12_signature(
@@ -347,8 +420,11 @@ fn apply_deterministic_node_id(identity: &mut ZhtpIdentity) {
     );
 }
 
-fn make_client_config(spki_pin: [u8; 32]) -> ClientConfig {
-    let verifier = Arc::new(SpkiPinVerifier::new(spki_pin));
+fn make_client_config(spki_pin: Option<[u8; 32]>) -> ClientConfig {
+    let verifier: Arc<dyn ServerCertVerifier> = match spki_pin {
+        Some(pin) => Arc::new(SpkiPinVerifier::new(pin)),
+        None => Arc::new(AcceptAnyVerifier),
+    };
     let provider = Arc::new(rustls::crypto::ring::default_provider());
     let mut tls = rustls::ClientConfig::builder_with_provider(provider)
         .with_protocol_versions(&[&rustls::version::TLS13])
@@ -376,9 +452,8 @@ async fn quic_connect_with_endpoint(
     server_name: &str,
     cfg: ClientConfig,
 ) -> Result<(Endpoint, Connection)> {
-    let bind_addr = "[::]:0".parse()?;
-    let mut endpoint = Endpoint::client(bind_addr)?;
-    endpoint.set_default_client_config(cfg);
+    // Reuse the process-wide singleton — same shape as the iOS quinn-ffi.
+    let endpoint = shared_client_endpoint()?;
 
     let addr = (host, port)
         .to_socket_addrs()?
@@ -390,7 +465,11 @@ async fn quic_connect_with_endpoint(
         port,
         server_name
     );
-    let connecting = endpoint.connect(addr, server_name)?;
+    // Per-connection config via `connect_with` — never mutate the shared
+    // endpoint's default config.
+    let connecting = endpoint
+        .connect_with(cfg, addr, server_name)
+        .map_err(|e| anyhow::anyhow!("connect_with failed: {e}"))?;
     let conn = timeout(Duration::from_secs(10), connecting)
         .await
         .map_err(|_| anyhow::anyhow!("connect timed out"))??;
@@ -558,7 +637,7 @@ pub fn quic_connect_and_handshake(
     host: &str,
     port: u16,
     server_name: &str,
-    spki_pin: [u8; 32],
+    spki_pin: Option<[u8; 32]>,
     identity_json: &str,
     key_bytes: UhpPrivateKeyBytes,
     chain_id: u8,

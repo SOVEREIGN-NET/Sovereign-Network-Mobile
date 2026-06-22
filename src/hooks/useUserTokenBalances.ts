@@ -112,7 +112,13 @@ const mergeRegistryWithBalances = (
 export const useUserTokenBalances = (address?: string | null) => {
   const { currentIdentity } = useAuth();
   const fallbackId = normalizeIdentityId(currentIdentity?.did);
-  const queryAddress = address ?? fallbackId;
+  // Only fall back to the identity DID when the caller passed nothing
+  // (`undefined` — they want the legacy "balances for this identity"
+  // behavior). Explicit `null` means "I'm still loading the wallet, do
+  // not fetch yet" — distinguishing the two prevents an extra fetch
+  // against the identity DID that gets immediately overwritten when
+  // the real wallet ID resolves a moment later (SIDScreen pattern).
+  const queryAddress = address === undefined ? fallbackId : address;
 
   const { tokens: registry, loading: registryLoading } = useTokenRegistry();
 

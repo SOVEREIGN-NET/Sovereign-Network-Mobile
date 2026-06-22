@@ -24,8 +24,8 @@ import { publishKyberKeyBestEffort } from '../services/KyberKeyService';
 import {
   ingestEnvelopes,
   receivePending,
+  resumeInboundOnForeground,
   setSelfDid as setMessagingSelfDid,
-  startInboundSubscription,
   stopInboundSubscription,
 } from '../services/MessagingService';
 import {
@@ -1146,7 +1146,7 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
     if (!did) return;
 
     let cancelled = false;
-    const drainAndSubscribe = (forceCycle: boolean) => {
+    const drainAndResume = (forceCycle: boolean) => {
       if (cancelled) return;
       void (async () => {
         try {
@@ -1162,26 +1162,28 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
         } catch (e) {
           console.warn('[AuthContext] deposit drain failed:', e);
         }
-        if (!cancelled && isNativeQuicSessionAvailable) {
-          // Foreground: force-cycle the inbound stream. iOS commonly
-          // suspends the QUIC socket while we're backgrounded; without
-          // a forced re-open the JS-side `inboundStreamId !== null`
-          // check would bail and we'd keep delivering to a dead stream
-          // server-side, losing any message that arrived while the
-          // chat was on screen during background.
-          void startInboundSubscription(forceCycle);
+        // Subscription itself is owned by messaging screens via
+        // `registerInboundConsumer` — AuthContext no longer kicks the
+        // persistent push stream on startup, so an unmounted messaging
+        // UI doesn't spam `getSession failed: openFailed` while the
+        // upstream handshake bug remains. Foreground transitions
+        // still resume any active consumer's subscription (force=true
+        // path) so a backgrounded chat keeps working.
+        if (!cancelled && isNativeQuicSessionAvailable && forceCycle) {
+          resumeInboundOnForeground();
         }
       })();
     };
 
-    drainAndSubscribe(false);
+    drainAndResume(false);
     const sub = AppState.addEventListener('change', (next: AppStateStatus) => {
-      // On foreground we drain the deposit store AND force-cycle the
-      // push stream so we're not stuck on a phantom subscriber the OS
-      // tore down during suspension. The brief no-subscriber window
-      // between the cycle and the new register is covered by the
-      // drain above — anything that lands then sits in deposit.
-      if (next === 'active') drainAndSubscribe(true);
+      // On foreground we drain the deposit store AND resume the push
+      // stream (if any consumer is registered) so we're not stuck on a
+      // phantom subscriber the OS tore down during suspension. The
+      // brief no-subscriber window between the cycle and the new
+      // register is covered by the drain above — anything that lands
+      // then sits in deposit.
+      if (next === 'active') drainAndResume(true);
     });
 
     return () => {

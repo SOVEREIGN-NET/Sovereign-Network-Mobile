@@ -226,7 +226,10 @@ final class Web4SchemeHandler: NSObject, WKURLSchemeHandler {
             method: method,
             headers: [
               "content-type": contentType,
-              // Important: use the Web4 domain as SNI/Host to match the node certificate.
+              // HTTP Host header only — TLS SNI is derived from the URL host
+              // by `NativeQuicModule.resolveServerName`. The Web4 domain
+              // never belongs in TLS SNI; gateways serve a public LE cert
+              // bound to their own hostname.
               "Host": proxyHostHeader ?? domain
             ],
             body: body,
