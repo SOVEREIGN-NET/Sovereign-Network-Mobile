@@ -50,7 +50,7 @@ impl ZhtpRequest {
         
         // Fee Policy: Getters are FREE (rate-limited), Setters require DAO fee
         // GET/HEAD: 0 fee (100 requests per 30 seconds enforced by node)
-        // POST/PUT/DELETE/PATCH: Standard DAO fee for UBS funding
+        // POST/PUT/DELETE/PATCH: Standard DAO fee for UBI funding
         let (network_fee, dao_fee) = match method {
             ZhtpMethod::Get | ZhtpMethod::Head => {
                 // Getters are free - rate limiting enforced server-side
@@ -65,7 +65,7 @@ impl ZhtpRequest {
             }
         };
         
-        // Generate DAO fee proof for UBS funding validation
+        // Generate DAO fee proof for UBI funding validation
         let dao_fee_proof = hash_blake3(&format!("dao_fee_{}_{}", dao_fee, timestamp).as_bytes());
         
         // Create headers with Web4 defaults
@@ -214,7 +214,7 @@ impl ZhtpRequest {
         Ok(request)
     }
 
-    /// Validate ZHTP request includes mandatory DAO fee for UBS/welfare funding
+    /// Validate ZHTP request includes mandatory DAO fee for UBI/welfare funding
     pub fn validate_dao_fee(&self, _economic_model: &EconomicModel) -> anyhow::Result<bool> {
         // Calculate expected DAO fee based on request value
         let request_value = crate::economics::utils::calculate_request_value(&self.method, &self.body, &self.uri);
@@ -243,7 +243,7 @@ impl ZhtpRequest {
         }
         
         tracing::info!(
-            "ZHTP request validated: {} ZHTP DAO fee paid for UBS/welfare funding",
+            "ZHTP request validated: {} ZHTP DAO fee paid for UBI/welfare funding",
             self.headers.dao_fee
         );
         

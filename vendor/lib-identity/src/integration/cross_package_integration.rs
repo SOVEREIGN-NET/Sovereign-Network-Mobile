@@ -203,7 +203,7 @@ impl CrossPackageIntegration {
 
     /// Initialize connection to economics package
     async fn initialize_economics_connection(&mut self) -> Result<(), Box<dyn std::error::Error>> {
-        // Connect to UBS and economic systems
+        // Connect to UBI and economic systems
         let econ_request = CrossPackageRequest {
             target_package: "lib-economy".to_string(),
             operation: "connect_ubi_system".to_string(),
@@ -341,7 +341,7 @@ impl CrossPackageIntegration {
         Err("Failed to generate identity proof".into())
     }
 
-    /// Verify economic eligibility for UBS
+    /// Verify economic eligibility for UBI
     pub async fn verify_ubi_eligibility(&mut self, identity_id: &str) -> Result<bool, Box<dyn std::error::Error>> {
         if !self.economics_connection.authenticated {
             return Err("Economics package not connected".into());
@@ -370,10 +370,10 @@ impl CrossPackageIntegration {
         Ok(false)
     }
 
-    /// Distribute UBS payment
+    /// Distribute UBI payment
     pub async fn distribute_ubi_payment(&mut self, identity_id: &str, amount: u64) -> Result<String, Box<dyn std::error::Error>> {
         if !self.economics_connection.authenticated || !self.economics_connection.ubi_system_active {
-            return Err("UBS system not available".into());
+            return Err("UBI system not available".into());
         }
 
         let payment_request = CrossPackageRequest {
@@ -398,7 +398,7 @@ impl CrossPackageIntegration {
             }
         }
         
-        Err("Failed to distribute UBS payment".into())
+        Err("Failed to distribute UBI payment".into())
     }
 
     /// Health check for all connections

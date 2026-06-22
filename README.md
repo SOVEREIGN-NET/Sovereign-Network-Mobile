@@ -34,7 +34,7 @@ Multi-node QUIC with per-host SPKI certificate pinning. Nodes configured via `.e
 ## Features
 
 - **Identity** — Create, recover, backup ZK-DID identities with seed phrase support and biometric lock
-- **Wallet** — Multi-wallet token management, send/receive, staking, UBS claims
+- **Wallet** — Multi-wallet token management, send/receive, staking, UBI claims
 - **Tokens** — Token creation with bonding curves, token management and trading
 - **PoUW** — Proof of Useful Work mining with reward tracking
 - **DAO** — Governance proposals, zero-knowledge voting, treasury status

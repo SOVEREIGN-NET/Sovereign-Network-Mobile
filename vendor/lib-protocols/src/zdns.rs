@@ -113,7 +113,7 @@ pub struct EconomicConfig {
     pub access_fee: f64,
     /// Revenue sharing percentage for domain owner
     pub owner_share: f64,
-    /// UBS contribution percentage
+    /// UBI contribution percentage
     pub ubi_share: f64,
     /// Network maintenance fee percentage
     pub network_share: f64,
@@ -208,7 +208,7 @@ pub struct EconomicTransaction {
     pub tx_id: String,
     /// DAO fee amount paid
     pub dao_fee_paid: f64,
-    /// UBS contribution amount
+    /// UBI contribution amount
     pub ubi_contribution: f64,
     /// Domain owner payment
     pub owner_payment: f64,
@@ -568,7 +568,7 @@ impl ZdnsServer {
         let fee_amount = query.dao_fee.unwrap_or(0.01); // Default minimal fee
         
         // Calculate fee distribution
-        let ubi_contribution = fee_amount * 0.4; // 40% to UBS
+        let ubi_contribution = fee_amount * 0.4; // 40% to UBI
         let network_fee = fee_amount * 0.3; // 30% to network maintenance
         let owner_payment = fee_amount * 0.2; // 20% to domain owner
         let hosting_reward = fee_amount * 0.1; // 10% to hosting nodes

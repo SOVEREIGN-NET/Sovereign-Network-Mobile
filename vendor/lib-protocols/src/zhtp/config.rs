@@ -58,9 +58,9 @@ pub struct EconomicConfig {
     pub min_dao_fee_wei: u64,
     /// Maximum DAO fee in wei
     pub max_dao_fee_wei: u64,
-    /// Enable UBS distribution
+    /// Enable UBI distribution
     pub enable_ubi: bool,
-    /// UBS distribution percentage (0.0 to 1.0)
+    /// UBI distribution percentage (0.0 to 1.0)
     pub ubi_percentage: f64,
     /// Economic validation timeout in seconds
     pub validation_timeout_seconds: u64,
@@ -72,7 +72,7 @@ pub struct EconomicConfig {
     pub payment_processor: PaymentProcessorConfig,
 }
 
-/// UBS incentive calculation methods
+/// UBI incentive calculation methods
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub enum IncentiveMethod {
     /// Fixed amount per request
@@ -611,7 +611,7 @@ impl Default for EconomicConfig {
             min_dao_fee_wei: 1000,
             max_dao_fee_wei: 1_000_000_000_000_000_000, // 1 ETH
             enable_ubi: true,
-            ubi_percentage: 0.8, // 80% of DAO fees go to UBS
+            ubi_percentage: 0.8, // 80% of DAO fees go to UBI
             validation_timeout_seconds: 30,
             enable_incentives: true,
             incentive_method: IncentiveMethod::Percentage(0.001), // 0.1%
@@ -903,7 +903,7 @@ impl ServerConfig {
         }
         
         if self.economic.ubi_percentage < 0.0 || self.economic.ubi_percentage > 1.0 {
-            return Err("UBS percentage must be between 0.0 and 1.0".to_string());
+            return Err("UBI percentage must be between 0.0 and 1.0".to_string());
         }
         
         if self.compression_level < 1 || self.compression_level > 9 {

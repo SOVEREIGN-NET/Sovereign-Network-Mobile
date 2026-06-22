@@ -1,7 +1,7 @@
 //! Fee calculation algorithms
 //! 
 //! Implements the fee calculation logic for network infrastructure costs
-//! and mandatory DAO fees for Universal Basic Services funding.
+//! and mandatory DAO fees for Universal Basic Income funding.
 
 use crate::types::Priority;
 
@@ -18,9 +18,9 @@ pub fn calculate_network_fee(tx_size: u64, priority: Priority) -> u64 {
     network_fee.max(crate::MINIMUM_NETWORK_FEE)
 }
 
-/// Calculate mandatory DAO fee for UBS and welfare funding
+/// Calculate mandatory DAO fee for UBI and welfare funding
 pub fn calculate_dao_fee(amount: u64) -> u64 {
-    // 1% of transaction amount goes to DAO treasury (Phase 1: UBS and welfare services)
+    // 1% of transaction amount goes to DAO treasury (Phase 1: UBI and welfare services)
     // Use saturating arithmetic to prevent overflow
     let dao_fee = amount.saturating_mul(crate::DEFAULT_DAO_FEE_RATE) / 10000; // 1.00% mandatory (TRANSACTION_FEE_RATE)
 
@@ -37,7 +37,7 @@ pub fn calculate_total_fee(tx_size: u64, amount: u64, priority: Priority) -> (u6
     (network_fee, dao_fee, total_fee)
 }
 
-/// Calculate fee with exemptions for UBS and welfare distributions
+/// Calculate fee with exemptions for UBI and welfare distributions
 pub fn calculate_fee_with_exemptions(
     tx_size: u64, 
     amount: u64, 
@@ -45,7 +45,7 @@ pub fn calculate_fee_with_exemptions(
     is_ubi_or_welfare: bool
 ) -> (u64, u64, u64) {
     if is_ubi_or_welfare {
-        // UBS and welfare distributions are completely fee-free
+        // UBI and welfare distributions are completely fee-free
         (0, 0, 0)
     } else {
         calculate_total_fee(tx_size, amount, priority)

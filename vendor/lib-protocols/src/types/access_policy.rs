@@ -28,7 +28,7 @@ pub struct AccessPolicy {
     pub time_restrictions: Option<TimeRestriction>,
     /// Required DAO membership level
     pub required_dao_level: Option<u32>,
-    /// Required UBS eligibility
+    /// Required UBI eligibility
     pub requires_ubi_eligibility: bool,
     /// Maximum simultaneous access count
     pub max_concurrent_access: Option<u32>,
@@ -128,7 +128,7 @@ pub struct EconomicRequirements {
     pub subscription_fee: Option<u64>,
     /// Required DAO participation score
     pub dao_participation_score: Option<f64>,
-    /// UBS contribution requirement
+    /// UBI contribution requirement
     pub ubi_contribution_requirement: Option<u64>,
 }
 

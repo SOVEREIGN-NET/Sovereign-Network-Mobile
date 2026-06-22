@@ -1,7 +1,7 @@
 //! Transaction types for economic operations
 //! 
 //! Defines all types of economic transactions in the ZHTP network,
-//! from rewards and payments to UBS distribution and governance.
+//! from rewards and payments to UBI distribution and governance.
 
 use serde::{Serialize, Deserialize};
 
@@ -18,11 +18,11 @@ pub enum TransactionType {
     Unstake,
     /// Network infrastructure fee payment
     NetworkFee,
-    /// DAO fee for Universal Basic Services fund (mandatory 2% on transactions)
+    /// DAO fee for Universal Basic Income fund (mandatory 2% on transactions)
     DaoFee,
     /// Token burning (for deflationary mechanics if needed)
     Burn,
-    /// Universal Basic Services payment to verified citizens
+    /// Universal Basic Income payment to verified citizens
     UbiDistribution,
     /// Welfare service funding (healthcare, education, infrastructure)
     WelfareDistribution,
@@ -69,9 +69,9 @@ impl TransactionType {
             TransactionType::Stake => "Stake tokens",
             TransactionType::Unstake => "Unstake tokens",
             TransactionType::NetworkFee => "Network infrastructure fee",
-            TransactionType::DaoFee => "DAO fee for UBS fund",
+            TransactionType::DaoFee => "DAO fee for UBI fund",
             TransactionType::Burn => "Token burn",
-            TransactionType::UbiDistribution => "Universal Basic Services",
+            TransactionType::UbiDistribution => "Universal Basic Income",
             TransactionType::WelfareDistribution => "Welfare service funding",
             TransactionType::ProposalVote => "DAO proposal vote",
             TransactionType::ProposalExecution => "DAO proposal execution",

@@ -1,7 +1,7 @@
 //! Integration tests for ZHTP Economics module
 //! 
 //! Comprehensive tests covering all economic functionality including
-//! fee calculation, reward distribution, UBS mechanics, and  economics.
+//! fee calculation, reward distribution, UBI mechanics, and  economics.
 
 use lib_economy::*;
 use lib_economy::incentives::{cost_savings::CostSavings, infrastructure_rewards::InfrastructureRewards};
@@ -46,10 +46,10 @@ mod tests {
         assert!(tx.base_fee > 0); // Should have network fee
         assert_eq!(tx.tx_type, TransactionType::Payment);
         
-        // Test UBS distribution (should be fee-free)
+        // Test UBI distribution (should be fee-free)
         let ubi_tx = Transaction::new_ubi_distribution([3u8; 32], 1000).unwrap();
         assert_eq!(ubi_tx.amount, 1000);
-        assert_eq!(ubi_tx.dao_fee, 0); // UBS distributions are fee-free
+        assert_eq!(ubi_tx.dao_fee, 0); // UBI distributions are fee-free
         assert_eq!(ubi_tx.base_fee, 0);
         assert_eq!(ubi_tx.tx_type, TransactionType::UbiDistribution);
         
@@ -175,11 +175,11 @@ mod tests {
         assert_eq!(treasury.dev_grants_allocated, 100); // 10% of 1000
         assert_eq!(treasury.total_dao_fees_collected, 1000);
 
-        // Test UBS calculation
+        // Test UBI calculation
         let ubi_per_citizen = treasury.calculate_ubi_per_citizen(100); // 100 citizens
         assert_eq!(ubi_per_citizen, 4); // 450 / 100 (changed from 6)
 
-        // Test non-UBS funding
+        // Test non-UBI funding
         let sector_available = treasury.calculate_sector_dao_funding_available();
         let emergency_available = treasury.calculate_emergency_funding_available();
         let dev_grants_available = treasury.calculate_dev_grants_funding_available();

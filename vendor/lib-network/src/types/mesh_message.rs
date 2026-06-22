@@ -428,7 +428,7 @@ pub enum ZhtpMeshMessage {
         max_hops: u8,
     },
 
-    /// UBS distribution message
+    /// UBI distribution message
     UbiDistribution {
         recipient: PublicKey,
         amount_tokens: u64,

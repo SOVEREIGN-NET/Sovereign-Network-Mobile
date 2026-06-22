@@ -39,7 +39,7 @@ See [OVERVIEW.md](./OVERVIEW.md) for complete examples and getting started guide
 - **ZDNS v1.0**: Censorship-resistant domain resolution
 - **Post-Quantum Security**: CRYSTALS-Dilithium, CRYSTALS-Kyber
 - **Zero-Knowledge Proofs**: Privacy-preserving validation
-- **Economic Incentives**: 2% DAO fees for UBS funding
+- **Economic Incentives**: 2% DAO fees for UBI funding
 - ****: Complete mesh networking capability
 
 ## 📖 Documentation Resources

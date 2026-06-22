@@ -15,7 +15,7 @@ ZHTP replaces the entire traditional internet stack:
 3. **HTTP/HTTPS** → Native ZHTP protocol with built-in privacy
 4. **TLS** → Post-quantum encryption by default
 5. **CDNs** → Distributed content with economic rewards
-6. **Governments** → DAO governance with UBS for all participants
+6. **Governments** → DAO governance with UBI for all participants
 
 **Result: A free internet that pays users to participate**
 
@@ -25,7 +25,7 @@ ZHTP replaces the entire traditional internet stack:
 - HTTP replacement with built-in economics
 - Zero-knowledge proof validation at transport layer
 - Post-quantum cryptography (CRYSTALS-Dilithium, CRYSTALS-Kyber)
-- Mandatory 2% DAO fees for UBS funding
+- Mandatory 2% DAO fees for UBI funding
 - Complete  capability
 - Native .zhtp domains and Web4 addressing
 
@@ -136,7 +136,7 @@ let response = integration.process_integrated_request(request).await?;
 
 All ZHTP operations include economic incentives:
 
-- **Mandatory 2% DAO fees** for UBS funding
+- **Mandatory 2% DAO fees** for UBI funding
 - **Dynamic fee calculation** based on operation type, data size, and priority
 - **Proof-of-Useful-Work** rewards for network participation
 - **Storage contracts** with economic guarantees

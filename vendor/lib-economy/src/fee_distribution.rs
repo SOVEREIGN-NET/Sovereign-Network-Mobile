@@ -2,7 +2,7 @@
 //!
 //! Implements deterministic fee splitting for the Sovereign Network economy.
 //! This module calculates how a 1% protocol fee is split across five buckets:
-//! - 45% → Universal Basic Services (UBS)
+//! - 45% → Universal Basic Income (UBI)
 //! - 30% → Sector DAOs (5 DAOs × 6% each: Healthcare, Education, Energy, Housing, Food)
 //! - 15% → Emergency Reserve
 //! - 10% → Development Grants
@@ -39,7 +39,7 @@
 //! let volume_cents = 100_000_000; // $1M in cents
 //! let distribution = distribute_fee(volume_cents).unwrap();
 //!
-//! assert_eq!(distribution.ubs(), 450_000);           // $4,500
+//! assert_eq!(distribution.ubi(), 450_000);           // $4,500
 //! assert_eq!(distribution.sector_dao_total(), 300_000); // $3,000 (6%×5)
 //! assert_eq!(distribution.sector_dao(SectorDao::Healthcare), 60_000); // $600
 //! assert_eq!(distribution.emergency_reserve(), 150_000); // $1,500
@@ -53,7 +53,7 @@ use std::fmt;
 /// This is a hard-coded constant, immutable and not subject to governance override in Phase 1.
 pub const PROTOCOL_FEE_RATE_BASIS_POINTS: u64 = 100; // 1% = 100 basis points
 
-/// UBS allocation: 45% of the 1% fee
+/// UBI allocation: 45% of the 1% fee
 pub const UBI_ALLOCATION_PERCENT: u64 = 45;
 
 /// Sector DAOs allocation: 30% of the 1% fee (split equally among 5 DAOs)
@@ -158,8 +158,8 @@ impl std::error::Error for FeeDistributionError {}
 ///
 /// # Invariants
 ///
-/// - sum(ubs, sector_daos, emergency, development) ≤ fee (no value creation)
-/// - ubs = fee * 45 / 100
+/// - sum(ubi, sector_daos, emergency, development) ≤ fee (no value creation)
+/// - ubi = fee * 45 / 100
 /// - sector_dao[i] = fee * 6 / 100 for each of 5 DAOs
 /// - emergency = fee * 15 / 100 + remainder (remainder goes here for safety)
 /// - development = fee * 10 / 100
@@ -168,8 +168,8 @@ pub struct FeeDistribution {
     /// Total fee amount (input)
     fee: u64,
 
-    /// UBS allocation: 45% of fee
-    ubs: u64,
+    /// UBI allocation: 45% of fee
+    ubi: u64,
 
     /// Healthcare DAO allocation: 6% of fee
     healthcare: u64,
@@ -200,7 +200,7 @@ impl FeeDistribution {
     /// Used internally by distribute_fee. Validates conservation invariant.
     fn new(
         fee: u64,
-        ubs: u64,
+        ubi: u64,
         healthcare: u64,
         education: u64,
         energy: u64,
@@ -209,7 +209,7 @@ impl FeeDistribution {
         emergency_reserve: u64,
         development_grants: u64,
     ) -> Result<Self, FeeDistributionError> {
-        let total = ubs
+        let total = ubi
             .saturating_add(healthcare)
             .saturating_add(education)
             .saturating_add(energy)
@@ -224,7 +224,7 @@ impl FeeDistribution {
 
         Ok(FeeDistribution {
             fee,
-            ubs,
+            ubi,
             healthcare,
             education,
             energy,
@@ -235,9 +235,9 @@ impl FeeDistribution {
         })
     }
 
-    /// Get the UBS allocation (45% of fee)
-    pub const fn ubs(&self) -> u64 {
-        self.ubs
+    /// Get the UBI allocation (45% of fee)
+    pub const fn ubi(&self) -> u64 {
+        self.ubi
     }
 
     /// Get Healthcare DAO allocation (6% of fee)
@@ -298,7 +298,7 @@ impl FeeDistribution {
 
     /// Get sum of all distributions
     pub const fn total_distributed(&self) -> u64 {
-        self.ubs + self.sector_dao_total() + self.emergency_reserve + self.development_grants
+        self.ubi + self.sector_dao_total() + self.emergency_reserve + self.development_grants
     }
 
 }
@@ -307,10 +307,10 @@ impl fmt::Display for FeeDistribution {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         write!(
             f,
-            "FeeDistribution {{fee: {}, ubs: {}, sectors: {{healthcare: {}, education: {}, energy: {}, housing: {}, food: {}}}, \
+            "FeeDistribution {{fee: {}, ubi: {}, sectors: {{healthcare: {}, education: {}, energy: {}, housing: {}, food: {}}}, \
              emergency: {}, dev: {}}}",
             self.fee,
-            self.ubs,
+            self.ubi,
             self.healthcare,
             self.education,
             self.energy,
@@ -325,13 +325,13 @@ impl fmt::Display for FeeDistribution {
 /// Distribute a transaction fee across all allocation buckets
 ///
 /// This is a pure function: given a transaction volume, it returns the deterministic
-/// allocation of the 1% protocol fee across UBS, sector DAOs, emergency reserve, and dev grants.
+/// allocation of the 1% protocol fee across UBI, sector DAOs, emergency reserve, and dev grants.
 ///
 /// # Algorithm
 ///
 /// 1. Calculate 1% fee from volume: `fee = volume * 100 / 10_000`
 /// 2. Allocate using integer division:
-///    - UBS = fee * 45 / 100
+///    - UBI = fee * 45 / 100
 ///    - Healthcare = fee * 6 / 100
 ///    - Education = fee * 6 / 100
 ///    - Energy = fee * 6 / 100
@@ -358,7 +358,7 @@ impl fmt::Display for FeeDistribution {
 /// let volume = 100_000_000; // $1,000,000 in cents
 /// let distribution = distribute_fee(volume)?;
 /// assert_eq!(distribution.fee(), 1_000_000);       // $10,000 fee (1%)
-/// assert_eq!(distribution.ubs(), 450_000);         // $4,500 (45%)
+/// assert_eq!(distribution.ubi(), 450_000);         // $4,500 (45%)
 /// assert_eq!(distribution.sector_dao_total(), 300_000); // $3,000 (30%)
 /// assert_eq!(distribution.emergency_reserve(), 150_000); // $1,500 (15%)
 /// assert_eq!(distribution.development_grants(), 100_000); // $1,000 (10%)
@@ -380,7 +380,7 @@ pub fn distribute_fee(volume: u64) -> Result<FeeDistribution, FeeDistributionErr
     // Allocate each bucket using u128 intermediates for overflow safety
     // This prevents overflow when multiplying u64 by allocation percentages (up to 100)
     let fee_u128 = fee as u128;
-    let ubs = ((fee_u128 * UBI_ALLOCATION_PERCENT as u128) / 100) as u64;
+    let ubi = ((fee_u128 * UBI_ALLOCATION_PERCENT as u128) / 100) as u64;
     let healthcare = ((fee_u128 * SECTOR_DAO_INDIVIDUAL_PERCENT as u128) / 100) as u64;
     let education = ((fee_u128 * SECTOR_DAO_INDIVIDUAL_PERCENT as u128) / 100) as u64;
     let energy = ((fee_u128 * SECTOR_DAO_INDIVIDUAL_PERCENT as u128) / 100) as u64;
@@ -389,7 +389,7 @@ pub fn distribute_fee(volume: u64) -> Result<FeeDistribution, FeeDistributionErr
     let development_grants = ((fee_u128 * DEVELOPMENT_GRANTS_ALLOCATION_PERCENT as u128) / 100) as u64;
 
     // Calculate sum of all allocations
-    let sum_without_emergency = ubs
+    let sum_without_emergency = ubi
         + healthcare
         + education
         + energy
@@ -402,7 +402,7 @@ pub fn distribute_fee(volume: u64) -> Result<FeeDistribution, FeeDistributionErr
 
     FeeDistribution::new(
         fee,
-        ubs,
+        ubi,
         healthcare,
         education,
         energy,
@@ -436,7 +436,7 @@ pub fn distribute_fee(volume: u64) -> Result<FeeDistribution, FeeDistributionErr
         assert_eq!(distribution.fee(), expected_fee);
         
         // Verify allocations are reasonable (can't be larger than fee)
-        assert!(distribution.ubs() <= expected_fee);
+        assert!(distribution.ubi() <= expected_fee);
         assert!(distribution.emergency_reserve() <= expected_fee);
         assert!(distribution.development_grants() <= expected_fee);
         assert!(distribution.sector_dao_total() <= expected_fee);
@@ -483,7 +483,7 @@ pub fn distribute_fee(volume: u64) -> Result<FeeDistribution, FeeDistributionErr
             
             // Each allocation is at most the expected percentage
             assert_eq!(
-                distribution.ubs(),
+                distribution.ubi(),
                 (expected_fee as u128 * UBI_ALLOCATION_PERCENT as u128 / 100) as u64
             );
         }
@@ -538,8 +538,8 @@ mod tests {
         assert_eq!(distribution.fee(), 1_000_000);
 
         // Expected allocations:
-        // UBS: 45% = $4,500
-        assert_eq!(distribution.ubs(), 450_000);
+        // UBI: 45% = $4,500
+        assert_eq!(distribution.ubi(), 450_000);
 
         // Sector DAOs: 30% = $3,000 (6% each = $600)
         assert_eq!(distribution.healthcare(), 60_000);
@@ -570,7 +570,7 @@ mod tests {
         assert_eq!(distribution.fee(), 500_000_000);
 
         // Expected allocations (in cents):
-        assert_eq!(distribution.ubs(), 225_000_000); // 45%
+        assert_eq!(distribution.ubi(), 225_000_000); // 45%
         assert_eq!(distribution.sector_dao(SectorDao::Healthcare), 30_000_000); // 6%
         assert_eq!(distribution.sector_dao(SectorDao::Education), 30_000_000);
         assert_eq!(distribution.sector_dao(SectorDao::Energy), 30_000_000);
@@ -595,7 +595,7 @@ mod tests {
         assert_eq!(distribution.fee(), 5_000_000_000);
 
         // Expected allocations (in cents):
-        assert_eq!(distribution.ubs(), 2_250_000_000); // 45%
+        assert_eq!(distribution.ubi(), 2_250_000_000); // 45%
         assert_eq!(distribution.sector_dao(SectorDao::Healthcare), 300_000_000); // 6%
         assert_eq!(distribution.sector_dao(SectorDao::Education), 300_000_000);
         assert_eq!(distribution.sector_dao(SectorDao::Energy), 300_000_000);
@@ -616,7 +616,7 @@ mod tests {
     fn test_zero_volume() {
         let distribution = distribute_fee(0).unwrap();
         assert_eq!(distribution.fee(), 0);
-        assert_eq!(distribution.ubs(), 0);
+        assert_eq!(distribution.ubi(), 0);
         assert_eq!(distribution.sector_dao_total(), 0);
         assert_eq!(distribution.emergency_reserve(), 0);
         assert_eq!(distribution.development_grants(), 0);
@@ -644,7 +644,7 @@ mod tests {
         assert_eq!(distribution.fee(), 1);
 
         // All allocations should be 0 or small
-        assert_eq!(distribution.ubs(), 0); // 1 * 45 / 100 = 0
+        assert_eq!(distribution.ubi(), 0); // 1 * 45 / 100 = 0
         assert_eq!(distribution.sector_dao_total(), 0); // 1 * 30 / 100 = 0
         assert_eq!(distribution.development_grants(), 0); // 1 * 10 / 100 = 0
 
@@ -669,7 +669,7 @@ mod tests {
         assert_eq!(distribution.fee(), 101);
 
         // Verify remainder goes to emergency (safety-biased)
-        let sum_without_emergency = distribution.ubs()
+        let sum_without_emergency = distribution.ubi()
             + distribution.sector_dao_total()
             + distribution.development_grants();
         let remainder = distribution.fee() - sum_without_emergency;
@@ -706,8 +706,8 @@ mod tests {
         for volume in [1_000, 10_000, 100_000, 1_000_000] {
             let distribution = distribute_fee(volume).unwrap();
             assert!(
-                distribution.ubs() <= distribution.fee(),
-                "UBS exceeds fee"
+                distribution.ubi() <= distribution.fee(),
+                "UBI exceeds fee"
             );
             assert!(
                 distribution.sector_dao_total() <= distribution.fee(),
@@ -754,7 +754,7 @@ mod tests {
         let distribution = distribute_fee(100_000_000).unwrap();
 
         // Available: read-only getters
-        let _: u64 = distribution.ubs();
+        let _: u64 = distribution.ubi();
         let _: u64 = distribution.sector_dao(SectorDao::Healthcare);
         let _: u64 = distribution.emergency_reserve();
         let _: u64 = distribution.development_grants();
@@ -771,7 +771,7 @@ mod tests {
 
         // Should contain all buckets
         assert!(display_str.contains("fee:"));
-        assert!(display_str.contains("ubs:"));
+        assert!(display_str.contains("ubi:"));
         assert!(display_str.contains("healthcare:"));
         assert!(display_str.contains("emergency:"));
         assert!(display_str.contains("dev:"));
@@ -794,14 +794,14 @@ mod tests {
         let distribution = distribute_fee(100_000_000).unwrap();
 
         // What we CAN do: read allocations
-        let _ubi = distribution.ubs();
+        let _ubi = distribution.ubi();
         let _sector = distribution.sector_dao(SectorDao::Healthcare);
 
         // What we CANNOT do (and intentionally don't in Phase 1):
         // - No vesting: allocation is fixed, not time-based
         // - No performance scoring: distributions are predetermined
         // - No liquidity: this is just accounting, not spending
-        // - No user-level UBS calculation: this is protocol-level only
+        // - No user-level UBI calculation: this is protocol-level only
         // - No DAO execution: this module only splits fees
         // - No KYC enforcement: that's in a different layer
     }

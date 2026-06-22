@@ -17,7 +17,7 @@ pub struct SupplyMetrics {
     pub total_burned: u64,
     /// Operational tokens minted (for infrastructure)
     pub operational_minted: u64,
-    /// UBS tokens minted
+    /// UBI tokens minted
     pub ubi_minted: u64,
     /// Infrastructure reward tokens minted
     pub infrastructure_minted: u64,
@@ -46,7 +46,7 @@ impl SupplyMetrics {
         
         match purpose {
             MintingPurpose::Operational => self.operational_minted += amount,
-            MintingPurpose::UBS => self.ubi_minted += amount,
+            MintingPurpose::UBI => self.ubi_minted += amount,
             MintingPurpose::Infrastructure => self.infrastructure_minted += amount,
         }
         
@@ -103,8 +103,8 @@ impl SupplyMetrics {
 pub enum MintingPurpose {
     /// Operational tokens for network services
     Operational,
-    /// UBS distribution tokens
-    UBS,
+    /// UBI distribution tokens
+    UBI,
     /// Infrastructure reward tokens
     Infrastructure,
 }
@@ -160,7 +160,7 @@ pub fn calculate_optimal_supply_for_utility(
     // Infrastructure rewards (assume 10% of transaction value goes to infrastructure)
     let monthly_infrastructure_rewards = monthly_transaction_value / 10;
     
-    // UBS requirements (assume 1000 tokens per person per month)
+    // UBI requirements (assume 1000 tokens per person per month)
     let monthly_ubi_requirement = infrastructure_participants * 1000;
     
     // Total monthly supply needed

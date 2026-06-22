@@ -64,7 +64,7 @@ pub async fn process_lib_request(
 // Get current network statistics
 pub async fn get_network_stats(&self) -> MeshProtocolStats
 
-// Get revenue pools for UBS distribution
+// Get revenue pools for UBI distribution
 pub async fn get_revenue_pools(&self) -> HashMap<String, u64>
 
 // Check if emergency stop has been triggered

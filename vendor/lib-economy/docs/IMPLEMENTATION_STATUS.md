@@ -21,7 +21,7 @@ lib-economy is a nearly-complete, production-ready economic system implementing 
   - Dynamic fee calculation with DAO contribution (2%)
   - Infrastructure service rewards (routing, storage, compute)
   - Quality and uptime bonuses
-  - Treasury fund allocation (40% UBS, 30% welfare, 30% dev)
+  - Treasury fund allocation (40% UBI, 30% welfare, 30% dev)
 
 ### 2. **wallets/** - Multi-Wallet System 
 - **Status**: Production-ready
@@ -38,10 +38,10 @@ lib-economy is a nearly-complete, production-ready economic system implementing 
 - **Status**: Production-ready
 - **Lines**: ~400 lines
 - **Files**: 2/2 complete
-  - `treasury_calculations.rs` (157 lines) - UBS calculations, efficiency tracking
+  - `treasury_calculations.rs` (157 lines) - UBI calculations, efficiency tracking
 - **Key Features**:
-  - Optimal UBS per citizen calculation
-  - Welfare and UBS efficiency metrics
+  - Optimal UBI per citizen calculation
+  - Welfare and UBI efficiency metrics
   - Treasury sustainability analysis
   - Funding gap calculations
 
@@ -151,13 +151,13 @@ pub fn distribute_ubi_to_citizens() -> anyhow::Result<()> {
 - Duplicate claim prevention
 
 **What Exists Elsewhere:**
--  UBS calculation logic in `treasury_economics/treasury_calculations.rs`
+-  UBI calculation logic in `treasury_economics/treasury_calculations.rs`
 -  Treasury fund allocation in `models/dao_treasury.rs`
--  UBS transaction type in `transactions/transaction.rs`
+-  UBI transaction type in `transactions/transaction.rs`
 
 **Impact:**
-- **Minor** - Core UBS calculations work
-- UBS amounts can be calculated
+- **Minor** - Core UBI calculations work
+- UBI amounts can be calculated
 - Manual distribution possible via transaction system
 - Only automated distribution scheduling missing
 
@@ -208,7 +208,7 @@ pub fn distribute_ubi_to_citizens() -> anyhow::Result<()> {
 
 ### 3. DAO-Driven Welfare 
 - Mandatory 2% DAO fee on all transactions
-- Transparent allocation: 40% UBS, 30% welfare, 30% development
+- Transparent allocation: 40% UBI, 30% welfare, 30% development
 - On-chain auditable
 
 ### 4. Anti-Sybil Design 
@@ -331,12 +331,12 @@ pub fn distribute_ubi_to_citizens() -> anyhow::Result<()> {
 -  Dynamic pricing
 
 ### Optional Features: STUB/MISSING 
--  Automated UBS distribution (manual workaround possible)
+-  Automated UBI distribution (manual workaround possible)
 -  Aggregated reward calculator (individual calculations work)
 
 ### Assessment
 **lib-economy can be used in production TODAY** with minor workarounds:
-- UBS distributions can be done manually via transaction system
+- UBI distributions can be done manually via transaction system
 - Rewards can be calculated individually and combined manually
 - All core economic functions work completely
 

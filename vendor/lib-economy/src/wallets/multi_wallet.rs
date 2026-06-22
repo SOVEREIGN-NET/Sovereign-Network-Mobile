@@ -34,7 +34,7 @@ pub enum WalletType {
     Staking,
     /// Specialized wallet for DAO governance
     Governance,
-    /// Specialized wallet for UBS distributions
+    /// Specialized wallet for UBI distributions
     UbiDistribution,
     /// Specialized wallet for infrastructure investment
     Infrastructure,
@@ -55,7 +55,7 @@ impl WalletType {
             WalletType::MeshDiscoveryRewards => "Mesh discovery and topology rewards",
             WalletType::Staking => "Staking and infrastructure investment",
             WalletType::Governance => "DAO governance and voting",
-            WalletType::UbiDistribution => "Universal Basic Services distribution",
+            WalletType::UbiDistribution => "Universal Basic Income distribution",
             WalletType::Infrastructure => "Infrastructure provider rewards",
             WalletType::Bridge => "Cross-chain bridge operations",
             WalletType::SmartContract => "Smart contract interactions",
@@ -499,7 +499,7 @@ impl MultiWalletManager {
                 Ok(())
             },
             WalletType::UbiDistribution => {
-                // Check if identity is authorized for UBS distribution
+                // Check if identity is authorized for UBI distribution
                 // This would typically require DAO approval
                 Ok(())
             },
@@ -594,10 +594,10 @@ impl MultiWalletManager {
         // Validate the target wallet type is compatible
         match (from_wallet, to_wallet) {
             (WalletType::Governance, WalletType::UbiDistribution) => {
-                return Err(anyhow::anyhow!("Cannot transfer from governance to UBS distribution directly"));
+                return Err(anyhow::anyhow!("Cannot transfer from governance to UBI distribution directly"));
             },
             (WalletType::UbiDistribution, WalletType::Governance) => {
-                return Err(anyhow::anyhow!("UBS to governance transfers require special approval"));
+                return Err(anyhow::anyhow!("UBI to governance transfers require special approval"));
             },
             (WalletType::Infrastructure, WalletType::Governance) => {
                 return Err(anyhow::anyhow!("Infrastructure to governance transfers require DAO approval"));
@@ -704,7 +704,7 @@ impl MultiWalletManager {
             (_, WalletType::IspBypassRewards) | (_, WalletType::MeshDiscoveryRewards) => TransactionType::Reward,
             (WalletType::IspBypassRewards, _) | (WalletType::MeshDiscoveryRewards, _) => TransactionType::Reward,
             
-            // UBS-related transfers
+            // UBI-related transfers
             (_, WalletType::UbiDistribution) | (WalletType::UbiDistribution, _) => TransactionType::UbiDistribution,
             
             // Staking-related transfers

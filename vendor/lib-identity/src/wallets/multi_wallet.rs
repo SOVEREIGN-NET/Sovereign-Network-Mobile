@@ -13,11 +13,11 @@ impl WalletManager {
             Some("primary".to_string()),
         ).await?;
         
-        // Create UBS wallet with seed phrase
+        // Create UBI wallet with seed phrase
         let (ubi_id, ubi_seed) = self.create_wallet_with_seed_phrase(
-            WalletType::UBS,
-            "UBS Wallet".to_string(),
-            Some("ubs".to_string()),
+            WalletType::UBI,
+            "UBI Wallet".to_string(),
+            Some("ubi".to_string()),
         ).await?;
         
         // Create savings wallet with seed phrase
@@ -52,7 +52,7 @@ impl WalletManager {
             let summary = wallet.to_summary();
             match wallet.wallet_type {
                 WalletType::Primary => primary_wallets.push(summary),
-                WalletType::UBS => ubi_wallets.push(summary),
+                WalletType::UBI => ubi_wallets.push(summary),
                 WalletType::Savings => savings_wallets.push(summary),
                 WalletType::Stealth => stealth_wallets.push(summary),
                 WalletType::Standard => standard_wallets.push(summary),
@@ -81,7 +81,7 @@ impl WalletManager {
         for wallet in self.wallets.values() {
             match wallet.wallet_type {
                 WalletType::Primary => balances.primary_balance += wallet.balance,
-                WalletType::UBS => balances.ubi_balance += wallet.balance,
+                WalletType::UBI => balances.ubi_balance += wallet.balance,
                 WalletType::Savings => balances.savings_balance += wallet.balance,
                 WalletType::Stealth => balances.stealth_balance += wallet.balance,
                 WalletType::Standard => balances.standard_balance += wallet.balance,

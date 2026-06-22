@@ -1,4 +1,4 @@
-//! UBS registration system from the original identity.rs
+//! UBI registration system from the original identity.rs
 
 use anyhow::Result;
 use serde::{Deserialize, Serialize};
@@ -11,36 +11,36 @@ use crate::economics::{EconomicModel, Transaction, TransactionType, Priority};
 const BLOCKS_PER_DAY: u64 = 8_640;
 
 /// Days per month used for remainder accumulation
-/// When dividing monthly UBS by days to get daily amount, we track remainder for later distribution
+/// When dividing monthly UBI by days to get daily amount, we track remainder for later distribution
 const DAYS_PER_MONTH: u64 = 30;
 
-/// UBS registration result
+/// UBI registration result
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct UbiRegistration {
     /// Citizen's identity ID
     pub identity_id: IdentityId,
-    /// UBS wallet ID for automatic payouts
+    /// UBI wallet ID for automatic payouts
     pub ubi_wallet_id: WalletId,
-    /// UBS registration transaction
+    /// UBI registration transaction
     pub registration_tx: Transaction,
-    /// Daily UBS amount (~33 ZHTP)
+    /// Daily UBI amount (~33 ZHTP)
     pub daily_amount: u64,
-    /// Monthly UBS amount (1000 ZHTP)
+    /// Monthly UBI amount (1000 ZHTP)
     pub monthly_amount: u64,
-    /// UBS eligibility proof
+    /// UBI eligibility proof
     pub eligibility_proof: [u8; 32],
     /// Registration block height (deterministic consensus layer)
     pub registered_at_block: u64,
-    /// Last UBS payout block height (deterministic consensus layer)
+    /// Last UBI payout block height (deterministic consensus layer)
     pub last_payout_block: Option<u64>,
-    /// Total UBS received to date
+    /// Total UBI received to date
     pub total_received: u64,
     /// Accumulated remainder from integer division (e.g., 1000 / 30 = 33 remainder 10)
     pub remainder_balance: u64,
 }
 
 impl UbiRegistration {
-    /// Create a new UBS registration
+    /// Create a new UBI registration
     pub fn new(
         identity_id: IdentityId,
         ubi_wallet_id: WalletId,
@@ -68,7 +68,7 @@ impl UbiRegistration {
         }
     }
     
-    /// Register identity for Universal Basic Services payouts - IMPLEMENTATION FROM ORIGINAL
+    /// Register identity for Universal Basic Income payouts - IMPLEMENTATION FROM ORIGINAL
     pub async fn register_for_ubi_payouts(
         identity_id: &IdentityId,
         ubi_wallet_id: &WalletId,
@@ -77,22 +77,22 @@ impl UbiRegistration {
         // Use block height for deterministic consensus (not wall-clock time)
         let current_block = economic_model.current_block;
 
-        // Calculate monthly UBS amount (1000 ZHTP tokens per month)
+        // Calculate monthly UBI amount (1000 ZHTP tokens per month)
         let monthly_ubi_amount = 1000u64;
         let daily_ubi_amount = monthly_ubi_amount / 30; // ~33 ZHTP per day
 
-        // Create UBS registration transaction
+        // Create UBI registration transaction
         let ubi_tx = Transaction::new(
-            [0u8; 32], // UBS treasury
+            [0u8; 32], // UBI treasury
             identity_id.0,
-            0, // No cost to register for UBS
+            0, // No cost to register for UBI
             TransactionType::UbiDistribution,
             economic_model,
             128, // Transaction size
             Priority::Normal,
         )?;
 
-        // Generate UBS eligibility proof using block height (deterministic)
+        // Generate UBI eligibility proof using block height (deterministic)
         let eligibility_proof = lib_crypto::hash_blake3(
             &[
                 identity_id.0.as_slice(),
@@ -103,7 +103,7 @@ impl UbiRegistration {
         );
 
         tracing::info!(
-            "UBS REGISTERED: Citizen {} eligible for {} ZHTP daily ({} ZHTP monthly) at block {}",
+            "UBI REGISTERED: Citizen {} eligible for {} ZHTP daily ({} ZHTP monthly) at block {}",
             hex::encode(&identity_id.0[..8]),
             daily_ubi_amount,
             monthly_ubi_amount,
@@ -123,7 +123,7 @@ impl UbiRegistration {
         ))
     }
     
-    /// Check if eligible for UBS payout
+    /// Check if eligible for UBI payout
     pub fn is_eligible_for_payout(&self) -> bool {
         self.eligibility_proof != [0u8; 32] && self.daily_amount > 0
     }
@@ -139,7 +139,7 @@ impl UbiRegistration {
         }
     }
     
-    /// Record a UBS payout with block height (deterministic)
+    /// Record a UBI payout with block height (deterministic)
     /// Accumulates remainder and distributes when threshold reached
     pub fn record_payout(&mut self, amount: u64, block_height: u64) -> u64 {
         let mut actual_payout = amount;
@@ -167,12 +167,12 @@ impl UbiRegistration {
         self.blocks_since_registration(current_block) / BLOCKS_PER_DAY
     }
     
-    /// Calculate expected total UBS based on blocks since registration
+    /// Calculate expected total UBI based on blocks since registration
     pub fn expected_total_ubi(&self, current_block: u64) -> u64 {
         self.days_since_registration(current_block).saturating_mul(self.daily_amount)
     }
 
-    /// Check if citizen is up to date with UBS payouts
+    /// Check if citizen is up to date with UBI payouts
     pub fn is_ubi_up_to_date(&self, current_block: u64) -> bool {
         let expected = self.expected_total_ubi(current_block);
         // Allow some tolerance (within 2 days worth = 17280 blocks)

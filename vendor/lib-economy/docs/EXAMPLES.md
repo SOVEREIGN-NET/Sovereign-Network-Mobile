@@ -11,7 +11,7 @@ Practical examples and tutorials for using lib-economy in various scenarios.
 - [Treasury Operations](#treasury-operations)
 - [Network Participation](#network-participation)
 - [ Rewards](#isp-bypass-rewards)
-- [UBS Distribution](#ubs-distribution)
+- [UBI Distribution](#ubi-distribution)
 - [Dynamic Pricing](#dynamic-pricing)
 - [Complete Economic Flows](#complete-economic-flows)
 
@@ -182,18 +182,18 @@ fn compare_priorities() -> anyhow::Result<()> {
 }
 ```
 
-### Fee-Free Transactions (UBS/Welfare)
+### Fee-Free Transactions (UBI/Welfare)
 
 ```rust
 fn create_ubi_distribution(recipient: [u8; 32]) -> anyhow::Result<Transaction> {
-    // UBS distributions are fee-free
+    // UBI distributions are fee-free
     let tx = Transaction::new_ubi_distribution(recipient, 1000)?;
     
     assert_eq!(tx.base_fee, 0);
     assert_eq!(tx.dao_fee, 0);
     assert_eq!(tx.total_fee, 0);
     
-    println!(" UBS distribution: 1000 ZHTP (no fees)");
+    println!(" UBI distribution: 1000 ZHTP (no fees)");
     Ok(tx)
 }
 ```
@@ -316,7 +316,7 @@ fn process_dao_fees() -> anyhow::Result<()> {
     
     println!("\n=== Treasury Status ===");
     println!("Total fees collected: {} ZHTP", treasury.total_dao_fees_collected);
-    println!("UBS allocated (40%): {} ZHTP", treasury.ubi_allocated);
+    println!("UBI allocated (40%): {} ZHTP", treasury.ubi_allocated);
     println!("Welfare allocated (30%): {} ZHTP", treasury.welfare_allocated);
     println!("Development (30%): {} ZHTP", treasury.development_allocated);
     println!("Treasury balance: {} ZHTP", treasury.treasury_balance);
@@ -325,7 +325,7 @@ fn process_dao_fees() -> anyhow::Result<()> {
 }
 ```
 
-### Calculating UBS Distribution
+### Calculating UBI Distribution
 
 ```rust
 use lib_economy::treasury_economics::calculate_optimal_ubi_per_citizen;
@@ -340,14 +340,14 @@ fn calculate_ubi_amounts(treasury: &DaoTreasury) -> anyhow::Result<()> {
         target_monthly_ubi,
     );
     
-    println!("\n=== UBS Calculation ===");
+    println!("\n=== UBI Calculation ===");
     println!("Total verified citizens: {}", total_citizens);
-    println!("Target monthly UBS: {} ZHTP", target_monthly_ubi);
+    println!("Target monthly UBI: {} ZHTP", target_monthly_ubi);
     
     if can_meet_target {
         println!(" Can provide full target: {} ZHTP per citizen", actual_ubi);
     } else {
-        println!("⚠ Reduced UBS: {} ZHTP per citizen", actual_ubi);
+        println!("⚠ Reduced UBI: {} ZHTP per citizen", actual_ubi);
         println!("  (Insufficient treasury funds)");
     }
     
@@ -474,11 +474,11 @@ fn isp_bypass_node_rewards() -> anyhow::Result<()> {
 
 ---
 
-## UBS Distribution
+## UBI Distribution
 
 ### Status:  Stub Implementation
 
-The UBS distribution module is currently a stub and needs full implementation. Here's the intended usage:
+The UBI distribution module is currently a stub and needs full implementation. Here's the intended usage:
 
 ```rust
 // INTENDED USAGE (not yet implemented)
@@ -488,7 +488,7 @@ fn monthly_ubi_distribution() -> anyhow::Result<()> {
     // This currently returns Ok(()) without doing anything
     // Full implementation needed:
     // - Verify citizen eligibility
-    // - Calculate individual UBS amounts
+    // - Calculate individual UBI amounts
     // - Create distribution transactions
     // - Track distribution history
     
@@ -498,7 +498,7 @@ fn monthly_ubi_distribution() -> anyhow::Result<()> {
 }
 ```
 
-### Workaround: Manual UBS Distribution
+### Workaround: Manual UBI Distribution
 
 ```rust
 fn manual_ubi_distribution(
@@ -507,12 +507,12 @@ fn manual_ubi_distribution(
 ) -> anyhow::Result<()> {
     let ubi_per_citizen = treasury.calculate_ubi_per_citizen(citizens.len() as u64);
     
-    println!("\n=== Manual UBS Distribution ===");
+    println!("\n=== Manual UBI Distribution ===");
     println!("Citizens: {}", citizens.len());
-    println!("UBS per citizen: {} ZHTP", ubi_per_citizen);
+    println!("UBI per citizen: {} ZHTP", ubi_per_citizen);
     
     for citizen_address in citizens {
-        // Create UBS distribution transaction
+        // Create UBI distribution transaction
         let tx = Transaction::new_ubi_distribution(citizen_address, ubi_per_citizen)?;
         
         // Process transaction (would be done by consensus layer)
@@ -622,7 +622,7 @@ fn node_operator_daily_flow() -> anyhow::Result<()> {
 }
 ```
 
-### Citizen Receiving UBS
+### Citizen Receiving UBI
 
 ```rust
 fn citizen_ubi_flow() -> anyhow::Result<()> {
@@ -631,19 +631,19 @@ fn citizen_ubi_flow() -> anyhow::Result<()> {
     let mut manager = MultiWalletManager::new(identity)?;
     let personal_wallet = manager.create_wallet("Personal", WalletType::Personal)?;
     
-    // Receive monthly UBS (1000 ZHTP)
+    // Receive monthly UBI (1000 ZHTP)
     let ubi_amount = 1000;
     let ubi_tx = Transaction::new_ubi_distribution(identity, ubi_amount)?;
     
-    // Credit UBS to personal wallet
+    // Credit UBI to personal wallet
     manager.deposit(&personal_wallet, ubi_amount)?;
     
-    println!("\n=== Citizen UBS Receipt ===");
-    println!(" Received {} ZHTP UBS", ubi_amount);
+    println!("\n=== Citizen UBI Receipt ===");
+    println!(" Received {} ZHTP UBI", ubi_amount);
     println!("Personal wallet balance: {} ZHTP",
         manager.get_wallet(&personal_wallet).unwrap().balance);
     
-    // Use UBS for payment
+    // Use UBI for payment
     let recipient = [2u8; 32];
     let payment_amount = 300;
     
@@ -691,24 +691,24 @@ fn treasury_monthly_cycle() -> anyhow::Result<()> {
     treasury.allocate_funds()?;
     println!("Week 2: {} ZHTP collected", treasury.total_dao_fees_collected);
     
-    // Calculate UBS distribution
+    // Calculate UBI distribution
     let citizens = 1000;
     let ubi_per_citizen = treasury.calculate_ubi_per_citizen(citizens);
     
     println!("\n=== Month End Summary ===");
     println!("Total collected: {} ZHTP", treasury.total_dao_fees_collected);
-    println!("UBS allocated: {} ZHTP", treasury.ubi_allocated);
+    println!("UBI allocated: {} ZHTP", treasury.ubi_allocated);
     println!("Welfare allocated: {} ZHTP", treasury.welfare_allocated);
     println!("Development: {} ZHTP", treasury.development_allocated);
     println!("\nUBI per citizen ({} citizens): {} ZHTP", citizens, ubi_per_citizen);
     
-    // Distribute UBS
+    // Distribute UBI
     for _ in 0..citizens {
         treasury.distribute_ubi(ubi_per_citizen)?;
     }
     
-    println!("\n UBS distributed to {} citizens", citizens);
-    println!("Remaining UBS allocation: {} ZHTP", treasury.ubi_allocated);
+    println!("\n UBI distributed to {} citizens", citizens);
+    println!("Remaining UBI allocation: {} ZHTP", treasury.ubi_allocated);
     
     Ok(())
 }

@@ -27,8 +27,7 @@ react {
 
     /* Bundling */
     //   A list containing the node command and its flags. Default is just 'node'.
-    //   If you use nvm/nvm-windows, uncomment and set to your Node.js path.
-    //   nodeExecutableAndArgs = ["node"]
+    nodeExecutableAndArgs = ["/Users/supertramp/.nvm/versions/node/v20.19.4/bin/node"]
     //
     //   The command to run when bundling. By default is 'bundle'
     // bundleCommand = "ram-bundle"
@@ -144,33 +143,10 @@ if (playServiceAccountPath != null && !playServiceAccountPath.trim().isEmpty()) 
 def quicJniScript = file("src/main/rust/quic-jni/build-android.sh")
 def quicJniOutputDir = file("src/main/jniLibs")
 
-// The QUIC JNI Rust build requires a full cross-compilation toolchain
-// (Android NDK + Rust nightly + Android targets) that is typically only
-// configured on macOS/Linux developer machines. On Windows, Git Bash is
-// often present but the NDK toolchain paths differ.
-//
-// We skip the build entirely on Windows and rely on pre-built .so files
-// already shipped in src/main/jniLibs/. Set -PskipQuicJni or the
-// SKIP_QUIC_JNI env var to force-skip on any platform.
-def isWindows = System.getProperty("os.name").toLowerCase(Locale.ROOT).contains("win")
-
 tasks.register("buildQuicJni", Exec) {
-    onlyIf {
-        if (project.hasProperty("skipQuicJni") || System.getenv("SKIP_QUIC_JNI") != null) {
-            logger.warn("⚠️  buildQuicJni explicitly skipped (skipQuicJni prop or SKIP_QUIC_JNI env)")
-            return false
-        }
-        if (isWindows) {
-            logger.warn("⚠️  Windows detected — skipping QUIC JNI Rust build. " +
-                "Using pre-built .so files from src/main/jniLibs/.")
-            return false
-        }
-        return true
-    }
+    onlyIf { !project.hasProperty("skipQuicJni") && System.getenv("SKIP_QUIC_JNI") == null }
     workingDir file("src/main/rust/quic-jni")
-    // Convert Windows backslashes to forward slashes for bash
-    def scriptPath = quicJniScript.absolutePath.replace('\\', '/')
-    commandLine "bash", scriptPath
+    commandLine "bash", quicJniScript.absolutePath
     inputs.dir file("src/main/rust/quic-jni/src")
     inputs.file file("src/main/rust/quic-jni/Cargo.toml")
     inputs.file file("src/main/rust/quic-jni/Cargo.lock")

@@ -220,7 +220,7 @@ Path: src/screens/ClaimUBIScreen.tsx
 Size: 73 lines
 Exports: ClaimUBIScreen (default)
 
-Purpose: Claim monthly Universal Basic Services
+Purpose: Claim monthly Universal Basic Income
 Navigation Parent: DashboardStack
 Accessed Via: DashboardScreen button, WalletScreen button
 

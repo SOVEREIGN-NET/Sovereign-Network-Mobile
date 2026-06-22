@@ -47,9 +47,9 @@ impl SupplyManager {
         Ok(amount)
     }
     
-    /// Mint tokens for UBS distribution
+    /// Mint tokens for UBI distribution
     pub fn mint_for_ubi(&mut self, amount: u64) -> Result<u64> {
-        self.mint_operational_tokens(amount, "UBS distribution")
+        self.mint_operational_tokens(amount, "UBI distribution")
     }
     
     /// Mint tokens for welfare services

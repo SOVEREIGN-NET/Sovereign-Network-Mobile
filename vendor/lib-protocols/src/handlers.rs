@@ -175,7 +175,7 @@ pub struct EconomicData {
     pub total_fees_collected: u64,
     /// DAO fees collected
     pub dao_fees_collected: u64,
-    /// UBS contributions
+    /// UBI contributions
     pub ubi_contributions: u64,
     /// Access count
     pub access_count: u64,
@@ -250,7 +250,7 @@ pub struct EconomicStats {
     pub total_fees_processed: u64,
     /// Total DAO fees
     pub total_dao_fees: u64,
-    /// Total UBS contributions
+    /// Total UBI contributions
     pub total_ubi_contributions: u64,
     /// Economic transactions count
     pub economic_transactions: u64,
@@ -498,7 +498,7 @@ impl ZhtpHandlers {
         
         // Add ZHTP-specific options
         response.headers.set("ZHTP-Version", "1.0".to_string());
-        response.headers.set("ZHTP-Features", "zk-proofs,post-quantum,dao-fees,ubs,mesh".to_string());
+        response.headers.set("ZHTP-Features", "zk-proofs,post-quantum,dao-fees,ubi,mesh".to_string());
         
         Ok(response)
     }
@@ -776,7 +776,7 @@ impl ZhtpHandlers {
                 "Post-quantum cryptography", 
                 "Economic incentives",
                 "DAO governance",
-                "UBS integration",
+                "UBI integration",
                 "Mesh networking",
                 " capability"
             ],

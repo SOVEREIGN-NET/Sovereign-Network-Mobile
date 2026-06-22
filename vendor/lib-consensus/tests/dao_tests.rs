@@ -52,8 +52,8 @@ async fn test_dao_proposal_creation() -> Result<()> {
     let mut dao_engine = DaoEngine::new();
 
     let proposer = create_test_identity("alice");
-    let title = "Test Proposal: Increase UBS".to_string();
-    let description = "A proposal to increase monthly UBS distribution".to_string();
+    let title = "Test Proposal: Increase UBI".to_string();
+    let description = "A proposal to increase monthly UBI distribution".to_string();
     let proposal_type = DaoProposalType::UbiDistribution;
     let voting_period_days = 7;
 

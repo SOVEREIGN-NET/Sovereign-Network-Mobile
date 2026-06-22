@@ -1,7 +1,7 @@
 /**
  * WalletKeychain.swift
  * Secure storage for the master seed phrase in iOS Keychain
- * Each wallet seed (primary, ubs, savings) stored encrypted separately
+ * Each wallet seed (primary, ubi, savings) stored encrypted separately
  */
 
 import Foundation
@@ -146,7 +146,7 @@ class WalletKeychain: NSObject {
         withRejecter reject: @escaping RCTPromiseRejectBlock
     ) {
         DispatchQueue.global(qos: .userInitiated).async {
-            let walletTypes = ["primary", "ubs", "savings"]
+            let walletTypes = ["primary", "ubi", "savings"]
             var deletedCount = 0
 
             for walletType in walletTypes {
