@@ -206,6 +206,11 @@ const MessagesScreen: React.FC<Props> = ({ navigation }) => {
           </Text>
         </View>
         <View style={styles.headerActions}>
+          <BublMiniWallet
+            compact
+            did={currentIdentity?.did}
+            onPress={() => navigation.navigate('BublRewards')}
+          />
           <TouchableOpacity
             style={styles.iconButton}
             onPress={() => setPrivacyPref(!privacyPref)}
@@ -227,12 +232,6 @@ const MessagesScreen: React.FC<Props> = ({ navigation }) => {
           </TouchableOpacity>
         </View>
       </View>
-
-      {/* BUBL mini-wallet — balance-only; opens the full rewards ledger. */}
-      <BublMiniWallet
-        did={currentIdentity?.did}
-        onPress={() => navigation.navigate('BublRewards')}
-      />
 
       {/* Release-announcement opt-in. */}
       <ReleaseNotifyCard did={currentIdentity?.did} />

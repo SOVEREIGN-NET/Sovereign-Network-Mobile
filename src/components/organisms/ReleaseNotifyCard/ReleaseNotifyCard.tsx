@@ -6,6 +6,9 @@
  * see `NotificationsService`). The opted-in state is remembered locally
  * so the card returns as a calm confirmation — with an undo — rather
  * than re-pitching on every visit.
+ *
+ * The entire card can be dismissed via a close button; the dismiss
+ * preference is persisted so it stays gone across launches.
  */
 
 import React, { useState } from 'react';
@@ -23,6 +26,9 @@ import {
   subscribeToReleases,
   unsubscribeFromReleases,
 } from '../../../services/NotificationsService';
+
+/** Persisted key for the "user dismissed this card" flag. */
+const RELEASE_DISMISSED_KEY = 'bubl.releaseNotify.dismissed';
 
 /**
  * PingGlyph — a radar-ping mark: a filled core with two emanating
@@ -94,6 +100,13 @@ export const ReleaseNotifyCard: React.FC<ReleaseNotifyCardProps> = ({ did }) => 
     RELEASE_SUBSCRIBED_DID_KEY,
     null,
   );
+  // User may dismiss the card entirely. Once dismissed it stays gone
+  // until they opt in from elsewhere (the full rewards screen or an
+  // OS-level notification prompt).
+  const [dismissed, setDismissed] = usePersistedState<boolean>(
+    RELEASE_DISMISSED_KEY,
+    false,
+  );
   const [phase, setPhase] = useState<Phase>('idle');
   const [error, setError] = useState<string | null>(null);
 
@@ -128,6 +141,11 @@ export const ReleaseNotifyCard: React.FC<ReleaseNotifyCardProps> = ({ did }) => 
     }
   };
 
+  // ── Fully dismissed ────────────────────────────────────────────────
+  if (dismissed) {
+    return null;
+  }
+
   // ── Confirmed state ────────────────────────────────────────────────
   if (isSubscribed) {
     return (
@@ -135,9 +153,9 @@ export const ReleaseNotifyCard: React.FC<ReleaseNotifyCardProps> = ({ did }) => 
         <View style={styles.row}>
           <PingGlyph size={32} color={colors.success} />
           <View style={styles.body}>
-            <Text style={styles.titleConfirmed}>You&apos;re on the list ✦</Text>
+            <Text style={styles.titleConfirmed}>You're on the list ✦</Text>
             <Text style={styles.text}>
-              We&apos;ll ping you the moment the next release ships.
+              We'll ping you the moment the next release ships.
             </Text>
           </View>
         </View>
@@ -161,10 +179,21 @@ export const ReleaseNotifyCard: React.FC<ReleaseNotifyCardProps> = ({ did }) => 
   // ── Pitch state ────────────────────────────────────────────────────
   return (
     <View style={styles.card}>
+      {/* Close button — top-right corner */}
+      <Pressable
+        onPress={() => setDismissed(true)}
+        hitSlop={8}
+        style={styles.dismiss}
+        accessibilityRole="button"
+        accessibilityLabel="Dismiss"
+      >
+        <Text style={styles.dismissText}>✕</Text>
+      </Pressable>
+
       <View style={styles.row}>
         <PingGlyph size={34} />
         <View style={styles.body}>
-          <Text style={styles.title}>Don&apos;t miss the next drop</Text>
+          <Text style={styles.title}>Don't miss the next drop</Text>
           <Text style={styles.text}>
             New features hit the Sovereign Network all the time. Be first
             in line — get a ping the moment the next one lands.
@@ -276,6 +305,23 @@ const styles = StyleSheet.create({
     fontSize: typography.size.xs,
     color: colors.text_tertiary,
     textDecorationLine: 'underline',
+  },
+  dismiss: {
+    position: 'absolute',
+    top: spacing.xs,
+    right: spacing.xs,
+    zIndex: 1,
+    width: 26,
+    height: 26,
+    borderRadius: 13,
+    backgroundColor: colors.bg_darkest,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  dismissText: {
+    fontSize: typography.size.sm,
+    color: colors.text_secondary,
+    lineHeight: 16,
   },
   error: {
     marginTop: spacing.sm,

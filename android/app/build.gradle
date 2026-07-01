@@ -27,7 +27,7 @@ react {
 
     /* Bundling */
     //   A list containing the node command and its flags. Default is just 'node'.
-    nodeExecutableAndArgs = ["/Users/supertramp/.nvm/versions/node/v20.19.4/bin/node"]
+    // nodeExecutableAndArgs = ["node"]  // default; uncomment and adjust path if needed
     //
     //   The command to run when bundling. By default is 'bundle'
     // bundleCommand = "ram-bundle"
@@ -140,13 +140,25 @@ if (playServiceAccountPath != null && !playServiceAccountPath.trim().isEmpty()) 
     logger.lifecycle("GOOGLE_PLAY_SERVICE_ACCOUNT_JSON not set; skipping Play Publisher configuration.")
 }
 
-def quicJniScript = file("src/main/rust/quic-jni/build-android.sh")
+import org.gradle.internal.os.OperatingSystem
+
+def quicJniScript
+def quicJniScriptArgs
+
+if (OperatingSystem.current().isWindows()) {
+    quicJniScript = file("src/main/rust/quic-jni/build-android.ps1")
+    quicJniScriptArgs = ["powershell", "-ExecutionPolicy", "Bypass", "-File"]
+} else {
+    quicJniScript = file("src/main/rust/quic-jni/build-android.sh")
+    quicJniScriptArgs = ["bash"]
+}
+
 def quicJniOutputDir = file("src/main/jniLibs")
 
 tasks.register("buildQuicJni", Exec) {
     onlyIf { !project.hasProperty("skipQuicJni") && System.getenv("SKIP_QUIC_JNI") == null }
     workingDir file("src/main/rust/quic-jni")
-    commandLine "bash", quicJniScript.absolutePath
+    commandLine quicJniScriptArgs + [quicJniScript.absolutePath]
     inputs.dir file("src/main/rust/quic-jni/src")
     inputs.file file("src/main/rust/quic-jni/Cargo.toml")
     inputs.file file("src/main/rust/quic-jni/Cargo.lock")
@@ -157,6 +169,16 @@ tasks.register("buildQuicJni", Exec) {
 }
 
 preBuild.dependsOn(buildQuicJni)
+
+// The kapt worker JVM does NOT inherit JAVA_TOOL_OPTIONS or
+// org.gradle.jvmargs.  Without java.io.tmpdir it falls back to the
+// working directory (C:\WINDOWS on Windows), causing AccessDeniedException
+// when Room's DatabaseVerifier (via SQLite JDBC) tries to extract native
+// libraries there.  We set it explicitly for the kapt worker process.
+tasks.withType(org.jetbrains.kotlin.gradle.internal.KaptWithoutKotlincTask).configureEach {
+    kaptProcessJvmArgs.add("-Djava.io.tmpdir=${System.getProperty("java.io.tmpdir", "${System.getProperty("user.home")}/AppData/Local/Temp")}")
+    kaptProcessJvmArgs.add("-Dorg.sqlite.tmpdir=${System.getProperty("java.io.tmpdir", "${System.getProperty("user.home")}/AppData/Local/Temp")}")
+}
 
 dependencies {
     // The version of react-native is set by the React Native Gradle Plugin
