@@ -23,6 +23,7 @@ import type {
 
 // 10 SOV at 18 decimals — minimum the web4 domain registration handler enforces.
 const DOMAIN_REGISTRATION_FEE_ATOMS = '10000000000000000000';
+const DOMAIN_CHAIN_ID = 0x03;
 
 class DomainService {
   /**
@@ -66,7 +67,7 @@ class DomainService {
    *      DAO treasury). Treasury wallet id defaults to lib-client's
    *      deterministic `blake3("SOV_DAO_TREASURY_V1")` constant.
    *   4. Ask lib-client to assemble + sign the full register request JSON,
-   *      attaching the fee_payment_tx hex from step 3.
+   *      attaching the fee_payment_tx hex and domain_tx_signature_hex.
    *   5. POST the request_json.
    */
   async registerDomain(
@@ -97,21 +98,38 @@ class DomainService {
       senderWalletIdHex: primaryWalletIdHex,
       amountAtoms: DOMAIN_REGISTRATION_FEE_ATOMS,
       nonce,
+      chainId: DOMAIN_CHAIN_ID,
     });
 
     // 4. Have lib-client build the full canonical register request JSON.
     const contentMappingsJson = request.content_mappings
       ? JSON.stringify(request.content_mappings)
       : null;
-    const signingResult = await nativeIdentityProvisioning.signDomainRegisterRequest({
-      domain: request.domain,
-      contentMappingsJson,
-      feePaymentTxHex: feeTx.fee_payment_tx_hex,
-    });
+    const signingResult =
+      await nativeIdentityProvisioning.signDomainRegisterRequestWithFeePayment({
+        domain: request.domain,
+        feePaymentTxHex: feeTx.fee_payment_tx_hex,
+        contentMappingsJson,
+        metadataJson: null,
+        chainId: DOMAIN_CHAIN_ID,
+      });
+
+    const requestBody = JSON.parse(signingResult.request_json) as Record<
+      string,
+      unknown
+    >;
+    const domainTxSig = requestBody.domain_tx_signature_hex;
+    if (typeof domainTxSig !== 'string' || domainTxSig.length === 0) {
+      throw new Error(
+        'domain_tx_signature_hex missing from signed request — rebuild the app so native lib-client includes the domain system tx signature (audit #2766)',
+      );
+    }
 
     console.log(
       '[DomainService] Register request built, json length:',
       signingResult.request_json.length,
+      'domain_tx_signature_hex length:',
+      domainTxSig.length,
     );
 
     // 5. POST.

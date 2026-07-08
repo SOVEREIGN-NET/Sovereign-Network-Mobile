@@ -485,11 +485,34 @@ class NativeIdentityProvisioningBridge {
   }
 
   /**
-   * Build a signed domain registration request (JSON for REST API).
-   * lib-client builds the complete request body with signature + timestamp +
-   * attached `fee_payment_tx`. Build the fee tx first via
-   * [signDomainFeePaymentTx] and pass its hex result here.
+   * Build full domain registration JSON including fee_payment_tx and
+   * domain_tx_signature_hex (required by the server since audit #2766).
+   * Build the fee tx first via [signDomainFeePaymentTx].
    */
+  async signDomainRegisterRequestWithFeePayment(params: {
+    domain: string;
+    feePaymentTxHex: string;
+    contentMappingsJson?: string | null;
+    metadataJson?: string | null;
+    chainId?: number;
+  }): Promise<{ request_json: string }> {
+    if (!this.nativeModule) {
+      throw new Error(
+        'NativeIdentityProvisioning not available on this platform',
+      );
+    }
+
+    if (!this.nativeModule.signDomainRegisterRequestWithFeePayment) {
+      throw new Error(
+        'NativeIdentityProvisioning.signDomainRegisterRequestWithFeePayment not available — rebuild native lib-client',
+      );
+    }
+
+    return await this.nativeModule.signDomainRegisterRequestWithFeePayment(
+      params,
+    );
+  }
+
   async signDomainRegisterRequest(params: {
     domain: string;
     contentMappingsJson?: string | null;

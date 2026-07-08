@@ -282,7 +282,9 @@ private func cBuildDomainRegisterRequestWithFeePayment(
     _ handle: UnsafeMutableRawPointer,
     _ domain: UnsafePointer<CChar>?,
     _ contentMappingsJson: UnsafePointer<CChar>?,
-    _ feePaymentTxHex: UnsafePointer<CChar>?
+    _ feePaymentTxHex: UnsafePointer<CChar>?,
+    _ metadataJson: UnsafePointer<CChar>?,
+    _ chainId: UInt8
 ) -> UnsafeMutablePointer<CChar>?
 
 // MARK: - C FFI Declarations: Fee Config (global, no handle)
@@ -1096,23 +1098,38 @@ public class ZhtpClient {
         return String(cString: ptr)
     }
 
-    /// Build the full POST /api/v1/web4/domains/register JSON body with fee_payment_tx attached.
-    /// `contentMappingsJson` may be nil for metadata-only registrations.
-    public static func buildDomainRegisterRequest(
+    /// Build domain registration request with fee tx + domain system tx signature.
+    public static func buildDomainRegisterRequestWithFeePayment(
         domain: String,
-        contentMappingsJson: String?,
         feePaymentTxHex: String,
+        contentMappingsJson: String?,
+        metadataJson: String?,
+        chainId: UInt8,
         using identity: Identity
     ) throws -> String {
-        let resultPtr: UnsafeMutablePointer<CChar>? = domain.withCString { domainPtr -> UnsafeMutablePointer<CChar>? in
-            feePaymentTxHex.withCString { feePtr -> UnsafeMutablePointer<CChar>? in
+        let resultPtr = domain.withCString { domainPtr in
+            feePaymentTxHex.withCString { feePtr in
                 if let mappings = contentMappingsJson {
                     return mappings.withCString { mappingsPtr in
-                        cBuildDomainRegisterRequestWithFeePayment(
+                        if let metadata = metadataJson {
+                            return metadata.withCString { metadataPtr in
+                                cBuildDomainRegisterRequestWithFeePayment(
+                                    identity.getHandle(),
+                                    domainPtr,
+                                    mappingsPtr,
+                                    feePtr,
+                                    metadataPtr,
+                                    chainId
+                                )
+                            }
+                        }
+                        return cBuildDomainRegisterRequestWithFeePayment(
                             identity.getHandle(),
                             domainPtr,
                             mappingsPtr,
-                            feePtr
+                            feePtr,
+                            nil,
+                            chainId
                         )
                     }
                 }
@@ -1120,16 +1137,37 @@ public class ZhtpClient {
                     identity.getHandle(),
                     domainPtr,
                     nil,
-                    feePtr
+                    feePtr,
+                    nil,
+                    chainId
                 )
             }
         }
 
         guard let ptr = resultPtr else {
-            throw ClientError.signingError("Failed to build domain register request")
+            throw ClientError.signingError("Failed to build domain register request with fee payment")
         }
         defer { cStringFree(ptr) }
         return String(cString: ptr)
+    }
+
+    /// Build the full POST /api/v1/web4/domains/register JSON body with fee_payment_tx attached.
+    /// `contentMappingsJson` may be nil for metadata-only registrations.
+    public static func buildDomainRegisterRequest(
+        domain: String,
+        contentMappingsJson: String?,
+        feePaymentTxHex: String,
+        using identity: Identity,
+        chainId: UInt8 = 0x03
+    ) throws -> String {
+        return try buildDomainRegisterRequestWithFeePayment(
+            domain: domain,
+            feePaymentTxHex: feePaymentTxHex,
+            contentMappingsJson: contentMappingsJson,
+            metadataJson: nil,
+            chainId: chainId,
+            using: identity
+        )
     }
 
     /// Build domain update request (returns JSON for REST API)

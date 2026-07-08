@@ -967,6 +967,58 @@ class NativeIdentityProvisioning(reactContext: ReactApplicationContext) :
     }
 
     @ReactMethod
+    fun signDomainRegisterRequestWithFeePayment(params: ReadableMap, promise: Promise) {
+        executor.execute {
+            try {
+                val domain = params.getString("domain") ?: ""
+                val feePaymentTxHex = params.getString("feePaymentTxHex") ?: ""
+                val contentMappingsJson = params.getString("contentMappingsJson")
+                val metadataJson = params.getString("metadataJson")
+                val chainId = if (params.hasKey("chainId")) params.getInt("chainId") else 0x03
+
+                if (domain.isEmpty() || feePaymentTxHex.isEmpty()) {
+                    promise.reject("INVALID_PARAMS", "domain and feePaymentTxHex are required")
+                    return@execute
+                }
+
+                val identity = getLatestIdentity()
+                if (identity == null) {
+                    promise.reject("IDENTITY_ERROR", "No identity available for signing")
+                    return@execute
+                }
+
+                Log.d(TAG, "Building domain register request with fee payment: $domain")
+
+                val requestJson = identity.buildDomainRegisterRequestWithFeePayment(
+                    domain,
+                    feePaymentTxHex,
+                    contentMappingsJson,
+                    metadataJson,
+                    chainId
+                )
+                if (requestJson == null) {
+                    promise.reject(
+                        "SIGNING_ERROR",
+                        "Failed to build domain registration request with fee payment"
+                    )
+                    return@execute
+                }
+
+                promise.resolve(WritableNativeMap().apply {
+                    putString("request_json", requestJson)
+                })
+            } catch (e: Exception) {
+                Log.e(TAG, "Domain registration with fee payment failed", e)
+                promise.reject(
+                    "IDENTITY_ERROR",
+                    "Failed to build domain registration request: ${e.message}",
+                    e
+                )
+            }
+        }
+    }
+
+    @ReactMethod
     fun signDomainUpdateRequest(params: ReadableMap, promise: Promise) {
         executor.execute {
             try {

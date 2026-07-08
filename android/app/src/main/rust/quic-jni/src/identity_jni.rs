@@ -987,6 +987,65 @@ pub extern "system" fn Java_com_sovereignnetworkmobile_Identity_nativeBuildDomai
 }
 
 #[no_mangle]
+pub extern "system" fn Java_com_sovereignnetworkmobile_Identity_nativeBuildDomainRegisterRequestWithFeePayment<
+    'local,
+>(
+    mut env: JNIEnv<'local>,
+    _class: JClass<'local>,
+    handle: jlong,
+    domain: JString<'local>,
+    content_mappings_json: JString<'local>,
+    fee_payment_tx_hex: JString<'local>,
+    metadata_json: JString<'local>,
+    chain_id: jbyte,
+) -> JString<'local> {
+    if handle == 0 {
+        return JString::default();
+    }
+    let identity = unsafe { handle_ref(handle) };
+    let domain_str = match jstring_to_string(&mut env, &domain) {
+        Some(s) => s,
+        None => return JString::default(),
+    };
+    let fee_tx = match jstring_to_string(&mut env, &fee_payment_tx_hex) {
+        Some(s) => s,
+        None => return JString::default(),
+    };
+    let mappings = jstring_to_string(&mut env, &content_mappings_json).and_then(|json| {
+        serde_json::from_str::<std::collections::HashMap<String, zhtp_client::ContentMapping>>(
+            &json,
+        )
+        .ok()
+    });
+    let metadata = jstring_to_string(&mut env, &metadata_json).and_then(|json| {
+        serde_json::from_str::<serde_json::Value>(&json).ok()
+    });
+    let effective_chain_id = if chain_id == 0 {
+        zhtp_client::token_tx::DEFAULT_DOMAIN_CHAIN_ID
+    } else {
+        chain_id as u8
+    };
+
+    match zhtp_client::build_domain_register_request_with_fee_payment_and_metadata(
+        identity,
+        &domain_str,
+        mappings,
+        Some(fee_tx),
+        metadata,
+        effective_chain_id,
+    ) {
+        Ok(json) => env.new_string(&json).unwrap_or_default(),
+        Err(e) => {
+            log::error!(
+                "[Identity JNI] buildDomainRegisterRequestWithFeePayment failed: {}",
+                e
+            );
+            JString::default()
+        }
+    }
+}
+
+#[no_mangle]
 pub extern "system" fn Java_com_sovereignnetworkmobile_Identity_nativeBuildDomainUpdateRequest<
     'local,
 >(

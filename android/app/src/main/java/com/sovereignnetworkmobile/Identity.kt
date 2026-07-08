@@ -162,6 +162,15 @@ class Identity private constructor(
             handle: Long, domain: String, contentMappingsJson: String?, feePaymentTxHex: String
         ): String?
 
+        @JvmStatic private external fun nativeBuildDomainRegisterRequestWithFeePayment(
+            handle: Long,
+            domain: String,
+            contentMappingsJson: String?,
+            feePaymentTxHex: String,
+            metadataJson: String?,
+            chainId: Int
+        ): String?
+
         @JvmStatic private external fun nativeBuildDomainUpdateRequest(
             handle: Long, domain: String, newManifestCid: String, expectedPreviousManifestCid: String
         ): String?
@@ -362,6 +371,22 @@ class Identity private constructor(
         amountAtoms,
         nonce,
         chainId,
+    )
+
+    /** Build domain register request with fee_payment_tx + domain_tx_signature_hex. */
+    fun buildDomainRegisterRequestWithFeePayment(
+        domain: String,
+        feePaymentTxHex: String,
+        contentMappingsJson: String? = null,
+        metadataJson: String? = null,
+        chainId: Int = 0x03
+    ): String? = nativeBuildDomainRegisterRequestWithFeePayment(
+        handle,
+        domain,
+        contentMappingsJson,
+        feePaymentTxHex,
+        metadataJson,
+        chainId
     )
 
     /** Build domain update request with manifest CID versioning. */
