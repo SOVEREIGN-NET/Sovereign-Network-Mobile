@@ -80,6 +80,10 @@ RCT_EXTERN_METHOD(signDomainRegisterRequest:(NSDictionary *)params
                   resolve:(RCTPromiseResolveBlock)resolve
                   reject:(RCTPromiseRejectBlock)reject)
 
+RCT_EXTERN_METHOD(signDomainRegisterRequestWithFeePayment:(NSDictionary *)params
+                  resolve:(RCTPromiseResolveBlock)resolve
+                  reject:(RCTPromiseRejectBlock)reject)
+
 RCT_EXTERN_METHOD(signDomainUpdateRequest:(NSDictionary *)params
                   resolve:(RCTPromiseResolveBlock)resolve
                   reject:(RCTPromiseRejectBlock)reject)

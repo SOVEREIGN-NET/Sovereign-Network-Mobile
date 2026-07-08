@@ -1743,6 +1743,46 @@ class NativeIdentityProvisioning: NSObject, UIDocumentPickerDelegate {
         self.signDomainRequest("domain_register", params: params, resolve: resolve, reject: reject)
     }
 
+    /// Build domain register request with fee_payment_tx + domain_tx_signature_hex (RN)
+    @objc
+    func signDomainRegisterRequestWithFeePayment(
+        _ params: NSDictionary,
+        resolve: @escaping RCTPromiseResolveBlock,
+        reject: @escaping RCTPromiseRejectBlock
+    ) {
+        queue.async {
+            do {
+                guard let domain = params["domain"] as? String,
+                      let feePaymentTxHex = params["feePaymentTxHex"] as? String else {
+                    reject("INVALID_PARAMS", "Missing domain or feePaymentTxHex", nil)
+                    return
+                }
+                guard let identityAny = IdentityHandleStore.shared.getLatestIdentity(),
+                      let identity = identityAny as? Identity else {
+                    reject("NO_IDENTITY", "No active identity for signing", nil)
+                    return
+                }
+
+                let contentMappingsJson = params["contentMappingsJson"] as? String
+                let metadataJson = params["metadataJson"] as? String
+                let chainId = UInt8(truncatingIfNeeded: (params["chainId"] as? NSNumber)?.intValue ?? 3)
+
+                let requestJson = try ZhtpClient.buildDomainRegisterRequestWithFeePayment(
+                    domain: domain,
+                    feePaymentTxHex: feePaymentTxHex,
+                    contentMappingsJson: contentMappingsJson,
+                    metadataJson: metadataJson,
+                    chainId: chainId,
+                    using: identity
+                )
+
+                resolve(["request_json": requestJson])
+            } catch {
+                reject("SIGNING_ERROR", "Failed to build domain register request: \(error)", nil)
+            }
+        }
+    }
+
     /// Build the signed 10 SOV fee payment TokenTransfer for a domain registration.
     /// Params: { senderWalletIdHex: hex(32B), treasuryWalletIdHex?: hex(32B), amountAtoms: u128 decimal string,
     ///           nonce: number|string, chainId?: number|string }
