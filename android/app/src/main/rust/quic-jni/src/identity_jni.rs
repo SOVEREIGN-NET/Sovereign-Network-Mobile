@@ -997,7 +997,7 @@ pub extern "system" fn Java_com_sovereignnetworkmobile_Identity_nativeBuildDomai
     content_mappings_json: JString<'local>,
     fee_payment_tx_hex: JString<'local>,
     metadata_json: JString<'local>,
-    chain_id: jbyte,
+    chain_id: jint,
 ) -> JString<'local> {
     if handle == 0 {
         return JString::default();
