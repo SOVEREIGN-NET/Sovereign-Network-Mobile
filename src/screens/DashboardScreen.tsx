@@ -156,9 +156,6 @@ const DashboardScreen: React.FC<any> = ({ navigation }) => {
       <View style={{ zIndex: 500, position: 'absolute', top: 0, left: 0, right: 0 }}>
         <HeaderBar
           onMenuPress={() => setDrawerVisible(true)}
-          onNavigatePouw={() => navigation.navigate('SIDTab', { screen: 'PoUW' })}
-          onNavigateExplorer={() => navigation.navigate('ExplorerDashboard')}
-          onNavigateDevPortal={() => navigation.navigate('DeveloperPortal')}
         />
         {activeNotice && (
           <Pressable

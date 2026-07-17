@@ -7,7 +7,7 @@ import {
   View,
   ScrollView,
   StyleSheet,
-  TouchableOpacity,
+  Pressable,
   TextInput,
 } from 'react-native';
 import {
@@ -18,6 +18,7 @@ import {
   Text,
   Badge,
   ActivityDot,
+  ArrowIcon,
 } from '../components';
 import { colors, spacing, typography, borderRadius } from '../theme';
 import { useTrendingDapps, getActivityColor } from '../hooks/useTrendingDapps';
@@ -25,22 +26,12 @@ import { useTrendingDapps, getActivityColor } from '../hooks/useTrendingDapps';
 const DappsSearchResultsScreen: React.FC<any> = ({ navigation, route }) => {
   const { query: initialQuery } = route.params || { query: '' };
   const [searchQuery, setSearchQuery] = useState(initialQuery);
-  const allApps = useTrendingDapps();
-
-  const devApp = {
-    id: 'central-sov',
-    name: 'central.sov',
-    desc: 'The official Sovereign Hub for CBE and core apps',
-    url: 'zhtp://central.sov',
-    category: 'Finance',
-    rating: 4.9,
-    downloads: '1.2M',
-    developer: 'Sovereign Network Foundation',
-    longDesc: 'Central.sov is the primary gateway to the Sovereign Network ecosystem.',
-  };
+  // The dApp store should currently be empty as no apps are listed yet.
+  // We previously used useTrendingDapps() here, but those are domains, not store apps.
+  const allApps: any[] = [];
 
   const filteredResults = useMemo(() => {
-    const apps = [devApp, ...(allApps || [])];
+    const apps = [...(allApps || [])];
     if (!searchQuery) return apps;
 
     const q = searchQuery.toLowerCase();
@@ -50,10 +41,6 @@ const DappsSearchResultsScreen: React.FC<any> = ({ navigation, route }) => {
   }, [searchQuery, allApps]);
 
   const handleAppPress = (app: any) => {
-    if (app.id === 'central-sov') {
-      navigation.navigate('AppDetail', { app });
-      return;
-    }
     navigation.navigate('Browser', { url: app.url });
   };
 
@@ -82,9 +69,12 @@ const DappsSearchResultsScreen: React.FC<any> = ({ navigation, route }) => {
             </Text>
 
             {filteredResults.map((app, index) => (
-              <TouchableOpacity
+              <Pressable
                 key={`${app.id}-${index}`}
-                style={styles.resultCard}
+                style={({ pressed }) => [
+                  styles.resultCard,
+                  pressed && { opacity: 0.7 }
+                ]}
                 onPress={() => handleAppPress(app)}
               >
                 <Row align="center" gap="md">
@@ -102,7 +92,7 @@ const DappsSearchResultsScreen: React.FC<any> = ({ navigation, route }) => {
                   </Column>
                   <ArrowIcon direction="right" size={16} color={colors.text_tertiary} />
                 </Row>
-              </TouchableOpacity>
+              </Pressable>
             ))}
 
             {filteredResults.length === 0 && (
@@ -204,14 +194,5 @@ const styles = StyleSheet.create({
     fontSize: 14,
   },
 });
-
-const ArrowIcon = ({ direction, size, color }: any) => {
-  const rotation = direction === 'right' ? '0deg' : direction === 'left' ? '180deg' : direction === 'up' ? '-90deg' : '90deg';
-  return (
-    <View style={{ transform: [{ rotate: rotation }] }}>
-      <Text style={{ fontSize: size, color }}>→</Text>
-    </View>
-  );
-};
 
 export default DappsSearchResultsScreen;

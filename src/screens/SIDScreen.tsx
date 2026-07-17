@@ -831,9 +831,6 @@ const SIDScreen = ({ navigation, route }: any) => {
       <View style={{ flex: 1, backgroundColor: colors.bg_darkest }}>
         <HeaderBar
           onMenuPress={() => setDrawerVisible(true)}
-          onNavigatePouw={() => navigation.navigate('PoUW')}
-          onNavigateExplorer={() => navigation.navigate('ExplorerDashboard')}
-          onNavigateDevPortal={() => navigation.navigate('DeveloperPortal')}
         />
 
         <SideDrawer
@@ -934,9 +931,6 @@ const SIDScreen = ({ navigation, route }: any) => {
     <View style={{ flex: 1, backgroundColor: colors.bg_darkest }}>
       <HeaderBar
         onMenuPress={() => setDrawerVisible(true)}
-        onNavigatePouw={() => navigation.navigate('PoUW')}
-        onNavigateExplorer={() => navigation.navigate('ExplorerDashboard')}
-        onNavigateDevPortal={() => navigation.navigate('DeveloperPortal')}
       />
 
       <SideDrawer

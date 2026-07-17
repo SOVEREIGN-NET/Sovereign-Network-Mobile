@@ -88,7 +88,9 @@ const AppSection: React.FC<{
 const DappsScreen: React.FC<any> = ({ navigation }) => {
   const [searchQuery, setSearchQuery] = useState('');
   const [activeCategory, setActiveCategory] = useState('All');
-  const allApps = useTrendingDapps();
+  // The dApp store should currently be empty as no apps are listed yet.
+  // We previously used useTrendingDapps() here, but those are domains, not store apps.
+  const allApps: any[] = [];
 
   const filteredApps = useMemo(() => {
     return (allApps || []).filter(app => {
@@ -113,11 +115,7 @@ const DappsScreen: React.FC<any> = ({ navigation }) => {
 
   return (
     <View style={{ flex: 1, backgroundColor: colors.bg_darkest }}>
-      <HeaderBar
-        onNavigatePouw={() => navigation.navigate('SIDTab', { screen: 'PoUW' })}
-        onNavigateExplorer={() => navigation.navigate('ExplorerDashboard')}
-        onNavigateDevPortal={() => navigation.navigate('DeveloperPortal')}
-      />
+      <HeaderBar />
 
       <ScreenLayout
         paddingTop={spacing.md}

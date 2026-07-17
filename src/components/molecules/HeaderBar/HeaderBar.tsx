@@ -15,7 +15,8 @@
 import React, { useEffect, useState, useRef } from 'react';
 import { View, Pressable, StyleSheet, Modal, TouchableOpacity } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import Svg, { Circle, Path, Rect } from 'react-native-svg';
+import { useNavigation } from '@react-navigation/native';
+import Svg, { Circle, Path } from 'react-native-svg';
 import { Text, Row } from '../../atoms';
 import { colors, spacing, typography, shadows } from '../../../theme';
 import { useTranslation } from '../../../i18n';
@@ -32,7 +33,8 @@ export interface HeaderBarProps {
    *  navigates to PoUW — that's now in the dropdown. */
   onBalancePress?: () => void;
   showHamburger?: boolean;
-  /** Callbacks for the hamburger dropdown menu */
+  /** Optional overrides for the standard hamburger dropdown menu actions.
+   *  If not provided, the HeaderBar uses its own internal navigation logic. */
   onNavigateExplorer?: () => void;
   onNavigatePouw?: () => void;
   onNavigateDevPortal?: () => void;
@@ -51,6 +53,7 @@ const HeaderBar: React.FC<HeaderBarProps> = ({
   onNavigateDevPortal,
 }) => {
   const insets = useSafeAreaInsets();
+  const navigation = useNavigation<any>();
   const { t } = useTranslation();
 
   // SOV reward counter
@@ -111,13 +114,13 @@ const HeaderBar: React.FC<HeaderBarProps> = ({
     setDropdownVisible(false);
     switch (action) {
       case 'explorer':
-        onNavigateExplorer?.();
+        onNavigateExplorer ? onNavigateExplorer() : navigation.navigate('ExplorerDashboard');
         break;
       case 'pouw':
-        onNavigatePouw?.();
+        onNavigatePouw ? onNavigatePouw() : navigation.navigate('SIDTab', { screen: 'PoUW' });
         break;
       case 'devPortal':
-        onNavigateDevPortal?.();
+        onNavigateDevPortal ? onNavigateDevPortal() : navigation.navigate('DeveloperPortal');
         break;
     }
   };
