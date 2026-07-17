@@ -17,7 +17,10 @@ import { RootStackParamList } from '../types/navigation';
 
 // Screens
 import DashboardScreen from '../screens/DashboardScreen';
+import Web4SearchResultsScreen from '../screens/Web4SearchResultsScreen';
 import DappsScreen from '../screens/DappsScreen';
+import DappsSearchResultsScreen from '../screens/DappsSearchResultsScreen';
+import AppDetailScreen from '../screens/AppDetailScreen';
 import ProfileEditScreen from '../screens/ProfileEditScreen';
 import IdentitySettingsScreen from '../screens/IdentitySettingsScreen';
 import WalletSettingsScreen from '../screens/WalletSettingsScreen';
@@ -46,6 +49,7 @@ import TokenManagementScreen from '../screens/TokenManagementScreen';
 import MyTokensScreen from '../screens/MyTokensScreen';
 import TokenDetailScreen from '../screens/TokenDetailScreen';
 import MyDomainsScreen from '../screens/MyDomainsScreen';
+import DeveloperPortalScreen from '../screens/DeveloperPortalScreen';
 import DomainDetailScreen from '../screens/DomainDetailScreen';
 import ExplorerDashboardScreen from '../screens/explorer/ExplorerDashboardScreen';
 import OracleDashboardScreen from '../screens/oracle/OracleDashboardScreen';
@@ -56,7 +60,6 @@ import {
   MessagesScreen,
   ChatScreen,
   NewChatScreen,
-  BublRewardsScreen,
 } from '../screens/messaging';
 import BlockDetailScreen from '../screens/explorer/BlockDetailScreen';
 import TransactionDetailScreen from '../screens/explorer/TransactionDetailScreen';
@@ -97,6 +100,13 @@ const DashboardStack = () => {
         }}
       />
       <Stack.Screen
+        name="Web4SearchResults"
+        component={Web4SearchResultsScreen}
+        options={{
+          headerShown: false,
+        }}
+      />
+      <Stack.Screen
         name="Browser"
         component={BrowserScreen}
         options={{
@@ -121,6 +131,18 @@ const DashboardStack = () => {
       <Stack.Screen
         name="Dapps"
         component={DappsScreen}
+        options={{ headerShown: false }}
+      />
+      <Stack.Screen
+        name="DappsSearchResults"
+        component={DappsSearchResultsScreen}
+        options={{
+          headerShown: false,
+        }}
+      />
+      <Stack.Screen
+        name="DeveloperPortal"
+        component={DeveloperPortalScreen}
         options={{ headerShown: false }}
       />
       <Stack.Screen
@@ -469,27 +491,41 @@ const DAOStack = () => {
   );
 };
 
-const MessagesStack = () => {
+const StoreStack = () => {
   return (
     <Stack.Navigator screenOptions={{ headerShown: false }}>
       <Stack.Screen
-        name="MessagesMain"
-        component={MessagesScreen as any}
+        name="StoreMain"
+        component={DappsScreen}
         options={{ headerShown: false }}
       />
       <Stack.Screen
-        name="Chat"
-        component={ChatScreen as any}
-        options={{ headerShown: false }}
+        name="DappsSearchResults"
+        component={DappsSearchResultsScreen}
+        options={{
+          headerShown: false,
+        }}
       />
       <Stack.Screen
-        name="NewChat"
-        component={NewChatScreen as any}
-        options={{ headerShown: false, presentation: 'modal' }}
+        name="AppDetail"
+        component={AppDetailScreen}
+        options={{
+          title: 'App Details',
+          headerShown: false,
+        }}
       />
       <Stack.Screen
-        name="BublRewards"
-        component={BublRewardsScreen as any}
+        name="Browser"
+        component={BrowserScreen}
+        options={{
+          headerShown: false,
+          presentation: 'modal',
+          animation: 'slide_from_bottom',
+        }}
+      />
+      <Stack.Screen
+        name="SovSwapHome"
+        component={SovSwapHomeScreen as any}
         options={{ headerShown: false }}
       />
     </Stack.Navigator>
@@ -497,7 +533,7 @@ const MessagesStack = () => {
 };
 
 // Tab Icon Components - Simple geometric icons using Views
-const HomeIcon = ({ color }: { color: string }) => (
+const SearchIcon = ({ color }: { color: string }) => (
   <View
     style={{
       width: 24,
@@ -508,115 +544,146 @@ const HomeIcon = ({ color }: { color: string }) => (
   >
     <View
       style={{
-        width: 14,
-        height: 12,
-        borderWidth: 1.5,
+        width: 16,
+        height: 16,
+        borderRadius: 8,
+        borderWidth: 2,
         borderColor: color,
-        borderTopWidth: 0,
       }}
     />
+    <View
+      style={{
+        width: 2,
+        height: 8,
+        backgroundColor: color,
+        transform: [{ rotate: '-45deg' }],
+        position: 'absolute',
+        bottom: 2,
+        right: 2,
+      }}
+    />
+  </View>
+);
+
+const ProfileIcon = ({ color }: { color: string }) => (
+  <View
+    style={{
+      width: 24,
+      height: 24,
+      justifyContent: 'center',
+      alignItems: 'center',
+    }}
+  >
+    {/* Head */}
     <View
       style={{
         width: 8,
         height: 8,
-        borderWidth: 1.5,
-        borderColor: color,
-        marginTop: -6,
-        marginLeft: 3,
-      }}
-    />
-  </View>
-);
-
-const BriefcaseIcon = ({ color }: { color: string }) => (
-  <View
-    style={{
-      width: 24,
-      height: 24,
-      justifyContent: 'center',
-      alignItems: 'center',
-    }}
-  >
-    <View
-      style={{ width: 14, height: 10, borderWidth: 1.5, borderColor: color }}
-    />
-    <View
-      style={{
-        width: 6,
-        height: 4,
-        borderWidth: 1,
-        borderColor: color,
-        position: 'absolute',
-        top: 0,
-        left: 9,
-      }}
-    />
-  </View>
-);
-
-const VoteIcon = ({ color }: { color: string }) => (
-  <View
-    style={{
-      width: 24,
-      height: 24,
-      justifyContent: 'center',
-      alignItems: 'center',
-    }}
-  >
-    <View
-      style={{
-        width: 10,
-        height: 10,
-        borderRadius: 5,
-        borderWidth: 1.5,
-        borderColor: color,
-      }}
-    />
-    <View
-      style={{
-        width: 1.5,
-        height: 6,
-        backgroundColor: color,
-        position: 'absolute',
-        bottom: 2,
-      }}
-    />
-  </View>
-);
-
-// Speech-bubble glyph for the messaging tab. Drawn with two Views so
-// it stays crisp at any pixel density without an extra icon library.
-const ChatIcon = ({ color }: { color: string }) => (
-  <View
-    style={{
-      width: 24,
-      height: 24,
-      justifyContent: 'center',
-      alignItems: 'center',
-    }}
-  >
-    <View
-      style={{
-        width: 18,
-        height: 14,
-        borderWidth: 1.5,
-        borderColor: color,
         borderRadius: 4,
+        borderWidth: 1.5,
+        borderColor: color,
+        marginBottom: 2,
       }}
     />
+    {/* Body */}
+    <View
+      style={{
+        width: 14,
+        height: 7,
+        borderTopLeftRadius: 7,
+        borderTopRightRadius: 7,
+        borderWidth: 1.5,
+        borderColor: color,
+        borderBottomWidth: 0,
+      }}
+    />
+  </View>
+);
+
+const GovernanceIcon = ({ color }: { color: string }) => (
+  <View
+    style={{
+      width: 24,
+      height: 24,
+      justifyContent: 'center',
+      alignItems: 'center',
+    }}
+  >
+    {/* Pediment (Roof) */}
     <View
       style={{
         width: 0,
         height: 0,
-        borderLeftWidth: 4,
-        borderRightWidth: 4,
-        borderTopWidth: 4,
+        borderLeftWidth: 10,
+        borderRightWidth: 10,
+        borderBottomWidth: 6,
         borderLeftColor: 'transparent',
         borderRightColor: 'transparent',
-        borderTopColor: color,
+        borderBottomColor: color,
+        marginBottom: 1,
+      }}
+    />
+    {/* Columns */}
+    <View style={{ flexDirection: 'row', gap: 3, alignItems: 'flex-end' }}>
+      <View style={{ width: 2, height: 7, backgroundColor: color, borderRadius: 1 }} />
+      <View style={{ width: 2, height: 7, backgroundColor: color, borderRadius: 1 }} />
+      <View style={{ width: 2, height: 7, backgroundColor: color, borderRadius: 1 }} />
+    </View>
+    {/* Base */}
+    <View
+      style={{
+        width: 18,
+        height: 2,
+        backgroundColor: color,
+        marginTop: 1,
+        borderRadius: 1,
+      }}
+    />
+  </View>
+);
+
+// Shopping bag icon for the store tab.
+const StoreIcon = ({ color }: { color: string }) => (
+  <View
+    style={{
+      width: 24,
+      height: 24,
+      justifyContent: 'center',
+      alignItems: 'center',
+    }}
+  >
+    {/* Handle */}
+    <View
+      style={{
+        width: 8,
+        height: 6,
+        borderWidth: 1.5,
+        borderColor: color,
+        borderBottomWidth: 0,
+        borderTopLeftRadius: 4,
+        borderTopRightRadius: 4,
+        marginBottom: -1,
+      }}
+    />
+    {/* Bag Body */}
+    <View
+      style={{
+        width: 16,
+        height: 14,
+        borderWidth: 1.5,
+        borderColor: color,
+        borderRadius: 2,
+      }}
+    />
+    {/* Bag Detail (optional line) */}
+    <View
+      style={{
+        width: 6,
+        height: 1.5,
+        backgroundColor: color,
         position: 'absolute',
-        bottom: 2,
-        left: 7,
+        bottom: 8,
+        borderRadius: 1,
       }}
     />
   </View>
@@ -783,9 +850,9 @@ const MainTabs = () => {
         component={DashboardStack}
         options={
           {
-            title: 'Dashboard',
-            tabBarLabel: 'Dashboard',
-            tabBarIcon: HomeIcon,
+            title: 'Search',
+            tabBarLabel: 'Search',
+            tabBarIcon: SearchIcon,
           } as any
         }
       />
@@ -796,18 +863,18 @@ const MainTabs = () => {
           {
             title: 'DAO',
             tabBarLabel: 'DAO',
-            tabBarIcon: VoteIcon,
+            tabBarIcon: GovernanceIcon,
           } as any
         }
       />
       <Tab.Screen
-        name="MessagesTab"
-        component={MessagesStack}
+        name="StoreTab"
+        component={StoreStack}
         options={
           {
-            title: 'Bubl',
-            tabBarLabel: 'Bubl',
-            tabBarIcon: ChatIcon,
+            title: 'Store',
+            tabBarLabel: 'Store',
+            tabBarIcon: StoreIcon,
           } as any
         }
       />
@@ -818,7 +885,7 @@ const MainTabs = () => {
           {
             title: 'SID',
             tabBarLabel: 'SID',
-            tabBarIcon: BriefcaseIcon,
+            tabBarIcon: ProfileIcon,
             unmountOnBlur: true,
           } as any
         }

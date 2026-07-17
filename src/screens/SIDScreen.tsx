@@ -831,8 +831,9 @@ const SIDScreen = ({ navigation, route }: any) => {
       <View style={{ flex: 1, backgroundColor: colors.bg_darkest }}>
         <HeaderBar
           onMenuPress={() => setDrawerVisible(true)}
-          onBalancePress={() => navigation.navigate('PoUW')}
-          showHamburger={false}
+          onNavigatePouw={() => navigation.navigate('PoUW')}
+          onNavigateExplorer={() => navigation.navigate('ExplorerDashboard')}
+          onNavigateDevPortal={() => navigation.navigate('DeveloperPortal')}
         />
 
         <SideDrawer
@@ -933,8 +934,9 @@ const SIDScreen = ({ navigation, route }: any) => {
     <View style={{ flex: 1, backgroundColor: colors.bg_darkest }}>
       <HeaderBar
         onMenuPress={() => setDrawerVisible(true)}
-        onBalancePress={() => navigation.navigate('PoUW')}
-        showHamburger={false}
+        onNavigatePouw={() => navigation.navigate('PoUW')}
+        onNavigateExplorer={() => navigation.navigate('ExplorerDashboard')}
+        onNavigateDevPortal={() => navigation.navigate('DeveloperPortal')}
       />
 
       <SideDrawer
@@ -1376,128 +1378,100 @@ const SIDScreen = ({ navigation, route }: any) => {
                 )}
 
                 {activeWalletTab === 'Staking' && (
-                  <>
-                    {daoStakes.stakes.length === 0 ? (
-                      <View
-                        style={{
-                          flex: 1,
-                          justifyContent: 'center',
-                          alignItems: 'center',
-                          paddingHorizontal: spacing.lg,
-                        }}
-                      >
-                        <Text
-                          style={{
-                            color: colors.text_secondary,
-                            textAlign: 'center',
-                            marginBottom: spacing.xs,
-                          }}
+                  <ScrollView
+                    style={{ flex: 1 }}
+                    showsVerticalScrollIndicator
+                    nestedScrollEnabled
+                    contentContainerStyle={{ gap: spacing.sm, paddingTop: spacing.sm }}
+                  >
+                    {WELFARE_DAOS.map((dao) => {
+                      // Find if the user has an active stake in this DAO sector
+                      const stake = daoStakes.stakes.find(
+                        (s) => s.sector === dao.id || s.sector_dao_key_id === dao.wallet
+                      );
+
+                      const accent = dao.color;
+                      const amountSov = stake ? stake.amount / 1_000_000_000 : 0;
+                      const canUnstake = stake && (stake.unlocked || stake.blocks_remaining <= 0);
+                      const daysRemaining = stake
+                        ? Math.max(0, Math.round(stake.blocks_remaining / 7200))
+                        : 0;
+
+                      return (
+                        <TouchableOpacity
+                          key={dao.id}
+                          activeOpacity={stake ? 0.85 : 1}
+                          onPress={() => stake && setSelectedStake(stake)}
+                          disabled={!stake}
                         >
-                          No active stakes
-                        </Text>
-                        <Text
-                          style={{
-                            color: colors.text_tertiary,
-                            fontSize: typography.size.xs,
-                            textAlign: 'center',
-                          }}
-                        >
-                          Stake SOV in a welfare DAO from the DAO tab to support real outcomes.
-                        </Text>
-                      </View>
-                    ) : (
-                      <ScrollView
-                        style={{ flex: 1 }}
-                        showsVerticalScrollIndicator
-                        nestedScrollEnabled
-                        contentContainerStyle={{ gap: spacing.sm }}
-                      >
-                        {daoStakes.stakes.map((stake, idx) => {
-                          const dao = WELFARE_DAOS.find(
-                            d => d.id === stake.sector,
-                          );
-                          const accent = dao?.color ?? colors.primary;
-                          const amountSov = stake.amount / 1_000_000_000;
-                          const canUnstake =
-                            stake.unlocked || stake.blocks_remaining <= 0;
-                          const daysRemaining = Math.max(
-                            0,
-                            Math.round(stake.blocks_remaining / 7200),
-                          );
-                          return (
-                            <TouchableOpacity
-                              key={`${stake.sector_dao_key_id}-${idx}`}
-                              activeOpacity={0.85}
-                              onPress={() => setSelectedStake(stake)}
+                          <Card
+                            style={{
+                              marginHorizontal: 0,
+                              borderWidth: 0.5,
+                              borderColor: accent,
+                            }}
+                          >
+                            <View
+                              style={{
+                                paddingHorizontal: spacing.md,
+                                paddingVertical: spacing.sm,
+                              }}
                             >
-                              <Card
+                              <Row
                                 style={{
-                                  marginHorizontal: 0,
-                                  borderWidth: 0.5,
-                                  borderColor: accent,
+                                  justifyContent: 'space-between',
+                                  alignItems: 'center',
                                 }}
                               >
                                 <View
                                   style={{
-                                    paddingHorizontal: spacing.md,
-                                    paddingVertical: spacing.sm,
+                                    flex: 1,
+                                    paddingRight: spacing.sm,
                                   }}
                                 >
-                                  <Row
+                                  <Text
                                     style={{
-                                      justifyContent: 'space-between',
-                                      alignItems: 'center',
+                                      fontSize: typography.size.base,
+                                      fontWeight:
+                                        typography.weight.semibold,
+                                      color: colors.text_primary,
                                     }}
                                   >
-                                    <View
-                                      style={{
-                                        flex: 1,
-                                        paddingRight: spacing.sm,
-                                      }}
-                                    >
-                                      <Text
-                                        style={{
-                                          fontSize: typography.size.base,
-                                          fontWeight:
-                                            typography.weight.semibold,
-                                          color: colors.text_primary,
-                                        }}
-                                      >
-                                        {dao?.name ?? stake.sector}
-                                      </Text>
-                                      <Text
-                                        numberOfLines={1}
-                                        style={{
-                                          fontSize: typography.size.xs,
-                                          color: canUnstake
-                                            ? accent
-                                            : colors.text_secondary,
-                                          marginTop: 2,
-                                        }}
-                                      >
-                                        {canUnstake
-                                          ? 'Unlocked · tap to unstake'
-                                          : `Locked · ${daysRemaining}d remaining`}
-                                      </Text>
-                                    </View>
-                                    <Text
-                                      style={{
-                                        fontSize: typography.size.base,
-                                        fontWeight: typography.weight.bold,
-                                        color: colors.text_primary,
-                                      }}
-                                    >
-                                      {formatBalance(amountSov)} SOV
-                                    </Text>
-                                  </Row>
+                                    {dao.name}
+                                  </Text>
+                                  <Text
+                                    numberOfLines={1}
+                                    style={{
+                                      fontSize: typography.size.xs,
+                                      color: canUnstake
+                                        ? accent
+                                        : colors.text_tertiary,
+                                      marginTop: 2,
+                                    }}
+                                  >
+                                    {!stake
+                                      ? 'No active stake'
+                                      : canUnstake
+                                      ? 'Unlocked · tap to unstake'
+                                      : `Locked · ${daysRemaining}d remaining`}
+                                  </Text>
                                 </View>
-                              </Card>
-                            </TouchableOpacity>
-                          );
-                        })}
-                      </ScrollView>
-                    )}
-                  </>
+                                <Text
+                                  style={{
+                                    fontSize: typography.size.base,
+                                    fontWeight: typography.weight.bold,
+                                    color: colors.text_primary,
+                                  }}
+                                >
+                                  {formatBalance(amountSov)} SOV
+                                </Text>
+                              </Row>
+                            </View>
+                          </Card>
+                        </TouchableOpacity>
+                      );
+                    })}
+                  </ScrollView>
                 )}
 
                 {activeWalletTab === 'Activity' && (
@@ -1660,66 +1634,6 @@ const SIDScreen = ({ navigation, route }: any) => {
               </View>
             </View>
 
-            {/* UBS Status Card */}
-            {ubiData && (
-              <View style={{ paddingHorizontal: spacing.sm }}>
-                <Card
-                  style={{
-                    marginHorizontal: 0,
-                    backgroundColor: colors.success + '15',
-                    borderWidth: 1,
-                    borderColor: colors.success + '40',
-                  }}
-                >
-                  <Column gap="xs">
-                    <Row style={{ alignItems: 'center', gap: spacing.sm }}>
-                      
-                      <Text
-                        style={{
-                          fontSize: typography.size.base,
-                          fontWeight: typography.weight.bold,
-                          color: colors.success,
-                        }}
-                      >
-                        Universal Basic Services
-                      </Text>
-                    </Row>
-                    <Row style={{ alignItems: 'center', gap: spacing.sm }}>
-                      <Badge label={t.sidScreen.tokens.comingSoon} variant="info" size="sm" />
-                      <Text
-                        style={{
-                          fontSize: typography.size.xs,
-                          color: colors.text_secondary,
-                        }}
-                      >
-                        {t.sidScreen.tokens.comingSoon}
-                      </Text>
-                    </Row>
-                  </Column>
-
-                  <View
-                    style={{
-                      marginTop: spacing.md,
-                      backgroundColor: colors.bg_dark,
-                      padding: spacing.sm,
-                      borderRadius: borderRadius.sm,
-                    }}
-                  >
-                    <Text
-                      style={{
-                        fontSize: typography.size.xs,
-                        color: colors.text_secondary,
-                        lineHeight: 16,
-                      }}
-                    >
-                      UBS is calculated as an equal per-citizen share of 45% of
-                      all protocol transaction fees collected during the
-                      distribution period.
-                    </Text>
-                  </View>
-                </Card>
-              </View>
-            )}
           </Column>
         </ScrollView>
       </ScreenLayout>

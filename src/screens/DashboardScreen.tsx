@@ -158,8 +158,7 @@ const DashboardScreen: React.FC<any> = ({ navigation }) => {
           onMenuPress={() => setDrawerVisible(true)}
           onNavigatePouw={() => navigation.navigate('SIDTab', { screen: 'PoUW' })}
           onNavigateExplorer={() => navigation.navigate('ExplorerDashboard')}
-          onNavigateDapps={() => navigation.navigate('StoreTab')}
-          onNavigateDomains={openDomains}
+          onNavigateDevPortal={() => navigation.navigate('DeveloperPortal')}
         />
         {activeNotice && (
           <Pressable

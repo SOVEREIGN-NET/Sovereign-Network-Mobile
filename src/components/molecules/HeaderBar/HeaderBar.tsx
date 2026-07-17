@@ -24,6 +24,7 @@ import { useRewardCounter } from '../../../hooks/useRewardCounter';
 
 export interface HeaderBarProps {
   onMenuPress?: () => void;
+  onBackPress?: () => void;
   sovAddress?: string;
   isConnected?: boolean;
   onConnectionStatusChange?: (connected: boolean, latencyMs?: number) => void;
@@ -34,12 +35,12 @@ export interface HeaderBarProps {
   /** Callbacks for the hamburger dropdown menu */
   onNavigateExplorer?: () => void;
   onNavigatePouw?: () => void;
-  onNavigateDomains?: () => void;
-  onNavigateDapps?: () => void;
+  onNavigateDevPortal?: () => void;
 }
 
 const HeaderBar: React.FC<HeaderBarProps> = ({
   onMenuPress,
+  onBackPress,
   sovAddress,
   isConnected: isConnectedProp,
   onConnectionStatusChange,
@@ -47,8 +48,7 @@ const HeaderBar: React.FC<HeaderBarProps> = ({
   showHamburger = true,
   onNavigateExplorer,
   onNavigatePouw,
-  onNavigateDomains,
-  onNavigateDapps,
+  onNavigateDevPortal,
 }) => {
   const insets = useSafeAreaInsets();
   const { t } = useTranslation();
@@ -116,11 +116,8 @@ const HeaderBar: React.FC<HeaderBarProps> = ({
       case 'pouw':
         onNavigatePouw?.();
         break;
-      case 'dapps':
-        onNavigateDapps?.();
-        break;
-      case 'domains':
-        onNavigateDomains?.();
+      case 'devPortal':
+        onNavigateDevPortal?.();
         break;
     }
   };
@@ -272,12 +269,15 @@ const HeaderBar: React.FC<HeaderBarProps> = ({
     </Svg>
   );
 
-  const DappsIcon = () => (
+  const DevPortalIcon = () => (
     <Svg width={20} height={20} viewBox="0 0 24 24" fill="none">
-      <Rect x="3" y="3" width="7" height="7" rx="1" stroke={colors.text_primary} strokeWidth={1.5} />
-      <Rect x="14" y="3" width="7" height="7" rx="1" stroke={colors.text_primary} strokeWidth={1.5} />
-      <Rect x="3" y="14" width="7" height="7" rx="1" stroke={colors.text_primary} strokeWidth={1.5} />
-      <Rect x="14" y="14" width="7" height="7" rx="1" stroke={colors.text_primary} strokeWidth={1.5} />
+      <Path
+        d="M16 18l6-6-6-6M8 6l-6 6 6 6"
+        stroke={colors.text_primary}
+        strokeWidth={1.5}
+        strokeLinecap="round"
+        strokeLinejoin="round"
+      />
     </Svg>
   );
 
@@ -299,9 +299,8 @@ const HeaderBar: React.FC<HeaderBarProps> = ({
 
   const dropdownItems = [
     { id: 'explorer', label: 'Block Explorer', icon: ExplorerIcon },
-    { id: 'dapps', label: 'Trending dApps', icon: DappsIcon },
+    { id: 'devPortal', label: 'Developer Portal', icon: DevPortalIcon },
     { id: 'pouw', label: 'PoUW Rewards', icon: PouwIcon },
-    { id: 'domains', label: 'My Domains', icon: DomainsIcon },
   ];
 
   return (
@@ -310,7 +309,24 @@ const HeaderBar: React.FC<HeaderBarProps> = ({
         {/* Left slot: renders hamburger when enabled, otherwise empty
             placeholder to keep the right slot pinned to the right */}
         <View style={[styles.sideSlot, styles.leftSlot]}>
-          {showHamburger && (
+          {onBackPress ? (
+            <TouchableOpacity
+              onPress={onBackPress}
+              style={styles.hamburger}
+              hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+              accessibilityLabel="Go back"
+            >
+              <Svg width={24} height={24} viewBox="0 0 24 24" fill="none">
+                <Path
+                  d="M19 12H5M5 12L12 19M5 12L12 5"
+                  stroke={colors.text_primary}
+                  strokeWidth={2}
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                />
+              </Svg>
+            </TouchableOpacity>
+          ) : showHamburger && (
             <Pressable
               onPress={() => setDropdownVisible(true)}
               style={styles.hamburger}
