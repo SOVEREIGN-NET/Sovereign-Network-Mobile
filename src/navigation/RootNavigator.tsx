@@ -96,6 +96,7 @@ const DashboardStack = () => {
       <Stack.Screen name="ExplorerDashboard" component={ExplorerDashboardScreen} />
       <Stack.Screen name="Dapps" component={DappsScreen} />
       <Stack.Screen name="DappsSearchResults" component={DappsSearchResultsScreen} />
+      <Stack.Screen name="AppDetail" component={AppDetailScreen} />
       <Stack.Screen name="DeveloperPortal" component={DeveloperPortalScreen} />
       <Stack.Screen name="UploadDapp" component={UploadDappScreen} />
       <Stack.Screen name="RegisterDao" component={RegisterDaoScreen} />

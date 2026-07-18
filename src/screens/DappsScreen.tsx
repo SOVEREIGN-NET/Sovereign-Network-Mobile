@@ -31,6 +31,8 @@ const CARD_WIDTH = SCREEN_WIDTH * 0.42;
 
 const CATEGORIES = ['All', 'Finance', 'Services', 'Social', 'Tools', 'Governance'];
 
+const MOCK_APPS: any[] = [];
+
 const AppCard: React.FC<{
   app: any;
   onPress: () => void;
@@ -54,12 +56,13 @@ const AppSection: React.FC<{
   title: string;
   apps: any[];
   onAppPress: (app: any) => void;
-}> = ({ title, apps, onAppPress }) => {
+  onSeeAll?: () => void;
+}> = ({ title, apps, onAppPress, onSeeAll }) => {
   return (
     <Column gap="md" style={styles.sectionContainer}>
       <Row justify="space-between" align="center" style={{ paddingHorizontal: spacing.lg }}>
         <Text style={styles.sectionTitle}>{title}</Text>
-        <Pressable>
+        <Pressable onPress={onSeeAll}>
           <Text style={styles.seeAllText}>See all</Text>
         </Pressable>
       </Row>
@@ -89,9 +92,8 @@ const AppSection: React.FC<{
 const DappsScreen: React.FC<any> = ({ navigation }) => {
   const [searchQuery, setSearchQuery] = useState('');
   const [activeCategory, setActiveCategory] = useState('All');
-  // The dApp store should currently be empty as no apps are listed yet.
-  // We previously used useTrendingDapps() here, but those are domains, not store apps.
-  const allApps: any[] = [];
+
+  const allApps = MOCK_APPS;
 
   const filteredApps = useMemo(() => {
     return (allApps || []).filter(app => {
@@ -108,10 +110,10 @@ const DappsScreen: React.FC<any> = ({ navigation }) => {
 
   const handleAppPress = (app: any) => {
     if (app.id === 'sovswap') {
-      navigation.navigate('SovSwapHome');
+      navigation.navigate('MainTabs', { screen: 'SwapTab' });
       return;
     }
-    navigation.navigate('Browser', { url: app.url });
+    navigation.navigate('AppDetail', { app });
   };
 
   return (
@@ -205,24 +207,27 @@ const DappsScreen: React.FC<any> = ({ navigation }) => {
             <>
               <AppSection
                 title="New & Notable"
-                apps={[]}
+                apps={allApps}
                 onAppPress={handleAppPress}
+                onSeeAll={() => navigation.navigate('DappsSearchResults', { query: 'New' })}
               />
 
               <View style={styles.sectionDivider} />
 
               <AppSection
                 title="Most Popular"
-                apps={[]}
+                apps={allApps.slice().reverse()}
                 onAppPress={handleAppPress}
+                onSeeAll={() => navigation.navigate('DappsSearchResults', { query: 'Popular' })}
               />
 
               <View style={styles.sectionDivider} />
 
               <AppSection
                 title="Suggested for You"
-                apps={[]}
+                apps={allApps}
                 onAppPress={handleAppPress}
+                onSeeAll={() => navigation.navigate('DappsSearchResults', { query: 'Suggested' })}
               />
             </>
           )}

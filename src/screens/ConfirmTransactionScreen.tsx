@@ -30,7 +30,7 @@ const ConfirmTransactionScreen = ({ navigation, route }: any) => {
 
   const handleBack = () => {
     if (transactionResult === 'success') {
-      navigation.navigate('WalletMain');
+      navigation.navigate('SIDMain');
     } else {
       navigation.goBack();
     }

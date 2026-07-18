@@ -23,12 +23,13 @@ import {
 import { colors, spacing, typography, borderRadius } from '../theme';
 import { useTrendingDapps, getActivityColor } from '../hooks/useTrendingDapps';
 
+const MOCK_APPS: any[] = [];
+
 const DappsSearchResultsScreen: React.FC<any> = ({ navigation, route }) => {
   const { query: initialQuery } = route.params || { query: '' };
   const [searchQuery, setSearchQuery] = useState(initialQuery);
-  // The dApp store should currently be empty as no apps are listed yet.
-  // We previously used useTrendingDapps() here, but those are domains, not store apps.
-  const allApps: any[] = [];
+
+  const allApps = MOCK_APPS;
 
   const filteredResults = useMemo(() => {
     const apps = [...(allApps || [])];
@@ -41,7 +42,11 @@ const DappsSearchResultsScreen: React.FC<any> = ({ navigation, route }) => {
   }, [searchQuery, allApps]);
 
   const handleAppPress = (app: any) => {
-    navigation.navigate('Browser', { url: app.url });
+    if (app.id === 'sovswap') {
+      navigation.navigate('MainTabs', { screen: 'SwapTab' });
+      return;
+    }
+    navigation.navigate('AppDetail', { app });
   };
 
   return (

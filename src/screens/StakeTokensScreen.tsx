@@ -88,7 +88,7 @@ const StakeTokensScreen = ({ navigation }: any) => {
             text: t.stakeTokens.success.button,
             onPress: () => {
               setIsStaking(false);
-              navigation.navigate('WalletMain');
+              navigation.navigate('SIDMain');
             },
           },
         ]

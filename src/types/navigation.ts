@@ -43,7 +43,10 @@ export type DashboardStackParamList = {
   UploadDapp: undefined;
   RegisterDao: undefined;
   MyStorage: undefined;
-  SovSwapHome: undefined;
+  Dapps: undefined;
+  DappsSearchResults: { query: string };
+  AppDetail: { app: any };
+  SovSwapMain: undefined;
   SovSwapDaoDetail: { id: number };
   SovSwapMarketDetail: { id: number };
 };
