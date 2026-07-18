@@ -84,7 +84,7 @@ const DappsSearchResultsScreen: React.FC<any> = ({ navigation, route }) => {
               >
                 <Row align="center" gap="md">
                   <View style={styles.iconPlaceholder}>
-                    <Text style={styles.iconText}>{app.name.charAt(0)}</Text>
+                    <Text style={styles.iconText}>{app.name ? app.name.charAt(0) : '?'}</Text>
                   </View>
                   <Column style={{ flex: 1 }}>
                     <Text style={styles.resultName}>{app.name}</Text>

@@ -39,7 +39,7 @@ const AppCard: React.FC<{
 }> = ({ app, onPress }) => (
   <Pressable onPress={onPress} style={styles.appCard}>
     <View style={styles.appIconPlaceholder}>
-      <Text style={styles.appIconText}>{app.name.charAt(0)}</Text>
+      <Text style={styles.appIconText}>{app.name ? app.name.charAt(0) : '?'}</Text>
     </View>
     <Column gap="xxs" style={{ marginTop: spacing.xs }}>
       <Text variant="body" numberOfLines={1} style={styles.appName}>
@@ -118,7 +118,7 @@ const DappsScreen: React.FC<any> = ({ navigation }) => {
 
   return (
     <View style={{ flex: 1, backgroundColor: colors.bg_darkest }}>
-      <HeaderBar />
+      <HeaderBar onBackPress={navigation.canGoBack() ? () => navigation.goBack() : undefined} />
 
       <ScreenLayout
         paddingTop={spacing.md}
@@ -187,7 +187,7 @@ const DappsScreen: React.FC<any> = ({ navigation }) => {
                   >
                     <Row align="center" gap="md">
                       <View style={styles.iconPlaceholderSmall}>
-                        <Text style={styles.iconTextSmall}>{app.name.charAt(0)}</Text>
+                        <Text style={styles.iconTextSmall}>{app.name ? app.name.charAt(0) : '?'}</Text>
                       </View>
                       <Column style={{ flex: 1 }}>
                         <Text style={styles.resultName}>{app.name}</Text>

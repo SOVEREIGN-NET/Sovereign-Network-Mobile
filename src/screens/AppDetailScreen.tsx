@@ -23,7 +23,19 @@ import {
 import { borderRadius, colors, spacing, typography } from '../theme';
 
 const AppDetailScreen: React.FC<any> = ({ navigation, route }) => {
-  const { app } = route.params;
+  const { app } = route.params || {};
+
+  if (!app) {
+    return (
+      <View style={{ flex: 1, backgroundColor: colors.bg_darkest }}>
+        <HeaderBar onBackPress={() => navigation.goBack()} />
+        <ScreenLayout centerContent>
+          <Text style={{ color: colors.text_secondary }}>App information not found.</Text>
+        </ScreenLayout>
+      </View>
+    );
+  }
+
   const [ratingModalVisible, setRatingModalVisible] = useState(false);
   const [userRating, setUserRating] = useState(0);
   const [reviewText, setReviewText] = useState('');
@@ -67,7 +79,7 @@ const AppDetailScreen: React.FC<any> = ({ navigation, route }) => {
           {/* Header Section: Icon, Name, Category */}
           <Row gap="lg" align="center" style={styles.header}>
             <View style={styles.appIconLarge}>
-              <Text style={styles.appIconTextLarge}>{app.name.charAt(0)}</Text>
+              <Text style={styles.appIconTextLarge}>{app.name ? app.name.charAt(0) : '?'}</Text>
             </View>
             <Column gap="xs" style={{ flex: 1 }}>
               <Text variant="h2" style={styles.appName}>

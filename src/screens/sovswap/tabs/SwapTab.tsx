@@ -98,20 +98,25 @@ export const SwapTab: React.FC = () => {
   return (
     <View style={{ flex: 1 }}>
       <ScrollView
-        contentContainerStyle={[styles.scroll, { flexGrow: 1, justifyContent: 'center' }]}
+        contentContainerStyle={styles.scroll}
         keyboardShouldPersistTaps="handled"
+        showsVerticalScrollIndicator={false}
       >
         <View style={styles.headerWrap}>
           <Text
-            variant="h1"
+            variant="h2"
             weight="bold"
             style={{
               textAlign: 'center',
               letterSpacing: 1.5,
-              marginBottom: spacing.xl,
+              marginTop: spacing.xl,
+              marginBottom: spacing.md,
             }}
           >
             SOV SWAP
+          </Text>
+          <Text style={{ textAlign: 'center', color: colors.text_secondary, fontSize: 13, marginBottom: spacing.lg }}>
+            Fast, secure decentralized exchange
           </Text>
         </View>
 
