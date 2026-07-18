@@ -7,6 +7,7 @@ import {
   Alert,
   TextInput,
   Image,
+  Platform,
 } from 'react-native';
 import { useNavigation } from '@react-navigation/native';
 import Svg, { Path, Circle, Rect } from 'react-native-svg';
@@ -30,8 +31,11 @@ const UploadDappScreen: React.FC = () => {
   const [category, setCategory] = useState('');
   const [priceSov, setPriceSov] = useState('0');
   const [apkFile, setApkFile] = useState<string | null>(null);
+  const [sovDomain, setSovDomain] = useState('');
   const [screenshots, setScreenshots] = useState<string[]>([]);
   const [isSubmitting, setIsSubmitting] = useState(false);
+
+  const isAndroid = Platform.OS === 'android';
 
   const handleSelectApk = () => {
     // Mock file picker
@@ -48,9 +52,16 @@ const UploadDappScreen: React.FC = () => {
   };
 
   const handleSubmit = () => {
-    if (!appName || !description || !apkFile) {
-      Alert.alert('Missing Info', 'Please provide an app name, description, and APK file.');
-      return;
+    if (isAndroid) {
+      if (!appName || !description || !apkFile) {
+        Alert.alert('Missing Info', 'Please provide an app name, description, and APK file.');
+        return;
+      }
+    } else {
+      if (!appName || !description || !sovDomain) {
+        Alert.alert('Missing Info', 'Please provide an app name, description, and .sov domain link.');
+        return;
+      }
     }
 
     setIsSubmitting(true);
@@ -79,7 +90,9 @@ const UploadDappScreen: React.FC = () => {
             <View style={{ paddingHorizontal: spacing.sm }}>
               <Text variant="h2" style={{ marginBottom: spacing.xs }}>Publish to Store</Text>
               <Text style={{ color: colors.text_secondary, fontSize: 14 }}>
-                Reach the Sovereign community by publishing your Android app.
+                {isAndroid
+                  ? 'Reach the Sovereign community by publishing your Android app.'
+                  : 'Link your .sov domain to enable users to save your dApp to their iOS home screen.'}
               </Text>
             </View>
 
@@ -89,27 +102,43 @@ const UploadDappScreen: React.FC = () => {
                 <Column style={{ flex: 1 }}>
                   <Text style={styles.reviewTitle}>Security Review Required</Text>
                   <Text style={styles.reviewText}>
-                    All submissions are manually reviewed to ensure they are safe, non-malicious, and respect user privacy.
+                    {isAndroid
+                      ? 'All submissions are manually reviewed to ensure they are safe, non-malicious, and respect user privacy.'
+                      : 'We verify that your .sov domain serves a valid Progressive Web App (PWA) that is safe for the community.'}
                   </Text>
                 </Column>
               </Row>
             </Card>
 
             <Column gap="md">
-              <FormSection title="APK File">
-                <TouchableOpacity
-                  style={styles.uploadBox}
-                  onPress={handleSelectApk}
-                >
-                  <Svg width={24} height={24} viewBox="0 0 24 24" fill="none">
-                    <Path d="M12 15V3m0 0l-3 3m3-3l3 3M5 12v7a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2v-7" stroke={colors.primary} strokeWidth={1.5} strokeLinecap="round" strokeLinejoin="round" />
-                  </Svg>
-                  <Text style={styles.uploadLabel}>
-                    {apkFile ? apkFile : 'Select .apk file'}
-                  </Text>
-                  <Text style={styles.uploadSublabel}>Max size: 100MB • Free to upload</Text>
-                </TouchableOpacity>
-              </FormSection>
+              {isAndroid ? (
+                <FormSection title="APK File">
+                  <TouchableOpacity
+                    style={styles.uploadBox}
+                    onPress={handleSelectApk}
+                  >
+                    <Svg width={24} height={24} viewBox="0 0 24 24" fill="none">
+                      <Path d="M12 15V3m0 0l-3 3m3-3l3 3M5 12v7a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2v-7" stroke={colors.primary} strokeWidth={1.5} strokeLinecap="round" strokeLinejoin="round" />
+                    </Svg>
+                    <Text style={styles.uploadLabel}>
+                      {apkFile ? apkFile : 'Select .apk file'}
+                    </Text>
+                    <Text style={styles.uploadSublabel}>Max size: 100MB • Free to upload</Text>
+                  </TouchableOpacity>
+                </FormSection>
+              ) : (
+                <FormSection title="Web dApp (.sov domain)">
+                  <TextInput
+                    placeholder="your-app.sov"
+                    placeholderTextColor={colors.text_placeholder}
+                    style={styles.input}
+                    value={sovDomain}
+                    onChangeText={setSovDomain}
+                    autoCapitalize="none"
+                  />
+                  <Text style={styles.priceNote}>Users will be prompted to "Add to Home Screen" to install your dApp.</Text>
+                </FormSection>
+              )}
 
               <FormSection title="App Details">
                 <TextInput
