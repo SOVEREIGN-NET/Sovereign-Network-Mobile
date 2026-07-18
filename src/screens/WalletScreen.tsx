@@ -176,11 +176,10 @@ const WalletScreen = ({ navigation }: any) => {
                   </View>
                 </View>
 
-                {/* Balance Section */}
                 <View style={{ paddingHorizontal: spacing.lg, paddingVertical: spacing.xs, alignItems: 'center' }}>
                   <Text
                     style={{
-                      fontSize: typography.size['5xl'],
+                      fontSize: typography.size['4xl'],
                       fontWeight: typography.weight.bold,
                       color: colors.primary,
                       marginBottom: spacing.sm,

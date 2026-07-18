@@ -833,12 +833,12 @@ const SIDScreen = ({ navigation, route }: any) => {
                         const len = displayStr.length;
                         const fontSize =
                           len <= 12
-                            ? typography.size['5xl']
+                            ? typography.size['4xl']
                             : len <= 16
-                            ? 32
+                            ? 28
                             : len <= 20
-                            ? 26
-                            : 20;
+                            ? 22
+                            : 18;
                         return (
                           <Text
                             style={{
