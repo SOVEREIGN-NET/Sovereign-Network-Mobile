@@ -52,6 +52,7 @@ import MyDomainsScreen from '../screens/MyDomainsScreen';
 import DeveloperPortalScreen from '../screens/DeveloperPortalScreen';
 import RegisterDaoScreen from '../screens/RegisterDaoScreen';
 import OperateNodesScreen from '../screens/OperateNodesScreen';
+import UploadDappScreen from '../screens/UploadDappScreen';
 import DomainDetailScreen from '../screens/DomainDetailScreen';
 import MyStorageScreen from '../screens/MyStorageScreen';
 import WelfareDaoDetailScreen from '../screens/WelfareDaoDetailScreen';
@@ -96,6 +97,7 @@ const DashboardStack = () => {
       <Stack.Screen name="Dapps" component={DappsScreen} />
       <Stack.Screen name="DappsSearchResults" component={DappsSearchResultsScreen} />
       <Stack.Screen name="DeveloperPortal" component={DeveloperPortalScreen} />
+      <Stack.Screen name="UploadDapp" component={UploadDappScreen} />
       <Stack.Screen name="RegisterDao" component={RegisterDaoScreen} />
       <Stack.Screen name="BlockDetail" component={BlockDetailScreen} />
       <Stack.Screen name="TransactionDetail" component={TransactionDetailScreen} />

@@ -40,6 +40,7 @@ export type DashboardStackParamList = {
   OracleDashboard: undefined;
   NetworkTopology: undefined;
   DeveloperPortal: undefined;
+  UploadDapp: undefined;
   RegisterDao: undefined;
   MyStorage: undefined;
   SovSwapHome: undefined;

@@ -80,6 +80,18 @@ const DeveloperPortalScreen: React.FC<any> = () => {
       ),
       onPress: () => {},
     },
+    {
+      id: 'upload_dapp',
+      title: 'Upload dApp',
+      subtitle: 'Publish your Android app to the Sovereign Store',
+      icon: (color: string) => (
+        <Svg width={24} height={24} viewBox="0 0 24 24" fill="none">
+          <Path d="M12 2v8m0 0l-3-3m3 3l3-3M5 12v7a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2v-7" stroke={color} strokeWidth={1.5} strokeLinecap="round" strokeLinejoin="round" />
+          <Circle cx="12" cy="16" r="1.5" fill={color} />
+        </Svg>
+      ),
+      onPress: () => navigation.navigate('UploadDapp'),
+    },
   ];
 
   return (
