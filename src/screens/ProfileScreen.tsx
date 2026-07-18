@@ -4,13 +4,15 @@
  */
 
 import React, { useState } from 'react';
-import Svg, { Path } from 'react-native-svg';
+import Svg, { Path, Circle, Rect } from 'react-native-svg';
 import {
   View,
   ScrollView,
   TouchableOpacity,
   Alert,
   Clipboard,
+  StyleSheet,
+  Modal,
 } from 'react-native';
 import {
   ArrowIcon,
@@ -19,6 +21,7 @@ import {
   Button,
   LoadingView,
   Column,
+  Row,
   ScreenLayout,
   DetailRow,
   SectionLabel,
@@ -26,7 +29,165 @@ import {
 } from '../components';
 import { useAuth, useAsyncData } from '../hooks';
 import { useTranslation } from '../i18n';
-import { colors, spacing, typography, borderRadius } from '../theme';
+import { colors, spacing, typography, borderRadius, shadows } from '../theme';
+
+// --- Premium UI Components ---
+
+const CheckIcon = ({ color = colors.success }: { color?: string }) => (
+  <Svg width={16} height={16} viewBox="0 0 24 24" fill="none">
+    <Path d="M20 6L9 17l-5-5" stroke={color} strokeWidth={2.5} strokeLinecap="round" strokeLinejoin="round" />
+  </Svg>
+);
+
+const PremiumBadge = () => (
+  <View style={premiumStyles.badge}>
+    <Text style={premiumStyles.badgeText}>PREMIUM</Text>
+  </View>
+);
+
+const UpgradeModal = ({ visible, onClose, onUpgrade }: { visible: boolean, onClose: () => void, onUpgrade: () => void }) => {
+  return (
+    <Modal visible={visible} animationType="slide" transparent onRequestClose={onClose}>
+      <View style={premiumStyles.modalOverlay}>
+        <View style={premiumStyles.modalContent}>
+          <ScrollView showsVerticalScrollIndicator={false}>
+            <Column gap="lg" style={{ padding: spacing.lg }}>
+              <Row justify="space-between" align="center">
+                <Text variant="h2" style={{ color: colors.primary }}>Upgrade to Premium</Text>
+                <TouchableOpacity onPress={onClose} hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}>
+                  <Text style={{ fontSize: 24, color: colors.text_secondary }}>✕</Text>
+                </TouchableOpacity>
+              </Row>
+
+              <Text style={{ color: colors.text_secondary, fontSize: 14, lineHeight: 20 }}>
+                Unlock the full power of the Sovereign Network with a one-time Premium SID upgrade.
+              </Text>
+
+              <Card style={premiumStyles.tierCard}>
+                <Text style={premiumStyles.tierTitle}>Premium SID — $40</Text>
+                <Text style={premiumStyles.tierSubtitle}>One-time fee • Lifetime access • Mainnet Ready</Text>
+
+                <Column gap="sm" style={{ marginTop: spacing.md }}>
+                  <FeatureRow text="5 DAO Slots (Bundle: Domain + Token)" />
+                  <FeatureRow text="1 Free Mainnet-Ready DAO Bundle" />
+                  <FeatureRow text="25GB Network Storage (vs 10GB Free)" />
+                  <FeatureRow text="Custom SID Name (ex: user.sov)" />
+                  <FeatureRow text="Upload Custom Profile Pictures" />
+                  <FeatureRow text="$5 Testnet / $10 Mainnet Bundle Add-ons" />
+                  <FeatureRow text="Lifetime Premium Status (Mainnet)" />
+                </Column>
+              </Card>
+
+              <View style={premiumStyles.impactBox}>
+                <Text style={premiumStyles.impactTitle}>Community Impact</Text>
+                <Text style={premiumStyles.impactText}>
+                  <Text style={{ fontWeight: 'bold', color: colors.primary }}>80%</Text> of all profits go back to the project for funding free hardware devices (routers, phones, etc).
+                </Text>
+                <Text style={premiumStyles.impactText}>
+                  <Text style={{ fontWeight: 'bold', color: colors.text_primary }}>20%</Text> supports the core development team.
+                </Text>
+              </View>
+
+              <Button variant="primary" size="lg" onPress={onUpgrade} style={{ marginTop: spacing.md }}>
+                Upgrade Now — $40
+              </Button>
+
+              <Text style={premiumStyles.disclaimer}>
+                Testnet domains and status will transfer over to mainnet through a blockchain snapshot.
+              </Text>
+            </Column>
+          </ScrollView>
+        </View>
+      </View>
+    </Modal>
+  );
+};
+
+const FeatureRow = ({ text }: { text: string }) => (
+  <Row gap="sm" align="center">
+    <CheckIcon />
+    <Text style={{ fontSize: 13, color: colors.text_primary }}>{text}</Text>
+  </Row>
+);
+
+const premiumStyles = StyleSheet.create({
+  badge: {
+    backgroundColor: colors.primary + '22',
+    paddingHorizontal: 8,
+    paddingVertical: 2,
+    borderRadius: 4,
+    borderWidth: 1,
+    borderColor: colors.primary,
+    alignSelf: 'center',
+    marginTop: spacing.xs,
+  },
+  badgeText: {
+    color: colors.primary,
+    fontSize: 10,
+    fontWeight: 'bold',
+    letterSpacing: 1,
+  },
+  upgradeCard: {
+    marginHorizontal: 0,
+    backgroundColor: colors.bg_darker,
+    borderWidth: 1,
+    borderColor: colors.primary + '44',
+    padding: spacing.md,
+  },
+  modalOverlay: {
+    flex: 1,
+    backgroundColor: 'rgba(0,0,0,0.8)',
+    justifyContent: 'flex-end',
+  },
+  modalContent: {
+    backgroundColor: colors.bg_darkest,
+    borderTopLeftRadius: borderRadius.lg,
+    borderTopRightRadius: borderRadius.lg,
+    maxHeight: '90%',
+  },
+  tierCard: {
+    marginHorizontal: 0,
+    backgroundColor: colors.bg_dark,
+    padding: spacing.lg,
+    borderWidth: 1,
+    borderColor: colors.border,
+  },
+  tierTitle: {
+    fontSize: 20,
+    fontWeight: 'bold',
+    color: colors.text_primary,
+  },
+  tierSubtitle: {
+    fontSize: 12,
+    color: colors.text_secondary,
+    marginTop: 2,
+  },
+  impactBox: {
+    backgroundColor: colors.bg_dark,
+    padding: spacing.md,
+    borderRadius: borderRadius.md,
+    borderLeftWidth: 4,
+    borderLeftColor: colors.primary,
+  },
+  impactTitle: {
+    fontSize: 14,
+    fontWeight: 'bold',
+    color: colors.text_primary,
+    marginBottom: spacing.xs,
+  },
+  impactText: {
+    fontSize: 13,
+    color: colors.text_secondary,
+    lineHeight: 18,
+  },
+  disclaimer: {
+    fontSize: 11,
+    color: colors.text_tertiary,
+    textAlign: 'center',
+    fontStyle: 'italic',
+    marginTop: spacing.sm,
+  },
+});
 
 /**
  * Normalise a timestamp that might be in seconds, milliseconds, a numeric
@@ -64,11 +225,24 @@ const formatCreatedDate = (raw: unknown): string | null => {
 
 const ProfileScreen = ({ navigation }: any) => {
   const { t } = useTranslation();
-  const { currentIdentity, signOut, isLoading } = useAuth();
+  const { currentIdentity, signOut, isLoading, upgradeToPremium } = useAuth();
   const [loggingOut, setLoggingOut] = useState(false);
+  const [showUpgradeModal, setShowUpgradeModal] = useState(false);
+
+  const isPremium = currentIdentity?.tier === 'premium';
 
   // Keep hook order stable without triggering any network requests.
   useAsyncData(async () => null, [currentIdentity?.did]);
+
+  const handleUpgrade = async () => {
+    try {
+      await upgradeToPremium();
+      setShowUpgradeModal(false);
+      Alert.alert('Welcome to Premium!', 'Your SID has been upgraded. You now have lifetime access to premium features.');
+    } catch (error) {
+      Alert.alert('Upgrade Failed', 'Could not complete the upgrade at this time.');
+    }
+  };
 
   // Fetch UBS data for stats
   const { data: ubiData } = useAsyncData(async () => {
@@ -296,11 +470,13 @@ const ProfileScreen = ({ navigation }: any) => {
                 <Text variant="h2" style={{ marginBottom: spacing.xs }}>
                   {currentIdentity.displayName}
                 </Text>
+                {isPremium && <PremiumBadge />}
                 {currentIdentity.username && (
                   <Text
                     style={{
                       fontSize: typography.size.sm,
                       color: colors.primary,
+                      marginTop: spacing.xs,
                       marginBottom: spacing.xs,
                     }}
                   >
@@ -311,10 +487,30 @@ const ProfileScreen = ({ navigation }: any) => {
                   variant="secondary"
                   onPress={() => navigation?.navigate('ProfileEdit')}
                   disabled={authLoading}
+                  style={{ marginTop: spacing.sm }}
                 >
                   {t.identity.actions.editProfile}
                 </Button>
               </View>
+
+              {/* Tier Status for Free Users */}
+              {!isPremium && (
+                <TouchableOpacity
+                  activeOpacity={0.8}
+                  onPress={() => setShowUpgradeModal(true)}
+                  style={{ marginBottom: spacing.md }}
+                >
+                  <Card style={premiumStyles.upgradeCard}>
+                    <Row justify="space-between" align="center">
+                      <Column style={{ flex: 1 }}>
+                        <Text style={{ fontWeight: 'bold', color: colors.text_primary, fontSize: 14 }}>Upgrade to Premium SID</Text>
+                        <Text style={{ color: colors.text_secondary, fontSize: 11, marginTop: 2 }}>Unlock Mainnet transfer, custom .sov name & more</Text>
+                      </Column>
+                      <ArrowIcon direction="right" size={16} color={colors.primary} />
+                    </Row>
+                  </Card>
+                </TouchableOpacity>
+              )}
 
               {/* Identity Details */}
               <Column gap="sm">
@@ -523,6 +719,12 @@ const ProfileScreen = ({ navigation }: any) => {
           </View>
         </Column>
       </ScrollView>
+
+      <UpgradeModal
+        visible={showUpgradeModal}
+        onClose={() => setShowUpgradeModal(false)}
+        onUpgrade={handleUpgrade}
+      />
     </ScreenLayout>
   );
 };

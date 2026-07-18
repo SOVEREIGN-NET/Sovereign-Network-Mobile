@@ -14,7 +14,7 @@ export interface InputProps extends Omit<TextInputProps, 'style'> {
   label?: string;
   error?: string;
   hint?: string;
-  leftIcon?: string;
+  leftIcon?: string | React.ReactNode;
   rightIcon?: string | React.ReactNode;
   containerStyle?: ViewStyle;
   style?: ViewStyle | TextStyle;
@@ -130,7 +130,12 @@ export const Input = React.forwardRef<TextInput | null, InputProps>(
               borderColor,
             }}
           >
-            {leftIcon && <Text style={baseStyles.icon}>{leftIcon}</Text>}
+            {leftIcon && typeof leftIcon === 'string' && (
+              <Text style={baseStyles.icon}>{leftIcon}</Text>
+            )}
+            {leftIcon && typeof leftIcon !== 'string' && (
+              <View style={{ marginRight: spacing.sm }}>{leftIcon}</View>
+            )}
 
             <TextInput
               ref={ref}

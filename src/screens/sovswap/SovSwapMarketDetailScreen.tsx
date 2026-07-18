@@ -1,7 +1,7 @@
 import React, { useMemo, useState } from 'react';
 import { Alert, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
-import { SafeAreaView } from 'react-native-safe-area-context';
-import { SovPriceChart, SovSectionHeader } from '../../components/organisms/SovSwap';
+import { HeaderBar } from '../../components';
+import { SovPriceChart } from '../../components/organisms/SovSwap';
 import {
   findDao,
   formatNumber,
@@ -9,11 +9,9 @@ import {
 } from '../../services/SovSwapMockData';
 import {
   sovswapAccentFor,
-  createSovSwapStyles,
-  sovswapColors,
-  sovswapSpacing,
   sovswapType,
 } from './theme/sovswapTokens';
+import { colors, spacing, typography } from '../../theme';
 
 interface MockTx {
   type: 'Buy' | 'Sell';
@@ -55,11 +53,6 @@ export interface SovSwapMarketDetailScreenProps {
   navigation: any;
 }
 
-/**
- * Market detail — the trading desk's full-page entry. 30-period chart
- * up top, then the trade form inline beneath, market stats, and a
- * recent transactions ledger.
- */
 export const SovSwapMarketDetailScreen: React.FC<SovSwapMarketDetailScreenProps> = ({
   route,
   navigation,
@@ -75,14 +68,12 @@ export const SovSwapMarketDetailScreen: React.FC<SovSwapMarketDetailScreenProps>
 
   if (!dao || !chart) {
     return (
-      <SafeAreaView style={styles.safe}>
-        <Pressable onPress={() => navigation.goBack()} style={styles.backBtn}>
-          <Text style={styles.backText}>← Back</Text>
-        </Pressable>
+      <View style={styles.container}>
+        <HeaderBar onBackPress={() => navigation.goBack()} showHamburger={false} />
         <View style={styles.missing}>
           <Text style={styles.missingTitle}>Market not found.</Text>
         </View>
-      </SafeAreaView>
+      </View>
     );
   }
 
@@ -105,11 +96,9 @@ export const SovSwapMarketDetailScreen: React.FC<SovSwapMarketDetailScreenProps>
   };
 
   return (
-    <SafeAreaView style={styles.safe} edges={['top']}>
-      <ScrollView contentContainerStyle={styles.scroll}>
-        <View style={styles.headerWrap}>
-          <SovSectionHeader title="Market" onBack={() => navigation.goBack()} />
-        </View>
+    <View style={styles.container}>
+      <HeaderBar onBackPress={() => navigation.goBack()} showHamburger={false} />
+      <ScrollView contentContainerStyle={styles.scroll} showsVerticalScrollIndicator={false}>
         {/* Token header */}
         <View style={styles.heroWrap}>
           <Text style={[styles.typeTag, { color: accent.accent }]}>
@@ -130,10 +119,7 @@ export const SovSwapMarketDetailScreen: React.FC<SovSwapMarketDetailScreenProps>
                 style={[
                   styles.heroDelta,
                   {
-                    color:
-                      dao.priceChange >= 0
-                        ? sovswapColors.up
-                        : sovswapColors.down,
+                    color: dao.priceChange >= 0 ? colors.success : colors.error,
                   },
                 ]}
               >
@@ -171,7 +157,7 @@ export const SovSwapMarketDetailScreen: React.FC<SovSwapMarketDetailScreenProps>
                 value={amount}
                 onChangeText={setAmount}
                 placeholder="0.00"
-                placeholderTextColor={sovswapColors.paperInkFaint}
+                placeholderTextColor={colors.text_tertiary}
                 keyboardType="decimal-pad"
                 style={styles.amountInput}
               />
@@ -232,7 +218,7 @@ export const SovSwapMarketDetailScreen: React.FC<SovSwapMarketDetailScreenProps>
         <View style={styles.txWrap}>
           <Text style={styles.sectionKicker}>RECENT TRANSACTIONS</Text>
           {txs.map(tx => {
-            const tone = tx.type === 'Buy' ? sovswapColors.up : sovswapColors.down;
+            const tone = tx.type === 'Buy' ? colors.success : colors.error;
             return (
               <View key={`${tx.address}-${tx.time}`} style={styles.txRow}>
                 <Text style={[styles.txType, { color: tone }]}>{tx.type.toUpperCase()}</Text>
@@ -255,7 +241,7 @@ export const SovSwapMarketDetailScreen: React.FC<SovSwapMarketDetailScreenProps>
           })}
         </View>
       </ScrollView>
-    </SafeAreaView>
+    </View>
   );
 };
 
@@ -272,38 +258,50 @@ const BreakdownRow: React.FC<{ label: string; value: string }> = ({
 
 const Stat: React.FC<{ label: string; value: string }> = ({ label, value }) => (
   <View style={styles.statCell}>
-    <Text style={styles.statLabel}>{label}</Text>
-    <Text style={styles.statValue}>{value}</Text>
+    <Text style={statStyles.label}>{label}</Text>
+    <Text style={statStyles.value}>{value}</Text>
   </View>
 );
 
-const styles = createSovSwapStyles(() => StyleSheet.create({
-  safe: { flex: 1, backgroundColor: sovswapColors.paper },
-  headerWrap: { paddingHorizontal: sovswapSpacing.lg },
-  backBtn: { width: 110, paddingVertical: 4 },
-  backText: { ...sovswapType.smallCapsInk, color: sovswapColors.paperInkSoft, fontSize: 11 },
-  scroll: { paddingBottom: sovswapSpacing.xxxl },
+const statStyles = StyleSheet.create({
+  label: {
+    ...sovswapType.smallCaps,
+    fontSize: 9,
+  },
+  value: {
+    color: colors.text_primary,
+    fontSize: 14,
+    fontWeight: '600',
+    marginTop: 2,
+  },
+});
+
+const styles = StyleSheet.create({
+  container: { flex: 1, backgroundColor: colors.bg_darkest },
+  headerWrap: { paddingHorizontal: spacing.lg },
+  scroll: { paddingBottom: spacing.xxxl },
   missing: {
     flex: 1,
     alignItems: 'center',
     justifyContent: 'center',
-    padding: sovswapSpacing.xl,
+    padding: spacing.xl,
   },
-  missingTitle: { ...sovswapType.daoTitle },
+  missingTitle: { color: colors.text_primary, fontSize: 18, fontWeight: '700' },
 
   heroWrap: {
-    paddingHorizontal: sovswapSpacing.lg,
-    paddingTop: sovswapSpacing.lg,
-    paddingBottom: sovswapSpacing.lg,
+    paddingHorizontal: spacing.lg,
+    paddingTop: spacing.lg,
+    paddingBottom: spacing.lg,
   },
   typeTag: { ...sovswapType.smallCaps },
   heroTitle: {
-    ...sovswapType.masthead,
-    fontSize: 30,
+    color: colors.text_primary,
+    fontSize: 28,
+    fontWeight: '700',
     marginTop: 2,
   },
   heroName: {
-    ...sovswapType.bodySoft,
+    color: colors.text_secondary,
     fontStyle: 'italic',
     fontSize: 14,
     marginTop: 4,
@@ -311,17 +309,17 @@ const styles = createSovSwapStyles(() => StyleSheet.create({
   heroFigures: {
     flexDirection: 'row',
     alignItems: 'baseline',
-    marginTop: sovswapSpacing.md,
+    marginTop: spacing.md,
   },
-  heroPrice: { ...sovswapType.priceLg, fontSize: 40 },
+  heroPrice: { color: colors.text_primary, fontSize: 40, fontWeight: '700' },
   heroUnit: {
     ...sovswapType.smallCaps,
-    color: sovswapColors.paperInkSoft,
+    color: colors.text_tertiary,
     paddingLeft: 4,
   },
   heroLeader: {
     flex: 1,
-    marginHorizontal: sovswapSpacing.sm,
+    marginHorizontal: spacing.sm,
   },
   heroDelta: {
     fontSize: 16,
@@ -330,44 +328,45 @@ const styles = createSovSwapStyles(() => StyleSheet.create({
 
   chartWrap: {
     paddingHorizontal: 0,
-    paddingTop: sovswapSpacing.md,
+    paddingTop: spacing.md,
   },
   chartKicker: {
-    paddingHorizontal: sovswapSpacing.lg,
+    paddingHorizontal: spacing.lg,
   },
   sectionKicker: {
     ...sovswapType.smallCaps,
-    color: sovswapColors.paperInk,
-    marginBottom: sovswapSpacing.sm,
+    color: colors.text_primary,
+    marginBottom: spacing.sm,
   },
 
   tradeCard: {
-    marginHorizontal: sovswapSpacing.lg,
-    marginTop: sovswapSpacing.lg,
+    marginHorizontal: spacing.lg,
+    marginTop: spacing.lg,
     flexDirection: 'column',
-    backgroundColor: sovswapColors.paperWarm,
-    borderRadius: 6,
+    backgroundColor: colors.bg_dark,
+    borderRadius: 12,
+    borderWidth: 1,
     overflow: 'hidden',
   },
   tradeStripe: { height: 4 },
-  tradeBody: { flex: 1, padding: sovswapSpacing.lg },
-  tradeKicker: { ...sovswapType.smallCaps, marginBottom: sovswapSpacing.sm },
+  tradeBody: { flex: 1, padding: spacing.lg },
+  tradeKicker: { ...sovswapType.smallCaps, marginBottom: spacing.sm },
   smallNote: {
     ...sovswapType.smallCaps,
-    color: sovswapColors.paperInkSoft,
+    color: colors.text_tertiary,
     fontSize: 9,
   },
   amountRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    borderBottomWidth: StyleSheet.hairlineWidth,
-    borderBottomColor: sovswapColors.ruleSoft,
+    borderBottomWidth: 1,
+    borderBottomColor: colors.border,
     paddingVertical: 4,
   },
   amountInput: {
     flex: 1,
     fontSize: 30,
-    color: sovswapColors.paperInk,
+    color: colors.text_primary,
     paddingVertical: 4,
   },
   amountUnit: {
@@ -376,7 +375,7 @@ const styles = createSovSwapStyles(() => StyleSheet.create({
   },
 
   breakdownWrap: {
-    paddingTop: sovswapSpacing.md,
+    paddingTop: spacing.md,
   },
   breakdownRow: {
     flexDirection: 'row',
@@ -385,71 +384,74 @@ const styles = createSovSwapStyles(() => StyleSheet.create({
   },
   breakdownLabel: {
     ...sovswapType.smallCaps,
-    color: sovswapColors.paperInkSoft,
+    color: colors.text_secondary,
   },
   breakdownLeader: {
     flex: 1,
-    marginHorizontal: sovswapSpacing.sm,
+    marginHorizontal: spacing.sm,
   },
   breakdownValue: {
-    ...sovswapType.numeral,
+    color: colors.text_primary,
+    fontSize: 14,
   },
   totalLine: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-    marginTop: sovswapSpacing.sm,
-    paddingTop: sovswapSpacing.sm,
-    borderTopWidth: StyleSheet.hairlineWidth,
-    borderTopColor: sovswapColors.ruleSoft,
+    marginTop: spacing.sm,
+    paddingTop: spacing.sm,
+    borderTopWidth: 1,
+    borderTopColor: colors.border,
   },
   totalLabel: { ...sovswapType.smallCapsInk },
-  totalValue: { ...sovswapType.numeral, fontSize: 16, fontWeight: '700' },
+  totalValue: { color: colors.text_primary, fontSize: 16, fontWeight: '700' },
   balance: {
-    ...sovswapType.numeralSoft,
+    color: colors.text_tertiary,
     fontSize: 11,
     marginTop: 4,
     textAlign: 'right',
   },
 
   tradeCta: {
-    marginTop: sovswapSpacing.md,
-    paddingVertical: sovswapSpacing.md,
+    marginTop: spacing.md,
+    paddingVertical: spacing.md,
     alignItems: 'center',
+    borderRadius: 8,
   },
   tradeCtaText: {
     ...sovswapType.smallCaps,
-    color: sovswapColors.paper,
+    color: colors.bg_darkest,
     letterSpacing: 1.4,
     fontSize: 12,
+    fontWeight: 'bold',
   },
 
   statsWrap: {
-    paddingHorizontal: sovswapSpacing.lg,
-    paddingTop: sovswapSpacing.lg,
+    paddingHorizontal: spacing.lg,
+    paddingTop: spacing.lg,
   },
   statsRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    paddingVertical: sovswapSpacing.sm,
+    paddingVertical: spacing.sm,
   },
   statsDivider: {
     width: 0,
-    marginHorizontal: sovswapSpacing.md,
+    marginHorizontal: spacing.md,
   },
   statCell: { flex: 1 },
   statLabel: { ...sovswapType.smallCaps, fontSize: 9 },
-  statValue: { ...sovswapType.numeral, fontWeight: '600', marginTop: 2 },
+  statValue: { color: colors.text_primary, fontSize: 14, fontWeight: '600', marginTop: 2 },
 
   txWrap: {
-    paddingHorizontal: sovswapSpacing.lg,
-    paddingTop: sovswapSpacing.lg,
+    paddingHorizontal: spacing.lg,
+    paddingTop: spacing.lg,
   },
   txRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    paddingVertical: sovswapSpacing.sm,
-    gap: sovswapSpacing.md,
+    paddingVertical: spacing.sm,
+    gap: spacing.md,
   },
   txType: {
     ...sovswapType.smallCaps,
@@ -457,22 +459,23 @@ const styles = createSovSwapStyles(() => StyleSheet.create({
   },
   txMid: { flex: 1 },
   txAmount: {
-    ...sovswapType.numeral,
+    color: colors.text_primary,
+    fontSize: 14,
     fontWeight: '600',
   },
   txMeta: {
-    ...sovswapType.bodySoft,
+    color: colors.text_secondary,
     fontSize: 11,
     fontStyle: 'italic',
     marginTop: 1,
   },
   txRight: { alignItems: 'flex-end' },
-  txTotal: { ...sovswapType.numeral, fontWeight: '600' },
+  txTotal: { color: colors.text_primary, fontSize: 14, fontWeight: '600' },
   txMetaRight: {
-    ...sovswapType.numeralSoft,
+    color: colors.text_secondary,
     fontSize: 10,
     marginTop: 1,
   },
-}));
+});
 
 export default SovSwapMarketDetailScreen;

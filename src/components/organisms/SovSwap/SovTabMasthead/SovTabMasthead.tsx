@@ -1,11 +1,6 @@
 import React from 'react';
 import { Pressable, StyleSheet, Text, View } from 'react-native';
-import {
-  createSovSwapStyles,
-  sovswapColors,
-  sovswapSpacing,
-  sovswapType,
-} from '../../../../screens/sovswap/theme/sovswapTokens';
+import { colors, spacing, typography } from '../../../../theme';
 
 export interface SovTabMastheadProps {
   /** Localised section labels. */
@@ -36,7 +31,6 @@ export const SovTabMasthead: React.FC<SovTabMastheadProps> = ({
               styles.cell,
               active ? styles.cellActive : null,
             ]}
-            android_ripple={{ color: sovswapColors.ruleSoft, borderless: true }}
           >
             <Text
               style={[
@@ -54,31 +48,36 @@ export const SovTabMasthead: React.FC<SovTabMastheadProps> = ({
   );
 };
 
-const styles = createSovSwapStyles(() => StyleSheet.create({
+const styles = StyleSheet.create({
   row: {
     flexDirection: 'row',
-    backgroundColor: sovswapColors.paper,
-    borderBottomWidth: StyleSheet.hairlineWidth,
-    borderBottomColor: sovswapColors.ruleSoft,
+    backgroundColor: colors.bg_darkest,
+    borderBottomWidth: 1,
+    borderBottomColor: colors.border,
+    paddingTop: spacing.xs,
   },
   cell: {
     flex: 1,
-    paddingVertical: sovswapSpacing.md,
-    paddingHorizontal: sovswapSpacing.xs,
+    paddingVertical: spacing.md,
+    paddingHorizontal: spacing.xs,
     alignItems: 'center',
     justifyContent: 'center',
+    borderBottomWidth: 2,
+    borderBottomColor: 'transparent',
   },
   cellActive: {
-    backgroundColor: sovswapColors.paperEdge,
+    borderBottomColor: colors.primary,
   },
   label: {
-    ...sovswapType.smallCapsInk,
-    fontSize: 11,
-    color: sovswapColors.paperInkSoft,
+    fontSize: 12,
+    fontWeight: '600',
+    color: colors.text_secondary,
+    textTransform: 'uppercase',
+    letterSpacing: 1,
   },
   labelActive: {
-    color: sovswapColors.paperInk,
+    color: colors.primary,
   },
-}));
+});
 
 export default SovTabMasthead;

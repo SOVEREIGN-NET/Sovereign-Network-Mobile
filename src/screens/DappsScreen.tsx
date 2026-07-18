@@ -22,6 +22,7 @@ import {
   Text,
   Input,
   ArrowIcon,
+  SearchIcon,
 } from '../components';
 import { borderRadius, colors, spacing } from '../theme';
 
@@ -135,7 +136,7 @@ const DappsScreen: React.FC<any> = ({ navigation }) => {
               }
             }}
             containerStyle={{ marginBottom: 0 }}
-            leftIcon="🔍"
+            leftIcon={<SearchIcon color={colors.text_tertiary} size={18} />}
           />
         </View>
 

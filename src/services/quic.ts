@@ -173,7 +173,7 @@ interface RequestOptions {
    * Override the target node. Defaults to `DEFAULT_NODE_HOST` /
    * `DEFAULT_NODE_PORT`. Used to pin the rewards endpoints to g1 (they
    * 503 on every other validator by design) regardless of where
-   * general API traffic is routed — see `RewardsService`.
+   * general API traffic is routed.
    */
   host?: string;
   port?: number;

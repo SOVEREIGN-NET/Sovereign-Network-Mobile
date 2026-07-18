@@ -1,11 +1,6 @@
 import React from 'react';
 import { Pressable, StyleSheet, Text, View } from 'react-native';
-import {
-  createSovSwapStyles,
-  sovswapColors,
-  sovswapSpacing,
-  sovswapType,
-} from '../../../../screens/sovswap/theme/sovswapTokens';
+import { colors, spacing, typography } from '../../../../theme';
 
 export interface SovSectionHeaderProps {
   /** Page title — printed centred, all-caps, on the dark band. */
@@ -68,53 +63,54 @@ export const SovSectionHeader: React.FC<SovSectionHeaderProps> = ({
   );
 };
 
-const styles = createSovSwapStyles(() => StyleSheet.create({
+const styles = StyleSheet.create({
   wrap: {
-    marginHorizontal: -sovswapSpacing.lg, // bleed to the screen edges
-    marginBottom: sovswapSpacing.lg,
+    marginBottom: spacing.lg,
   },
   band: {
-    backgroundColor: sovswapColors.paperInk,
     paddingVertical: 10,
-    paddingHorizontal: sovswapSpacing.lg,
     alignItems: 'center',
     justifyContent: 'center',
   },
   backBtn: {
     position: 'absolute',
-    left: sovswapSpacing.lg,
+    left: spacing.lg,
     top: 0,
     bottom: 0,
-    paddingHorizontal: sovswapSpacing.xs,
+    paddingHorizontal: spacing.xs,
     justifyContent: 'center',
   },
   backGlyph: {
-    color: sovswapColors.paper,
+    color: colors.text_primary,
     fontSize: 18,
     fontWeight: '600',
   },
   title: {
-    ...sovswapType.smallCapsInk,
-    color: sovswapColors.paper,
+    color: colors.text_tertiary,
     fontSize: 12,
+    fontWeight: '700',
     letterSpacing: 1.6,
     textAlign: 'center',
+    textTransform: 'uppercase',
   },
   footline: {
-    paddingTop: sovswapSpacing.lg,
-    paddingHorizontal: sovswapSpacing.lg,
+    paddingTop: spacing.xs,
+    paddingHorizontal: spacing.lg,
     alignItems: 'center',
   },
   subtitle: {
-    ...sovswapType.bodySoft,
+    color: colors.text_secondary,
     fontSize: 12,
     textAlign: 'center',
+    lineHeight: 18,
   },
   meta: {
-    ...sovswapType.smallCaps,
+    color: colors.text_tertiary,
     fontSize: 9,
     marginTop: 4,
+    textTransform: 'uppercase',
+    letterSpacing: 1,
   },
-}));
+});
 
 export default SovSectionHeader;

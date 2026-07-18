@@ -1,16 +1,11 @@
 import React, { useMemo, useState } from 'react';
-import { Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
+import { Pressable, ScrollView, StyleSheet, TextInput, View } from 'react-native';
 import {
   SovDaoCard,
-  SovSectionHeader,
 } from '../../../components/organisms/SovSwap';
+import { SearchIcon, Text } from '../../../components';
 import { mockDAOs } from '../../../services/SovSwapMockData';
-import {
-  createSovSwapStyles,
-  sovswapColors,
-  sovswapSpacing,
-  sovswapType,
-} from '../theme/sovswapTokens';
+import { colors, spacing, typography, borderRadius } from '../../../theme';
 import type { SovDao, SovOrgType } from '../../../types/sovSwap';
 
 type RegistryFilter = 'all' | SovOrgType;
@@ -54,11 +49,18 @@ export const RegistryTab: React.FC<RegistryTabProps> = ({ onPickDao }) => {
       keyboardShouldPersistTaps="handled"
     >
       <View style={styles.headerWrap}>
-        <SovSectionHeader
-          title="DAO Registry"
-          subtitle="Discover and explore all DAOs in the Sovereign network"
-          meta={`${mockDAOs.length} entries`}
-        />
+        <View style={styles.searchBar}>
+          <SearchIcon color={colors.text_tertiary} size={18} style={{ marginRight: spacing.xs }} />
+          <TextInput
+            value={search}
+            onChangeText={setSearch}
+            placeholder="Search DAO name or symbol..."
+            placeholderTextColor={colors.text_placeholder}
+            style={styles.searchInput}
+            autoCorrect={false}
+            autoCapitalize="none"
+          />
+        </View>
       </View>
 
       {/* Filter row */}
@@ -84,25 +86,10 @@ export const RegistryTab: React.FC<RegistryTabProps> = ({ onPickDao }) => {
         })}
       </View>
 
-      {/* Search field — underlined caret, marginal-note feel */}
-      <View style={styles.searchWrap}>
-        <Text style={styles.searchLabel}>QUERY</Text>
-        <TextInput
-          value={search}
-          onChangeText={setSearch}
-          placeholder="name, symbol, or description"
-          placeholderTextColor={sovswapColors.paperInkFaint}
-          style={styles.searchInput}
-          autoCorrect={false}
-          autoCapitalize="none"
-        />
-      </View>
-
       {/* Card list */}
       <View style={styles.listWrap}>
         {filtered.length === 0 ? (
           <View style={styles.emptyWrap}>
-            <Text style={styles.emptyKicker}>no entries</Text>
             <Text style={styles.emptyTitle}>
               No DAOs found matching your criteria.
             </Text>
@@ -122,74 +109,73 @@ export const RegistryTab: React.FC<RegistryTabProps> = ({ onPickDao }) => {
   );
 };
 
-const styles = createSovSwapStyles(() => StyleSheet.create({
+const styles = StyleSheet.create({
   scroll: {
-    paddingBottom: sovswapSpacing.xxxl,
+    paddingBottom: spacing['3xl'],
   },
   headerWrap: {
-    paddingHorizontal: sovswapSpacing.lg,
+    paddingHorizontal: spacing.lg,
+    paddingTop: spacing.md,
   },
-  filterRow: {
+  searchBar: {
     flexDirection: 'row',
-    paddingHorizontal: sovswapSpacing.lg,
-    paddingTop: sovswapSpacing.md,
-    gap: sovswapSpacing.sm,
-  },
-  filterPill: {
+    alignItems: 'center',
+    backgroundColor: colors.bg_dark,
+    borderRadius: borderRadius.md,
+    paddingHorizontal: spacing.md,
+    paddingVertical: spacing.sm,
     borderWidth: 1,
-    borderColor: sovswapColors.rule,
-    paddingVertical: 6,
-    paddingHorizontal: sovswapSpacing.md,
-  },
-  filterActive: {
-    backgroundColor: sovswapColors.paperInk,
-  },
-  filterText: {
-    ...sovswapType.smallCapsInk,
-    fontSize: 10,
-  },
-  filterTextActive: {
-    color: sovswapColors.paper,
-  },
-  searchWrap: {
-    paddingHorizontal: sovswapSpacing.lg,
-    paddingTop: sovswapSpacing.lg,
-    paddingBottom: sovswapSpacing.md,
-    flexDirection: 'row',
-    alignItems: 'flex-end',
-    gap: sovswapSpacing.md,
-  },
-  searchLabel: {
-    ...sovswapType.smallCaps,
-    color: sovswapColors.paperInk,
-    paddingBottom: 6,
+    borderColor: colors.border,
   },
   searchInput: {
     flex: 1,
-    fontSize: 16,
-    color: sovswapColors.paperInk,
-    paddingVertical: 4,
-    paddingHorizontal: 0,
-    borderBottomWidth: StyleSheet.hairlineWidth,
-    borderBottomColor: sovswapColors.ruleSoft,
+    fontSize: 14,
+    color: colors.text_primary,
+    padding: 0,
+  },
+  filterRow: {
+    flexDirection: 'row',
+    justifyContent: 'center',
+    paddingHorizontal: spacing.lg,
+    paddingVertical: spacing.lg,
+    gap: spacing.sm,
+  },
+  filterPill: {
+    borderWidth: 1,
+    borderColor: colors.border,
+    paddingVertical: 6,
+    paddingHorizontal: spacing.md,
+    borderRadius: borderRadius.full,
+  },
+  filterActive: {
+    backgroundColor: colors.primary,
+    borderColor: colors.primary,
+  },
+  filterText: {
+    fontSize: typography.size.xs,
+    fontWeight: typography.weight.bold,
+    color: colors.text_secondary,
+    textTransform: 'uppercase',
+  },
+  filterTextActive: {
+    color: colors.white,
   },
   listWrap: {
-    paddingTop: sovswapSpacing.sm,
+    paddingTop: spacing.sm,
   },
   emptyWrap: {
-    paddingHorizontal: sovswapSpacing.lg,
-    paddingTop: sovswapSpacing.xxxl,
+    backgroundColor: colors.bg_dark,
+    borderRadius: borderRadius.lg,
+    marginHorizontal: spacing.lg,
+    padding: spacing.xl,
     alignItems: 'center',
   },
-  emptyKicker: {
-    ...sovswapType.smallCaps,
-    marginBottom: 6,
-  },
   emptyTitle: {
-    ...sovswapType.bodySoft,
+    fontSize: 14,
+    color: colors.text_secondary,
     fontStyle: 'italic',
     textAlign: 'center',
   },
-}));
+});
 
 export default RegistryTab;

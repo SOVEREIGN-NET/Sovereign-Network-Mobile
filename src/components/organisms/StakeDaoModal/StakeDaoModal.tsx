@@ -11,7 +11,9 @@ import {
   ScrollView,
   Keyboard,
 } from 'react-native';
-import { Text } from '../../atoms/Text';
+import { Text } from '../../atoms/Text/Text';
+import { Column } from '../../atoms/Column/Column';
+import { Row } from '../../atoms/Row/Row';
 import {
   colors,
   spacing,
@@ -32,8 +34,10 @@ export interface StakeDaoTarget {
 export interface StakeDaoModalProps {
   visible: boolean;
   dao: StakeDaoTarget | null;
+  exchangeRate: number;
   onClose: () => void;
   onSubmit: (daoId: string, amount: number, lockBlocks: number) => void;
+  submitting?: boolean;
 }
 
 // Lock-period options. Longer locks earn a higher APY — linear tier curve.
@@ -66,7 +70,7 @@ const hexToRgba = (hex: string, alpha: number): string => {
 const QUICK_AMOUNTS = [10, 50, 100, 500];
 
 export const StakeDaoModal = React.memo(
-  ({ visible, dao, onClose, onSubmit }: StakeDaoModalProps) => {
+  ({ visible, dao, exchangeRate, onClose, onSubmit, submitting }: StakeDaoModalProps) => {
     const [amount, setAmount] = useState<string>('');
     const [isFocused, setIsFocused] = useState(false);
     const [lockDays, setLockDays] = useState<number>(DEFAULT_LOCK_DAYS);
@@ -85,20 +89,32 @@ export const StakeDaoModal = React.memo(
       const n = parseFloat(amount);
       return Number.isFinite(n) && n > 0 ? n : 0;
     }, [amount]);
-    // canSubmit / lockBlocks / handleSubmit live on when the submit button
-    // is re-enabled — left out for now since the button is a "Coming soon"
-    // placeholder. Reintroduce once stake submission is wired up.
+
     const selectedOption =
       LOCK_OPTIONS.find(o => o.days === lockDays) ?? LOCK_OPTIONS[0];
     const apy = selectedOption.apy;
-    // Welfare tokens earned over the lock period = principal × APY × (days / 365)
-    const tokensEarned = parsed * (apy / 100) * (lockDays / 365);
-    const formatTokens = (n: number): string => {
+
+    // MATH REFACTOR:
+    // 1. Calculate how much SOV is actually needed to reach the 500 Hub Token cap
+    const sovNeededForCap = 500 / exchangeRate;
+
+    // 2. You receive Hub Tokens immediately at the exchange rate.
+    const rawHubTokens = parsed * exchangeRate;
+    const hubTokensReceived = Math.min(rawHubTokens, 500);
+
+    // 3. You receive an APY on your SOV commitment, paid back in SOV after the lock.
+    const sovYield = parsed * (apy / 100) * (lockDays / 365);
+
+    const isOverCap = rawHubTokens > 500;
+
+    const handleMaxForCap = () => {
+      setAmount(sovNeededForCap.toFixed(2));
+    };
+
+    const formatValue = (n: number): string => {
       if (n === 0) return '0.00';
       if (n < 0.01) return n.toFixed(4);
-      if (n < 1) return n.toFixed(3);
-      if (n < 1000) return n.toFixed(2);
-      return `${(n / 1000).toFixed(n % 1000 === 0 ? 0 : 1)}k`;
+      return n.toLocaleString('en-US', { maximumFractionDigits: 2 });
     };
 
     const handleQuickAmount = (value: number) => {
@@ -196,6 +212,9 @@ export const StakeDaoModal = React.memo(
                       >
                         {dao.desc}
                       </Text>
+                      <View style={[styles.limitBadge, { backgroundColor: hexToRgba(accent, 0.15), borderColor: accent }]}>
+                        <Text style={{ color: accent, fontSize: 10, fontWeight: 'bold' }}>MONTHLY LIMIT: 500 {dao.symbol}</Text>
+                      </View>
                     </View>
 
                     {/* Explanatory copy */}
@@ -210,24 +229,25 @@ export const StakeDaoModal = React.memo(
                         color={colors.text_secondary}
                         style={{ lineHeight: 19 }}
                       >
-                        Stake your SOV to support this welfare program. Your
-                        tokens remain yours — they signal commitment, power
-                        governance, and help fund real outcomes for the
-                        community.
+                        You are providing SOV to fund this welfare hub. By doing so, you <Text weight="bold" style={{ color: colors.text_primary }}>exchange your principal SOV</Text> for Hub Tokens immediately. Your original SOV will be locked to ensure service coverage, and you will earn a yield in SOV for your commitment.
                       </Text>
                     </View>
 
                     {/* Amount label */}
-                    <Text
-                      style={{
-                        color: colors.text_primary,
-                        fontSize: typography.size.sm,
-                        fontWeight: typography.weight.semibold,
-                        marginBottom: spacing.sm,
-                      }}
-                    >
-                      Amount
-                    </Text>
+                    <Row justify="space-between" align="center" style={{ marginBottom: spacing.sm }}>
+                      <Text
+                        style={{
+                          color: colors.text_primary,
+                          fontSize: typography.size.sm,
+                          fontWeight: typography.weight.semibold,
+                        }}
+                      >
+                        Amount
+                      </Text>
+                      <TouchableOpacity onPress={handleMaxForCap}>
+                        <Text style={{ color: accent, fontSize: 11, fontWeight: '700' }}>IDEAL STAKE: {sovNeededForCap.toFixed(2)} SOV</Text>
+                      </TouchableOpacity>
+                    </Row>
 
                     {/* Custom input */}
                     <View
@@ -363,85 +383,97 @@ export const StakeDaoModal = React.memo(
                     </View>
 
                     {/* You receive preview */}
-                    <View
-                      style={[
-                        styles.preview,
-                        {
-                          borderColor: hexToRgba(accent, 0.35),
-                          backgroundColor: hexToRgba(accent, 0.08),
-                        },
-                      ]}
-                    >
-                      <View>
-                        <Text
-                          style={{
-                            color: colors.text_secondary,
-                            fontSize: typography.size.xs,
-                            textTransform: 'uppercase',
-                            letterSpacing: 1,
-                            marginBottom: 2,
-                          }}
-                        >
-                          You receive
-                        </Text>
-                        <Text
-                          style={{
-                            color: colors.text_tertiary,
-                            fontSize: typography.size.xs,
-                          }}
-                        >
-                          {apy}% APY · {lockDays} day lock
-                        </Text>
+                    <Column gap="sm" style={{ marginBottom: spacing.lg }}>
+                      <Text
+                        style={{
+                          color: colors.text_primary,
+                          fontSize: typography.size.sm,
+                          fontWeight: typography.weight.semibold,
+                        }}
+                      >
+                        Distribution Breakdown
+                      </Text>
+
+                      <View
+                        style={[
+                          styles.preview,
+                          {
+                            borderColor: hexToRgba(accent, 0.35),
+                            backgroundColor: hexToRgba(accent, 0.08),
+                          },
+                        ]}
+                      >
+                        <View style={{ flex: 1 }}>
+                          <Text style={{ color: colors.text_primary, fontWeight: '700', fontSize: 13 }}>Immediate Swap</Text>
+                          <Text style={{ color: isOverCap ? colors.warning : colors.text_secondary, fontSize: 11 }}>
+                            {isOverCap ? 'Monthly Cap Reached' : `1 SOV = ${exchangeRate} ${dao.symbol}`}
+                          </Text>
+                        </View>
+                        <View style={{ alignItems: 'flex-end' }}>
+                          <Text style={{ color: accent, fontSize: 18, fontWeight: 'bold' }}>
+                            {formatValue(hubTokensReceived)}
+                          </Text>
+                          <Text style={{ color: accent, fontSize: 10, fontWeight: '700' }}>{dao.symbol}</Text>
+                        </View>
                       </View>
-                      <View style={{ alignItems: 'flex-end' }}>
-                        <Text
-                          style={{
-                            color: accent,
-                            fontSize: typography.size['2xl'],
-                            fontWeight: typography.weight.bold,
-                          }}
-                          numberOfLines={1}
-                        >
-                          {formatTokens(tokensEarned)}
-                        </Text>
-                        <Text
-                          style={{
-                            color: accent,
-                            fontSize: typography.size.xs,
-                            fontWeight: typography.weight.semibold,
-                            fontFamily: 'Courier',
-                            letterSpacing: 0.5,
-                          }}
-                        >
-                          {dao.symbol}
-                        </Text>
+
+                      <View
+                        style={[
+                          styles.preview,
+                          {
+                            borderColor: hexToRgba(colors.primary, 0.35),
+                            backgroundColor: hexToRgba(colors.primary, 0.08),
+                          },
+                        ]}
+                      >
+                        <View style={{ flex: 1 }}>
+                          <Text style={{ color: colors.text_primary, fontWeight: '700', fontSize: 13 }}>Commitment Yield</Text>
+                          <Text style={{ color: colors.text_secondary, fontSize: 11 }}>{apy}% APY on locked capital</Text>
+                        </View>
+                        <View style={{ alignItems: 'flex-end' }}>
+                          <Text style={{ color: colors.primary, fontSize: 18, fontWeight: 'bold' }}>
+                            +{formatValue(sovYield)}
+                          </Text>
+                          <Text style={{ color: colors.primary, fontSize: 10, fontWeight: '700' }}>SOV</Text>
+                        </View>
                       </View>
+                    </Column>
+
+                    <View style={styles.warningBox}>
+                      <Text style={styles.warningText}>
+                        NOTE: You are swapping your principal. You will receive the Hub Tokens now and the Yield later, but the {parsed} SOV principal is converted to service funding and not returned.
+                      </Text>
                     </View>
 
-                    {/* Submit — disabled, stake flow not yet live on-chain */}
+                    {/* Submit */}
                     <TouchableOpacity
-                      onPress={() => {}}
-                      disabled
-                      activeOpacity={1}
+                      onPress={() => {
+                        if (dao && parsed > 0) {
+                          const lockBlocks = lockDays * BLOCKS_PER_DAY;
+                          onSubmit(dao.id, parsed, lockBlocks);
+                        }
+                      }}
+                      disabled={parsed <= 0 || submitting}
+                      activeOpacity={0.8}
                       style={[
                         styles.submit,
                         {
-                          backgroundColor: hexToRgba(accent, 0.25),
-                          shadowOpacity: 0,
+                          backgroundColor: parsed > 0 && !submitting ? accent : hexToRgba(accent, 0.25),
+                          shadowOpacity: parsed > 0 && !submitting ? 0.3 : 0,
                         },
                       ]}
                       accessibilityRole="button"
-                      accessibilityLabel="Staking coming soon"
+                      accessibilityLabel={`Stake ${parsed} SOV`}
                     >
                       <Text
                         style={{
-                          color: colors.text_tertiary,
+                          color: parsed > 0 && !submitting ? colors.bg_darkest : colors.text_tertiary,
                           fontSize: typography.size.md,
                           fontWeight: typography.weight.bold,
                           letterSpacing: 0.3,
                         }}
                       >
-                        Coming soon
+                        {submitting ? 'Submitting...' : 'Stake Now'}
                       </Text>
                     </TouchableOpacity>
 
@@ -515,6 +547,14 @@ const makeStyles = () => StyleSheet.create({
     marginBottom: spacing.lg,
     paddingRight: spacing.xl, // leave room for close button
   },
+  limitBadge: {
+    alignSelf: 'flex-start',
+    paddingHorizontal: 8,
+    paddingVertical: 3,
+    borderRadius: 4,
+    borderWidth: 1,
+    marginTop: spacing.sm,
+  },
   explainer: {
     paddingVertical: spacing.md,
     paddingHorizontal: spacing.md,
@@ -576,6 +616,21 @@ const makeStyles = () => StyleSheet.create({
     shadowRadius: 14,
     elevation: 6,
   },
+  warningBox: {
+    backgroundColor: hexToRgba(colors.error, 0.1),
+    padding: spacing.md,
+    borderRadius: borderRadius.sm,
+    borderWidth: 1,
+    borderColor: hexToRgba(colors.error, 0.3),
+    marginBottom: spacing.xl,
+  },
+  warningText: {
+    color: colors.error,
+    fontSize: 11,
+    lineHeight: 16,
+    textAlign: 'center',
+    fontStyle: 'italic',
+  }
 });
 
 // Theme-reactive stylesheet proxy — rebuilds when `colors.bg_darkest` changes

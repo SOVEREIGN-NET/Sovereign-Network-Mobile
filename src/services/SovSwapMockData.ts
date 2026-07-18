@@ -30,107 +30,88 @@ export const sovToken: SovDao = {
   volume: 1_000_000,
 };
 
-export const mockDAOs: SovDao[] = [
+export const mockDAOs: SovDao[] = [];
+
+export const welfareTokens: SovDao[] = [
   {
     id: 1,
-    name: 'TechVentures DAO',
-    type: 'for-profit',
-    tokenName: 'TechVentures Token',
-    tokenSymbol: 'TECH',
-    description:
-      'Empowering tech startups through decentralized funding and governance. We invest in innovative technology companies.',
-    price: 12.5,
-    priceChange: 5.2,
-    supply: INITIAL_SUPPLY,
-    daoAllocation: INITIAL_SUPPLY * FOR_PROFIT_DAO_ALLOCATION,
-    treasuryAllocation: INITIAL_SUPPLY * FOR_PROFIT_TREASURY_ALLOCATION,
-    volume: 125_000,
+    name: 'Food Hub',
+    type: 'non-profit',
+    tokenName: 'Food Token',
+    tokenSymbol: 'FOOD',
+    description: 'Community food security network. Funded via $SOV staking.',
+    price: 1.0,
+    priceChange: 0.0,
+    supply: 1_000_000,
+    daoAllocation: 0,
+    treasuryAllocation: 1_000_000,
+    volume: 50_000,
   },
   {
     id: 2,
-    name: 'Green Earth Foundation',
+    name: 'Health Hub',
     type: 'non-profit',
-    tokenName: 'Green Earth Token',
-    tokenSymbol: 'GRNE',
-    description:
-      'Fighting climate change through community-driven environmental projects. 100% funded via $SOV staking.',
-    price: 8.75,
-    priceChange: 2.1,
-    supply: INITIAL_SUPPLY,
-    daoAllocation: INITIAL_SUPPLY * NON_PROFIT_DAO_ALLOCATION,
-    treasuryAllocation: INITIAL_SUPPLY * NON_PROFIT_TREASURY_ALLOCATION,
-    volume: 87_500,
+    tokenName: 'Health Token',
+    tokenSymbol: 'HEAL',
+    description: 'Decentralized healthcare access. Funded via $SOV staking.',
+    price: 1.0,
+    priceChange: 0.0,
+    supply: 1_000_000,
+    daoAllocation: 0,
+    treasuryAllocation: 1_000_000,
+    volume: 50_000,
   },
   {
     id: 3,
-    name: 'Crypto Ventures Inc',
-    type: 'for-profit',
-    tokenName: 'Crypto Ventures Token',
-    tokenSymbol: 'CRYP',
-    description:
-      'Leading blockchain investment firm focused on DeFi and Web3 infrastructure projects.',
-    price: 25.0,
-    priceChange: -1.8,
-    supply: INITIAL_SUPPLY,
-    daoAllocation: INITIAL_SUPPLY * FOR_PROFIT_DAO_ALLOCATION,
-    treasuryAllocation: INITIAL_SUPPLY * FOR_PROFIT_TREASURY_ALLOCATION,
-    volume: 250_000,
-  },
-  {
-    id: 4,
-    name: 'Education For All',
+    name: 'Education Hub',
     type: 'non-profit',
     tokenName: 'Education Token',
     tokenSymbol: 'EDU',
-    description:
-      'Providing free education resources to underserved communities worldwide. Powered by community staking.',
-    price: 5.5,
-    priceChange: 3.5,
-    supply: INITIAL_SUPPLY,
-    daoAllocation: INITIAL_SUPPLY * NON_PROFIT_DAO_ALLOCATION,
-    treasuryAllocation: INITIAL_SUPPLY * NON_PROFIT_TREASURY_ALLOCATION,
-    volume: 55_000,
+    description: 'Open learning resources. Funded via $SOV staking.',
+    price: 1.0,
+    priceChange: 0.0,
+    supply: 1_000_000,
+    daoAllocation: 0,
+    treasuryAllocation: 1_000_000,
+    volume: 50_000,
+  },
+  {
+    id: 4,
+    name: 'Housing Hub',
+    type: 'non-profit',
+    tokenName: 'Housing Token',
+    tokenSymbol: 'HOME',
+    description: 'Affordable housing collective. Funded via $SOV staking.',
+    price: 1.0,
+    priceChange: 0.0,
+    supply: 1_000_000,
+    daoAllocation: 0,
+    treasuryAllocation: 1_000_000,
+    volume: 50_000,
   },
   {
     id: 5,
-    name: 'HealthTech Solutions',
-    type: 'for-profit',
-    tokenName: 'HealthTech Token',
-    tokenSymbol: 'HLTH',
-    description:
-      'Revolutionizing healthcare through blockchain technology and telemedicine platforms.',
-    price: 18.25,
-    priceChange: 7.3,
-    supply: INITIAL_SUPPLY,
-    daoAllocation: INITIAL_SUPPLY * FOR_PROFIT_DAO_ALLOCATION,
-    treasuryAllocation: INITIAL_SUPPLY * FOR_PROFIT_TREASURY_ALLOCATION,
-    volume: 182_500,
-  },
-  {
-    id: 6,
-    name: 'Open Source Coalition',
+    name: 'Energy Hub',
     type: 'non-profit',
-    tokenName: 'Open Source Token',
-    tokenSymbol: 'OPEN',
-    description:
-      'Supporting open source developers and projects that benefit the global community.',
-    price: 4.0,
-    priceChange: 1.2,
-    supply: INITIAL_SUPPLY,
-    daoAllocation: INITIAL_SUPPLY * NON_PROFIT_DAO_ALLOCATION,
-    treasuryAllocation: INITIAL_SUPPLY * NON_PROFIT_TREASURY_ALLOCATION,
-    volume: 40_000,
+    tokenName: 'Energy Token',
+    tokenSymbol: 'ENRG',
+    description: 'Renewable energy sharing. Funded via $SOV staking.',
+    price: 1.0,
+    priceChange: 0.0,
+    supply: 1_000_000,
+    daoAllocation: 0,
+    treasuryAllocation: 1_000_000,
+    volume: 50_000,
   },
 ];
 
 export const initialBalances: Record<string, number> = {
   SOV: 10_000,
-  TECH: 500,
-  GRNE: 300,
-  CRYP: 200,
-  EDU: 400,
-  HLTH: 150,
-  OPEN: 250,
+  FOOD: 0,
+  HEAL: 0,
+  EDU: 0,
+  HOME: 0,
+  ENRG: 0,
 };
 
 /**
@@ -172,13 +153,13 @@ export function generateChartData(
   return { labels, data };
 }
 
-/** Combined picker list: universal SOV first, then DAOs. */
-export const allSovTokens: SovDao[] = [sovToken, ...mockDAOs];
+/** Combined picker list: universal SOV first, then welfare tokens, then any custom DAOs. */
+export const allSovTokens: SovDao[] = [sovToken, ...welfareTokens, ...mockDAOs];
 
 export function findToken(symbol: string): SovDao | undefined {
   return allSovTokens.find(t => t.tokenSymbol === symbol);
 }
 
 export function findDao(id: number): SovDao | undefined {
-  return mockDAOs.find(d => d.id === id);
+  return [...welfareTokens, ...mockDAOs].find(d => d.id === id);
 }

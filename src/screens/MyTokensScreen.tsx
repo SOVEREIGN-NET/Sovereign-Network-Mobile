@@ -19,7 +19,6 @@ import { colors, spacing, typography, borderRadius } from '../theme';
 import { useAuth } from '../hooks/useAuth';
 import tokenService from '../services/TokenService';
 import { atomsToDisplayLocale } from '../utils/tokenUnits';
-import { BUBL_TOKEN_ID } from '../types/bubl';
 
 // Storage keys
 const TRACKED_TOKENS_KEY = 'sov:tracked_tokens';
@@ -27,13 +26,9 @@ const LEGACY_CREATED_TOKENS_KEY = 'sov:created_tokens';
 
 /**
  * Tokens the wallet always shows for every signed-in user, regardless
- * of whether they've explicitly added them. BUBL belongs here because
- * it's the reward token earned passively by using the app — members
- * should see it (even at zero) without having to track it manually.
+ * of whether they've explicitly added them.
  */
-const ALWAYS_TRACKED_TOKEN_IDS: readonly string[] = [BUBL_TOKEN_ID].filter(
-  (id): id is string => !!id && id.length > 0,
-);
+const ALWAYS_TRACKED_TOKEN_IDS: readonly string[] = [];
 
 interface TokenWithInfo {
   token_id: string;
@@ -112,7 +107,7 @@ const MyTokensScreen = ({ navigation }: any) => {
           }
         }
 
-        // Fold in the always-tracked ids (BUBL today) so the reward
+        // Fold in the always-tracked ids so the reward
         // token shows up in the wallet from the very first open —
         // before any balance has landed. Persist the merged list so the
         // entry survives future loads without having to re-add it.
@@ -135,8 +130,8 @@ const MyTokensScreen = ({ navigation }: any) => {
               // `/token/balances` only returns tokens the user actually
               // holds, so a tracked token with no balance gets left out
               // of the per-user balance sweep. Read its balance
-              // explicitly — that way BUBL (and any other always-
-              // tracked token) shows the real number, not a hard-coded
+              // explicitly — that way any always-
+              // tracked token shows the real number, not a hard-coded
               // zero, the moment a balance lands on chain.
               let balanceDisplay: string | null = '0';
               try {

@@ -13,7 +13,6 @@ import {
 } from 'react-native';
 import Svg, { Path } from 'react-native-svg';
 import { useNetworkNotices } from '../hooks/useNetworkNotices';
-import { useAuth } from '../hooks';
 import {
   useTrendingDapps,
   getActivityColor,
@@ -79,9 +78,7 @@ const DappRow: React.FC<{
 };
 
 const DashboardScreen: React.FC<any> = ({ navigation }) => {
-  const [drawerVisible, setDrawerVisible] = useState(false);
   const { activeNotice, dismiss } = useNetworkNotices();
-  const { currentIdentity } = useAuth();
   const [urlInput, setUrlInput] = useState('zhtp://central.sov');
   const scrollY = useRef(new Animated.Value(0)).current;
   const scrollRef = useRef<ScrollView>(null);
@@ -128,23 +125,6 @@ const DashboardScreen: React.FC<any> = ({ navigation }) => {
     { useNativeDriver: true }
   );
 
-  const openDomains = useCallback(() => {
-    if (currentIdentity) {
-      navigation.navigate('SIDTab', { screen: 'MyDomains' });
-    } else {
-      navigation.navigate('SIDTab');
-    }
-  }, [currentIdentity, navigation]);
-
-  const drawerItems: DrawerItem[] = useMemo(() => [
-    { id: 'pouw', label: 'PoUW Rewards', icon: '', onPress: () => { setDrawerVisible(false); navigation.navigate('SIDTab', { screen: 'PoUW' }); } },
-    { id: 'history', label: 'History', icon: '', onPress: () => { setDrawerVisible(false); navigation.navigate('SIDTab', { screen: 'History' }); } },
-    { id: 'bookmarks', label: 'Bookmarks', icon: '', onPress: () => { setDrawerVisible(false); navigation.navigate('SIDTab', { screen: 'Bookmarks' }); } },
-    { id: 'favorites', label: 'Favorites', icon: '', onPress: () => { setDrawerVisible(false); navigation.navigate('SIDTab', { screen: 'Favorites' }); } },
-    { id: 'domains', label: 'My Domains', icon: '', onPress: () => { setDrawerVisible(false); openDomains(); } },
-    { id: 'settings', label: 'Settings', icon: '', onPress: () => { setDrawerVisible(false); navigation.navigate('SIDTab', { screen: 'AppSettings' }); } },
-  ], [navigation, openDomains]);
-
   const NOTICE_STYLE: Record<'info' | 'warning' | 'error', { bg: string; border: string; text: string; icon: string }> = {
     error:   { bg: '#3D1515', border: '#7B2020', text: '#FF6B6B', icon: '⚠' },
     warning: { bg: '#3D2E00', border: '#7B5C00', text: '#FFB800', icon: '⚡' },
@@ -154,9 +134,7 @@ const DashboardScreen: React.FC<any> = ({ navigation }) => {
   return (
     <View style={{ flex: 1, backgroundColor: colors.bg_darkest }}>
       <View style={{ zIndex: 500, position: 'absolute', top: 0, left: 0, right: 0 }}>
-        <HeaderBar
-          onMenuPress={() => setDrawerVisible(true)}
-        />
+        <HeaderBar />
         {activeNotice && (
           <Pressable
             onPress={() => dismiss(activeNotice.id)}
@@ -168,8 +146,6 @@ const DashboardScreen: React.FC<any> = ({ navigation }) => {
           </Pressable>
         )}
       </View>
-
-      <SideDrawer visible={drawerVisible} onClose={() => setDrawerVisible(false)} items={drawerItems} title="Menu" />
 
       {/* ── STATIONARY HERO: LOGO + SEARCH ── */}
       <View style={[styles.fixedHeroContainer, { top: FIXED_HERO_TOP }]} pointerEvents="box-none">
@@ -267,13 +243,7 @@ const DashboardScreen: React.FC<any> = ({ navigation }) => {
             <DappRow
               key={dapp.id}
               dapp={dapp}
-              onPress={() => {
-                if (dapp.id.includes('sovswap') || dapp.name === 'SovSwap') {
-                  navigation.navigate('SovSwapHome');
-                  return;
-                }
-                openBrowser(dapp.url);
-              }}
+              onPress={() => openBrowser(dapp.url)}
             />
           ))}
           {/* Extra min-height ensures you can scroll down the list before hitting the bottom */}

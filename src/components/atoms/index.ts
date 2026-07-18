@@ -45,6 +45,11 @@ export type { SkeletonProps } from './Skeleton';
 export { ArrowIcon } from './ArrowIcon';
 export type { ArrowIconProps, ArrowDirection } from './ArrowIcon';
 
+export { SearchIcon } from './SearchIcon';
+export type { SearchIconProps } from './SearchIcon';
+
+export { default as Logo } from './Logo';
+
 export { LockIcon } from './LockIcon';
 export { KeyIcon } from './KeyIcon';
 export { EyeOpenIcon } from './EyeOpenIcon';

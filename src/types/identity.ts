@@ -22,6 +22,7 @@ export interface Identity {
   displayName: string;
   username?: string;
   identityType: 'citizen' | 'human' | 'organization' | 'developer' | 'validator';
+  tier?: 'free' | 'premium';
   avatar?: string;
   createdAt?: string | number;
   citizenship?: boolean;

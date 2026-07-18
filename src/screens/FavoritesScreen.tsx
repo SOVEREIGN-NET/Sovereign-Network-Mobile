@@ -17,46 +17,6 @@ import { colors, spacing, typography, borderRadius } from '../theme';
 const FavoritesScreen = ({ navigation }: any) => {
   const { t } = useTranslation();
   const { currentIdentity } = useAuth();
-  const [drawerVisible, setDrawerVisible] = useState(false);
-
-  const drawerItems: DrawerItem[] = [
-    {
-      id: 'history',
-      label: 'History',
-      icon: '',
-      onPress: () => {
-        navigation.navigate('History');
-        setDrawerVisible(false);
-      },
-    },
-    {
-      id: 'bookmarks',
-      label: 'Bookmarks',
-      icon: '',
-      onPress: () => {
-        navigation.navigate('Bookmarks');
-        setDrawerVisible(false);
-      },
-    },
-    {
-      id: 'favorites',
-      label: 'Favorites',
-      icon: '',
-      onPress: () => {
-        navigation.navigate('Favorites');
-        setDrawerVisible(false);
-      },
-    },
-    {
-      id: 'settings',
-      label: 'App Settings',
-      icon: '',
-      onPress: () => {
-        navigation.navigate('AppSettings');
-        setDrawerVisible(false);
-      },
-    },
-  ];
 
   const favoriteWallets = [
     {
@@ -96,16 +56,7 @@ const FavoritesScreen = ({ navigation }: any) => {
 
   return (
     <View style={{ flex: 1, backgroundColor: colors.bg_darkest }}>
-      <HeaderBar
-        onMenuPress={() => setDrawerVisible(true)}
-      />
-
-      <SideDrawer
-        visible={drawerVisible}
-        onClose={() => setDrawerVisible(false)}
-        items={drawerItems}
-        title="Menu"
-      />
+      <HeaderBar />
 
       <ScreenLayout paddingTop={spacing.md}>
         <ScrollView showsVerticalScrollIndicator={false}>

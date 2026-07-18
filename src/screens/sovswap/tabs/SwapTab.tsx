@@ -4,20 +4,17 @@ import {
   Pressable,
   ScrollView,
   StyleSheet,
-  Text,
   TextInput,
   View,
 } from 'react-native';
 import {
-  SovPriceChart,
-  SovSectionHeader,
   SovTokenPickerModal,
 } from '../../../components/organisms/SovSwap';
+import { Text } from '../../../components';
 import {
   allSovTokens,
   canSwap,
   findToken,
-  generateChartData,
   initialBalances,
 } from '../../../services/SovSwapMockData';
 import {
@@ -27,24 +24,16 @@ import {
   sovswapSpacing,
   sovswapType,
 } from '../theme/sovswapTokens';
+import { colors, spacing, typography, borderRadius } from '../../../theme/tokens';
 
 type PickerSlot = null | 'from' | 'to';
 
-/**
- * Swap tab — the trading desk page. Two stacked entry rows joined by
- * a flip glyph in the gutter, an exchange-rate ledger line, a primary
- * action stamp, and a price chart at the foot of the page.
- *
- * Swap math + validation are ported from the web Dapp's `app/swap/page.tsx`.
- */
 export const SwapTab: React.FC = () => {
   const [fromToken, setFromToken] = useState<string>('');
   const [toToken, setToToken] = useState<string>('');
   const [fromAmount, setFromAmount] = useState<string>('');
   const [toAmount, setToAmount] = useState<string>('');
-  const [chartToken, setChartToken] = useState<string>('');
   const [picker, setPicker] = useState<PickerSlot>(null);
-  const [chartPickerOpen, setChartPickerOpen] = useState(false);
   const [balances] = useState<Record<string, number>>(initialBalances);
 
   const rate = useMemo(() => {
@@ -105,132 +94,81 @@ export const SwapTab: React.FC = () => {
 
   const fromTok = fromToken ? findToken(fromToken) : undefined;
   const toTok = toToken ? findToken(toToken) : undefined;
-  const chartTok = chartToken ? findToken(chartToken) : undefined;
-  const chartData = chartTok ? generateChartData(chartTok.price) : null;
-  const chartAccent = chartTok
-    ? sovswapAccentFor(chartTok.type).accent
-    : sovswapColors.paperInk;
 
   return (
-    <ScrollView
-      contentContainerStyle={styles.scroll}
-      keyboardShouldPersistTaps="handled"
-    >
-      <View style={styles.headerWrap}>
-        <SovSectionHeader
-          title="Token Swap"
-          subtitle="Exchange tokens within your network type. $SOV is universal."
-        />
-      </View>
-
-      {/* Swap card — two halves stacked, flip button floating between them */}
-      <View style={styles.swapCard}>
-        <SwapHalf
-          label="From"
-          amount={fromAmount}
-          onAmountChange={setFromAmount}
-          token={fromTok}
-          onPickToken={() => setPicker('from')}
-          balance={fromToken ? balances[fromToken] : undefined}
-          editable
-        />
-
-        <View style={styles.divider} />
-
-        <SwapHalf
-          label="To"
-          amount={toAmount}
-          onAmountChange={() => {}}
-          token={toTok}
-          onPickToken={() => setPicker('to')}
-          balance={toToken ? balances[toToken] : undefined}
-          editable={false}
-        />
-
-        <Pressable onPress={flipTokens} style={styles.flipFloat}>
-          <Text style={styles.flipGlyph}>⇅</Text>
-        </Pressable>
-      </View>
-
-      {/* Rate line — only when both tokens selected */}
-      {rate && fromTok && toTok ? (
-        <View style={styles.rateLine}>
-          <Text style={styles.rateText}>
-            1 {fromTok.tokenSymbol} = {rate.toFixed(4)} {toTok.tokenSymbol}
+    <View style={{ flex: 1 }}>
+      <ScrollView
+        contentContainerStyle={[styles.scroll, { flexGrow: 1, justifyContent: 'center' }]}
+        keyboardShouldPersistTaps="handled"
+      >
+        <View style={styles.headerWrap}>
+          <Text
+            variant="h1"
+            weight="bold"
+            style={{
+              textAlign: 'center',
+              letterSpacing: 1.5,
+              marginBottom: spacing.xl,
+            }}
+          >
+            SOV SWAP
           </Text>
         </View>
-      ) : null}
 
-      {/* Primary action */}
-      <Pressable onPress={handleSwap} style={styles.swapBtn}>
-        <Text style={styles.swapBtnText}>Swap</Text>
-      </Pressable>
+        <View style={styles.swapCard}>
+          <SwapHalf
+            label="From"
+            amount={fromAmount}
+            onAmountChange={setFromAmount}
+            token={fromTok}
+            onPickToken={() => setPicker('from')}
+            balance={fromToken ? balances[fromToken] : undefined}
+            editable
+          />
 
-      {/* Charts section */}
-      <View style={styles.chartHeaderWrap}>
-        <SovSectionHeader
-          title="Price Charts"
-          subtitle="Thirty-day price history, rendered in $SOV."
-        />
-      </View>
+          <View style={styles.divider} />
 
-      <View style={styles.chartCard}>
-        <Pressable
-          style={styles.chartPicker}
-          onPress={() => setChartPickerOpen(true)}
-        >
-          <Text style={styles.chartPickerLabel}>SUBJECT</Text>
-          <Text style={styles.chartPickerValue}>
-            {chartTok
-              ? `$${chartTok.tokenSymbol} — ${chartTok.name}`
-              : 'Select token'}
-          </Text>
-          <Text style={styles.chartPickerArrow}>▾</Text>
-        </Pressable>
+          <SwapHalf
+            label="To"
+            amount={toAmount}
+            onAmountChange={() => {}}
+            token={toTok}
+            onPickToken={() => setPicker('to')}
+            balance={toToken ? balances[toToken] : undefined}
+            editable={false}
+          />
 
-        {chartData ? (
-          <View style={styles.chartBody}>
-            <SovPriceChart
-              data={chartData.data}
-              labels={chartData.labels}
-              accent={chartAccent}
-              height={200}
-            />
-          </View>
-        ) : (
-          <View style={styles.chartEmpty}>
-            <Text style={styles.chartEmptyKicker}>fig. —</Text>
-            <Text style={styles.chartEmptyText}>
-              Select a token to view its price chart.
+          <Pressable onPress={flipTokens} style={styles.flipFloat}>
+            <Text style={styles.flipGlyph}>⇅</Text>
+          </Pressable>
+        </View>
+
+        {rate && fromTok && toTok ? (
+          <View style={styles.rateLine}>
+            <Text style={styles.rateText}>
+              1 {fromTok.tokenSymbol} = {rate.toFixed(4)} {toTok.tokenSymbol}
             </Text>
           </View>
-        )}
-      </View>
+        ) : null}
 
-      {/* From / To picker */}
+        <Pressable onPress={handleSwap} style={styles.swapBtn}>
+          <Text style={styles.swapBtnText}>Swap</Text>
+        </Pressable>
+      </ScrollView>
+
       <SovTokenPickerModal
         visible={picker !== null}
         tokens={allSovTokens}
         selected={picker === 'from' ? fromToken : toToken}
         balances={balances}
-        title={picker === 'from' ? 'Sell from' : 'Receive into'}
+        title={picker === 'from' ? 'Swap from' : 'Swap into'}
         onSelect={sym => {
           if (picker === 'from') setFromToken(sym);
           if (picker === 'to') setToToken(sym);
         }}
         onClose={() => setPicker(null)}
       />
-
-      {/* Chart picker */}
-      <SovTokenPickerModal
-        visible={chartPickerOpen}
-        tokens={allSovTokens}
-        selected={chartToken}
-        title="Plot token"
-        onSelect={sym => setChartToken(sym)}
-        onClose={() => setChartPickerOpen(false)}
-      />
-    </ScrollView>
+    </View>
   );
 };
 
@@ -304,12 +242,11 @@ const halfStyles = createSovSwapStyles(() => StyleSheet.create({
   },
   label: {
     ...sovswapType.smallCaps,
-    fontSize: 10,
     color: sovswapColors.paperInkSoft,
   },
   balance: {
     ...sovswapType.numeralSoft,
-    fontSize: 11,
+    fontSize: typography.size.xs,
   },
   body: {
     flexDirection: 'row',
@@ -318,10 +255,9 @@ const halfStyles = createSovSwapStyles(() => StyleSheet.create({
   },
   input: {
     flex: 1,
-    fontSize: 30,
+    fontSize: typography.size['3xl'],
     color: sovswapColors.paperInk,
     paddingVertical: 4,
-    fontVariant: ['tabular-nums'],
   },
   inputDisabled: {
     color: sovswapColors.paperInkSoft,
@@ -331,16 +267,15 @@ const halfStyles = createSovSwapStyles(() => StyleSheet.create({
     alignItems: 'center',
     backgroundColor: sovswapColors.paper,
     paddingHorizontal: sovswapSpacing.md,
-    paddingVertical: 8,
-    borderRadius: 999,
+    paddingVertical: 6,
+    borderRadius: borderRadius.full,
     gap: 4,
     minWidth: 88,
     justifyContent: 'center',
   },
   chipText: {
-    fontSize: 15,
-    fontWeight: '700',
-    letterSpacing: 0.3,
+    fontSize: typography.size.md,
+    fontWeight: typography.weight.bold,
   },
   chipArrow: {
     fontSize: 11,
@@ -349,7 +284,7 @@ const halfStyles = createSovSwapStyles(() => StyleSheet.create({
 }));
 
 const styles = createSovSwapStyles(() => StyleSheet.create({
-  scroll: { paddingBottom: sovswapSpacing.xxxl },
+  scroll: { paddingBottom: sovswapSpacing.lg },
   headerWrap: { paddingHorizontal: sovswapSpacing.lg },
   swapCard: {
     backgroundColor: sovswapColors.paperWarm,
@@ -392,62 +327,15 @@ const styles = createSovSwapStyles(() => StyleSheet.create({
   swapBtn: {
     marginTop: sovswapSpacing.lg,
     marginHorizontal: sovswapSpacing.lg,
-    backgroundColor: sovswapColors.paperInk,
-    paddingVertical: sovswapSpacing.md,
+    backgroundColor: colors.primary,
+    paddingVertical: spacing.md,
     alignItems: 'center',
-    borderRadius: 12,
+    borderRadius: borderRadius.base,
   },
   swapBtnText: {
-    color: sovswapColors.paper,
-    fontSize: 16,
-    fontWeight: '600',
-  },
-  chartHeaderWrap: {
-    paddingHorizontal: sovswapSpacing.lg,
-    marginTop: sovswapSpacing.lg,
-  },
-  chartCard: {
-    paddingHorizontal: sovswapSpacing.lg,
-    paddingVertical: sovswapSpacing.md,
-    backgroundColor: sovswapColors.paperWarm,
-    marginHorizontal: sovswapSpacing.lg,
-    borderRadius: 4,
-  },
-  chartPicker: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    paddingVertical: sovswapSpacing.sm,
-    borderBottomWidth: StyleSheet.hairlineWidth,
-    borderBottomColor: sovswapColors.ruleSoft,
-    gap: sovswapSpacing.sm,
-  },
-  chartPickerLabel: {
-    ...sovswapType.smallCaps,
-    color: sovswapColors.paperInk,
-  },
-  chartPickerValue: {
-    flex: 1,
-    ...sovswapType.body,
-    fontStyle: 'italic',
-  },
-  chartPickerArrow: {
-    fontSize: 12,
-    color: sovswapColors.paperInkSoft,
-  },
-  chartBody: {
-    paddingTop: sovswapSpacing.sm,
-  },
-  chartEmpty: {
-    paddingVertical: sovswapSpacing.xxl,
-    alignItems: 'center',
-  },
-  chartEmptyKicker: {
-    ...sovswapType.smallCaps,
-    marginBottom: 6,
-  },
-  chartEmptyText: {
-    ...sovswapType.bodySoft,
-    fontStyle: 'italic',
+    color: colors.white,
+    fontSize: typography.size.md,
+    fontWeight: typography.weight.bold,
   },
 }));
 

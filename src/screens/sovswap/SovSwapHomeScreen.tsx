@@ -1,50 +1,35 @@
 import React, { useState } from 'react';
-import { Pressable, StatusBar, StyleSheet, Text, View } from 'react-native';
-import { SafeAreaView } from 'react-native-safe-area-context';
+import { StatusBar, StyleSheet, View } from 'react-native';
+import { HeaderBar } from '../../components';
 import { SovTabMasthead } from '../../components/organisms/SovSwap';
 import RegistryTab from './tabs/RegistryTab';
-import CreateDaoTab from './tabs/CreateDaoTab';
 import MarketplaceTab from './tabs/MarketplaceTab';
 import SwapTab from './tabs/SwapTab';
 import {
   applySovSwapTheme,
   createSovSwapStyles,
   sovswapColors,
-  sovswapSpacing,
-  sovswapType,
 } from './theme/sovswapTokens';
 import type { SovDao } from '../../types/sovSwap';
 import { useTheme } from '../../context/ThemeContext';
+import { colors, spacing } from '../../theme';
 
-const TAB_LABELS: readonly [string, string, string, string] = [
-  'Registry',
-  "DAO's",
-  'Market',
+const TAB_LABELS: readonly [string, string, string] = [
   'Swap',
+  'Registry',
+  'Market',
 ] as const;
 
 export interface SovSwapHomeScreenProps {
   navigation: any;
 }
 
-/**
- * The SovSwap publication's cover page. A title strip with masthead,
- * a Roman-numeral tab bar, and a single content viewport. Tabs stay
- * mounted so list scroll positions and form draft state persist as
- * the user pages between sections — like flipping back and forth
- * inside a bound register.
- */
 export const SovSwapHomeScreen: React.FC<SovSwapHomeScreenProps> = ({
   navigation,
 }) => {
   const { theme } = useTheme();
-  // Sync the SovSwap palette to the active host theme on every render.
-  // Idempotent — same input yields the same mutation. Done in render
-  // (not useEffect) so children read the right palette on the very
-  // first paint, no flash. The Proxy stylesheet detects the sentinel
-  // change and rebuilds.
-  applySovSwapTheme(theme);
-  const [activeTab, setActiveTab] = useState(0);
+  applySovSwapTheme(theme as any);
+  const [activeTab, setActiveTab] = useState(0); // Default to Swap tab
 
   const onPickDao = (dao: SovDao) => {
     navigation.navigate('SovSwapDaoDetail', { id: dao.id });
@@ -54,114 +39,57 @@ export const SovSwapHomeScreen: React.FC<SovSwapHomeScreenProps> = ({
   };
 
   return (
-    <SafeAreaView style={styles.safe} edges={['top']}>
+    <View style={styles.container}>
       <StatusBar
         barStyle={theme === 'charcoal' ? 'light-content' : 'dark-content'}
-        backgroundColor={sovswapColors.paper}
+        backgroundColor={colors.bg_darkest}
       />
-      {/* Masthead title strip */}
-      <View style={styles.masthead}>
-        <Pressable onPress={() => navigation.goBack()} style={styles.backBtn}>
-          <Text style={styles.backText}>←</Text>
-        </Pressable>
-        <View style={styles.mastheadCenter}>
-          <Text style={styles.mastheadTitle}>SovSwap</Text>
-        </View>
-        <View style={styles.backBtn} />
-      </View>
 
-      {/* Demo notice — editorial "specimen issue" strip */}
-      <View style={styles.demoBanner}>
-        <Text style={styles.demoText}>
-          ◆ Demo issue — sample data, not a live exchange ◆
-        </Text>
-      </View>
+      <HeaderBar />
 
       {/* Tab strip */}
-      <SovTabMasthead
-        labels={TAB_LABELS}
-        activeIndex={activeTab}
-        onChange={setActiveTab}
-      />
+      <View style={styles.tabContainer}>
+        <SovTabMasthead
+          labels={TAB_LABELS as any}
+          activeIndex={activeTab}
+          onChange={setActiveTab}
+        />
+      </View>
 
-      {/* Content — keep all four mounted, hide inactive */}
+      {/* Content — keep all three mounted, hide inactive */}
       <View style={styles.content}>
         <View style={[styles.tabSlot, activeTab === 0 ? null : styles.tabHidden]}>
-          <RegistryTab onPickDao={onPickDao} />
+          <SwapTab />
         </View>
         <View style={[styles.tabSlot, activeTab === 1 ? null : styles.tabHidden]}>
-          <CreateDaoTab />
+          <RegistryTab onPickDao={onPickDao} />
         </View>
         <View style={[styles.tabSlot, activeTab === 2 ? null : styles.tabHidden]}>
           <MarketplaceTab onPickDao={onPickMarket} />
         </View>
-        <View style={[styles.tabSlot, activeTab === 3 ? null : styles.tabHidden]}>
-          <SwapTab />
-        </View>
       </View>
-    </SafeAreaView>
+    </View>
   );
 };
 
 const styles = createSovSwapStyles(() => StyleSheet.create({
-  safe: {
+  container: {
     flex: 1,
-    backgroundColor: sovswapColors.paper,
+    backgroundColor: colors.bg_darkest,
   },
-  masthead: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    paddingHorizontal: sovswapSpacing.lg,
-    paddingTop: sovswapSpacing.sm,
-    paddingBottom: sovswapSpacing.lg,
-    backgroundColor: sovswapColors.paper,
-  },
-  backBtn: {
-    width: 90,
-    paddingVertical: 4,
-  },
-  backText: {
-    ...sovswapType.smallCapsInk,
-    color: sovswapColors.paperInkSoft,
-    fontSize: 11,
-  },
-  mastheadCenter: {
-    flex: 1,
-    alignItems: 'center',
-  },
-  mastheadTitle: {
-    ...sovswapType.masthead,
-    fontSize: 22,
-  },
-  demoBanner: {
-    alignItems: 'center',
-    paddingHorizontal: sovswapSpacing.lg,
-    paddingVertical: sovswapSpacing.sm,
-    // Light orange — a soft "notice" tone, deliberately not the rust
-    // semantic accent so it doesn't read as an error.
-    backgroundColor: '#FBE6CE',
-    borderTopWidth: 1,
-    borderBottomWidth: 1,
-    borderColor: '#E0A267',
-  },
-  demoText: {
-    ...sovswapType.smallCaps,
-    color: '#C2701E',
-    fontSize: 10,
-    textAlign: 'center',
+  tabContainer: {
+    paddingHorizontal: spacing.sm,
+    backgroundColor: colors.bg_darkest,
   },
   content: {
     flex: 1,
-    backgroundColor: sovswapColors.paper,
+    backgroundColor: colors.bg_darkest,
   },
   tabSlot: {
     ...StyleSheet.absoluteFillObject,
   },
   tabHidden: {
     opacity: 0,
-    // Pointer-events disabled implicitly because Pressable bubbles
-    // through opacity:0 in some RN versions; we also push it off-screen
-    // via translation to be safe.
     transform: [{ translateX: 99999 }],
   },
 }));

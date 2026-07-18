@@ -16,6 +16,7 @@ export type RootStackParamList = {
   MigrationSeed: { seedWords: string[] };
   SeedPhrase: { seedPhrases: string[]; identity?: Identity };
   BuyCrypto: { walletAddress?: string } | undefined;
+  OperateNodes: undefined;
 };
 
 // Define the tab navigator param list
@@ -38,6 +39,9 @@ export type DashboardStackParamList = {
   ExplorerSearch: { query?: string };
   OracleDashboard: undefined;
   NetworkTopology: undefined;
+  DeveloperPortal: undefined;
+  RegisterDao: undefined;
+  MyStorage: undefined;
   SovSwapHome: undefined;
   SovSwapDaoDetail: { id: number };
   SovSwapMarketDetail: { id: number };

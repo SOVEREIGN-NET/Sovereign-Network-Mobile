@@ -1,4 +1,4 @@
-import { useEffect, useRef } from 'react';
+import { useEffect, useRef, useMemo } from 'react';
 import { Animated, Easing } from 'react-native';
 
 export interface DappData {
@@ -22,9 +22,9 @@ interface DappConfig {
 }
 
 const DAPP_CONFIGS: DappConfig[] = [
-  { id: 'central', name: 'Central.sov', desc: 'CBE applications', url: 'zhtp://central.sov', baseChange: 234, volatility: 0.08 },
-  { id: 'sovswap', name: 'SovSwap', desc: 'DAO registry - Token Swap', url: 'zhtp://sovswap.sov', baseChange: 189, volatility: 0.12 },
-  { id: 'ballot', name: 'Ballot', desc: 'Voting Platform', url: 'zhtp://ballot.sov', baseChange: 143, volatility: 0.1 },
+  { id: 'central', name: 'central.sov', desc: 'CBE applications', url: 'zhtp://central.sov', baseChange: 234, volatility: 0.08 },
+  { id: 'sovswap', name: 'sovswap.sov', desc: 'DAO registry - Token Swap', url: 'zhtp://sovswap.sov', baseChange: 189, volatility: 0.12 },
+  { id: 'ballot', name: 'ballot.sov', desc: 'Voting Platform', url: 'zhtp://ballot.sov', baseChange: 143, volatility: 0.1 },
 ];
 
 const UPDATE_INTERVAL = 8000;
@@ -40,31 +40,32 @@ const getActivityLevel = (volatility: number, change: number): 'high' | 'medium'
  * Returns stable dApp data with animated pulse/glow effects.
  */
 export const useTrendingDapps = (): DappData[] => {
-  const animatedRefs = useRef<{
-    pulseAnim: Animated.Value;
-    glowAnim: Animated.Value;
-  }[]>(
+  // Initialize animations once. We use useMemo to ensure stability across re-renders
+  // but keep the Animated values in a ref-like structure for the animation loops.
+  const anims = useMemo(() =>
     DAPP_CONFIGS.map(() => ({
       pulseAnim: new Animated.Value(1),
       glowAnim: new Animated.Value(0),
-    }))
-  );
+    })),
+  []);
 
-  // Stable dapps — no user count simulation.
-  const dapps: DappData[] = DAPP_CONFIGS.map((config, index) => ({
-    id: config.id,
-    name: config.name,
-    desc: config.desc,
-    url: config.url,
-    change: config.baseChange,
-    activityLevel: getActivityLevel(config.volatility, config.baseChange),
-    pulseAnim: animatedRefs.current[index].pulseAnim,
-    glowAnim: animatedRefs.current[index].glowAnim,
-  }));
+  // Construct the data objects
+  const dapps: DappData[] = useMemo(() =>
+    DAPP_CONFIGS.map((config, index) => ({
+      id: config.id,
+      name: config.name,
+      desc: config.desc,
+      url: config.url,
+      change: config.baseChange,
+      activityLevel: getActivityLevel(config.volatility, config.baseChange),
+      pulseAnim: anims[index].pulseAnim,
+      glowAnim: anims[index].glowAnim,
+    })),
+  [anims]);
 
   // Continuous pulse animation for activity dots
   useEffect(() => {
-    const pulseAnimations = animatedRefs.current.map((refs, index) => {
+    const pulseAnimations = anims.map((refs, index) => {
       const config = DAPP_CONFIGS[index];
       const speed = config.volatility > 0.1 ? 1000 : config.volatility > 0.07 ? 1500 : 2000;
 
@@ -91,18 +92,15 @@ export const useTrendingDapps = (): DappData[] => {
     return () => {
       pulseAnimations.forEach((anim) => anim.stop());
     };
-  }, []);
+  }, [anims]);
 
-  // Update change and activity level periodically
+  // Update glow effects periodically
   useEffect(() => {
     const interval = setInterval(() => {
-      // Slight change in growth percentage
       DAPP_CONFIGS.forEach((config, index) => {
         const changeFluctuation = (Math.random() - 0.5) * 5;
-        const newChange = Math.max(0, config.baseChange + changeFluctuation);
-        const animRefs = animatedRefs.current[index];
+        const animRefs = anims[index];
 
-        // Glow effect on significant changes
         if (Math.abs(changeFluctuation) > 2) {
           animRefs.glowAnim.setValue(1);
           Animated.timing(animRefs.glowAnim, {
@@ -116,7 +114,7 @@ export const useTrendingDapps = (): DappData[] => {
     }, UPDATE_INTERVAL);
 
     return () => clearInterval(interval);
-  }, []);
+  }, [anims]);
 
   return dapps;
 };

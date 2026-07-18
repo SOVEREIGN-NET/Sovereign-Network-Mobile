@@ -15,8 +15,8 @@ import {
 } from './src/context';
 import RootNavigator from './src/navigation/RootNavigator';
 import { AnnouncementBanner } from './src/components/molecules';
-import { colors } from './src/theme';
-import { Text } from './src/components'; // NavigationContainer is handled by each navigator
+import { colors, spacing } from './src/theme';
+import { Text, Logo } from './src/components'; // NavigationContainer is handled by each navigator
 import UsernameClaimModal from './src/components/organisms/UsernameClaimModal/UsernameClaimModal';
 import { hydrateLanguageFromStorage, useTranslation } from './src/i18n';
 import { config } from './src/config';
@@ -73,16 +73,25 @@ function AppContent() {
           backgroundColor: colors.bg_darkest,
           justifyContent: 'center',
           alignItems: 'center',
+          padding: spacing.xl,
         }}
       >
-        <Text variant="h2" style={{ color: colors.primary }}>
+        <Logo size={80} />
+        <Text
+          variant="h2"
+          style={{
+            color: colors.text_primary,
+            marginTop: spacing.lg,
+            textAlign: 'center',
+          }}
+        >
           {t.app.title}
         </Text>
         <Text
           variant="body"
           style={{
             color: colors.text_secondary,
-            marginTop: 16,
+            marginTop: spacing.sm,
           }}
         >
           {t.app.loading}
@@ -100,16 +109,25 @@ function AppContent() {
           backgroundColor: colors.bg_darkest,
           justifyContent: 'center',
           alignItems: 'center',
+          padding: spacing.xl,
         }}
       >
-        <Text variant="h2" style={{ color: colors.primary }}>
+        <Logo size={80} />
+        <Text
+          variant="h2"
+          style={{
+            color: colors.text_primary,
+            marginTop: spacing.lg,
+            textAlign: 'center',
+          }}
+        >
           {t.app.title}
         </Text>
         <Text
           variant="body"
           style={{
             color: colors.text_secondary,
-            marginTop: 16,
+            marginTop: spacing.sm,
           }}
         >
           Syncing your account...

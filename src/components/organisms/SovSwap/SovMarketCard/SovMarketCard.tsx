@@ -1,5 +1,5 @@
 import React from 'react';
-import { Pressable, StyleSheet, Text, View } from 'react-native';
+import { Pressable, StyleSheet, View } from 'react-native';
 import {
   sovswapAccentFor,
   createSovSwapStyles,
@@ -7,6 +7,7 @@ import {
   sovswapSpacing,
   sovswapType,
 } from '../../../../screens/sovswap/theme/sovswapTokens';
+import { Text } from '../../../../components';
 import type { SovDao } from '../../../../types/sovSwap';
 
 export interface SovMarketCardProps {

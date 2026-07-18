@@ -21,6 +21,8 @@ export {
   ActivityDot,
   RefreshRing,
   Skeleton,
+  SearchIcon,
+  Logo,
 } from './atoms';
 export type {
   ArrowIconProps,
@@ -46,6 +48,7 @@ export type {
   SectionLabelProps,
   RefreshRingProps,
   SkeletonProps,
+  SearchIconProps,
 } from './atoms';
 
 // Molecules

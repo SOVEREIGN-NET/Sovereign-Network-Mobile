@@ -18,7 +18,7 @@ import type { Translation } from './en';
 export const es: Translation = {
   // App
   app: {
-    title: 'SOV Web4',
+    title: 'The Sovereign Network',
     loading: 'Cargando...',
     back: 'Atrás',
     error: 'Error: contexto de autenticación no disponible',
@@ -907,7 +907,7 @@ export const es: Translation = {
     },
     walletOptionsSheet: {
       title: 'Opciones de la cartera',
-      subtitle: 'Gestiona tu identidad, dominios y ajustes',
+      subtitle: 'Gestiona tu identidad y los ajustes de la cartera',
       accessibilityLabel: 'Opciones de la cartera',
       cancel: 'Cancelar',
       rows: {

@@ -41,7 +41,7 @@ class NativeQuicModule(reactContext: ReactApplicationContext) :
     private val bootstrapPrimary =
         com.sovereignnetworkmobile.config.GeneratedConfig.BOOTSTRAP_GATEWAYS.firstOrNull()
     private var quinnControlPlaneHost: String =
-        bootstrapPrimary?.ip?.takeIf { it.isNotEmpty() }
+        bootstrapPrimary?.ip?.takeIf { !it.isNullOrEmpty() }
             ?: bootstrapPrimary?.host
             ?: com.sovereignnetworkmobile.config.GeneratedConfig.NODE_HOST
     private var quinnControlPlanePort: Int =

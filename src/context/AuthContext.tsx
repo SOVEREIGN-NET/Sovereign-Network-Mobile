@@ -20,23 +20,10 @@ import {
   claimUsername as claimUsernameOnChain,
   fetchIdentityRecord,
 } from '../services/RealAuthService';
-import { publishKyberKeyBestEffort } from '../services/KyberKeyService';
-import {
-  ingestEnvelopes,
-  receivePending,
-  resumeInboundOnForeground,
-  setSelfDid as setMessagingSelfDid,
-  stopInboundSubscription,
-} from '../services/MessagingService';
 import {
   bindIdentity as bindQuicIdentity,
 } from '../services/QuicSessionManager';
 import { isNativeQuicSessionAvailable } from '../services/NativeQuicSession';
-import { resubscribeIfOptedIn } from '../services/NotificationsService';
-import {
-  fireDailyCheckin,
-  fireWelcomeClaim,
-} from '../services/RewardsService';
 import {
   opaqueLogin,
   opaqueRegisterBegin,
@@ -180,6 +167,7 @@ export interface AuthContextType {
   updateProfile: (displayName: string, avatar?: string) => Promise<void>;
   updatePassphrase: (newPassphrase: string) => Promise<void>;
   updateBiometric: (enabled: boolean) => Promise<void>;
+  upgradeToPremium: () => Promise<void>;
   setCurrentIdentity: (identity: Identity) => Promise<void>;
   // On-demand identity loading (with biometric prompt when accessing protected features)
   loadIdentityOnDemand: () => Promise<Identity | null>;
@@ -325,6 +313,59 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
    */
   useEffect(() => {
     const restoreIdentity = async () => {
+      // --- DEV BYPASS START ---
+      // Toggle BYPASS_AUTH to true to skip login and enter the app with a dummy identity.
+      // Set to false to return to normal authentication flow.
+      const BYPASS_AUTH = true;
+      if (__DEV__ && BYPASS_AUTH) {
+        console.log('⚠️ [AuthContext] BYPASS_AUTH is active - skipping login');
+        const mockIdentity: Identity = {
+          did: 'did:zhtp:0000000000000000000000000000000000000000000000000000000000000000',
+          identityId: '0000000000000000000000000000000000000000000000000000000000000000',
+          displayName: 'Dev Bypass',
+          username: 'dev_bypass',
+          identityType: 'citizen',
+          wallets: {
+            primary: {
+              id: 'primary-wallet',
+              wallet_type: 'primary',
+              name: 'Primary Wallet',
+              balance: 1000,
+              staked_balance: 0,
+              pending_rewards: 0,
+            },
+            ubs: {
+              id: 'ubs-wallet',
+              wallet_type: 'ubs',
+              name: 'UBS Wallet',
+              balance: 50,
+              staked_balance: 0,
+              pending_rewards: 0,
+            },
+            savings: {
+              id: 'savings-wallet',
+              wallet_type: 'savings',
+              name: 'Savings Wallet',
+              balance: 5000,
+              staked_balance: 0,
+              pending_rewards: 0,
+            },
+          },
+        };
+        setCurrentIdentity(mockIdentity);
+        setLobbySession({
+          sessionToken: 'mock-token',
+          sessionKeyB64: 'bW9jay1rZXk=',
+          did: mockIdentity.did,
+          username: mockIdentity.username!,
+          accessZone: 'public',
+          createdAt: Date.now(),
+        });
+        setIsBootstrapping(false);
+        return;
+      }
+      // --- DEV BYPASS END ---
+
       try {
         const migrationFlag = await AsyncStorage.getItem(MIGRATION_REQUIRED_KEY);
         if (migrationFlag) {
@@ -884,6 +925,38 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
   }, [currentIdentity]);
 
   /**
+   * Upgrade to Premium SID
+   */
+  const upgradeToPremium = useCallback(async () => {
+    if (!currentIdentity) {
+      setError('No identity to upgrade');
+      return;
+    }
+
+    setError(null);
+    setIsLoading(true);
+
+    try {
+      // In a real app, this would verify a payment transaction on-chain.
+      // For now, we update the local identity state.
+      const updatedIdentity: Identity = {
+        ...currentIdentity,
+        tier: 'premium',
+      };
+
+      await SecureIdentityStorage.setIdentity(updatedIdentity);
+      setCurrentIdentity(updatedIdentity);
+      console.log('[AuthContext] ✅ Upgraded to Premium SID');
+    } catch (err: any) {
+      const message = err.message || 'Failed to upgrade to Premium';
+      setError(message);
+      throw err;
+    } finally {
+      setIsLoading(false);
+    }
+  }, [currentIdentity]);
+
+  /**
    * Sign out (clear identity)
    * SECURITY: Clears both Keychain and AsyncStorage
    */
@@ -1078,44 +1151,9 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
   //
   // The messaging service keeps a "live self DID" used by every
   // REST call (session/init, send). It also hydrates the
-  // encrypted-at-rest store keyed by that DID. Wiring it here means
-  // the inbox is ready by the time the user opens the Bubl tab,
-  // and a sign-out properly tears the store down.
+  // encrypted-at-rest store keyed by that DID.
   useEffect(() => {
-    setMessagingSelfDid(currentIdentity?.did ?? null);
     bindQuicIdentity(currentIdentity?.did ?? null);
-  }, [currentIdentity?.did]);
-
-  // Defensive re-subscribe to release announcements. The notifications
-  // subscriber list is per-validator and not replicated, so a member
-  // who opted in on the Bubl tab can quietly fall off the list after a
-  // validator failover or a launch that lands on a different node.
-  // Firing here — once per identity activation, i.e. effectively once
-  // per launch — silently re-asserts the subscription if (and only if)
-  // this device previously opted in with the active DID. Idempotent,
-  // best-effort, never throws.
-  useEffect(() => {
-    void resubscribeIfOptedIn(currentIdentity?.did ?? null);
-  }, [currentIdentity?.did]);
-
-  // BUBL rewards — auto-fire the lifecycle claims. `welcome` runs once
-  // per launch on identity activation (the service backs off and
-  // retries, since a just-created identity may not be on-chain yet);
-  // `daily_checkin` runs on activation and on every foreground, with
-  // the service collapsing repeats within a UTC day. Both are
-  // best-effort and never throw — the rewards node is the authority.
-  useEffect(() => {
-    const did = currentIdentity?.did;
-    if (!did) return;
-    void fireWelcomeClaim(did);
-    void fireDailyCheckin(did);
-    const sub = AppState.addEventListener(
-      'change',
-      (next: AppStateStatus) => {
-        if (next === 'active') void fireDailyCheckin(did);
-      },
-    );
-    return () => sub.remove();
   }, [currentIdentity?.did]);
 
   // Server-push inbound stream — one long-lived `/msg/inbound`
@@ -1124,75 +1162,6 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
   // the moment they're routable, so messages arrive without
   // polling latency and without burning a PQC handshake per tick.
   //
-  // Lifecycle: open once when the identity is set. We deliberately
-  // do NOT close on background transitions — the server's
-  // `register_subscriber` overwrites prior subscribers, so a
-  // close-on-background / reopen-on-foreground cycle would race
-  // the new openInbound against the OS resuming us and produce a
-  // dead stream half the time. The QUIC connection survives short
-  // backgrounds; if iOS / Android actually tears it down, the
-  // reader thread will emit `QuicInboundClosed` and the
-  // MessagingService onClosed callback resets state so the next
-  // `startInboundSubscription` call reopens. The bridge layer in
-  // `MessagingService` coalesces concurrent calls.
-  //
-  // On foreground we still kick a one-shot `/msg/receive` drain
-  // in case something landed in the deposit store while we were
-  // away (the inbound stream couldn't deliver, server fell back
-  // to deposit). The drain is idempotent — `ingestEnvelopes`
-  // de-dupes by `(timestamp, sequence)` per sender.
-  useEffect(() => {
-    const did = currentIdentity?.did;
-    if (!did) return;
-
-    let cancelled = false;
-    const drainAndResume = (forceCycle: boolean) => {
-      if (cancelled) return;
-      void (async () => {
-        try {
-          const r = await receivePending();
-          if (r.count > 0) {
-            console.log(
-              '[AuthContext] one-shot deposit drain got',
-              r.count,
-              'envelopes',
-            );
-            await ingestEnvelopes(r.messages);
-          }
-        } catch (e) {
-          console.warn('[AuthContext] deposit drain failed:', e);
-        }
-        // Subscription itself is owned by messaging screens via
-        // `registerInboundConsumer` — AuthContext no longer kicks the
-        // persistent push stream on startup, so an unmounted messaging
-        // UI doesn't spam `getSession failed: openFailed` while the
-        // upstream handshake bug remains. Foreground transitions
-        // still resume any active consumer's subscription (force=true
-        // path) so a backgrounded chat keeps working.
-        if (!cancelled && isNativeQuicSessionAvailable && forceCycle) {
-          resumeInboundOnForeground();
-        }
-      })();
-    };
-
-    drainAndResume(false);
-    const sub = AppState.addEventListener('change', (next: AppStateStatus) => {
-      // On foreground we drain the deposit store AND resume the push
-      // stream (if any consumer is registered) so we're not stuck on a
-      // phantom subscriber the OS tore down during suspension. The
-      // brief no-subscriber window between the cycle and the new
-      // register is covered by the drain above — anything that lands
-      // then sits in deposit.
-      if (next === 'active') drainAndResume(true);
-    });
-
-    return () => {
-      cancelled = true;
-      stopInboundSubscription();
-      sub.remove();
-    };
-  }, [currentIdentity?.did]);
-
   // ─── Username claim ─────────────────────────────────────────────────
   //
   // Show the claim modal only when the user has NEITHER a chain
@@ -1516,6 +1485,7 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
     updateProfile,
     updatePassphrase,
     updateBiometric,
+    upgradeToPremium,
     setCurrentIdentity: setIdentity,
     loadIdentityOnDemand,
     isBiometricAvailable,
@@ -1546,6 +1516,7 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
     updateProfile,
     updatePassphrase,
     updateBiometric,
+    upgradeToPremium,
     setIdentity,
     loadIdentityOnDemand,
     isBiometricAvailable,

@@ -14,46 +14,27 @@ interface StatConfig {
 }
 
 const STATS_CONFIG: Record<keyof DAOStatsData, StatConfig> = {
-  members: { start: 12, target: 847, increment: 3 },
-  activeProposals: { start: 1, target: 5, increment: 1 },
-  totalProposals: { start: 4, target: 23, increment: 1 },
-  treasury: { start: 1250, target: 45720, increment: 150 },
+  members: { start: 0, target: 0, increment: 0 },
+  activeProposals: { start: 5, target: 5, increment: 0 },
+  totalProposals: { start: 5, target: 5, increment: 0 },
+  treasury: { start: 0, target: 0, increment: 0 },
 };
 
-const UPDATE_INTERVAL = 5000; // Update every 5 seconds
+const UPDATE_INTERVAL = 10000;
 
 /**
- * Simulates slowly growing DAO statistics
+ * Provides static DAO statistics as requested.
  */
 export const useDAOStats = (): DAOStatsData => {
-  const [stats, setStats] = useState<DAOStatsData>({
+  const [stats] = useState<DAOStatsData>({
     members: STATS_CONFIG.members.start,
     activeProposals: STATS_CONFIG.activeProposals.start,
     totalProposals: STATS_CONFIG.totalProposals.start,
     treasury: STATS_CONFIG.treasury.start,
   });
 
-  useEffect(() => {
-    const interval = setInterval(() => {
-      setStats((prev) => {
-        const newStats = { ...prev };
-
-        // Update each stat with some randomness
-        (Object.keys(STATS_CONFIG) as Array<keyof DAOStatsData>).forEach((key) => {
-          const config = STATS_CONFIG[key];
-          if (prev[key] < config.target) {
-            const randomFactor = 0.5 + Math.random();
-            const increment = Math.ceil(config.increment * randomFactor);
-            newStats[key] = Math.min(prev[key] + increment, config.target);
-          }
-        });
-
-        return newStats;
-      });
-    }, UPDATE_INTERVAL);
-
-    return () => clearInterval(interval);
-  }, []);
+  // Empty effect to preserve hook order during development hot-reloads
+  useEffect(() => {}, []);
 
   return stats;
 };

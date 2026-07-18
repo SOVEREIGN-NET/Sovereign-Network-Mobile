@@ -1,30 +1,20 @@
 import React from 'react';
-import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
-import { SafeAreaView } from 'react-native-safe-area-context';
-import { SovSectionHeader } from '../../components/organisms/SovSwap';
+import { ScrollView, StyleSheet, Text, View, Pressable } from 'react-native';
+import { HeaderBar } from '../../components';
 import { findDao, formatNumber } from '../../services/SovSwapMockData';
 import {
   sovswapAccentFor,
-  createSovSwapStyles,
-  sovswapColors,
-  sovswapSpacing,
   sovswapType,
 } from './theme/sovswapTokens';
+import { colors, spacing, typography } from '../../theme';
 
-const SHORTCUTS = ['Website', 'Bubl', 'Whisper', 'Konect', 'gitSmart', 'Ballot'];
+const SHORTCUTS = ['Website', 'Whisper', 'Konect', 'gitSmart', 'Ballot'];
 
 export interface SovSwapDaoDetailScreenProps {
   route: { params: { id: number } };
   navigation: any;
 }
 
-/**
- * DAO entry detail — the registry's full-page entry. Hero block with
- * type tag and ticker, description in serif body, six placeholder
- * "appendix" buttons (apps shipped from this DAO), a 2x2 monospaced
- * stat grid, an indigo-equivalent "current quote" hero, and a
- * governance footnote.
- */
 export const SovSwapDaoDetailScreen: React.FC<SovSwapDaoDetailScreenProps> = ({
   route,
   navigation,
@@ -32,14 +22,12 @@ export const SovSwapDaoDetailScreen: React.FC<SovSwapDaoDetailScreenProps> = ({
   const dao = findDao(route.params.id);
   if (!dao) {
     return (
-      <SafeAreaView style={styles.safe}>
-        <Pressable onPress={() => navigation.goBack()} style={styles.backBtn}>
-          <Text style={styles.backText}>← Back</Text>
-        </Pressable>
+      <View style={styles.container}>
+        <HeaderBar onBackPress={() => navigation.goBack()} showHamburger={false} />
         <View style={styles.missing}>
           <Text style={styles.missingTitle}>Entry not found.</Text>
         </View>
-      </SafeAreaView>
+      </View>
     );
   }
 
@@ -48,15 +36,13 @@ export const SovSwapDaoDetailScreen: React.FC<SovSwapDaoDetailScreenProps> = ({
   const marketCap = dao.price * dao.supply;
   const treasuryPct = dao.type === 'for-profit' ? 20 : 100;
   const changeColor =
-    dao.priceChange >= 0 ? sovswapColors.up : sovswapColors.down;
+    dao.priceChange >= 0 ? colors.success : colors.error;
   const changeSign = dao.priceChange > 0 ? '+' : '';
 
   return (
-    <SafeAreaView style={styles.safe} edges={['top']}>
-      <ScrollView contentContainerStyle={styles.scroll}>
-        <View style={styles.headerWrap}>
-          <SovSectionHeader title="DAO" onBack={() => navigation.goBack()} />
-        </View>
+    <View style={styles.container}>
+      <HeaderBar onBackPress={() => navigation.goBack()} showHamburger={false} />
+      <ScrollView contentContainerStyle={styles.scroll} showsVerticalScrollIndicator={false}>
         {/* Hero */}
         <View style={styles.heroWrap}>
           <View style={styles.heroTopRow}>
@@ -157,7 +143,7 @@ export const SovSwapDaoDetailScreen: React.FC<SovSwapDaoDetailScreenProps> = ({
           </View>
         </View>
       </ScrollView>
-    </SafeAreaView>
+    </View>
   );
 };
 
@@ -186,24 +172,24 @@ const GovStat: React.FC<{ label: string; value: string; small?: boolean }> = ({
   </View>
 );
 
-const statStyles = createSovSwapStyles(() => StyleSheet.create({
+const statStyles = StyleSheet.create({
   cell: {
     width: '50%',
-    paddingVertical: sovswapSpacing.md,
-    paddingHorizontal: sovswapSpacing.md,
+    paddingVertical: spacing.md,
+    paddingHorizontal: spacing.md,
   },
   label: {
     ...sovswapType.smallCaps,
     fontSize: 9,
   },
   value: {
-    ...sovswapType.numeral,
+    color: colors.text_primary,
     fontSize: 16,
     fontWeight: '600',
     marginTop: 4,
   },
   footnote: {
-    ...sovswapType.numeralSoft,
+    color: colors.text_secondary,
     fontSize: 11,
     marginTop: 2,
   },
@@ -212,7 +198,7 @@ const statStyles = createSovSwapStyles(() => StyleSheet.create({
     alignItems: 'flex-start',
   },
   govValue: {
-    ...sovswapType.numeral,
+    color: colors.text_primary,
     fontSize: 14,
     fontWeight: '600',
     marginTop: 2,
@@ -220,26 +206,24 @@ const statStyles = createSovSwapStyles(() => StyleSheet.create({
   govSmall: {
     fontSize: 11,
   },
-}));
+});
 
-const styles = createSovSwapStyles(() => StyleSheet.create({
-  safe: { flex: 1, backgroundColor: sovswapColors.paper },
-  headerWrap: { paddingHorizontal: sovswapSpacing.lg },
-  backBtn: { width: 90, paddingVertical: 4 },
-  backText: { ...sovswapType.smallCapsInk, color: sovswapColors.paperInkSoft, fontSize: 11 },
-  scroll: { paddingBottom: sovswapSpacing.xxxl },
+const styles = StyleSheet.create({
+  container: { flex: 1, backgroundColor: colors.bg_darkest },
+  headerWrap: { paddingHorizontal: spacing.lg },
+  scroll: { paddingBottom: spacing.xxxl },
   missing: {
     flex: 1,
     alignItems: 'center',
     justifyContent: 'center',
-    padding: sovswapSpacing.xl,
+    padding: spacing.xl,
   },
-  missingTitle: { ...sovswapType.daoTitle },
+  missingTitle: { color: colors.text_primary, fontSize: 18, fontWeight: '700' },
 
   heroWrap: {
-    paddingHorizontal: sovswapSpacing.lg,
-    paddingTop: sovswapSpacing.lg,
-    paddingBottom: sovswapSpacing.lg,
+    paddingHorizontal: spacing.lg,
+    paddingTop: spacing.lg,
+    paddingBottom: spacing.lg,
   },
   heroTopRow: {
     flexDirection: 'row',
@@ -249,18 +233,19 @@ const styles = createSovSwapStyles(() => StyleSheet.create({
   typeTag: { ...sovswapType.smallCaps },
   heroEstablished: {
     ...sovswapType.smallCaps,
-    color: sovswapColors.paperInkFaint,
+    color: colors.text_tertiary,
   },
   heroName: {
-    ...sovswapType.masthead,
-    fontSize: 30,
-    marginTop: sovswapSpacing.xs,
+    color: colors.text_primary,
+    fontSize: 28,
+    fontWeight: '700',
+    marginTop: spacing.xs,
   },
   heroTickerRow: {
     flexDirection: 'row',
     alignItems: 'baseline',
-    gap: sovswapSpacing.sm,
-    marginTop: sovswapSpacing.sm,
+    gap: spacing.sm,
+    marginTop: spacing.sm,
   },
   heroTicker: {
     fontSize: 22,
@@ -268,51 +253,52 @@ const styles = createSovSwapStyles(() => StyleSheet.create({
     letterSpacing: 0.4,
   },
   heroTokenName: {
-    ...sovswapType.bodySoft,
+    color: colors.text_secondary,
     fontStyle: 'italic',
     fontSize: 14,
   },
   heroRule: {
     height: 1,
-    backgroundColor: sovswapColors.rule,
-    marginVertical: sovswapSpacing.md,
+    backgroundColor: colors.border,
+    marginVertical: spacing.md,
   },
-  heroBody: { ...sovswapType.body, lineHeight: 22 },
+  heroBody: { color: colors.text_primary, fontSize: 14, lineHeight: 22 },
 
   shortcutsWrap: {
-    paddingHorizontal: sovswapSpacing.lg,
-    paddingTop: sovswapSpacing.md,
-    paddingBottom: sovswapSpacing.sm,
+    paddingHorizontal: spacing.lg,
+    paddingTop: spacing.md,
+    paddingBottom: spacing.sm,
   },
   sectionKicker: {
     ...sovswapType.smallCaps,
-    color: sovswapColors.paperInk,
-    marginBottom: sovswapSpacing.sm,
+    color: colors.text_primary,
+    marginBottom: spacing.sm,
   },
   shortcutGrid: {
     flexDirection: 'row',
     flexWrap: 'wrap',
-    gap: sovswapSpacing.sm,
+    gap: spacing.sm,
   },
   shortcutCell: {
     minWidth: '30%',
     flexGrow: 1,
-    paddingVertical: sovswapSpacing.sm,
-    paddingHorizontal: sovswapSpacing.md,
+    paddingVertical: spacing.sm,
+    paddingHorizontal: spacing.md,
     borderWidth: 1,
-    borderColor: sovswapColors.ruleSoft,
-    backgroundColor: sovswapColors.paperWarm,
+    borderColor: colors.border,
+    backgroundColor: colors.bg_dark,
     alignItems: 'center',
+    borderRadius: 8,
   },
   shortcutLabel: {
-    ...sovswapType.smallCapsInk,
-    color: sovswapColors.paperInkSoft,
+    ...sovswapType.smallCaps,
+    color: colors.text_secondary,
     fontSize: 10,
   },
 
   statsWrap: {
-    paddingHorizontal: sovswapSpacing.lg,
-    paddingTop: sovswapSpacing.lg,
+    paddingHorizontal: spacing.lg,
+    paddingTop: spacing.lg,
   },
   statsGrid: {
     flexDirection: 'row',
@@ -320,30 +306,32 @@ const styles = createSovSwapStyles(() => StyleSheet.create({
   },
 
   priceCard: {
-    marginHorizontal: sovswapSpacing.lg,
-    marginTop: sovswapSpacing.lg,
+    marginHorizontal: spacing.lg,
+    marginTop: spacing.lg,
     flexDirection: 'column',
-    backgroundColor: sovswapColors.paperWarm,
-    borderRadius: 6,
+    backgroundColor: colors.bg_dark,
+    borderRadius: 12,
+    borderWidth: 1,
     overflow: 'hidden',
   },
   priceStripe: { height: 4 },
   priceBody: {
     flex: 1,
-    padding: sovswapSpacing.lg,
+    padding: spacing.lg,
   },
   priceKicker: {
     ...sovswapType.smallCaps,
-    color: sovswapColors.paperInk,
+    color: colors.text_primary,
   },
   priceValue: {
-    ...sovswapType.priceLg,
-    fontSize: 44,
+    color: colors.text_primary,
+    fontSize: 40,
+    fontWeight: '700',
     marginTop: 4,
   },
   priceUnit: {
     ...sovswapType.smallCaps,
-    color: sovswapColors.paperInkSoft,
+    color: colors.text_secondary,
   },
   priceDelta: {
     fontSize: 14,
@@ -351,37 +339,40 @@ const styles = createSovSwapStyles(() => StyleSheet.create({
     marginTop: 6,
   },
   apySub: {
-    marginTop: sovswapSpacing.sm,
-    paddingVertical: sovswapSpacing.sm,
-    paddingHorizontal: sovswapSpacing.md,
+    marginTop: spacing.sm,
+    paddingVertical: spacing.sm,
+    paddingHorizontal: spacing.md,
     borderWidth: 1,
-    borderColor: sovswapColors.ruleSoft,
+    borderColor: colors.border,
+    borderRadius: 8,
   },
   apySubLabel: { ...sovswapType.smallCaps, fontSize: 9 },
-  apySubValue: { ...sovswapType.numeral, fontWeight: '700', marginTop: 2 },
+  apySubValue: { color: colors.text_primary, fontSize: 14, fontWeight: '700', marginTop: 2 },
   priceCta: {
-    marginTop: sovswapSpacing.md,
-    paddingVertical: sovswapSpacing.sm,
+    marginTop: spacing.md,
+    paddingVertical: spacing.md,
     alignItems: 'center',
+    borderRadius: 8,
   },
   priceCtaText: {
     ...sovswapType.smallCaps,
-    color: sovswapColors.paper,
+    color: colors.bg_darkest,
     letterSpacing: 1.4,
+    fontWeight: 'bold',
   },
 
   govWrap: {
-    paddingHorizontal: sovswapSpacing.lg,
-    paddingTop: sovswapSpacing.lg,
+    paddingHorizontal: spacing.lg,
+    paddingTop: spacing.lg,
   },
   govRow: {
     flexDirection: 'row',
-    paddingVertical: sovswapSpacing.md,
-    gap: sovswapSpacing.lg,
+    paddingVertical: spacing.md,
+    gap: spacing.lg,
   },
   govDivider: {
     width: 0,
   },
-}));
+});
 
 export default SovSwapDaoDetailScreen;

@@ -32,39 +32,11 @@ export interface DaoStakesResponse {
 
 const BLOCKS_PER_DAY = 7_200;
 
-// Mock dataset — exercises every welfare DAO plus a mix of locked / unlocked,
-// short / long durations. Amounts are in nSOV (1 SOV = 1e9 nSOV).
+// Mock dataset — starts empty so dev/demo begins from a clean slate.
+// Amounts are in nSOV (1 SOV = 1e9 nSOV).
 const MOCK_CURRENT_HEIGHT = 23_105;
 
-const MOCK_STAKES: DaoStake[] = [
-  {
-    sector: 'health',
-    sector_dao_key_id: WELFARE_DAOS[1].wallet,
-    amount: 5_000_000_000, // 5 SOV
-    staked_at_height: 23_000,
-    locked_until: 23_000 + 30 * BLOCKS_PER_DAY,
-    unlocked: false,
-    blocks_remaining: 23_000 + 30 * BLOCKS_PER_DAY - MOCK_CURRENT_HEIGHT,
-  },
-  {
-    sector: 'education',
-    sector_dao_key_id: WELFARE_DAOS[2].wallet,
-    amount: 25_000_000_000, // 25 SOV
-    staked_at_height: 12_500,
-    locked_until: 12_500 + 90 * BLOCKS_PER_DAY,
-    unlocked: false,
-    blocks_remaining: 12_500 + 90 * BLOCKS_PER_DAY - MOCK_CURRENT_HEIGHT,
-  },
-  {
-    sector: 'food',
-    sector_dao_key_id: WELFARE_DAOS[0].wallet,
-    amount: 100_000_000_000, // 100 SOV
-    staked_at_height: 1_200,
-    locked_until: 1_200 + 30 * BLOCKS_PER_DAY,
-    unlocked: true,
-    blocks_remaining: 0,
-  },
-];
+const MOCK_STAKES: DaoStake[] = [];
 
 export const useDaoStakes = (
   _stakerKeyId?: string | null,

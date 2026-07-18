@@ -1,10 +1,8 @@
 import React from 'react';
 import {
-  Modal,
   Pressable,
   ScrollView,
   StyleSheet,
-  Text,
   View,
 } from 'react-native';
 import {
@@ -14,6 +12,8 @@ import {
   sovswapSpacing,
   sovswapType,
 } from '../../../../screens/sovswap/theme/sovswapTokens';
+import { Text } from '../../../../components';
+import { colors, spacing, typography, borderRadius } from '../../../../theme';
 import type { SovDao } from '../../../../types/sovSwap';
 
 export interface SovTokenPickerModalProps {
@@ -42,15 +42,13 @@ export const SovTokenPickerModal: React.FC<SovTokenPickerModalProps> = ({
   onSelect,
   onClose,
 }) => {
+  if (!visible) return null;
+
   return (
-    <Modal
-      visible={visible}
-      transparent
-      animationType="fade"
-      onRequestClose={onClose}
-    >
-      <Pressable style={styles.scrim} onPress={onClose}>
-        <Pressable style={styles.card} onPress={() => {}}>
+    <View style={StyleSheet.absoluteFill}>
+      <View style={styles.scrim}>
+        <Pressable style={styles.scrimClickArea} onPress={onClose} />
+        <View style={styles.card}>
           {/* Header */}
           <View style={styles.header}>
             <Text style={styles.kicker}>INDEX</Text>
@@ -109,9 +107,9 @@ export const SovTokenPickerModal: React.FC<SovTokenPickerModalProps> = ({
               <Text style={styles.cancelText}>← Cancel</Text>
             </Pressable>
           </View>
-        </Pressable>
-      </Pressable>
-    </Modal>
+        </View>
+      </View>
+    </View>
   );
 };
 
@@ -122,11 +120,16 @@ const styles = createSovSwapStyles(() => StyleSheet.create({
     justifyContent: 'center',
     paddingHorizontal: sovswapSpacing.lg,
   },
+  scrimClickArea: {
+    ...StyleSheet.absoluteFillObject,
+  },
   card: {
     backgroundColor: sovswapColors.paper,
     borderRadius: 8,
     maxHeight: '78%',
     overflow: 'hidden',
+    borderWidth: 1,
+    borderColor: sovswapColors.ruleSoft,
   },
   header: {
     paddingHorizontal: sovswapSpacing.lg,
@@ -172,13 +175,12 @@ const styles = createSovSwapStyles(() => StyleSheet.create({
     flex: 1,
   },
   rowSymbol: {
-    fontSize: 16,
-    fontWeight: '700',
-    letterSpacing: 0.4,
+    fontSize: typography.size.md,
+    fontWeight: typography.weight.bold,
   },
   rowName: {
     ...sovswapType.bodySoft,
-    fontSize: 12,
+    fontSize: typography.size.sm,
     fontStyle: 'italic',
     marginTop: 1,
   },
@@ -187,7 +189,6 @@ const styles = createSovSwapStyles(() => StyleSheet.create({
   },
   rowType: {
     ...sovswapType.smallCaps,
-    fontSize: 9,
     color: sovswapColors.paperInkFaint,
   },
   rowBalance: {

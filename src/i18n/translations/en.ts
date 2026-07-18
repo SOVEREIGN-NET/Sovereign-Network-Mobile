@@ -12,7 +12,7 @@
 export const en = {
   // App
   app: {
-    title: 'SOV Web4',
+    title: 'The Sovereign Network',
     loading: 'Loading...',
     back: 'Back',
     error: 'Error: Auth context not available',
@@ -905,7 +905,7 @@ export const en = {
     },
     walletOptionsSheet: {
       title: 'Wallet Options',
-      subtitle: 'Manage your identity, domains, and settings',
+      subtitle: 'Manage your identity and wallet settings',
       accessibilityLabel: 'Wallet options',
       cancel: 'Cancel',
       rows: {

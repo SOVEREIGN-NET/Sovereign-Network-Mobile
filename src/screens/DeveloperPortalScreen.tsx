@@ -1,6 +1,7 @@
 import React from 'react';
 import { View, ScrollView, TouchableOpacity, StyleSheet } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { useNavigation } from '@react-navigation/native';
 import Svg, { Path, Circle, Rect } from 'react-native-svg';
 import {
   Card,
@@ -10,9 +11,10 @@ import {
   ScreenLayout,
   HeaderBar,
 } from '../components';
-import { colors, spacing, typography, borderRadius, shadows } from '../theme';
+import { colors, spacing, typography, borderRadius, shadows } from '../theme/tokens';
 
-const DeveloperPortalScreen: React.FC<any> = ({ navigation }) => {
+const DeveloperPortalScreen: React.FC<any> = () => {
+  const navigation = useNavigation<any>();
   const insets = useSafeAreaInsets();
 
   const sections = [
@@ -26,7 +28,7 @@ const DeveloperPortalScreen: React.FC<any> = ({ navigation }) => {
           <Path d="M12 3a9 9 0 0 1 9 9M12 21a9 9 0 0 0 9-9M3 12h18M12 3v18" stroke={color} strokeWidth={1.5} />
         </Svg>
       ),
-      onPress: () => navigation.navigate('SIDTab', { screen: 'MyDomains' }),
+      onPress: () => navigation.navigate('MyDomains'),
     },
     {
       id: 'contracts',
@@ -41,16 +43,31 @@ const DeveloperPortalScreen: React.FC<any> = ({ navigation }) => {
       onPress: () => {},
     },
     {
-      id: 'token_dao',
-      title: 'Token & DAO Creator',
-      subtitle: 'Launch a token and DAO for your website',
+      id: 'register_dao',
+      title: 'Register DAO',
+      subtitle: 'Launch a DAO, claim a domain, or create tokens',
       icon: (color: string) => (
         <Svg width={24} height={24} viewBox="0 0 24 24" fill="none">
           <Rect x="3" y="3" width="18" height="18" rx="2" stroke={color} strokeWidth={1.5} />
           <Path d="M12 8v8M8 12h8" stroke={color} strokeWidth={1.5} />
         </Svg>
       ),
-      onPress: () => navigation.navigate('SIDTab', { screen: 'TokenCreator' }),
+      onPress: () => navigation.navigate('RegisterDao'),
+    },
+    {
+      id: 'operate_nodes',
+      title: 'Operate Nodes',
+      subtitle: 'Download and deploy software to power the network',
+      icon: (color: string) => (
+        <Svg width={24} height={24} viewBox="0 0 24 24" fill="none">
+          <Rect x="2" y="5" width="20" height="6" rx="1" stroke={color} strokeWidth={1.5} />
+          <Rect x="2" y="13" width="20" height="6" rx="1" stroke={color} strokeWidth={1.5} />
+          <Circle cx="5" cy="8" r="0.5" fill={color} />
+          <Circle cx="5" cy="16" r="0.5" fill={color} />
+          <Path d="M17 8h2M17 16h2" stroke={color} strokeWidth={1.5} strokeLinecap="round" />
+        </Svg>
+      ),
+      onPress: () => navigation.navigate('OperateNodes'),
     },
     {
       id: 'hosting',

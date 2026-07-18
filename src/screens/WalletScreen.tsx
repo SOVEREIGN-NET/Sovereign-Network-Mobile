@@ -19,42 +19,6 @@ const WalletScreen = ({ navigation }: any) => {
   const { wallets, walletByType, loading: walletsLoading } = useWalletList();
   const { tokens, loading: tokensLoading } = useUserTokenBalances();
   const [activeTab, setActiveTab] = useState('Tokens');
-  const [drawerVisible, setDrawerVisible] = useState(false);
-
-  const drawerItems: DrawerItem[] = [
-    {
-      id: 'history',
-      label: 'History',
-      icon: '',
-      onPress: () => {
-        // TODO: Navigate to history
-      },
-    },
-    {
-      id: 'bookmarks',
-      label: 'Bookmarks',
-      icon: '',
-      onPress: () => {
-        // TODO: Navigate to bookmarks
-      },
-    },
-    {
-      id: 'favorites',
-      label: 'Favorites',
-      icon: '',
-      onPress: () => {
-        // TODO: Navigate to favorites
-      },
-    },
-    {
-      id: 'settings',
-      label: 'Settings',
-      icon: '',
-      onPress: () => {
-        navigation.navigate('AppSettings');
-      },
-    },
-  ];
 
   if (!currentIdentity || isLoading) {
     return <LoadingView />;
@@ -102,16 +66,7 @@ const WalletScreen = ({ navigation }: any) => {
 
   return (
     <View style={{ flex: 1, backgroundColor: colors.bg_darkest }}>
-      <HeaderBar
-        onMenuPress={() => setDrawerVisible(true)}
-      />
-
-      <SideDrawer
-        visible={drawerVisible}
-        onClose={() => setDrawerVisible(false)}
-        items={drawerItems}
-        title="Menu"
-      />
+      <HeaderBar />
 
       <ScreenLayout paddingTop={spacing.md}>
       <ScrollView showsVerticalScrollIndicator={false}>

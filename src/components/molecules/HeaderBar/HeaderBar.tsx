@@ -2,7 +2,7 @@
  * HeaderBar Component
  * Top navigation bar with:
  *  - Left: hamburger (☰) icon → opens a utility dropdown menu
- *          (Block Explorer, PoUW Rewards, Domains)
+ *          (Block Explorer, Developer Portal)
  *  - Center: SOV reward counter (display only — navigation removed;
  *            PoUW is now accessible from the dropdown)
  *  - Right: connection status indicator
@@ -114,13 +114,13 @@ const HeaderBar: React.FC<HeaderBarProps> = ({
     setDropdownVisible(false);
     switch (action) {
       case 'explorer':
-        onNavigateExplorer ? onNavigateExplorer() : navigation.navigate('ExplorerDashboard');
-        break;
-      case 'pouw':
-        onNavigatePouw ? onNavigatePouw() : navigation.navigate('SIDTab', { screen: 'PoUW' });
+        onNavigateExplorer ? onNavigateExplorer() : navigation.navigate('MainTabs', { screen: 'DashboardTab', params: { screen: 'ExplorerDashboard' } });
         break;
       case 'devPortal':
-        onNavigateDevPortal ? onNavigateDevPortal() : navigation.navigate('DeveloperPortal');
+        onNavigateDevPortal ? onNavigateDevPortal() : navigation.navigate('MainTabs', { screen: 'DashboardTab', params: { screen: 'DeveloperPortal' } });
+        break;
+      case 'myStorage':
+        navigation.navigate('MainTabs', { screen: 'DashboardTab', params: { screen: 'MyStorage' } });
         break;
     }
   };
@@ -284,12 +284,6 @@ const HeaderBar: React.FC<HeaderBarProps> = ({
     </Svg>
   );
 
-  const PouwIcon = () => (
-    <Svg width={20} height={20} viewBox="0 0 24 24" fill="none">
-      <Path d="M13 2L3 14h9l-1 8 10-12h-9l1-8z" stroke={colors.text_primary} strokeWidth={1.5} strokeLinejoin="round" />
-    </Svg>
-  );
-
   const DomainsIcon = () => (
     <Svg width={20} height={20} viewBox="0 0 24 24" fill="none">
       <Path d="M4 4h6v16H4z" stroke={colors.text_primary} strokeWidth={1.5} />
@@ -300,10 +294,21 @@ const HeaderBar: React.FC<HeaderBarProps> = ({
     </Svg>
   );
 
+  const StorageIcon = () => (
+    <Svg width={20} height={20} viewBox="0 0 24 24" fill="none">
+      <Path d="M3 15h18v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4z" stroke={colors.text_primary} strokeWidth={1.5} />
+      <Path d="M3 10h18v4H3v-4z" stroke={colors.text_primary} strokeWidth={1.5} />
+      <Path d="M3 5h18v4H3V5z" stroke={colors.text_primary} strokeWidth={1.5} />
+      <Circle cx="6" cy="12.5" r="0.5" fill={colors.text_primary} />
+      <Circle cx="6" cy="17.5" r="0.5" fill={colors.text_primary} />
+      <Circle cx="6" cy="7.5" r="0.5" fill={colors.text_primary} />
+    </Svg>
+  );
+
   const dropdownItems = [
     { id: 'explorer', label: 'Block Explorer', icon: ExplorerIcon },
     { id: 'devPortal', label: 'Developer Portal', icon: DevPortalIcon },
-    { id: 'pouw', label: 'PoUW Rewards', icon: PouwIcon },
+    { id: 'myStorage', label: 'My Storage', icon: StorageIcon },
   ];
 
   return (
@@ -331,7 +336,7 @@ const HeaderBar: React.FC<HeaderBarProps> = ({
             </TouchableOpacity>
           ) : showHamburger && (
             <Pressable
-              onPress={() => setDropdownVisible(true)}
+              onPress={() => (onMenuPress ? onMenuPress() : setDropdownVisible(true))}
               style={styles.hamburger}
               hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
               accessibilityLabel="Open navigation menu"

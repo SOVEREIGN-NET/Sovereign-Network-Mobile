@@ -25,17 +25,17 @@ export const sovswapFonts = {
  * Type scale, in points.
  */
 export const sovswapScale = {
-  masthead: 30,    // top-of-page H1
-  section: 22,     // section headers
-  daoTitle: 20,    // entry name on a card
-  body: 14,
-  bodyLg: 16,
-  meta: 11,
-  metaSm: 10,
-  priceLg: 36,     // hero price
-  priceMd: 22,     // card price
-  numeral: 14,     // inline numeric
-  index: 11,       // entry index №001
+  masthead: typography.size['2xl'],    // 20
+  section: typography.size.xl,       // 18
+  daoTitle: typography.size.lg,      // 16
+  body: typography.size.md,          // 14
+  bodyLg: typography.size.lg,        // 16
+  meta: typography.size.xs,          // 11
+  metaSm: typography.size.xs,        // 11
+  priceLg: typography.size['4xl'],   // 36
+  priceMd: typography.size['2xl'],   // 20
+  numeral: typography.size.md,       // 14
+  index: typography.size.xs,         // 11
 } as const;
 
 /**
@@ -43,10 +43,10 @@ export const sovswapScale = {
  * body text wants neutral; display is set tight on purpose.
  */
 export const sovswapTracking = {
-  display: -0.3,
+  display: 0,
   body: 0,
-  smallCaps: 1.2,
-  meta: 0.6,
+  smallCaps: 0,
+  meta: 0,
 } as const;
 
 /** Number rendering uses tabular figures so column values align. */
@@ -62,63 +62,62 @@ export const sovswapTabular = {
 // etc. through a Proxy stylesheet (`createSovSwapStyles` below) so
 // stylesheets rebuild when the palette key changes.
 
+import { colors as appColors, typography } from '../../../theme/tokens';
+
 const lightPalette = {
-  // Surface tones — warm cream paper
-  paper: '#F4EFE6',
-  paperWarm: '#EDE6D6',
-  paperEdge: '#DED5BF',
-  paperInk: '#1A1614',
-  paperInkSoft: '#5C544B',
-  paperInkFaint: '#8A8276',
-  rule: '#1A1614',
-  ruleSoft: 'rgba(26, 22, 20, 0.18)',
-  ruleFaint: 'rgba(26, 22, 20, 0.08)',
+  // Surface tones — Aligned with App Theme
+  paper: appColors.bg_darkest,
+  paperWarm: appColors.bg_dark,
+  paperEdge: appColors.bg_darker,
+  paperInk: appColors.text_primary,
+  paperInkSoft: appColors.text_secondary,
+  paperInkFaint: appColors.text_tertiary,
+  rule: appColors.border,
+  ruleSoft: appColors.border_light,
+  ruleFaint: appColors.border_light,
 
   // Semantic accents — also drive +%/−% sign colour.
-  forProfit: '#1F4D3A',
-  forProfitSoft: '#E1EAE3',
-  nonProfit: '#A23E2A',
-  nonProfitSoft: '#F0DED7',
-  universal: '#1B3A6B',
-  universalSoft: '#DCE2EC',
+  forProfit: appColors.success,
+  forProfitSoft: `${appColors.success}22`,
+  nonProfit: appColors.info,
+  nonProfitSoft: `${appColors.info}22`,
+  universal: appColors.info,
+  universalSoft: `${appColors.info}22`,
 
-  up: '#1F4D3A',
-  down: '#A23E2A',
-  flat: '#5C544B',
+  up: appColors.success,
+  down: appColors.error,
+  flat: appColors.text_secondary,
 
-  field: '#EDE6D6',
-  fieldFocus: '#E5DCC7',
+  field: appColors.bg_darker,
+  fieldFocus: appColors.bg_medium,
 };
 
 const darkPalette: typeof lightPalette = {
-  // Surface tones — flipped: ink is now light, paper is now dark.
-  // The ink reads as warm cream against the charcoal so the page
-  // feels like the same publication printed on dark stock, not a
-  // generic "dark mode".
-  paper: '#1A1614',
-  paperWarm: '#252220',
-  paperEdge: '#332E2A',
-  paperInk: '#F4EFE6',
-  paperInkSoft: '#B5ADA0',
-  paperInkFaint: '#7A726A',
-  rule: '#F4EFE6',
-  ruleSoft: 'rgba(244, 239, 230, 0.16)',
-  ruleFaint: 'rgba(244, 239, 230, 0.08)',
+  // Surface tones — Aligned with App Theme (Dark/Charcoal)
+  paper: appColors.bg_darkest,
+  paperWarm: appColors.bg_dark,
+  paperEdge: appColors.bg_darker,
+  paperInk: appColors.text_primary,
+  paperInkSoft: appColors.text_secondary,
+  paperInkFaint: appColors.text_tertiary,
+  rule: appColors.border,
+  ruleSoft: appColors.border_light,
+  ruleFaint: appColors.border_light,
 
-  // Brighter semantic accents so they stay legible on charcoal.
-  forProfit: '#3FA86F',
-  forProfitSoft: 'rgba(63, 168, 111, 0.16)',
-  nonProfit: '#E07560',
-  nonProfitSoft: 'rgba(224, 117, 96, 0.16)',
-  universal: '#5A8DD8',
-  universalSoft: 'rgba(90, 141, 216, 0.16)',
+  // Semantic accents
+  forProfit: appColors.success,
+  forProfitSoft: `${appColors.success}22`,
+  nonProfit: appColors.info,
+  nonProfitSoft: `${appColors.info}22`,
+  universal: appColors.info,
+  universalSoft: `${appColors.info}22`,
 
-  up: '#3FA86F',
-  down: '#E07560',
-  flat: '#B5ADA0',
+  up: appColors.success,
+  down: appColors.error,
+  flat: appColors.text_secondary,
 
-  field: '#252220',
-  fieldFocus: '#332E2A',
+  field: appColors.bg_darker,
+  fieldFocus: appColors.bg_medium,
 };
 
 /**
@@ -199,103 +198,88 @@ export const sovswapSpacing = {
 export const sovswapType = {
   get masthead() {
     return {
-      fontSize: sovswapScale.masthead,
-      color: sovswapColors.paperInk,
-      letterSpacing: sovswapTracking.display,
-      fontWeight: '700' as const,
+      fontSize: typography.size['2xl'],
+      color: appColors.text_primary,
+      fontWeight: typography.weight.bold,
     };
   },
   get sectionTitle() {
     return {
-      fontSize: sovswapScale.section,
-      color: sovswapColors.paperInk,
-      letterSpacing: sovswapTracking.display,
-      fontWeight: '700' as const,
+      fontSize: typography.size.xl,
+      color: appColors.text_primary,
+      fontWeight: typography.weight.bold,
     };
   },
   get daoTitle() {
     return {
-      fontSize: sovswapScale.daoTitle,
-      color: sovswapColors.paperInk,
-      letterSpacing: sovswapTracking.display,
-      fontWeight: '600' as const,
+      fontSize: typography.size.lg,
+      color: appColors.text_primary,
+      fontWeight: typography.weight.semibold,
     };
   },
   get body() {
     return {
-      fontSize: sovswapScale.body,
-      color: sovswapColors.paperInk,
-      letterSpacing: sovswapTracking.body,
-      lineHeight: 20,
+      fontSize: typography.size.md,
+      color: appColors.text_primary,
+      lineHeight: typography.lineHeight.normal,
     };
   },
   get bodySoft() {
     return {
-      fontSize: sovswapScale.body,
-      color: sovswapColors.paperInkSoft,
-      letterSpacing: sovswapTracking.body,
-      lineHeight: 20,
+      fontSize: typography.size.md,
+      color: appColors.text_secondary,
+      lineHeight: typography.lineHeight.normal,
     };
   },
   get smallCaps() {
     return {
-      fontSize: sovswapScale.meta,
-      color: sovswapColors.paperInkSoft,
-      letterSpacing: sovswapTracking.smallCaps,
-      fontWeight: '700' as const,
+      fontSize: typography.size.xs,
+      color: appColors.text_tertiary,
+      fontWeight: typography.weight.semibold,
       textTransform: 'uppercase' as const,
+      letterSpacing: 0,
     };
   },
   get smallCapsInk() {
     return {
-      fontSize: sovswapScale.meta,
-      color: sovswapColors.paperInk,
-      letterSpacing: sovswapTracking.smallCaps,
-      fontWeight: '700' as const,
+      fontSize: typography.size.xs,
+      color: appColors.text_primary,
+      fontWeight: typography.weight.semibold,
       textTransform: 'uppercase' as const,
+      letterSpacing: 0,
     };
   },
   get index() {
     return {
-      fontSize: sovswapScale.index,
-      color: sovswapColors.paperInkSoft,
-      letterSpacing: 0.5,
-      fontWeight: '600' as const,
-      fontVariant: ['tabular-nums'] as ['tabular-nums'],
+      fontSize: typography.size.xs,
+      color: appColors.text_tertiary,
+      fontWeight: typography.weight.semibold,
     };
   },
   get numeral() {
     return {
-      fontSize: sovswapScale.numeral,
-      color: sovswapColors.paperInk,
-      letterSpacing: 0,
-      fontVariant: ['tabular-nums'] as ['tabular-nums'],
+      fontSize: typography.size.md,
+      color: appColors.text_primary,
     };
   },
   get numeralSoft() {
     return {
-      fontSize: sovswapScale.numeral,
-      color: sovswapColors.paperInkSoft,
-      letterSpacing: 0,
-      fontVariant: ['tabular-nums'] as ['tabular-nums'],
+      fontSize: typography.size.md,
+      color: appColors.text_secondary,
     };
   },
   get priceLg() {
     return {
-      fontSize: sovswapScale.priceLg,
-      color: sovswapColors.paperInk,
-      letterSpacing: -0.5,
-      fontWeight: '600' as const,
-      fontVariant: ['tabular-nums'] as ['tabular-nums'],
+      fontSize: typography.size['4xl'],
+      color: appColors.text_primary,
+      fontWeight: typography.weight.bold,
     };
   },
   get priceMd() {
     return {
-      fontSize: sovswapScale.priceMd,
-      color: sovswapColors.paperInk,
-      letterSpacing: 0,
-      fontWeight: '600' as const,
-      fontVariant: ['tabular-nums'] as ['tabular-nums'],
+      fontSize: typography.size['2xl'],
+      color: appColors.text_primary,
+      fontWeight: typography.weight.semibold,
     };
   },
 };

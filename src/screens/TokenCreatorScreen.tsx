@@ -15,7 +15,7 @@ import {
   Text,
   LoadingView,
 } from '../components';
-import { colors, spacing, typography, borderRadius } from '../theme';
+import { colors, spacing, typography, borderRadius } from '../theme/tokens';
 import tokenService from '../services/TokenService';
 import { publicQuicRequest } from '../services/quic';
 import { useAuth } from '../hooks/useAuth';
@@ -40,9 +40,10 @@ interface SubmitStatus {
 
 interface TokenCreatorScreenProps {
   onClose?: () => void;
+  hideHeader?: boolean;
 }
 
-const TokenCreatorScreen: React.FC<TokenCreatorScreenProps> = ({ onClose }) => {
+const TokenCreatorScreen: React.FC<TokenCreatorScreenProps> = ({ onClose, hideHeader }) => {
   const insets = useSafeAreaInsets();
   const navigation = useNavigation();
   const { currentIdentity } = useAuth();
@@ -271,40 +272,42 @@ const TokenCreatorScreen: React.FC<TokenCreatorScreenProps> = ({ onClose }) => {
     >
       <View style={{ flex: 1, backgroundColor: colors.bg_darkest }}>
         {/* Header */}
-        <View
-          style={{
-            flexDirection: 'row',
-            justifyContent: 'space-between',
-            alignItems: 'center',
-            paddingHorizontal: spacing.md,
-            paddingVertical: spacing.md,
-            paddingTop: insets.top + spacing.md,
-          }}
-        >
-          <Text
+        {!hideHeader && (
+          <View
             style={{
-              fontSize: typography.size.lg,
-              fontWeight: typography.weight.semibold,
-              color: colors.text_primary,
+              flexDirection: 'row',
+              justifyContent: 'space-between',
+              alignItems: 'center',
+              paddingHorizontal: spacing.md,
+              paddingVertical: spacing.md,
+              paddingTop: insets.top + spacing.md,
             }}
-          >
-            Create Token
-          </Text>
-          <TouchableOpacity
-            onPress={handleClose}
-            hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
           >
             <Text
               style={{
                 fontSize: typography.size.lg,
-                color: colors.text_secondary,
-                fontWeight: typography.weight.light,
+                fontWeight: typography.weight.semibold,
+                color: colors.text_primary,
               }}
             >
-              ✕
+              Create Token
             </Text>
-          </TouchableOpacity>
-        </View>
+            <TouchableOpacity
+              onPress={handleClose}
+              hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
+            >
+              <Text
+                style={{
+                  fontSize: typography.size.lg,
+                  color: colors.text_secondary,
+                  fontWeight: typography.weight.light,
+                }}
+              >
+                ✕
+              </Text>
+            </TouchableOpacity>
+          </View>
+        )}
 
         <ScrollView
           showsVerticalScrollIndicator={false}

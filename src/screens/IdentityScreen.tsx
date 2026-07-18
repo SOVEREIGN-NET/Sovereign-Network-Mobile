@@ -22,7 +22,6 @@ const IdentityScreen = ({ navigation }: any) => {
   const { t } = useTranslation();
   const { currentIdentity, signOut, isLoading: authLoading } = useAuth();
   const [loggingOut, setLoggingOut] = useState(false);
-  const [drawerVisible, setDrawerVisible] = useState(false);
 
   // Fetch identity details from API when identity changes
   useAsyncData(async () => {
@@ -36,41 +35,6 @@ const IdentityScreen = ({ navigation }: any) => {
     }
     return null;
   }, [currentIdentity]);
-
-  const drawerItems: DrawerItem[] = [
-    {
-      id: 'history',
-      label: 'History',
-      icon: '',
-      onPress: () => {
-        // TODO: Navigate to history
-      },
-    },
-    {
-      id: 'bookmarks',
-      label: 'Bookmarks',
-      icon: '',
-      onPress: () => {
-        // TODO: Navigate to bookmarks
-      },
-    },
-    {
-      id: 'favorites',
-      label: 'Favorites',
-      icon: '',
-      onPress: () => {
-        // TODO: Navigate to favorites
-      },
-    },
-    {
-      id: 'settings',
-      label: 'Settings',
-      icon: '',
-      onPress: () => {
-        navigation.navigate('AppSettings');
-      },
-    },
-  ];
 
   const handleLogout = () => {
     Alert.alert(
@@ -178,14 +142,7 @@ const IdentityScreen = ({ navigation }: any) => {
 
   return (
     <View style={{ flex: 1, backgroundColor: colors.bg_darkest }}>
-      <HeaderBar onMenuPress={() => setDrawerVisible(true)} />
-
-      <SideDrawer
-        visible={drawerVisible}
-        onClose={() => setDrawerVisible(false)}
-        items={drawerItems}
-        title="Menu"
-      />
+      <HeaderBar />
 
       <ScreenLayout paddingTop={spacing.xl}>
         <Column gap="xl">

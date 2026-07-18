@@ -1,135 +1,51 @@
-import React, { useMemo, useState } from 'react';
+import React, { useMemo, useState, useEffect } from 'react';
 import { Alert, Clipboard, TouchableOpacity, View } from 'react-native';
 import {
   Card,
   Text,
   Button,
   LoadingView,
-  Column,
   ScreenLayout,
   HeaderBar,
+  ArrowIcon,
   SideDrawer,
   DrawerItem,
-  StakeDaoModal,
-  StakeDaoTarget,
 } from '../components';
-import { useAsyncData, useWalletList, useAuth } from '../hooks';
+import { Column } from '../components/atoms/Column/Column';
+import { Row } from '../components/atoms/Row/Row';
+import { Divider } from '../components/atoms/Divider/Divider';
+import { useAsyncData, useAuth } from '../hooks';
 import { useDAOStats, formatTreasury } from '../hooks/useDAOStats';
 import { useTranslation } from '../i18n';
 import MockDataService from '../services/MockDataService';
-import daoService from '../services/DaoService';
 import { colors, spacing, typography } from '../theme';
-import { WELFARE_DAOS, type WelfareDaoId } from '../constants';
+import { WELFARE_DAOS } from '../constants';
 
 const DAOScreen = ({ navigation }: any) => {
   const { t } = useTranslation();
-  const [drawerVisible, setDrawerVisible] = useState(false);
-  const [stakeTarget, setStakeTarget] = useState<StakeDaoTarget | null>(null);
-  const [stakeSubmitting, setStakeSubmitting] = useState(false);
-  const { currentIdentity } = useAuth();
-  const isLoggedIn = !!currentIdentity;
   const daoStats = useDAOStats();
-  const { walletByType, wallets } = useWalletList();
-  const primaryWalletId = useMemo(() => {
-    const wallet = walletByType?.primary ?? wallets?.[0] ?? null;
-    return wallet?.id || null;
-  }, [walletByType, wallets]);
+  const [timeLeft, setTimeLeft] = useState('');
 
-  const copyWallet = (address: string) => {
-    Clipboard.setString(address);
-    Alert.alert('Copied', 'Wallet address copied to clipboard');
-  };
+  useEffect(() => {
+    const timer = setInterval(() => {
+      const now = new Date();
+      // Next distribution on Sunday 00:00:00
+      const nextSunday = new Date();
+      nextSunday.setDate(now.getDate() + (7 - now.getDay()) % 7);
+      nextSunday.setHours(0, 0, 0, 0);
+      if (nextSunday <= now) nextSunday.setDate(nextSunday.getDate() + 7);
 
-  const truncateAddress = (address: string) =>
-    `${address.substring(0, 10)}...${address.substring(address.length - 10)}`;
+      const diff = nextSunday.getTime() - now.getTime();
+      const d = Math.floor(diff / (1000 * 60 * 60 * 24));
+      const h = Math.floor((diff / (1000 * 60 * 60)) % 24);
+      const m = Math.floor((diff / (1000 * 60)) % 60);
+      const s = Math.floor((diff / 1000) % 60);
 
-  const openStakeModal = (dao: (typeof WELFARE_DAOS)[number]) => {
-    setStakeTarget({
-      id: dao.id,
-      name: dao.name,
-      desc: dao.desc,
-      color: dao.color,
-      symbol: dao.symbol,
-    });
-  };
+      setTimeLeft(`${d}d ${h}h ${m}m ${s}s`);
+    }, 1000);
 
-  const closeStakeModal = () => setStakeTarget(null);
-
-  const handleStakeSubmit = async (
-    daoId: string,
-    amount: number,
-    lockBlocks: number,
-  ) => {
-    console.log('[DAOScreen] stake submit', { daoId, amount, lockBlocks });
-
-    if (stakeSubmitting) return; // guard re-entry
-
-    if (!primaryWalletId) {
-      Alert.alert(
-        'No wallet',
-        'Your primary wallet could not be resolved. Please try again once the wallet list has loaded.',
-      );
-      return;
-    }
-
-    setStakeSubmitting(true);
-    try {
-      const result = await daoService.stakeDao(
-        daoId as WelfareDaoId,
-        amount,
-        lockBlocks,
-        primaryWalletId,
-      );
-      closeStakeModal();
-      Alert.alert(
-        'Stake accepted',
-        `Tx ${result.tx_hash.substring(0, 12)}… accepted into mempool.`,
-      );
-    } catch (err: any) {
-      console.error('[DAOScreen] stake failed', err);
-      Alert.alert(
-        'Stake failed',
-        err?.message ?? 'Unknown error while submitting stake transaction.',
-      );
-    } finally {
-      setStakeSubmitting(false);
-    }
-  };
-
-  const drawerItems: DrawerItem[] = [
-    {
-      id: 'history',
-      label: 'History',
-      icon: '',
-      onPress: () => {
-        // TODO: Navigate to history
-      },
-    },
-    {
-      id: 'bookmarks',
-      label: 'Bookmarks',
-      icon: '',
-      onPress: () => {
-        // TODO: Navigate to bookmarks
-      },
-    },
-    {
-      id: 'favorites',
-      label: 'Favorites',
-      icon: '',
-      onPress: () => {
-        // TODO: Navigate to favorites
-      },
-    },
-    {
-      id: 'settings',
-      label: 'Settings',
-      icon: '',
-      onPress: () => {
-        navigation.navigate('AppSettings');
-      },
-    },
-  ];
+    return () => clearInterval(timer);
+  }, []);
 
   const { data, loading } = useAsyncData(async () => {
     // TODO: Re-enable when API is ready
@@ -160,235 +76,165 @@ const DAOScreen = ({ navigation }: any) => {
 
   return (
     <View style={{ flex: 1, backgroundColor: colors.bg_darkest }}>
-      <HeaderBar
-        onMenuPress={() => setDrawerVisible(true)}
-      />
-
-      <SideDrawer
-        visible={drawerVisible}
-        onClose={() => setDrawerVisible(false)}
-        items={drawerItems}
-        title="Menu"
-      />
+      <HeaderBar />
 
       <ScreenLayout testID="dao-screen">
-        {/* DAO Statistics — compact summary card */}
+        {/* Weekly Universal Basic Redistribution Treasury Section */}
         <Card
           style={{
             marginBottom: spacing.lg,
-            paddingVertical: spacing.md,
+            paddingVertical: spacing.xl,
             paddingHorizontal: spacing.lg,
+            alignItems: 'center',
+            backgroundColor: colors.bg_darker,
           }}
         >
-          <View
-            style={{
-              flexDirection: 'row',
-              alignItems: 'center',
-              justifyContent: 'space-between',
-            }}
-          >
-            <View style={{ flex: 1 }}>
-              <Text
-                style={{
-                  color: colors.text_tertiary,
-                  fontSize: typography.size.xs,
-                  textTransform: 'uppercase',
-                  letterSpacing: 0.8,
-                  marginBottom: 2,
-                }}
-              >
-                {t.dao.statistics.treasury}
-              </Text>
-              <Text
-                style={{
-                  color: colors.text_primary,
-                  fontSize: typography.size.lg,
-                  fontWeight: typography.weight.semibold,
-                }}
-                numberOfLines={1}
-              >
-                {formatTreasury(daoStats.treasury)}
-              </Text>
+          <Column align="center" gap="xs">
+            <View style={{ backgroundColor: `${colors.primary}22`, paddingHorizontal: 10, paddingVertical: 4, borderRadius: 20, marginBottom: spacing.sm }}>
+              <Text style={{ color: colors.primary, fontSize: 10, fontWeight: '800', letterSpacing: 1.5 }}>WEEKLY UBR TREASURY</Text>
             </View>
 
-            <View
+            <Text
               style={{
-                width: 1,
-                height: 32,
-                backgroundColor: colors.border_light,
-                marginHorizontal: spacing.md,
+                color: colors.text_primary,
+                fontSize: 36,
+                fontWeight: typography.weight.bold,
               }}
-            />
+            >
+              {formatTreasury(daoStats.treasury)}
+            </Text>
 
-            <View style={{ alignItems: 'center', minWidth: 56 }}>
-              <Text
-                style={{
-                  color: colors.text_primary,
-                  fontSize: typography.size.lg,
-                  fontWeight: typography.weight.semibold,
-                }}
-              >
-                {daoStats.members.toString()}
-              </Text>
-              <Text
-                style={{
-                  color: colors.text_tertiary,
-                  fontSize: typography.size.xs,
-                  textTransform: 'uppercase',
-                  letterSpacing: 0.6,
-                }}
-              >
-                {t.dao.statistics.members}
-              </Text>
-            </View>
-
-            <View
+            <Text
               style={{
-                width: 1,
-                height: 32,
-                backgroundColor: colors.border_light,
-                marginHorizontal: spacing.md,
+                color: colors.text_secondary,
+                fontSize: 11,
+                textAlign: 'center',
+                fontStyle: 'italic',
+                maxWidth: '90%',
+                marginTop: spacing.xs,
               }}
-            />
+            >
+              From network fees and 20% token allocations
+            </Text>
+          </Column>
 
-            <View style={{ alignItems: 'center', minWidth: 56 }}>
+          <Divider style={{ width: '100%', marginVertical: spacing.xl, opacity: 0.2 }} />
+
+          <Row justify="space-around" style={{ width: '100%' }}>
+            <Column align="center">
               <Text
                 style={{
                   color: colors.text_primary,
-                  fontSize: typography.size.lg,
-                  fontWeight: typography.weight.semibold,
+                  fontSize: typography.size.xl,
+                  fontWeight: typography.weight.bold,
                 }}
               >
-                {daoStats.activeProposals.toString()}
+                {daoStats.members.toLocaleString()}
               </Text>
               <Text
                 style={{
                   color: colors.text_tertiary,
-                  fontSize: typography.size.xs,
+                  fontSize: 10,
                   textTransform: 'uppercase',
-                  letterSpacing: 0.6,
+                  letterSpacing: 1,
+                  marginTop: 4,
                 }}
               >
-                {t.dao.statistics.active}
+                Active Members
               </Text>
-            </View>
-          </View>
+            </Column>
+
+            <View style={{ width: 1, height: 30, backgroundColor: colors.border, opacity: 0.5 }} />
+
+            <Column align="center">
+              <Text
+                style={{
+                  color: colors.text_primary,
+                  fontSize: typography.size.xl,
+                  fontWeight: typography.weight.bold,
+                }}
+              >
+                {timeLeft || '--'}
+              </Text>
+              <Text
+                style={{
+                  color: colors.text_tertiary,
+                  fontSize: 10,
+                  textTransform: 'uppercase',
+                  letterSpacing: 1,
+                  marginTop: 4,
+                }}
+              >
+                Next Distribution
+              </Text>
+            </Column>
+          </Row>
         </Card>
 
-        {/* Welfare DAOs */}
-        <Card style={{ marginBottom: spacing.lg }}>
-          <Text variant="h3" style={{ marginBottom: spacing.lg }}>
-            Welfare DAOs
-          </Text>
-          <Column gap="md">
-            {WELFARE_DAOS.map(dao => (
+        {/* Governance Hubs */}
+        <Column gap="md" style={{ marginBottom: spacing.xl, marginTop: spacing.md }}>
+          <Text variant="h3" style={{ paddingHorizontal: spacing.sm }}>Governance Hubs</Text>
+          {WELFARE_DAOS.map(dao => (
+            <TouchableOpacity
+              key={dao.id}
+              activeOpacity={0.8}
+              onPress={() => navigation.navigate('WelfareDaoDetail', { daoId: dao.id })}
+            >
               <Card
-                key={dao.url}
                 style={{
                   backgroundColor: colors.bg_darker,
                   padding: spacing.lg,
                   borderWidth: 0.5,
                   borderColor: dao.color,
+                  marginHorizontal: spacing.sm,
                 }}
               >
-                <View
-                  style={{
-                    flexDirection: 'row',
-                    alignItems: 'center',
-                    marginBottom: spacing.sm,
-                    gap: spacing.sm,
-                  }}
-                >
-                  <Text
-                    style={{
-                      color: colors.text_primary,
-                      fontWeight: typography.weight.semibold,
-                      flexShrink: 1,
-                    }}
-                  >
-                    {dao.name}
-                  </Text>
+                <Row align="center" gap="md">
                   <View
                     style={{
-                      paddingHorizontal: spacing.sm,
-                      paddingVertical: 2,
-                      borderRadius: 999,
+                      width: 48,
+                      height: 48,
+                      borderRadius: 12,
                       backgroundColor: `${dao.color}22`,
+                      justifyContent: 'center',
+                      alignItems: 'center',
                       borderWidth: 1,
                       borderColor: dao.color,
                     }}
                   >
+                    <Text style={{ color: dao.color, fontSize: 18, fontWeight: '800' }}>{dao.symbol.charAt(1)}</Text>
+                  </View>
+                  <Column style={{ flex: 1 }}>
                     <Text
                       style={{
-                        color: dao.color,
-                        fontSize: typography.size.xs,
+                        color: colors.text_primary,
                         fontWeight: typography.weight.semibold,
-                        letterSpacing: 0.5,
-                        fontFamily: 'Courier',
+                        fontSize: 16,
                       }}
                     >
-                      {dao.symbol}
+                      {dao.name}
                     </Text>
-                  </View>
-                </View>
-                <Text
-                  style={{
-                    color: colors.text_secondary,
-                    fontSize: typography.size.xs,
-                    marginBottom: spacing.md,
-                  }}
-                >
-                  {dao.desc}
-                </Text>
-                <Button
-                  variant="secondary"
-                  onPress={() =>
-                    isLoggedIn
-                      ? openStakeModal(dao)
-                      : navigation.navigate('SignIn')
-                  }
-                >
-                  {isLoggedIn ? `Launch ${dao.name}` : 'Sign in to stake'}
-                </Button>
-                <Text
-                  style={{
-                    color: colors.text_tertiary,
-                    fontSize: typography.size.xs,
-                    marginTop: spacing.sm,
-                  }}
-                >
-                  {dao.url}
-                </Text>
-                <TouchableOpacity
-                  onPress={() => copyWallet(dao.wallet)}
-                  style={{ marginTop: spacing.xs }}
-                >
-                  <Text
-                    style={{
-                      color: colors.text_tertiary,
-                      fontSize: typography.size.xs,
-                      fontFamily: 'Courier',
-                    }}
-                  >
-                    {truncateAddress(dao.wallet)}
-                  </Text>
-                </TouchableOpacity>
+                    <Text
+                      style={{
+                        color: colors.text_secondary,
+                        fontSize: 12,
+                      }}
+                    >
+                      {dao.url}
+                    </Text>
+                  </Column>
+                  <ArrowIcon direction="right" size={16} color={colors.text_tertiary} />
+                </Row>
               </Card>
-            ))}
-          </Column>
-        </Card>
+            </TouchableOpacity>
+          ))}
+        </Column>
 
         {/* Governance card hidden — will return when voting/proposal flow
             lands on-chain. Keep the imports/state around the section dead
             so re-enabling is a one-line toggle. */}
       </ScreenLayout>
 
-      <StakeDaoModal
-        visible={stakeTarget !== null}
-        dao={stakeTarget}
-        onClose={closeStakeModal}
-        onSubmit={handleStakeSubmit}
-      />
     </View>
   );
 };
