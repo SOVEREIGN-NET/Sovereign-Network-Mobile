@@ -12,6 +12,12 @@ export interface DomainRegisterRequest {
   // registration fee is debited from this wallet; lib-client signs the
   // TokenTransfer to the DAO treasury and attaches it as fee_payment_tx.
   primary_wallet_id: string;
+  /**
+   * Optional 32-byte sovereign asset id as 64 hex chars (optional `0x` prefix
+   * is stripped). When set, DomainRegistrationPayload is V3-bound to the
+   * asset (DAO M4).
+   */
+  asset_id?: string | null;
   content_mappings?: Record<
     string,
     {

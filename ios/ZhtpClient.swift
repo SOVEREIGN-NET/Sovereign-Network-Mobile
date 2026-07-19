@@ -192,6 +192,24 @@ private func cBuildTokenCreate(
     _ chainId: UInt8
 ) -> UnsafeMutablePointer<CChar>?
 
+/// Build signed AssetLaunch transaction (DAO M1 / POST /api/v1/assets/launch)
+/// Supply = u128 as lo/hi. Both manifest pointers NULL → local derive.
+@_silgen_name("zhtp_client_build_asset_launch")
+private func cBuildAssetLaunch(
+    _ handle: UnsafeMutableRawPointer,
+    _ name: UnsafePointer<CChar>?,
+    _ symbol: UnsafePointer<CChar>?,
+    _ initialSupplyLo: UInt64,
+    _ initialSupplyHi: UInt64,
+    _ decimals: UInt8,
+    _ treasuryKeyId: UnsafePointer<UInt8>?,
+    _ daoClass: UInt8,
+    _ burnBps: UInt16,
+    _ chainId: UInt8,
+    _ manifestCid: UnsafePointer<UInt8>?,
+    _ manifestHash: UnsafePointer<UInt8>?
+) -> UnsafeMutablePointer<CChar>?
+
 /// Build signed token burn transaction
 @_silgen_name("zhtp_client_build_token_burn")
 private func cBuildTokenBurn(
@@ -277,6 +295,7 @@ private func cBuildDomainFeePaymentTx(
 
 /// Build full /api/v1/web4/domains/register JSON body with attached fee_payment_tx.
 /// `contentMappingsJson` may be NULL for metadata-only registration.
+/// `assetIdHex` optional 64-char hex for DAO-scoped V3 domains (NULL = unbound).
 @_silgen_name("zhtp_client_build_domain_register_request_with_fee_payment")
 private func cBuildDomainRegisterRequestWithFeePayment(
     _ handle: UnsafeMutableRawPointer,
@@ -284,7 +303,8 @@ private func cBuildDomainRegisterRequestWithFeePayment(
     _ contentMappingsJson: UnsafePointer<CChar>?,
     _ feePaymentTxHex: UnsafePointer<CChar>?,
     _ metadataJson: UnsafePointer<CChar>?,
-    _ chainId: UInt8
+    _ chainId: UInt8,
+    _ assetIdHex: UnsafePointer<CChar>?
 ) -> UnsafeMutablePointer<CChar>?
 
 // MARK: - C FFI Declarations: Fee Config (global, no handle)
@@ -891,6 +911,129 @@ public class ZhtpClient {
 
     /// Build signed token burn transaction.
     /// `amountAtoms` is a decimal u128 atoms string.
+
+    /// Build signed AssetLaunch transaction for POST /api/v1/assets/launch.
+    /// - `initialSupplyAtomsLo/Hi`: u128 halves (or use parseU128Halves from decimal string)
+    /// - `daoClass`: 0 = Fp, 1 = Np
+    /// - `treasuryKeyId`: 32-byte key id (must be non-zero ≠ creator)
+    /// - manifests: both nil → derive; both 32-byte Data → use
+    public static func buildAssetLaunch(
+        name: String,
+        symbol: String,
+        initialSupplyAtomsLo: UInt64,
+        initialSupplyAtomsHi: UInt64 = 0,
+        decimals: UInt8 = 18,
+        treasuryKeyId: Data,
+        daoClass: UInt8 = 0,
+        burnBps: UInt16 = 0,
+        using identity: Identity,
+        chainId: UInt8 = 0x03,
+        manifestCid: Data? = nil,
+        manifestHash: Data? = nil
+    ) throws -> String {
+        guard treasuryKeyId.count == 32 else {
+            throw ClientError.signingError("treasuryKeyId must be 32 bytes")
+        }
+        guard daoClass == 0 || daoClass == 1 else {
+            throw ClientError.signingError("daoClass must be 0 (Fp) or 1 (Np); got \(daoClass)")
+        }
+        let cidOpt = manifestCid
+        let hashOpt = manifestHash
+        switch (cidOpt, hashOpt) {
+        case (nil, nil), (.some, .some):
+            break
+        default:
+            throw ClientError.signingError("manifestCid and manifestHash must both be set or both omitted")
+        }
+        if let c = cidOpt, c.count != 32 {
+            throw ClientError.signingError("manifestCid must be 32 bytes")
+        }
+        if let h = hashOpt, h.count != 32 {
+            throw ClientError.signingError("manifestHash must be 32 bytes")
+        }
+
+        var treasury = treasuryKeyId
+        let hexPtr: UnsafeMutablePointer<CChar>? = name.withCString { namePtr in
+            symbol.withCString { symbolPtr in
+                treasury.withUnsafeBytes { treasRaw in
+                    let treasPtr = treasRaw.bindMemory(to: UInt8.self).baseAddress
+                    if let cid = cidOpt, let hash = hashOpt {
+                        return cid.withUnsafeBytes { cidRaw in
+                            hash.withUnsafeBytes { hashRaw in
+                                cBuildAssetLaunch(
+                                    identity.getHandle(),
+                                    namePtr,
+                                    symbolPtr,
+                                    initialSupplyAtomsLo,
+                                    initialSupplyAtomsHi,
+                                    decimals,
+                                    treasPtr,
+                                    daoClass,
+                                    burnBps,
+                                    chainId,
+                                    cidRaw.bindMemory(to: UInt8.self).baseAddress,
+                                    hashRaw.bindMemory(to: UInt8.self).baseAddress
+                                )
+                            }
+                        }
+                    }
+                    return cBuildAssetLaunch(
+                        identity.getHandle(),
+                        namePtr,
+                        symbolPtr,
+                        initialSupplyAtomsLo,
+                        initialSupplyAtomsHi,
+                        decimals,
+                        treasPtr,
+                        daoClass,
+                        burnBps,
+                        chainId,
+                        nil,
+                        nil
+                    )
+                }
+            }
+        }
+        guard let ptr = hexPtr else {
+            throw ClientError.signingError("Failed to build AssetLaunch transaction")
+        }
+        defer { cStringFree(ptr) }
+        return String(cString: ptr)
+    }
+
+    /// Convenience: decimal u128 atoms string → halves.
+    public static func buildAssetLaunch(
+        name: String,
+        symbol: String,
+        initialSupplyAtoms: String,
+        decimals: UInt8 = 18,
+        treasuryKeyId: Data,
+        daoClass: UInt8 = 0,
+        burnBps: UInt16 = 0,
+        using identity: Identity,
+        chainId: UInt8 = 0x03,
+        manifestCid: Data? = nil,
+        manifestHash: Data? = nil
+    ) throws -> String {
+        guard let (lo, hi) = parseU128Halves(initialSupplyAtoms) else {
+            throw ClientError.signingError("initialSupplyAtoms must be a non-negative u128 decimal string")
+        }
+        return try buildAssetLaunch(
+            name: name,
+            symbol: symbol,
+            initialSupplyAtomsLo: lo,
+            initialSupplyAtomsHi: hi,
+            decimals: decimals,
+            treasuryKeyId: treasuryKeyId,
+            daoClass: daoClass,
+            burnBps: burnBps,
+            using: identity,
+            chainId: chainId,
+            manifestCid: manifestCid,
+            manifestHash: manifestHash
+        )
+    }
+
     public static func buildTokenBurn(
         tokenId: Data,
         amountAtoms: String,
@@ -1099,48 +1242,72 @@ public class ZhtpClient {
     }
 
     /// Build domain registration request with fee tx + domain system tx signature.
+    /// `assetIdHex` optional 64-char hex for DAO-scoped V3 domains (nil = unbound V2).
     public static func buildDomainRegisterRequestWithFeePayment(
         domain: String,
         feePaymentTxHex: String,
         contentMappingsJson: String?,
         metadataJson: String?,
         chainId: UInt8,
-        using identity: Identity
+        using identity: Identity,
+        assetIdHex: String? = nil
     ) throws -> String {
-        let resultPtr = domain.withCString { domainPtr in
+        func invoke(
+            domainPtr: UnsafePointer<CChar>,
+            feePtr: UnsafePointer<CChar>,
+            mappingsPtr: UnsafePointer<CChar>?,
+            metadataPtr: UnsafePointer<CChar>?,
+            assetPtr: UnsafePointer<CChar>?
+        ) -> UnsafeMutablePointer<CChar>? {
+            cBuildDomainRegisterRequestWithFeePayment(
+                identity.getHandle(),
+                domainPtr,
+                mappingsPtr,
+                feePtr,
+                metadataPtr,
+                chainId,
+                assetPtr
+            )
+        }
+
+        let resultPtr: UnsafeMutablePointer<CChar>? = domain.withCString { domainPtr in
             feePaymentTxHex.withCString { feePtr in
+                let callWithAsset: (UnsafePointer<CChar>?, UnsafePointer<CChar>?) -> UnsafeMutablePointer<CChar>? = { mapPtr, metaPtr in
+                    if let asset = assetIdHex, !asset.isEmpty {
+                        return asset.withCString { assetPtr in
+                            invoke(
+                                domainPtr: domainPtr,
+                                feePtr: feePtr,
+                                mappingsPtr: mapPtr,
+                                metadataPtr: metaPtr,
+                                assetPtr: assetPtr
+                            )
+                        }
+                    }
+                    return invoke(
+                        domainPtr: domainPtr,
+                        feePtr: feePtr,
+                        mappingsPtr: mapPtr,
+                        metadataPtr: metaPtr,
+                        assetPtr: nil
+                    )
+                }
                 if let mappings = contentMappingsJson {
                     return mappings.withCString { mappingsPtr in
                         if let metadata = metadataJson {
                             return metadata.withCString { metadataPtr in
-                                cBuildDomainRegisterRequestWithFeePayment(
-                                    identity.getHandle(),
-                                    domainPtr,
-                                    mappingsPtr,
-                                    feePtr,
-                                    metadataPtr,
-                                    chainId
-                                )
+                                callWithAsset(mappingsPtr, metadataPtr)
                             }
                         }
-                        return cBuildDomainRegisterRequestWithFeePayment(
-                            identity.getHandle(),
-                            domainPtr,
-                            mappingsPtr,
-                            feePtr,
-                            nil,
-                            chainId
-                        )
+                        return callWithAsset(mappingsPtr, nil)
                     }
                 }
-                return cBuildDomainRegisterRequestWithFeePayment(
-                    identity.getHandle(),
-                    domainPtr,
-                    nil,
-                    feePtr,
-                    nil,
-                    chainId
-                )
+                if let metadata = metadataJson {
+                    return metadata.withCString { metadataPtr in
+                        callWithAsset(nil, metadataPtr)
+                    }
+                }
+                return callWithAsset(nil, nil)
             }
         }
 

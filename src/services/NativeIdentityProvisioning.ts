@@ -337,6 +337,43 @@ class NativeIdentityProvisioningBridge {
   }
 
   /**
+   * Sign Sovereign Asset `AssetLaunch` (DAO M1) for POST /api/v1/assets/launch.
+   * Supply: prefer `initialSupplyAtomsLo`/`Hi` (u64 halves matching C ABI), or
+   * `initialSupply` decimal u128 string. Optional manifests: both omit → derive.
+   */
+  async signAssetLaunchTransaction(params: {
+    name: string;
+    symbol: string;
+    /** u64 low half of atomic supply (C ABI) */
+    initialSupplyAtomsLo?: number | string;
+    /** u64 high half of atomic supply (C ABI) */
+    initialSupplyAtomsHi?: number | string;
+    /** Decimal u128 atoms string (convenience; alternative to lo/hi) */
+    initialSupply?: string;
+    decimals?: number;
+    /** 64-char hex treasury key_id (optional 0x). Defaults natively if omitted. */
+    treasuryKeyIdHex?: string;
+    /** "fp" | "np" | "for-profit" | "non-profit" | 0 | 1 */
+    daoClass?: string | number;
+    burnBps?: number;
+    chainId?: number;
+    manifestCidHex?: string | null;
+    manifestHashHex?: string | null;
+  }): Promise<{ signed_tx: string }> {
+    if (!this.nativeModule) {
+      throw new Error(
+        'NativeIdentityProvisioning not available on this platform',
+      );
+    }
+    if (typeof this.nativeModule.signAssetLaunchTransaction !== 'function') {
+      throw new Error(
+        'signAssetLaunchTransaction is not available — rebuild native bridges',
+      );
+    }
+    return await this.nativeModule.signAssetLaunchTransaction(params);
+  }
+
+  /**
    * Sign a token mint transaction with Dilithium keypair
    * Returns hex-encoded signed transaction ready for API
    */
@@ -495,6 +532,8 @@ class NativeIdentityProvisioningBridge {
     contentMappingsJson?: string | null;
     metadataJson?: string | null;
     chainId?: number;
+    /** Optional 64-char hex asset_id for V3 DAO-bound domains (M4). null/omit → V2. */
+    assetIdHex?: string | null;
   }): Promise<{ request_json: string }> {
     if (!this.nativeModule) {
       throw new Error(

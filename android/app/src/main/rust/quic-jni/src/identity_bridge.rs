@@ -189,6 +189,66 @@ pub fn build_token_create_transaction(
     .map_err(|e| anyhow::anyhow!("Failed to build token create transaction: {}", e))
 }
 
+/// Build a signed Sovereign Asset `AssetLaunch` transaction (hex-encoded).
+///
+/// `dao_class`: 0 = Fp (for-profit), 1 = Np (non-profit).
+/// When both manifest_cid and manifest_hash are None, derives via
+/// `build_dao_launch_manifest`. Both Some → use as-is. Mixed → error.
+pub fn build_asset_launch_transaction(
+    identity_json: &str,
+    name: &str,
+    symbol: &str,
+    initial_supply: u128,
+    decimals: u8,
+    treasury_key_id: [u8; 32],
+    dao_class: u8,
+    burn_bps: u16,
+    chain_id: u8,
+    manifest_cid: Option<[u8; 32]>,
+    manifest_hash: Option<[u8; 32]>,
+) -> Result<String> {
+    use lib_blockchain::contracts::sovereign_asset::{DaoClass, SupplyMode};
+    use zhtp_client::{
+        build_asset_launch_tx, build_dao_launch_manifest, AssetLaunchBuildParams,
+    };
+
+    let identity = deserialize_identity(identity_json)?;
+    let dao = match dao_class {
+        0 => DaoClass::Fp,
+        1 => DaoClass::Np,
+        _ => anyhow::bail!("dao_class must be 0 (Fp) or 1 (Np), got {}", dao_class),
+    };
+    let (manifest_cid, manifest_hash) = match (manifest_cid, manifest_hash) {
+        (None, None) => build_dao_launch_manifest(name, symbol, decimals)
+            .map_err(|e| anyhow::anyhow!("Failed to build DAO launch manifest: {}", e))?,
+        (Some(c), Some(h)) => (c, h),
+        _ => anyhow::bail!(
+            "manifest_cid and manifest_hash must both be set or both omitted"
+        ),
+    };
+
+    build_asset_launch_tx(
+        &identity,
+        &AssetLaunchBuildParams {
+            name: name.to_string(),
+            symbol: symbol.to_string(),
+            initial_supply,
+            decimals,
+            treasury_key_id,
+            dao_class: dao,
+            burn_bps,
+            supply_mode: SupplyMode::Fixed,
+            manifest_cid,
+            manifest_hash,
+            chain_id,
+            rewards: None,
+            governance: None,
+            transfer_authority: false,
+        },
+    )
+    .map_err(|e| anyhow::anyhow!("Failed to build asset launch transaction: {}", e))
+}
+
 /// Build a signed token mint transaction (hex-encoded)
 pub fn build_token_mint_transaction(
     identity_json: &str,
