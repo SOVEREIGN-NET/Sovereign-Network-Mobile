@@ -698,6 +698,88 @@ pub extern "system" fn Java_com_sovereignnetworkmobile_NativeIdentityProvisionin
     }
 }
 
+/// Build signed AssetLaunch transaction (DAO M1 / assets/launch path).
+/// `initial_supply_atoms_lo/hi` = u128 halves; optional manifest byte arrays
+/// (both empty → derive; both 32 bytes → use; mixed → fail).
+#[no_mangle]
+pub extern "system" fn Java_com_sovereignnetworkmobile_NativeIdentityProvisioning_nativeBuildAssetLaunch<'local>(
+    mut env: JNIEnv<'local>,
+    _class: JClass<'local>,
+    identity_json: JString<'local>,
+    name: JString<'local>,
+    symbol: JString<'local>,
+    initial_supply_atoms_lo: jni::sys::jlong,
+    initial_supply_atoms_hi: jni::sys::jlong,
+    decimals: jni::sys::jint,
+    treasury_key_id: JByteArray<'local>,
+    dao_class: jni::sys::jint,
+    burn_bps: jni::sys::jint,
+    chain_id: jni::sys::jint,
+    manifest_cid: JByteArray<'local>,
+    manifest_hash: JByteArray<'local>,
+) -> JString<'local> {
+    let identity_json_str: String = match env.get_string(&identity_json) {
+        Ok(s) => s.into(),
+        Err(_) => return env.new_string("").unwrap_or_default(),
+    };
+    let name_str: String = match env.get_string(&name) {
+        Ok(s) => s.into(),
+        Err(_) => return env.new_string("").unwrap_or_default(),
+    };
+    let symbol_str: String = match env.get_string(&symbol) {
+        Ok(s) => s.into(),
+        Err(_) => return env.new_string("").unwrap_or_default(),
+    };
+    let lo = initial_supply_atoms_lo as u64;
+    let hi = initial_supply_atoms_hi as u64;
+    let initial_supply: u128 = (hi as u128) << 64 | (lo as u128);
+
+    let treasury_arr: Vec<u8> = env.convert_byte_array(treasury_key_id).unwrap_or_default();
+    let mut treasury_key_id_arr = [0u8; 32];
+    if treasury_arr.len() >= 32 {
+        treasury_key_id_arr.copy_from_slice(&treasury_arr[..32]);
+    }
+
+    let cid_bytes: Vec<u8> = env.convert_byte_array(manifest_cid).unwrap_or_default();
+    let hash_bytes: Vec<u8> = env.convert_byte_array(manifest_hash).unwrap_or_default();
+    let (manifest_cid_opt, manifest_hash_opt) = match (cid_bytes.len(), hash_bytes.len()) {
+        (0, 0) => (None, None),
+        (32, 32) => {
+            let mut c = [0u8; 32];
+            let mut h = [0u8; 32];
+            c.copy_from_slice(&cid_bytes);
+            h.copy_from_slice(&hash_bytes);
+            (Some(c), Some(h))
+        }
+        _ => {
+            log::error!(
+                "nativeBuildAssetLaunch: manifest cid/hash must both be empty or both 32 bytes"
+            );
+            return env.new_string("").unwrap_or_default();
+        }
+    };
+
+    match identity_bridge::build_asset_launch_transaction(
+        &identity_json_str,
+        &name_str,
+        &symbol_str,
+        initial_supply,
+        decimals as u8,
+        treasury_key_id_arr,
+        dao_class as u8,
+        burn_bps as u16,
+        chain_id as u8,
+        manifest_cid_opt,
+        manifest_hash_opt,
+    ) {
+        Ok(hex_tx) => env.new_string(&hex_tx).unwrap_or_default(),
+        Err(e) => {
+            log::error!("Failed to build asset launch transaction: {}", e);
+            env.new_string("").unwrap_or_default()
+        }
+    }
+}
+
 /// Build signed token mint transaction (legacy identity-json path).
 #[no_mangle]
 pub extern "system" fn Java_com_sovereignnetworkmobile_NativeIdentityProvisioning_nativeBuildTokenMint<'local>(

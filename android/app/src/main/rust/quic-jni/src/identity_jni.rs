@@ -998,6 +998,7 @@ pub extern "system" fn Java_com_sovereignnetworkmobile_Identity_nativeBuildDomai
     fee_payment_tx_hex: JString<'local>,
     metadata_json: JString<'local>,
     chain_id: jint,
+    asset_id_hex: JString<'local>,
 ) -> JString<'local> {
     if handle == 0 {
         return JString::default();
@@ -1020,6 +1021,15 @@ pub extern "system" fn Java_com_sovereignnetworkmobile_Identity_nativeBuildDomai
     let metadata = jstring_to_string(&mut env, &metadata_json).and_then(|json| {
         serde_json::from_str::<serde_json::Value>(&json).ok()
     });
+    // Optional 64-char hex (empty/null → V2 unbound). Monorepo #2919 7th arg.
+    let asset_id_opt = jstring_to_string(&mut env, &asset_id_hex).and_then(|s| {
+        let t = s.trim().to_string();
+        if t.is_empty() {
+            None
+        } else {
+            Some(t)
+        }
+    });
     let effective_chain_id = if chain_id == 0 {
         zhtp_client::token_tx::DEFAULT_DOMAIN_CHAIN_ID
     } else {
@@ -1033,6 +1043,7 @@ pub extern "system" fn Java_com_sovereignnetworkmobile_Identity_nativeBuildDomai
         Some(fee_tx),
         metadata,
         effective_chain_id,
+        asset_id_opt.as_deref(),
     ) {
         Ok(json) => env.new_string(&json).unwrap_or_default(),
         Err(e) => {

@@ -168,7 +168,8 @@ class Identity private constructor(
             contentMappingsJson: String?,
             feePaymentTxHex: String,
             metadataJson: String?,
-            chainId: Int
+            chainId: Int,
+            assetIdHex: String?
         ): String?
 
         @JvmStatic private external fun nativeBuildDomainUpdateRequest(
@@ -373,20 +374,25 @@ class Identity private constructor(
         chainId,
     )
 
-    /** Build domain register request with fee_payment_tx + domain_tx_signature_hex. */
+    /**
+     * Build domain register request with fee_payment_tx + domain_tx_signature_hex.
+     * `assetIdHex` optional 64-char hex for DAO-scoped V3 domains (null → V2).
+     */
     fun buildDomainRegisterRequestWithFeePayment(
         domain: String,
         feePaymentTxHex: String,
         contentMappingsJson: String? = null,
         metadataJson: String? = null,
-        chainId: Int = 0x03
+        chainId: Int = 0x03,
+        assetIdHex: String? = null,
     ): String? = nativeBuildDomainRegisterRequestWithFeePayment(
         handle,
         domain,
         contentMappingsJson,
         feePaymentTxHex,
         metadataJson,
-        chainId
+        chainId,
+        assetIdHex
     )
 
     /** Build domain update request with manifest CID versioning. */

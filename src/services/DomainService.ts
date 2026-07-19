@@ -22,7 +22,18 @@ import type {
 } from '../types/domain';
 
 // 10 SOV at 18 decimals — minimum the web4 domain registration handler enforces.
-const DOMAIN_REGISTRATION_FEE_ATOMS = '10000000000000000000';
+// 100 SOV at 18 decimals — monorepo #2919 / DAO M4 (was 10 SOV).
+const DOMAIN_REGISTRATION_FEE_ATOMS = '100000000000000000000';
+export const DOMAIN_REGISTRATION_FEE_SOV = 100;
+
+/** Strip optional 0x and require 64 hex chars. Returns null if invalid. */
+export function normalizeAssetIdHex(raw: string): string | null {
+  let s = String(raw).trim().replace(/\s+/g, '');
+  if (s.startsWith('0x') || s.startsWith('0X')) s = s.slice(2);
+  if (!/^[0-9a-fA-F]{64}$/.test(s)) return null;
+  return s.toLowerCase();
+}
+
 const DOMAIN_CHAIN_ID = 0x03;
 
 class DomainService {
@@ -75,6 +86,16 @@ class DomainService {
   ): Promise<DomainRegisterResponse> {
     console.log('[DomainService] Registering domain:', request.domain);
 
+    let assetIdHex: string | null = null;
+    if (request.asset_id != null && String(request.asset_id).trim() !== '') {
+      assetIdHex = normalizeAssetIdHex(String(request.asset_id));
+      if (!assetIdHex) {
+        throw new Error(
+          'asset_id must be a 64-char hex id (optional 0x prefix is stripped)',
+        );
+      }
+    }
+
     const primaryWalletIdHex = request.primary_wallet_id?.trim() ?? '';
     if (primaryWalletIdHex.length !== 64) {
       throw new Error(
@@ -112,6 +133,7 @@ class DomainService {
         contentMappingsJson,
         metadataJson: null,
         chainId: DOMAIN_CHAIN_ID,
+        assetIdHex,
       });
 
     const requestBody = JSON.parse(signingResult.request_json) as Record<

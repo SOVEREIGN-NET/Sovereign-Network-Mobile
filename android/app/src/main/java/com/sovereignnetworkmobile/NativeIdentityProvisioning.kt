@@ -44,6 +44,25 @@ class NativeIdentityProvisioning(reactContext: ReactApplicationContext) :
             initialSupplyAtoms: String, decimals: Int,
             treasuryRecipient: ByteArray, chainId: Int
         ): String
+
+        /**
+         * AssetLaunch (DAO M1). Supply = u128 as two signed jlong halves
+         * (lo/hi). Manifest byte arrays both empty → derive; both 32 → use.
+         */
+        @JvmStatic private external fun nativeBuildAssetLaunch(
+            identityJson: String,
+            name: String,
+            symbol: String,
+            initialSupplyAtomsLo: Long,
+            initialSupplyAtomsHi: Long,
+            decimals: Int,
+            treasuryKeyId: ByteArray,
+            daoClass: Int,
+            burnBps: Int,
+            chainId: Int,
+            manifestCid: ByteArray,
+            manifestHash: ByteArray,
+        ): String
     }
 
     private val executor: Executor = Executors.newCachedThreadPool()
@@ -387,6 +406,197 @@ class NativeIdentityProvisioning(reactContext: ReactApplicationContext) :
             } catch (e: Exception) {
                 Log.e(TAG, "Token creation signing failed", e)
                 promise.reject("IDENTITY_ERROR", "Failed to sign token creation: ${e.message}", e)
+            }
+        }
+    }
+
+
+    /**
+     * Sign an AssetLaunch transaction (POST /api/v1/assets/launch).
+     *
+     * Params (CR):
+     * - name, symbol
+     * - initialSupplyAtomsLo / initialSupplyAtomsHi (u64 halves) OR initialSupply decimal string
+     * - decimals
+     * - treasuryKeyIdHex: 64 hex (required for protocol; falls back to token-create treasury constant)
+     * - daoClass: "fp"|"np"|0|1
+     * - burnBps, chainId
+     * - manifestCidHex / manifestHashHex: both omit → derive; both 64 hex → use
+     */
+    @ReactMethod
+    fun signAssetLaunchTransaction(params: ReadableMap, promise: Promise) {
+        executor.execute {
+            try {
+                val name = params.getString("name") ?: ""
+                val symbol = params.getString("symbol") ?: ""
+                if (name.isEmpty() || symbol.isEmpty()) {
+                    promise.reject("INVALID_PARAMS", "name and symbol are required")
+                    return@execute
+                }
+
+                val decimals = if (params.hasKey("decimals") && !params.isNull("decimals")) {
+                    params.getInt("decimals")
+                } else {
+                    18
+                }
+
+                // Prefer lo/hi halves (C ABI); accept initialSupply decimal string as convenience.
+                val supplyLo: Long
+                val supplyHi: Long
+                if (params.hasKey("initialSupplyAtomsLo") && !params.isNull("initialSupplyAtomsLo")) {
+                    supplyLo = params.getDouble("initialSupplyAtomsLo").toLong()
+                    supplyHi = if (params.hasKey("initialSupplyAtomsHi") && !params.isNull("initialSupplyAtomsHi")) {
+                        params.getDouble("initialSupplyAtomsHi").toLong()
+                    } else {
+                        0L
+                    }
+                } else {
+                    val atoms = parseAmountAtoms(params, "initialSupply")
+                        ?: run {
+                            promise.reject(
+                                "INVALID_PARAMS",
+                                "initialSupplyAtomsLo/Hi or initialSupply (decimal u128 string) required",
+                            )
+                            return@execute
+                        }
+                    // Parse decimal string → lo/hi
+                    try {
+                        val v = java.math.BigInteger(atoms)
+                        if (v.signum() < 0) {
+                            promise.reject("INVALID_PARAMS", "initialSupply must be non-negative")
+                            return@execute
+                        }
+                        val mask = java.math.BigInteger("FFFFFFFFFFFFFFFF", 16)
+                        supplyLo = v.and(mask).toLong()
+                        supplyHi = v.shiftRight(64).and(mask).toLong()
+                    } catch (e: Exception) {
+                        promise.reject("INVALID_PARAMS", "invalid initialSupply: ${e.message}", e)
+                        return@execute
+                    }
+                }
+
+                val burnBps = if (params.hasKey("burnBps") && !params.isNull("burnBps")) {
+                    params.getInt("burnBps")
+                } else {
+                    0
+                }
+                if (burnBps < 0 || burnBps > 1000) {
+                    promise.reject("INVALID_PARAMS", "burnBps must be 0..1000")
+                    return@execute
+                }
+                val chainId = if (params.hasKey("chainId") && !params.isNull("chainId")) {
+                    params.getInt("chainId")
+                } else {
+                    0x03
+                }
+
+                val daoClass: Int = when {
+                    params.hasKey("daoClass") && !params.isNull("daoClass") -> {
+                        when (params.getType("daoClass")) {
+                            com.facebook.react.bridge.ReadableType.Number -> params.getInt("daoClass")
+                            com.facebook.react.bridge.ReadableType.String -> when (
+                                params.getString("daoClass")?.lowercase()
+                            ) {
+                                "fp", "for-profit", "for_profit" -> 0
+                                "np", "non-profit", "non_profit" -> 1
+                                else -> {
+                                    promise.reject("INVALID_PARAMS", "daoClass must be fp/np or 0/1")
+                                    return@execute
+                                }
+                            }
+                            else -> {
+                                promise.reject("INVALID_PARAMS", "daoClass has unsupported type")
+                                return@execute
+                            }
+                        }
+                    }
+                    else -> 0
+                }
+                if (daoClass != 0 && daoClass != 1) {
+                    promise.reject("INVALID_PARAMS", "daoClass must be 0 (Fp) or 1 (Np)")
+                    return@execute
+                }
+
+                val treasuryKeyId: ByteArray = run {
+                    val hex = params.getString("treasuryKeyIdHex")
+                    if (!hex.isNullOrBlank()) {
+                        val cleaned = hex.removePrefix("0x").removePrefix("0X")
+                        if (cleaned.length != 64) {
+                            promise.reject("INVALID_PARAMS", "treasuryKeyIdHex must be 64 hex chars")
+                            return@execute
+                        }
+                        cleaned.chunked(2).map { it.toInt(16).toByte() }.toByteArray()
+                    } else {
+                        TREASURY_RECIPIENT
+                    }
+                }
+
+                fun parseManifestHex(key: String): ByteArray? {
+                    if (!params.hasKey(key) || params.isNull(key)) return null
+                    val hex = params.getString(key) ?: return null
+                    if (hex.isBlank()) return null
+                    val cleaned = hex.removePrefix("0x").removePrefix("0X")
+                    if (cleaned.length != 64) {
+                        throw IllegalArgumentException("$key must be 64 hex chars when set")
+                    }
+                    return cleaned.chunked(2).map { it.toInt(16).toByte() }.toByteArray()
+                }
+                val cid = try { parseManifestHex("manifestCidHex") } catch (e: Exception) {
+                    promise.reject("INVALID_PARAMS", e.message, e)
+                    return@execute
+                }
+                val hash = try { parseManifestHex("manifestHashHex") } catch (e: Exception) {
+                    promise.reject("INVALID_PARAMS", e.message, e)
+                    return@execute
+                }
+                val (manifestCid, manifestHash) = when {
+                    cid == null && hash == null -> ByteArray(0) to ByteArray(0)
+                    cid != null && hash != null -> cid to hash
+                    else -> {
+                        promise.reject(
+                            "INVALID_PARAMS",
+                            "manifestCidHex and manifestHashHex must both be set or both omitted",
+                        )
+                        return@execute
+                    }
+                }
+
+                val identity = getLatestIdentity()
+                if (identity == null) {
+                    promise.reject("IDENTITY_ERROR", "No identity available for signing")
+                    return@execute
+                }
+                val identityJson = identity.serialize()
+                if (identityJson == null) {
+                    promise.reject("SIGNING_ERROR", "Failed to serialize identity for signing")
+                    return@execute
+                }
+
+                Log.d(TAG, "Building AssetLaunch: $name/$symbol daoClass=$daoClass burnBps=$burnBps")
+                val hexSignedTx = nativeBuildAssetLaunch(
+                    identityJson,
+                    name,
+                    symbol,
+                    supplyLo,
+                    supplyHi,
+                    decimals,
+                    treasuryKeyId,
+                    daoClass,
+                    burnBps,
+                    chainId,
+                    manifestCid,
+                    manifestHash,
+                )
+                if (hexSignedTx.isEmpty()) {
+                    promise.reject("SIGNING_ERROR", "Failed to build AssetLaunch transaction")
+                    return@execute
+                }
+                promise.resolve(WritableNativeMap().apply {
+                    putString("signed_tx", hexSignedTx)
+                })
+            } catch (e: Exception) {
+                Log.e(TAG, "AssetLaunch signing failed", e)
+                promise.reject("IDENTITY_ERROR", "Failed to sign AssetLaunch: ${e.message}", e)
             }
         }
     }
@@ -975,6 +1185,11 @@ class NativeIdentityProvisioning(reactContext: ReactApplicationContext) :
                 val contentMappingsJson = params.getString("contentMappingsJson")
                 val metadataJson = params.getString("metadataJson")
                 val chainId = if (params.hasKey("chainId")) params.getInt("chainId") else 0x03
+                val assetIdHex = if (params.hasKey("assetIdHex") && !params.isNull("assetIdHex")) {
+                    params.getString("assetIdHex")
+                } else {
+                    null
+                }
 
                 if (domain.isEmpty() || feePaymentTxHex.isEmpty()) {
                     promise.reject("INVALID_PARAMS", "domain and feePaymentTxHex are required")
@@ -987,14 +1202,18 @@ class NativeIdentityProvisioning(reactContext: ReactApplicationContext) :
                     return@execute
                 }
 
-                Log.d(TAG, "Building domain register request with fee payment: $domain")
+                Log.d(
+                    TAG,
+                    "Building domain register request with fee payment: $domain assetId=${assetIdHex != null}",
+                )
 
                 val requestJson = identity.buildDomainRegisterRequestWithFeePayment(
                     domain,
                     feePaymentTxHex,
                     contentMappingsJson,
                     metadataJson,
-                    chainId
+                    chainId,
+                    assetIdHex,
                 )
                 if (requestJson == null) {
                     promise.reject(
