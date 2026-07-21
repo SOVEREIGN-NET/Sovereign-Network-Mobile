@@ -22,7 +22,6 @@ import { useTranslation } from '../i18n';
 import { colors, spacing } from '../theme';
 
 const DappsScreen: React.FC<any> = ({ navigation }) => {
-  const { t } = useTranslation();
   const trendingDappsData = useTrendingDapps();
 
   const openBrowser = (url: string) => {

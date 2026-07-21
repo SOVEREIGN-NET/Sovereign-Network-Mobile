@@ -180,6 +180,8 @@ const MessagesScreen: React.FC<Props> = ({ navigation }) => {
 
   const totalUnread = conversations.reduce((n, c) => n + c.unread_count, 0);
 
+  const emptyPreviewText = privacyOn ? '' : 'No messages yet';
+
   return (
     <ScreenLayout
       paddingTop={spacing.md}
@@ -406,7 +408,7 @@ const ConversationRow: React.FC<RowProps> = ({
             )
           ) : (
             <Text style={styles.rowPreviewEmpty} numberOfLines={1}>
-              {privacyOn ? '' : 'No messages yet'}
+              {emptyPreviewText}
             </Text>
           )}
           {unread && (

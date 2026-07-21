@@ -93,7 +93,7 @@ describe('MockDataService', () => {
       const wallets1 = MockDataService.getWallets();
       const wallets2 = MockDataService.getWallets();
 
-      expect(wallets1.length).toBe(wallets2.length);
+      expect(wallets1).toHaveLength(wallets2.length);
       expect(wallets1[0].id).toBe(wallets2[0].id);
     });
   });

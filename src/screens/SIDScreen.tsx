@@ -83,7 +83,9 @@ const formatTxValue = (
   if (typeof value === 'number') {
     s = Number.isFinite(value) ? String(Math.trunc(value)) : '0';
   } else {
-    s = String(value).trim();
+    s = typeof value === 'object' && value !== null
+      ? JSON.stringify(value)
+      : String(value).trim();
   }
   if (!/^\d+$/.test(s)) return '0';
   return atomsToDisplayLocale(s, decimals, 8);
@@ -724,7 +726,7 @@ const SIDScreen = ({ navigation, route }: any) => {
         if (
           error instanceof QuicError &&
           error.status === 400 &&
-          String(error?.body ?? '').includes('Identity ID must be 32 bytes')
+          String(typeof error?.body === 'object' && error?.body !== null ? JSON.stringify(error.body) : (error?.body ?? '')).includes('Identity ID must be 32 bytes')
         ) {
           return {
             identity_id: identityHex,
@@ -1065,7 +1067,6 @@ const SIDScreen = ({ navigation, route }: any) => {
                       <>
                         {(() => {
                           const balStr = formatBalance(totalBalance);
-                          const len = balStr.length;
                           const fontSize = balanceFontSize(balStr);
                           return (
                             <Text

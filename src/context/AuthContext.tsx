@@ -684,6 +684,30 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
     }
   }, [setMigrationRequiredFlag]);
 
+  const restoreIdentityToHandleStore = async (identity: Identity): Promise<void> => {
+    if (!identity.identityId || !NativeModules.NativeIdentityProvisioning) return;
+    try {
+      const result = await NativeModules.NativeIdentityProvisioning.restoreIdentityToHandleStore(
+        identity.identityId
+      );
+      if (result?.status === 'restored') {
+        setRestoreWarning(null);
+        console.log('[AuthContext.setIdentity] ✅ Identity restored to handle store:', result);
+      } else if (result?.status === 'skipped') {
+        const message = `Handle store restore skipped: ${result.reason}${
+          result.error ? ` (${result.error})` : ''
+        }`;
+        setRestoreWarning(message);
+        console.warn('[AuthContext.setIdentity] ⚠️ Handle store restore skipped:', result);
+      } else {
+        console.log('[AuthContext.setIdentity] ℹ️ Handle store restoration result:', result);
+      }
+    } catch (err) {
+      console.error('[AuthContext.setIdentity] ⚠️ Failed to restore Identity to handle store:', err);
+      setRestoreWarning('Handle store restore failed');
+    }
+  };
+
   /**
    * Manually set the current identity
    * Used after saving identity to storage (e.g., after seed phrase confirmation)
@@ -709,26 +733,7 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
       setCurrentIdentity(identity);
 
       // SECURITY: Restore lib-client Identity to handle store for UHP signing
-        if (identity.identityId && NativeModules.NativeIdentityProvisioning) {
-          try {
-            const result = await NativeModules.NativeIdentityProvisioning.restoreIdentityToHandleStore(
-              identity.identityId
-            );
-            if (result?.status === 'restored') {
-              setRestoreWarning(null);
-              console.log('[AuthContext.setIdentity] ✅ Identity restored to handle store:', result);
-            } else if (result?.status === 'skipped') {
-              const message = `Handle store restore skipped: ${result.reason}${
-                result.error ? ` (${result.error})` : ''
-              }`;
-              setRestoreWarning(message);
-              console.warn('[AuthContext.setIdentity] ⚠️ Handle store restore skipped:', result);
-            } else {
-              console.log('[AuthContext.setIdentity] ℹ️ Handle store restoration result:', result);
-            }
-          } catch (err) {
-            console.error('[AuthContext.setIdentity] ⚠️ Failed to restore Identity to handle store:', err);
-            setRestoreWarning('Handle store restore failed');
+      await restoreIdentityToHandleStore(identity);
             // Non-fatal - continue anyway
           }
         }
@@ -1250,9 +1255,9 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
         .catch(() => null);
       if (
         !local ||
-        local.status !== 'found' ||
-        !local.identity_id ||
-        !local.did
+        local?.status !== 'found' ||
+        !local?.identity_id ||
+        !local?.did
       ) {
         return null;
       }

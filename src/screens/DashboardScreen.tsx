@@ -286,24 +286,26 @@ const DashboardScreen: React.FC<any> = ({ navigation }) => {
         },
       },
     ];
-    items.push({
-      id: 'domains',
-      label: 'My Domains',
-      icon: '',
-      onPress: () => {
-        setDrawerVisible(false);
-        openDomains();
+    items.push(
+      {
+        id: 'domains',
+        label: 'My Domains',
+        icon: '',
+        onPress: () => {
+          setDrawerVisible(false);
+          openDomains();
+        },
       },
-    });
-    items.push({
-      id: 'settings',
-      label: 'Settings',
-      icon: '',
-      onPress: () => {
-        setDrawerVisible(false);
-        navigation.navigate('SIDTab', { screen: 'AppSettings' });
+      {
+        id: 'settings',
+        label: 'Settings',
+        icon: '',
+        onPress: () => {
+          setDrawerVisible(false);
+          navigation.navigate('SIDTab', { screen: 'AppSettings' });
+        },
       },
-    });
+    );
     return items;
   }, [navigation, openDomains]);
 

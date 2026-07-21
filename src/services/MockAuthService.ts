@@ -4,8 +4,8 @@
  * TODO: Replace with real SOV API calls when backend is ready
  */
 
-import type { Identity, WalletInfo } from '../types/identity';
-export type { Identity, WalletInfo } from '../types/identity';
+import type { Identity } from '../types/identity';
+export type { Identity } from '../types/identity';
 
 // Keep old Wallet interface for backwards compatibility
 export interface Wallet {

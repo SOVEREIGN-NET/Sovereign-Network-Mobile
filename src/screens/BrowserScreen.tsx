@@ -43,8 +43,8 @@ const parseSidPrefix = (sidPrefix: string | null | undefined): Uint8Array => {
 /** Convert a Uint8Array session ID to a hex string for logging. */
 const sessionIdToHex = (id: Uint8Array): string => {
   let hex = '';
-  for (let i = 0; i < id.length; i++) {
-    hex += id[i].toString(16).padStart(2, '0');
+  for (const byte of id) {
+    hex += byte.toString(16).padStart(2, '0');
   }
   return hex;
 };
@@ -411,10 +411,8 @@ const BrowserScreen = ({ route, navigation }: any) => {
                       );
                     }
                   }, 8000);
-                } else {
-                  if (__DEV__) {
-                    console.log('[🌐 PoUW] Controller not available');
-                  }
+                } else if (__DEV__) {
+                  console.log('[🌐 PoUW] Controller not available');
                 }
               }}
               onError={e => console.log('[🌐 Web4] onError:', e)}

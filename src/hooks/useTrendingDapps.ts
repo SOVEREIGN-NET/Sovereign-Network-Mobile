@@ -99,7 +99,6 @@ export const useTrendingDapps = (): DappData[] => {
       // Slight change in growth percentage
       DAPP_CONFIGS.forEach((config, index) => {
         const changeFluctuation = (Math.random() - 0.5) * 5;
-        Math.max(0, config.baseChange + changeFluctuation);
         const animRefs = animatedRefs.current[index];
 
         // Glow effect on significant changes
