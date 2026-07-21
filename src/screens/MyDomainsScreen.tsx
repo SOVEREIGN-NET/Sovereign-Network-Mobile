@@ -364,7 +364,7 @@ const MyDomainsScreen = ({ navigation }: any) => {
                                 color: colors.success,
                               }}
                             >
-                              {Number.isFinite(domain.daysUntilExpiry ?? NaN)
+                              {Number.isFinite(domain.daysUntilExpiry ?? Number.NaN)
                                 ? `${domain.daysUntilExpiry} days left`
                                 : 'Days left: —'}
                             </Text>

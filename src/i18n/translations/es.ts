@@ -186,8 +186,7 @@ export const es: Translation = {
       displayName: 'Nombre visible',
       displayNamePlaceholder: 'Tu nombre visible público',
       displayNameHint: 'Visible para otros en votaciones del DAO y perfiles',
-      // NOSONAR — UI label, not a credential
-      passphrase: 'Contraseña',
+      passphrase: 'Contraseña', // NOSONAR — UI label, not a credential
       passphraseShowHide: {
         show: 'Mostrar',
         hide: 'Ocultar',

@@ -179,8 +179,8 @@ const MessagesScreen: React.FC<Props> = ({ navigation }) => {
     : conversations;
 
   const totalUnread = conversations.reduce((n, c) => n + c.unread_count, 0);
+const emptyPreviewText = privacyOn ? '' : 'No messages yet';
 
-  const emptyPreviewText = privacyOn ? '' : 'No messages yet';
 
   return (
     <ScreenLayout

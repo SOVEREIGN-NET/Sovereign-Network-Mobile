@@ -18,7 +18,6 @@ import {
   ScreenLayout,
   Text,
 } from '../components';
-import { useTranslation } from '../i18n';
 import { colors, spacing } from '../theme';
 
 const DappsScreen: React.FC<any> = ({ navigation }) => {

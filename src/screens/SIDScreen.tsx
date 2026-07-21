@@ -723,10 +723,13 @@ const SIDScreen = ({ navigation, route }: any) => {
           ),
         };
       } catch (error) {
+        const errBodyStr = typeof error?.body === 'object' && error?.body !== null
+          ? JSON.stringify(error.body)
+          : String(error?.body ?? '');
         if (
           error instanceof QuicError &&
           error.status === 400 &&
-          String(typeof error?.body === 'object' && error?.body !== null ? JSON.stringify(error.body) : (error?.body ?? '')).includes('Identity ID must be 32 bytes')
+          errBodyStr.includes('Identity ID must be 32 bytes')
         ) {
           return {
             identity_id: identityHex,
