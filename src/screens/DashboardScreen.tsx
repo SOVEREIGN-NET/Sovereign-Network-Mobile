@@ -5,7 +5,6 @@ import {
   Pressable,
   Animated,
   Dimensions,
-  ActivityIndicator,
   Easing,
   NativeScrollEvent,
   NativeSyntheticEvent,
@@ -35,24 +34,15 @@ import SShieldLogo from '../components/atoms/Logo';
 const { height: SCREEN_HEIGHT } = Dimensions.get('window');
 const SCROLL_THRESHOLD = 80;
 const SEARCH_BAR_HEIGHT = 44;
-
 /**
- * Small hero — just tall enough to show the logo at ~1/3 with the
- * search bar directly below it. A spacer pushes the dapps section
- * below the fold so they are invisible until the user scrolls.
+ * Hero section height — logo area above the sticky search bar + dapps.
  */
 const HERO_SECTION_HEIGHT = SCREEN_HEIGHT * 0.35;
-/** Spacer after the sticky search bar fills the remaining viewport */
-const DAPPS_SPACER = SCREEN_HEIGHT - HERO_SECTION_HEIGHT - SEARCH_BAR_HEIGHT - 64;
 
-/** Estimated height of the "Scroll to browse" indicator section (text + chevron + padding) */
-const INDICATOR_HEIGHT = 54;
-/** Scroll offset that positions dapp rows just below the stuck search bar */
-const DAPPS_SNAP_OFFSET = HERO_SECTION_HEIGHT + INDICATOR_HEIGHT + DAPPS_SPACER;
-/** Scroll threshold — scrolling past 35% of the way to dapps triggers snap */
-const SNAP_THRESHOLD = DAPPS_SNAP_OFFSET * 0.35;
-/** Buffer zone to prevent re-snapping when already freely scrolling within dapps */
-const SNAP_BUFFER = 60;
+/** Scroll offset where the dapp reveal animation begins (delayed) */
+const REVEAL_START = HERO_SECTION_HEIGHT * 0.4;
+/** Scroll offset where the dapp reveal animation completes */
+const REVEAL_END = REVEAL_START + 80;
 
 const NOTICE_STYLE: Record<
   'info' | 'warning' | 'error',
@@ -79,33 +69,6 @@ const WideChevronDown: React.FC<{ color: string; size?: number }> = ({
     />
   </Svg>
 );
-
-/** Generates more dapp configs for infinite-scroll simulation */
-const generateDappPage = (page: number, pageSize: number) => {
-  const templates = [
-    { name: 'Central.sov', desc: 'CBE applications', baseUsers: 342 },
-    { name: 'SovSwap', desc: 'DAO registry - Token Swap', baseUsers: 287 },
-    { name: 'Ballot', desc: 'Voting Platform', baseUsers: 89 },
-    { name: 'Namesake', desc: 'Domain Name Service', baseUsers: 156 },
-    { name: 'Vault', desc: 'Decentralized Storage', baseUsers: 201 },
-    { name: 'Stream', desc: 'Live Content Platform', baseUsers: 73 },
-    { name: 'Mint', desc: 'Token Creator', baseUsers: 118 },
-    { name: 'Bid', desc: 'Auction House', baseUsers: 45 },
-    { name: 'Vote', desc: 'DAO Governance', baseUsers: 234 },
-    { name: 'Stake', desc: 'Staking Dashboard', baseUsers: 167 },
-  ];
-  const start = (page - 1) * pageSize;
-  return templates.slice(start, start + pageSize).map((t, i) => ({
-    id: `page${page}-${i}`,
-    name: t.name,
-    desc: t.desc,
-    url: `zhtp://${t.name.toLowerCase().replace(/\s+/g, '')}.sov`,
-    change: Math.round(Math.random() * 200 + 50),
-    activityLevel: (['high', 'medium', 'low'] as const)[
-      Math.floor(Math.random() * 3)
-    ],
-  }));
-};
 
 const DappRow: React.FC<{
   dapp: { id: string; name: string; desc: string; url: string; activityLevel: string };
@@ -146,6 +109,7 @@ const DashboardScreen: React.FC<any> = ({ navigation }) => {
   const { activeNotice, dismiss } = useNetworkNotices();
   const { currentIdentity } = useAuth();
   const [urlInput, setUrlInput] = useState('zhtp://central.sov');
+  const [dappsTouchable, setDappsTouchable] = useState(false);
 
   // Scroll animation
   const scrollY = useRef(new Animated.Value(0)).current;
@@ -213,28 +177,29 @@ const DashboardScreen: React.FC<any> = ({ navigation }) => {
     extrapolate: 'clamp',
   });
 
-  // Search bar shadow appears when stuck
-  const searchBarShadowOpacity = scrollY.interpolate({
-    inputRange: [SCROLL_THRESHOLD - 10, SCROLL_THRESHOLD],
-    outputRange: [0, 0.3],
+  // Dapps fade in / indicator fades out — delayed until REVEAL_START
+  const dappsOpacity = scrollY.interpolate({
+    inputRange: [REVEAL_START, REVEAL_END],
+    outputRange: [0, 1],
+    extrapolate: 'clamp',
+  });
+  const indicatorOpacity = scrollY.interpolate({
+    inputRange: [REVEAL_START, REVEAL_END],
+    outputRange: [0.7, 0],
     extrapolate: 'clamp',
   });
 
-  // Dapps data and infinite scroll
+  // Dapps data — static list from useTrendingDapps
   const trendingDapps = useTrendingDapps();
-  const [loadedDapps, setLoadedDapps] = useState(() => {
-    const initial = trendingDapps.map(d => ({
+  const [loadedDapps] = useState(() => {
+    return trendingDapps.map(d => ({
       id: d.id,
       name: d.name,
       desc: d.desc,
       url: d.url,
       activityLevel: d.activityLevel,
     }));
-    return [...initial, ...generateDappPage(1, 5)];
   });
-  const [loadingMore, setLoadingMore] = useState(false);
-  const pageRef = useRef(2);
-  const hasMoreRef = useRef(true);
 
   const openBrowser = useCallback(
     (url?: string) => {
@@ -247,54 +212,29 @@ const DashboardScreen: React.FC<any> = ({ navigation }) => {
     [navigation, urlInput],
   );
 
-  const handleLoadMore = useCallback(() => {
-    if (loadingMore || !hasMoreRef.current) return;
-    setLoadingMore(true);
-    setTimeout(() => {
-      const nextPage = generateDappPage(pageRef.current, 5);
-      if (nextPage.length === 0) {
-        hasMoreRef.current = false;
-      } else {
-        setLoadedDapps(prev => [...prev, ...nextPage]);
-        pageRef.current += 1;
-      }
-      setLoadingMore(false);
-    }, 800);
-  }, [loadingMore]);
 
-  const isNearBottom = useRef(false);
   const handleScroll = Animated.event(
     [{ nativeEvent: { contentOffset: { y: scrollY } } }],
     {
       useNativeDriver: true,
       listener: (event: any) => {
-        const { contentOffset, contentSize, layoutMeasurement } =
-          event.nativeEvent;
-        if (
-          contentOffset.y + layoutMeasurement.height >
-          contentSize.height - layoutMeasurement.height * 0.2
-        ) {
-          if (!isNearBottom.current) {
-            isNearBottom.current = true;
-            handleLoadMore();
-          }
-        } else {
-          isNearBottom.current = false;
+        const offsetY = event.nativeEvent.contentOffset.y;
+        if (offsetY >= REVEAL_END && !dappsTouchable) {
+          setDappsTouchable(true);
         }
       },
     },
   );
 
-  /** Snaps to top or dapps section based on how far the user scrolled */
+  /** Snap: if user scrolled past the midpoint, finish the scroll to reveal dapps */
   const handleMomentumEnd = useCallback(
     (event: NativeSyntheticEvent<NativeScrollEvent>) => {
       const offsetY = event.nativeEvent.contentOffset.y;
-      if (offsetY < SNAP_THRESHOLD) {
+      if (offsetY < HERO_SECTION_HEIGHT * 0.5) {
         scrollRef.current?.scrollTo({ y: 0, animated: true });
-      } else if (offsetY < DAPPS_SNAP_OFFSET + SNAP_BUFFER) {
-        scrollRef.current?.scrollTo({ y: DAPPS_SNAP_OFFSET, animated: true });
+      } else {
+        scrollRef.current?.scrollTo({ y: HERO_SECTION_HEIGHT, animated: true });
       }
-      // else: already within dapps section, free scroll — no snap
     },
     [],
   );
@@ -434,23 +374,16 @@ const DashboardScreen: React.FC<any> = ({ navigation }) => {
           <View style={{ flex: 1 }} />
         </View>
 
-        {/* ── Index 1: Sticky search bar ── */}
+        {/* ── Index 1: Sticky header — search bar + dapp rows ── */}
         <Animated.View
           style={{
             paddingHorizontal: spacing.lg,
             paddingTop: spacing.sm,
-            paddingBottom: spacing.sm,
+            paddingBottom: spacing.md,
             backgroundColor: colors.bg_darkest,
-            shadowColor: '#000',
-            shadowOffset: { width: 0, height: 2 },
-            shadowOpacity: searchBarShadowOpacity,
-            shadowRadius: 4,
-            elevation: searchBarShadowOpacity.interpolate({
-              inputRange: [0, 0.3],
-              outputRange: [0, 6],
-            }),
           }}
         >
+          {/* Search bar */}
           <View
             style={{
               flexDirection: 'row',
@@ -508,64 +441,56 @@ const DashboardScreen: React.FC<any> = ({ navigation }) => {
               <ArrowIcon direction="right" size={16} color={colors.text_primary} />
             </Button>
           </View>
-        </Animated.View>
 
-        {/* ── Index 2: Available Dapps indicator (centered, arrow below text) ── */}
-        <Animated.View
-          style={{
-            alignItems: 'center',
-            paddingVertical: spacing.sm,
-            transform: [{ translateY: bobAnim }],
-          }}
-        >
-          <Animated.Text
+          {/* "Scroll to browse" indicator — fades out as dapps fade in */}
+          <Animated.View
             style={{
-              fontWeight: '600',
-              color: colors.text_secondary,
-              marginBottom: spacing.xs,
-              opacity: textOpacity,
+              opacity: indicatorOpacity,
+              alignItems: 'center',
+              paddingVertical: spacing.sm,
+              transform: [{ translateY: bobAnim }],
             }}
+            pointerEvents="none"
           >
-            Scroll to browse available Dapps
-          </Animated.Text>
-          <Animated.View style={{ opacity: textOpacity }}>
-            <WideChevronDown color={colors.text_secondary} size={20} />
+            <Animated.Text
+              style={{
+                fontWeight: '600',
+                fontSize: typography.size.xs,
+                color: colors.text_secondary,
+                marginBottom: spacing.xs,
+                opacity: textOpacity,
+              }}
+            >
+              Scroll to browse available Dapps
+            </Animated.Text>
+            <Animated.View style={{ opacity: textOpacity }}>
+              <WideChevronDown color={colors.text_secondary} size={20} />
+            </Animated.View>
+          </Animated.View>
+
+          {/* Dapp rows — fade in as user scrolls, not tappable until revealed */}
+          <Animated.View
+            style={{ opacity: dappsOpacity }}
+            pointerEvents={dappsTouchable ? 'auto' : 'none'}
+          >
+            {loadedDapps.map(dapp => (
+              <DappRow
+                key={dapp.id}
+                dapp={dapp}
+                onPress={() => {
+                  if (dapp.id.includes('sovswap') || dapp.name === 'SovSwap') {
+                    navigation.navigate('SovSwapHome');
+                    return;
+                  }
+                  openBrowser(dapp.url);
+                }}
+              />
+            ))}
           </Animated.View>
         </Animated.View>
 
-        {/* ── Index 3: Spacer — pushes dapp rows below the fold ── */}
-        <View style={{ height: DAPPS_SPACER }} />
-
-        {/* ── Dapp rows ── */}
-        <View style={{ paddingHorizontal: spacing.lg }}>
-          {loadedDapps.map(dapp => (
-            <DappRow
-              key={dapp.id}
-              dapp={dapp}
-              onPress={() => {
-                if (dapp.id.includes('sovswap') || dapp.name === 'SovSwap') {
-                  navigation.navigate('SovSwapHome');
-                  return;
-                }
-                openBrowser(dapp.url);
-              }}
-            />
-          ))}
-
-          {loadingMore && (
-            <View style={{ paddingVertical: spacing.lg, alignItems: 'center' }}>
-              <ActivityIndicator size="small" color={colors.primary} />
-            </View>
-          )}
-
-          {!hasMoreRef.current && !loadingMore && (
-            <View style={{ paddingVertical: spacing.lg, alignItems: 'center' }}>
-              <Text style={{ color: colors.text_secondary, fontSize: typography.size.sm }}>
-                All dapps loaded
-              </Text>
-            </View>
-          )}
-        </View>
+        {/* Spacer — gives the ScrollView content to scroll through */}
+        <View style={{ height: SCREEN_HEIGHT * 1.5 }} />
       </Animated.ScrollView>
     </View>
   );

@@ -16,6 +16,7 @@ import {
   FormField,
   Web4View,
   isWeb4ViewAvailable,
+  ArrowIcon,
 } from '../components';
 import { useTranslation } from '../i18n';
 import { colors, spacing } from '../theme';
@@ -263,7 +264,7 @@ const BrowserScreen = ({ route, navigation }: any) => {
               borderRadius: 18,
             }}
           >
-            <Text style={{ fontSize: 16, color: colors.text_primary }}>→</Text>
+            <ArrowIcon direction="right" size={18} color={colors.text_primary} />
           </Button>
         </View>
       </View>

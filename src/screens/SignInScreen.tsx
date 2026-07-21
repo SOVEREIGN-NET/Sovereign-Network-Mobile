@@ -380,33 +380,13 @@ const SignInScreen = ({ navigation }: SignInScreenProps) => {
             ...(__DEV__
               ? [
                   {
-                    label: '🧹 Clean Identities',
+                    label: 'Clean Identities',
                     onPress: () => {
                       NativeModules.NativeIdentityProvisioning.cleanKeystoreDirectory();
                       Alert.alert(
                         '✅ Cleaned',
                         'All identities removed. Create a new one.',
                       );
-                    },
-                    variant: 'secondary' as const,
-                  },
-                  {
-                    label: '🧪 Demo Login (mock)',
-                    onPress: () => {
-                      setUsername('did:zhtp:demo001');
-                      setPassword('democitizen');
-                      // Submit after a short tick so state propagates
-                      setTimeout(() => {
-                        passwordSignIn('did:zhtp:demo001', 'democitizen')
-                          .then(identity => {
-                            if (identity) {
-                              navigation.goBack();
-                            } else {
-                              navigation.navigate('RecoverIdentity');
-                            }
-                          })
-                          .catch(() => {});
-                      }, 100);
                     },
                     variant: 'secondary' as const,
                   },
