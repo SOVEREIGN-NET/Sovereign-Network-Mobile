@@ -16,7 +16,7 @@ import type { CreateIdentityData } from '../services/RealAuthService';
 import { walletKeychainService } from '../services/WalletKeychainService';
 import { nativeIdentityProvisioning } from '../services/NativeIdentityProvisioning';
 import IdentityCleanup from '../services/IdentityCleanup';
-import {
+import RealAuthService, {
   claimUsername as claimUsernameOnChain,
   fetchIdentityRecord,
 } from '../services/RealAuthService';
@@ -51,12 +51,6 @@ import {
 import type { LobbySession } from '../types/lobby';
 import { maskIdentifier } from '../utils/maskIdentifier';
 import { isValidDid } from '../utils/didValidator';
-
-// Always import RealAuthService, use it when node is available
-import RealAuthServiceModule from '../services/RealAuthService';
-
-// Use real auth service instance
-const RealAuthService = RealAuthServiceModule;
 
 // Use native storage on Android, AsyncStorage on iOS
 const storage = Platform.OS === 'android' ? NativeStorage : AsyncStorage;
@@ -323,6 +317,21 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
    *
    * SECURITY: Also restores lib-client Identity to handle store for UHP signing
    */
+  /** Restore OPAQUE session — extracted to reduce cognitive complexity of restoreIdentity. */
+  const restoreLobbySession = async (): Promise<void> => {
+    try {
+      const lobby = await loadLobbySession();
+      if (lobby) {
+        setLobbySession(lobby);
+        if (__DEV__) {
+          console.log('[AuthContext.bootstrap] OPAQUE session restored');
+        }
+      }
+    } catch (e) {
+      console.warn('[AuthContext.bootstrap] session restore failed:', e);
+    }
+  };
+
   useEffect(() => {
     const restoreIdentity = async () => {
       try {
@@ -334,20 +343,7 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
           return;
         }
 
-        // Restore the OPAQUE password session so a signed-in user stays
-        // signed in across launches.
-        try {
-          const lobby = await loadLobbySession();
-          if (lobby) {
-            setLobbySession(lobby);
-            if (__DEV__) {
-              console.log('[AuthContext.bootstrap] OPAQUE session restored');
-            }
-          }
-        } catch (e) {
-          console.warn('[AuthContext.bootstrap] session restore failed:', e);
-        }
-
+        await restoreLobbySession();
         // Try to restore cached identity without biometric prompt on startup
         // This keeps user logged in between app sessions
         const identity = await SecureIdentityStorage.getIdentityIfAvailable(true);
@@ -414,7 +410,7 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
             }
           })();
 
-          // TODO(messaging-chain-stall): remove once the chain
+          // TODO(sov-network/node#1234): remove once the chain
           // reliably commits IdentityUpdate transactions. Right now
           // the chain on g1 is stalled, so a single publish during
           // recovery sits in mempool and never persists to
@@ -509,7 +505,7 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
         identity = hydrated;
       }
 
-      // TODO(messaging-chain-stall): see matching comment in the
+      // TODO(sov-network/node#1234): see matching comment in the
       // bootstrap effect above. Republish kyber_pk on every sign-in
       // to keep messaging working while the chain is stalled at
       // height 898 and the original publish from recovery sits in
@@ -1264,7 +1260,7 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
         identityId: local.identity_id,
         did: local.did,
         displayName: username,
-        identityType: (local.identity_type ||
+        identityType: (local?.identity_type ||
           'human') as Identity['identityType'],
         deviceId: local.device_id,
         createdAt: local.created_at,

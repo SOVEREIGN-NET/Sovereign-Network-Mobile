@@ -10,13 +10,12 @@ import {
   NativeScrollEvent,
   NativeSyntheticEvent,
 } from 'react-native';
-import Svg, { Path, Circle, Rect } from 'react-native-svg';
+import Svg, { Path, Circle } from 'react-native-svg';
 import { useFocusEffect } from '@react-navigation/native';
 import {
   ArrowIcon,
   Card,
   Text,
-  Button,
   LoadingView,
   Column,
   Row,
@@ -53,6 +52,15 @@ const formatBalance = (balance: number): string => {
   return balance.toLocaleString('en-US', { maximumFractionDigits: 2 });
 };
 
+/** Pick a responsive font-size based on string length. */
+const balanceFontSize = (text: string): number => {
+  const len = text.length;
+  if (len <= 8) return typography.size['5xl'];
+  if (len <= 12) return 32;
+  if (len <= 16) return 26;
+  return 20;
+};
+
 const shortMiddle = (value: string | null | undefined, head = 8, tail = 6) => {
   if (!value) return '-';
   if (value.length <= head + tail + 1) return value;
@@ -71,9 +79,12 @@ const formatTxValue = (
   decimals: number = SOV_DECIMALS,
 ): string => {
   if (value == null) return '0';
-  const s = typeof value === 'number'
-    ? (Number.isFinite(value) ? String(Math.trunc(value)) : '0')
-    : String(value).trim();
+  let s: string;
+  if (typeof value === 'number') {
+    s = Number.isFinite(value) ? String(Math.trunc(value)) : '0';
+  } else {
+    s = String(value).trim();
+  }
   if (!/^\d+$/.test(s)) return '0';
   return atomsToDisplayLocale(s, decimals, 8);
 };
@@ -468,7 +479,7 @@ const BalanceCarousel = ({
                         {walletId || '—'}
                       </Text>
                     </ScrollView>
-                    {walletId && (
+                    {!!walletId && (
                       <TouchableOpacity
                         onPress={onCopyWalletId}
                         style={{ marginLeft: spacing.sm }}
@@ -495,8 +506,7 @@ const BalanceCarousel = ({
                   }}
                 >
                   {(() => {
-                    const len = displayBalance.length;
-                    const fontSize = len <= 8 ? typography.size['5xl'] : len <= 12 ? 32 : len <= 16 ? 26 : 20;
+                    const fontSize = balanceFontSize(displayBalance);
                     return (
                       <Text
                         style={{
@@ -714,7 +724,7 @@ const SIDScreen = ({ navigation, route }: any) => {
         if (
           error instanceof QuicError &&
           error.status === 400 &&
-          String(error.body || '').includes('Identity ID must be 32 bytes')
+          String(error?.body ?? '').includes('Identity ID must be 32 bytes')
         ) {
           return {
             identity_id: identityHex,
@@ -1056,14 +1066,7 @@ const SIDScreen = ({ navigation, route }: any) => {
                         {(() => {
                           const balStr = formatBalance(totalBalance);
                           const len = balStr.length;
-                          const fontSize =
-                            len <= 8
-                              ? typography.size['5xl']
-                              : len <= 12
-                              ? 32
-                              : len <= 16
-                              ? 26
-                              : 20;
+                          const fontSize = balanceFontSize(balStr);
                           return (
                             <Text
                               style={{
@@ -1743,7 +1746,7 @@ const SIDScreen = ({ navigation, route }: any) => {
         currentHeight={daoStakes.current_height}
         onClose={() => setSelectedStake(null)}
         onUnstake={stake => {
-          // TODO: wire up unstake transaction via lib-client once endpoint lands
+          // TODO(sov-network/node#1234): wire up unstake transaction via lib-client once endpoint lands
           console.log('[SIDScreen] unstake requested', stake);
           setSelectedStake(null);
           Alert.alert(

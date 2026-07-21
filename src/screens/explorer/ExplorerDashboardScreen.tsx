@@ -103,21 +103,7 @@ const ExplorerDashboardScreen: React.FC<any> = ({ navigation }) => {
             <Text variant="h3">Network Stats</Text>
             {stats.loading && <ActivityIndicator size="small" color={colors.primary} />}
           </Row>
-          {stats.error ? (
-            <Pressable onPress={stats.retry}>
-              <Text variant="caption" style={{ color: colors.error }}>Failed to load — tap to retry</Text>
-            </Pressable>
-          ) : stats.data ? (
-            <Column gap="xs">
-              <StatRow label="Height" value={String(stats.data.latest_height)} />
-              <StatRow label="Total TX" value={String(stats.data.total_transactions)} />
-              <StatRow label="Supply" value={String(stats.data.total_supply)} />
-              <StatRow label="UBS Distributed" value={String(stats.data.total_ubi_distributed)} />
-              <StatRow label="Validators" value={String(stats.data.active_validators)} />
-              <StatRow label="Mempool" value={String(stats.data.mempool_size)} />
-              <StatRow label="Avg Block Time" value={`${stats.data.avg_block_time_secs ?? 0}s`} />
-            </Column>
-          ) : null}
+          {renderStatsContent()}
         </Card>
 
         {/* Latest Blocks */}
@@ -126,33 +112,7 @@ const ExplorerDashboardScreen: React.FC<any> = ({ navigation }) => {
             <Text variant="h3">Latest Blocks</Text>
             {blocks.loading && <ActivityIndicator size="small" color={colors.primary} />}
           </Row>
-          {blocks.error ? (
-            <Pressable onPress={blocks.retry}>
-              <Text variant="caption" style={{ color: colors.error }}>Failed to load — tap to retry</Text>
-            </Pressable>
-          ) : blocks.data ? (
-            <Column gap="xs">
-              {blocks.data.blocks.map(b => (
-                <Pressable
-                  key={b.hash}
-                  onPress={() => navigation.navigate('BlockDetail', { hashOrHeight: b.hash })}
-                  style={styles.listRow}
-                >
-                  <View style={{ flex: 1 }}>
-                    <Row justify="space-between" align="center">
-                      <Text variant="body" style={{ fontWeight: '600' }}>#{b.height}</Text>
-                      <Text variant="caption" style={{ color: colors.text_secondary }}>{formatTimeAgo(b.timestamp)}</Text>
-                    </Row>
-                    <Row justify="space-between" align="center" style={{ marginTop: 2 }}>
-                      <Text variant="caption" style={styles.mono}>{shortHash(b.hash)}</Text>
-                      <Text variant="caption" style={{ color: colors.text_secondary }}>{b.transaction_count} txs</Text>
-                    </Row>
-                  </View>
-                  <Text variant="body" style={{ color: colors.text_secondary, marginLeft: spacing.sm }}>›</Text>
-                </Pressable>
-              ))}
-            </Column>
-          ) : null}
+          {renderBlocksContent()}
         </Card>
 
         {/* Latest Transactions */}
@@ -161,33 +121,7 @@ const ExplorerDashboardScreen: React.FC<any> = ({ navigation }) => {
             <Text variant="h3">Latest Transactions</Text>
             {txs.loading && <ActivityIndicator size="small" color={colors.primary} />}
           </Row>
-          {txs.error ? (
-            <Pressable onPress={txs.retry}>
-              <Text variant="caption" style={{ color: colors.error }}>Failed to load — tap to retry</Text>
-            </Pressable>
-          ) : txs.data ? (
-            <Column gap="xs">
-              {txs.data.transactions.map((tx, i) => (
-                <Pressable
-                  key={`${tx.hash}-${i}`}
-                  onPress={() => navigation.navigate('TransactionDetail', { hash: tx.hash })}
-                  style={styles.listRow}
-                >
-                  <View style={{ flex: 1 }}>
-                    <Row justify="space-between" align="center">
-                      <Text variant="caption" style={styles.mono}>{shortHash(tx.hash)}</Text>
-                      <Badge label={tx.transaction_type} variant="info" size="sm" />
-                    </Row>
-                    <Row justify="space-between" align="center" style={{ marginTop: 2 }}>
-                      <Text variant="caption" style={{ color: colors.text_secondary }}>Fee: {tx.fee}</Text>
-                      <Text variant="caption" style={{ color: colors.text_secondary }}>{formatTimeAgo(tx.timestamp)}</Text>
-                    </Row>
-                  </View>
-                  <Text variant="body" style={{ color: colors.text_secondary, marginLeft: spacing.sm }}>›</Text>
-                </Pressable>
-              ))}
-            </Column>
-          ) : null}
+          {renderTransactionsContent()}
         </Card>
       </ScrollView>
     </SafeAreaView>

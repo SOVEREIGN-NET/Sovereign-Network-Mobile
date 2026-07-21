@@ -127,7 +127,7 @@ const MOCK_IDENTITIES: Record<string, Identity> = {
  * All operations are simulated with delays to mimic network latency
  */
 class MockAuthService {
-  private delay: number = 800; // Simulate network delay
+  private readonly delay: number = 800; // Simulate network delay
 
   /**
    * Get demo credentials for testing
@@ -202,10 +202,10 @@ class MockAuthService {
     }
 
     // Mock username availability check
-    const existingUsername = Object.values(MOCK_IDENTITIES).find(
+    const usernameTaken = Object.values(MOCK_IDENTITIES).some(
       (id) => id.username === data.username
     );
-    if (existingUsername) {
+    if (usernameTaken) {
       throw new Error('Username already taken');
     }
 

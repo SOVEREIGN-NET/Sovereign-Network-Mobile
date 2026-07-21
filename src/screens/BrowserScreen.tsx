@@ -30,6 +30,25 @@ import { PoUWController } from '../lib-client-react-native-js';
 import web4Client from '../services/Web4Client';
 import { getCurrentAuthSessionIdPrefix } from '../services/quic';
 
+/** Parse a hex session-ID prefix string into a Uint8Array. */
+const parseSidPrefix = (sidPrefix: string | null | undefined): Uint8Array => {
+  if (!sidPrefix) return new Uint8Array(8);
+  const arr = new Uint8Array(8);
+  for (let i = 0; i < 8; i++) {
+    arr[i] = Number.parseInt(sidPrefix.slice(i * 2, i * 2 + 2), 16);
+  }
+  return arr;
+};
+
+/** Convert a Uint8Array session ID to a hex string for logging. */
+const sessionIdToHex = (id: Uint8Array): string => {
+  let hex = '';
+  for (let i = 0; i < id.length; i++) {
+    hex += id[i].toString(16).padStart(2, '0');
+  }
+  return hex;
+};
+
 const BrowserScreen = ({ route, navigation }: any) => {
   const { t } = useTranslation();
   const [urlInput, setUrlInput] = useState(
@@ -333,18 +352,7 @@ const BrowserScreen = ({ route, navigation }: any) => {
 
                   getCurrentAuthSessionIdPrefix({ forceRefresh: true })
                     .then(async sidPrefix => {
-                      let quicSessionId: Uint8Array;
-                      if (sidPrefix) {
-                        quicSessionId = new Uint8Array(8);
-                        for (let i = 0; i < 8; i++) {
-                          quicSessionId[i] = parseInt(
-                            sidPrefix.slice(i * 2, i * 2 + 2),
-                            16,
-                          );
-                        }
-                      } else {
-                        quicSessionId = new Uint8Array(8);
-                      }
+                      const quicSessionId = parseSidPrefix(sidPrefix);
                       const resolveResult = await web4Client.resolveDomain(
                         web4Domain,
                       );
@@ -353,9 +361,7 @@ const BrowserScreen = ({ route, navigation }: any) => {
 
                       console.log(
                         '[PoUW] RECORDING with quicSessionId:',
-                        Array.from(quicSessionId)
-                          .map(b => b.toString(16).padStart(2, '0'))
-                          .join(''),
+                        sessionIdToHex(quicSessionId),
                       );
 
                       await pouwControllerRef.current?.recordWeb4ManifestRoute({

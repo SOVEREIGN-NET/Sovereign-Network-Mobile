@@ -19,7 +19,7 @@ import {
   Text,
 } from '../components';
 import { useTranslation } from '../i18n';
-import { borderRadius, colors, spacing, typography } from '../theme';
+import { colors, spacing } from '../theme';
 
 const DappsScreen: React.FC<any> = ({ navigation }) => {
   const { t } = useTranslation();

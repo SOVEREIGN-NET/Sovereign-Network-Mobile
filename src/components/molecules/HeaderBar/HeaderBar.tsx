@@ -22,6 +22,43 @@ import { useTranslation } from '../../../i18n';
 import { useNodeConnectionStatus } from '../../../hooks/useNodeConnectionStatus';
 import { useRewardCounter } from '../../../hooks/useRewardCounter';
 
+// Simple SVG icons for the dropdown menu — defined outside the component
+// to avoid re-creating them on every render.
+const ExplorerIcon = () => (
+  <Svg width={20} height={20} viewBox="0 0 24 24" fill="none">
+    <Circle cx="12" cy="12" r="9" stroke={colors.text_primary} strokeWidth={1.5} />
+    <Path d="M12 3a9 9 0 0 1 9 9" stroke={colors.text_primary} strokeWidth={1.5} />
+    <Path d="M12 21a9 9 0 0 0 9-9" stroke={colors.text_primary} strokeWidth={1.5} />
+    <Path d="M3 12h18" stroke={colors.text_primary} strokeWidth={1.5} />
+    <Path d="M12 3v18" stroke={colors.text_primary} strokeWidth={1.5} />
+  </Svg>
+);
+
+const DappsIcon = () => (
+  <Svg width={20} height={20} viewBox="0 0 24 24" fill="none">
+    <Rect x="3" y="3" width="7" height="7" rx="1" stroke={colors.text_primary} strokeWidth={1.5} />
+    <Rect x="14" y="3" width="7" height="7" rx="1" stroke={colors.text_primary} strokeWidth={1.5} />
+    <Rect x="3" y="14" width="7" height="7" rx="1" stroke={colors.text_primary} strokeWidth={1.5} />
+    <Rect x="14" y="14" width="7" height="7" rx="1" stroke={colors.text_primary} strokeWidth={1.5} />
+  </Svg>
+);
+
+const PouwIcon = () => (
+  <Svg width={20} height={20} viewBox="0 0 24 24" fill="none">
+    <Path d="M13 2L3 14h9l-1 8 10-12h-9l1-8z" stroke={colors.text_primary} strokeWidth={1.5} strokeLinejoin="round" />
+  </Svg>
+);
+
+const DomainsIcon = () => (
+  <Svg width={20} height={20} viewBox="0 0 24 24" fill="none">
+    <Path d="M4 4h6v16H4z" stroke={colors.text_primary} strokeWidth={1.5} />
+    <Path d="M14 4h6v16h-6z" stroke={colors.text_primary} strokeWidth={1.5} />
+    <Path d="M4 12h16" stroke={colors.text_primary} strokeWidth={1.5} />
+    <Path d="M8 4V2" stroke={colors.text_primary} strokeWidth={1.5} strokeLinecap="round" />
+    <Path d="M16 4V2" stroke={colors.text_primary} strokeWidth={1.5} strokeLinecap="round" />
+  </Svg>
+);
+
 export interface HeaderBarProps {
   onMenuPress?: () => void;
   sovAddress?: string;
@@ -92,6 +129,14 @@ const HeaderBar: React.FC<HeaderBarProps> = ({
   useEffect(() => {
     onConnectionStatusChange?.(isConnected, latencyMs ?? undefined);
   }, [isConnected, latencyMs, onConnectionStatusChange]);
+
+  // Get status indicator style (extracted to avoid nested ternary)
+  const getStatusStyle = () => {
+    if (connectionStatus === 'checking') return styles.statusChecking;
+    if (connectionStatus === 'idle') return styles.statusIdle;
+    if (isConnected) return styles.statusConnected;
+    return styles.statusDisconnected;
+  };
 
   // Get status text
   const getStatusText = () => {
@@ -261,42 +306,6 @@ const HeaderBar: React.FC<HeaderBarProps> = ({
     },
   });
 
-  // Simple SVG icons for the dropdown menu
-  const ExplorerIcon = () => (
-    <Svg width={20} height={20} viewBox="0 0 24 24" fill="none">
-      <Circle cx="12" cy="12" r="9" stroke={colors.text_primary} strokeWidth={1.5} />
-      <Path d="M12 3a9 9 0 0 1 9 9" stroke={colors.text_primary} strokeWidth={1.5} />
-      <Path d="M12 21a9 9 0 0 0 9-9" stroke={colors.text_primary} strokeWidth={1.5} />
-      <Path d="M3 12h18" stroke={colors.text_primary} strokeWidth={1.5} />
-      <Path d="M12 3v18" stroke={colors.text_primary} strokeWidth={1.5} />
-    </Svg>
-  );
-
-  const DappsIcon = () => (
-    <Svg width={20} height={20} viewBox="0 0 24 24" fill="none">
-      <Rect x="3" y="3" width="7" height="7" rx="1" stroke={colors.text_primary} strokeWidth={1.5} />
-      <Rect x="14" y="3" width="7" height="7" rx="1" stroke={colors.text_primary} strokeWidth={1.5} />
-      <Rect x="3" y="14" width="7" height="7" rx="1" stroke={colors.text_primary} strokeWidth={1.5} />
-      <Rect x="14" y="14" width="7" height="7" rx="1" stroke={colors.text_primary} strokeWidth={1.5} />
-    </Svg>
-  );
-
-  const PouwIcon = () => (
-    <Svg width={20} height={20} viewBox="0 0 24 24" fill="none">
-      <Path d="M13 2L3 14h9l-1 8 10-12h-9l1-8z" stroke={colors.text_primary} strokeWidth={1.5} strokeLinejoin="round" />
-    </Svg>
-  );
-
-  const DomainsIcon = () => (
-    <Svg width={20} height={20} viewBox="0 0 24 24" fill="none">
-      <Path d="M4 4h6v16H4z" stroke={colors.text_primary} strokeWidth={1.5} />
-      <Path d="M14 4h6v16h-6z" stroke={colors.text_primary} strokeWidth={1.5} />
-      <Path d="M4 12h16" stroke={colors.text_primary} strokeWidth={1.5} />
-      <Path d="M8 4V2" stroke={colors.text_primary} strokeWidth={1.5} strokeLinecap="round" />
-      <Path d="M16 4V2" stroke={colors.text_primary} strokeWidth={1.5} strokeLinecap="round" />
-    </Svg>
-  );
-
   const dropdownItems = [
     { id: 'explorer', label: 'Block Explorer', icon: ExplorerIcon },
     { id: 'dapps', label: 'Trending dApps', icon: DappsIcon },
@@ -343,13 +352,7 @@ const HeaderBar: React.FC<HeaderBarProps> = ({
             <View
               style={[
                 styles.statusIndicator,
-                connectionStatus === 'checking'
-                  ? styles.statusChecking
-                  : connectionStatus === 'idle'
-                  ? styles.statusIdle
-                  : isConnected
-                  ? styles.statusConnected
-                  : styles.statusDisconnected,
+                getStatusStyle(),
               ]}
             />
             <Text style={{ color: colors.text_secondary }}>
@@ -360,7 +363,7 @@ const HeaderBar: React.FC<HeaderBarProps> = ({
       </Row>
 
       {/* Maturation banner — shown when identity is too new for rewards */}
-      {maturesAt && !bannerDismissed && (() => {
+      {!!maturesAt && !bannerDismissed && (() => {
         const remaining = maturesAt - Math.floor(Date.now() / 1000);
         if (remaining <= 0) return null;
         const hours = Math.ceil(remaining / 3600);

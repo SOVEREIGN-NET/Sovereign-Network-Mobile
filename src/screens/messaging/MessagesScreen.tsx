@@ -32,7 +32,6 @@ import {
   subscribe,
   type WireProbeResult,
 } from '../../services/MessagingService';
-import { publishKyberKey } from '../../services/KyberKeyService';
 import { fireActiveSession } from '../../services/RewardsService';
 import { useAuth } from '../../hooks/useAuth';
 import type { Conversation } from '../../types/messaging';
@@ -198,11 +197,11 @@ const MessagesScreen: React.FC<Props> = ({ navigation }) => {
         <View style={styles.headerTitleBlock}>
           <Text style={styles.title}>Bubl Social</Text>
           <Text style={styles.subtitle}>
-            {privacyOn
-              ? 'Privacy on · messages hidden'
-              : totalUnread > 0
-                ? `${totalUnread} unread`
-                : 'Post-quantum encrypted'}
+            {(() => {
+              if (privacyOn) return 'Privacy on · messages hidden';
+              if (totalUnread > 0) return `${totalUnread} unread`;
+              return 'Post-quantum encrypted';
+            })()}
           </Text>
         </View>
         <View style={styles.headerActions}>

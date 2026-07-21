@@ -92,7 +92,7 @@ export const SUCCESS_MESSAGES = {
 export const PATTERNS = {
   WALLET_ADDRESS: /^zhtp1[a-z0-9]{39}$/,
   DID: /^did:zhtp:[a-zA-Z0-9_-]+$/,
-  EMAIL: /^[^\s@]+@[^\s@]+\.[^\s@]+$/,
+  EMAIL: /^[^\s@]+@[^\s@]+\.[a-z]{2,}$/i,
   AMOUNT: /^\d+(\.\d{1,2})?$/,
 } as const;
 

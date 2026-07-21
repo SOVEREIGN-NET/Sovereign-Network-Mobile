@@ -16,7 +16,7 @@ import {
   Column,
   ScreenLayout,
 } from '../components';
-import { colors, spacing, typography, borderRadius } from '../theme';
+import { colors, spacing, typography } from '../theme';
 import domainService from '../services/DomainService';
 import { DOMAIN_REGISTRATION_DURATION_SECS } from '../types/domain';
 import DomainRegistrationScreen from './DomainRegistrationScreen';
@@ -55,13 +55,13 @@ function migrateStoredDomains(
       return null;
     }
     const e = entry as Partial<StoredDomain> & Record<string, unknown>;
-    const expiryMs = e.expires_at ? new Date(e.expires_at).getTime() : NaN;
+    const expiryMs = e.expires_at ? new Date(e.expires_at).getTime() : Number.NaN;
     if (Number.isFinite(expiryMs)) return e as StoredDomain;
 
     // expires_at is missing / unparseable — try to recompute from registered_at.
     const registeredMs = e.registered_at
       ? new Date(e.registered_at).getTime()
-      : NaN;
+      : Number.NaN;
     if (!Number.isFinite(registeredMs)) {
       // Can't recover this entry — but keep it (the loader marks it as
       // status: 'unknown' so the user can still see + delete it).
@@ -154,12 +154,15 @@ const MyDomainsScreen = ({ navigation }: any) => {
           try {
             const status = await domainService.getDomainStatus(domain.domain).catch(() => null);
             const expiresAt = status?.expires_at ?? domain.expires_at;
-            const expiryDate = typeof expiresAt === 'number'
-              ? new Date(expiresAt * 1000)
-              : expiresAt
-              ? new Date(expiresAt)
-              : null;
-            const expiryTime = expiryDate ? expiryDate.getTime() : NaN;
+            let expiryDate: Date | null;
+            if (typeof expiresAt === 'number') {
+              expiryDate = new Date(expiresAt * 1000);
+            } else if (expiresAt) {
+              expiryDate = new Date(expiresAt);
+            } else {
+              expiryDate = null;
+            }
+            const expiryTime = expiryDate ? expiryDate.getTime() : Number.NaN;
             if (!Number.isFinite(expiryTime)) {
               return {
                 ...domain,
@@ -176,7 +179,7 @@ const MyDomainsScreen = ({ navigation }: any) => {
               status: isExpired ? 'expired' : 'active',
               daysUntilExpiry: Math.max(0, daysUntilExpiry),
             };
-          } catch (error) {
+          } catch {
             return {
               ...domain,
               status: 'unknown',

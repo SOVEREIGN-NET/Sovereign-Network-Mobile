@@ -142,6 +142,7 @@ export const es: Translation = {
       didLabel: 'Dirección ZK-DID',
       didPlaceholder: 'did:zhtp:abc123...xyz',
       didExample: 'Ejemplo: did:zhtp:demo001',
+      // eslint-disable-next-line sonarjs/no-hardcoded-passwords
       passphraseLabel: 'Contraseña',
       passphrasePlaceholder: 'Introduce tu contraseña',
       passphraseHint: 'Pista: usa la contraseña de la creación de identidad',

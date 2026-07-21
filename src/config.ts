@@ -69,6 +69,7 @@ export const BOOTSTRAP_GATEWAYS: BootstrapGateway[] = Array.isArray(
  * don't inline in code. Fallbacks match current mainnet defaults so a
  * missing .env entry still boots.
  */
+// eslint-disable-next-line sonarjs/no-hardcoded-ip
 export const ZDNS_HOST: string =
   (generatedConfig as { ZDNS_HOST?: string }).ZDNS_HOST ?? '91.98.113.188';
 export const ZDNS_PORT: number = Number.isFinite(

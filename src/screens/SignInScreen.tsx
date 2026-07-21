@@ -153,6 +153,17 @@ const SignInScreen = ({ navigation }: SignInScreenProps) => {
   let signInLabel = t.auth.signIn.button;
   if (locked) signInLabel = `Try again in ${lockRemaining}s`;
 
+  const badgeLabel = hasChecked
+    ? isConnected
+      ? t.app.connected
+      : t.app.disconnected
+    : t.app.notChecked;
+  const badgeVariant: 'success' | 'error' | 'default' = hasChecked
+    ? isConnected
+      ? 'success'
+      : 'error'
+    : 'default';
+
   return (
     <ScreenLayout
       safeAreaEdges={['top', 'bottom']}
@@ -248,16 +259,8 @@ const SignInScreen = ({ navigation }: SignInScreenProps) => {
                 </Text>
               </Column>
               <Badge
-                label={
-                  hasChecked
-                    ? isConnected
-                      ? t.app.connected
-                      : t.app.disconnected
-                    : t.app.notChecked
-                }
-                variant={
-                  hasChecked ? (isConnected ? 'success' : 'error') : 'default'
-                }
+                label={badgeLabel}
+                variant={badgeVariant}
               />
             </Row>
           </Card>

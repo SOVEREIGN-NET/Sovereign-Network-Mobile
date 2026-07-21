@@ -23,7 +23,6 @@ export const en = {
     notChecked: 'Not checked',
     notCheckedHint: 'Connection has not been checked yet',
     tapToCheck: 'Tap to check connection',
-    back: 'Back',
     errors: {
       nodeUnreachable: 'Node is not reachable',
       connectionCheckFailed: 'Failed to check connection',

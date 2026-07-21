@@ -62,6 +62,38 @@ const formatCreatedDate = (raw: unknown): string | null => {
   return d.toLocaleDateString();
 };
 
+const truncateId = (id: any) => {
+  if (!id) return 'unknown';
+  if (Array.isArray(id)) {
+    const hexString = id
+      .map(byte => byte.toString(16).padStart(2, '0'))
+      .join('');
+    return `${hexString.substring(0, 12)}...${hexString.substring(hexString.length - 12)}`;
+  }
+  if (typeof id === 'string' && id !== '') {
+    return `${id.substring(0, 12)}...${id.substring(id.length - 12)}`;
+  }
+  return 'unknown';
+};
+
+const copyToClipboard = async (id: any) => {
+  let textToCopy = '';
+  if (Array.isArray(id)) {
+    textToCopy = id.map(byte => byte.toString(16).padStart(2, '0')).join('');
+  } else if (typeof id === 'string') {
+    textToCopy = id;
+  }
+  if (textToCopy) {
+    try {
+      await Clipboard.setString(textToCopy);
+      Alert.alert('Copied', `DID copied to clipboard:\n\n${textToCopy}`);
+    } catch (error) {
+      console.error('Failed to copy DID:', error);
+      Alert.alert('Error', 'Failed to copy DID to clipboard');
+    }
+  }
+};
+
 const ProfileScreen = ({ navigation }: any) => {
   const { t } = useTranslation();
   const { currentIdentity, signOut, isLoading } = useAuth();
@@ -219,44 +251,6 @@ const ProfileScreen = ({ navigation }: any) => {
     );
   }
 
-  const truncateId = (id: any) => {
-    if (!id) return 'unknown';
-
-    if (Array.isArray(id)) {
-      const hexString = id
-        .map(byte => byte.toString(16).padStart(2, '0'))
-        .join('');
-      return `${hexString.substring(0, 12)}...${hexString.substring(
-        hexString.length - 12,
-      )}`;
-    }
-
-    if (typeof id === 'string' && id !== '') {
-      return `${id.substring(0, 12)}...${id.substring(id.length - 12)}`;
-    }
-
-    return 'unknown';
-  };
-
-  const copyToClipboard = async (id: any) => {
-    let textToCopy = '';
-    if (Array.isArray(id)) {
-      textToCopy = id.map(byte => byte.toString(16).padStart(2, '0')).join('');
-    } else if (typeof id === 'string') {
-      textToCopy = id;
-    }
-
-    if (textToCopy) {
-      try {
-        await Clipboard.setString(textToCopy);
-        Alert.alert('Copied', `DID copied to clipboard:\n\n${textToCopy}`);
-      } catch (error) {
-        console.error('Failed to copy DID:', error);
-        Alert.alert('Error', 'Failed to copy DID to clipboard');
-      }
-    }
-  };
-
   // Stats values
   const votingPower = 0;
   const votingPowerFormatted = votingPower.toLocaleString();
@@ -376,7 +370,7 @@ const ProfileScreen = ({ navigation }: any) => {
                       : t.identity.details.notVerified
                   }
                 />
-                {createdDate && (
+                {!!createdDate && (
                   <DetailRow
                     label={t.identity.details.created}
                     value={createdDate}
