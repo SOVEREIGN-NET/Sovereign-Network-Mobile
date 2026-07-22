@@ -187,26 +187,36 @@ const conversationsReported = new Set<string>();
 /**
  * Claim the one-time welcome bonus. Fired on identity activation.
  *
- * A just-created identity may not be committed on-chain yet, so the
- * UHP-v2 auth on the rewards endpoint can reject the first attempts —
- * hence the backoff. If every attempt fails the claim is simply left
- * for the next app launch (the bonus is lifetime-idempotent).
+ * A just-created identity may not be committed on-chain yet (register
+ * returns before finality, ~block interval later), so the rewards
+ * endpoint can reject early attempts — hence the backoff. Failures
+ * re-arm `welcomeFired` so the next launch / re-activation retries
+ * (the bonus is lifetime-idempotent server-side).
  */
 export async function fireWelcomeClaim(
   did: string | null | undefined,
 ): Promise<void> {
   if (!did || welcomeFired) return;
   welcomeFired = true;
-  const backoffMs = [0, 8_000, 24_000];
+  // Cover registration finality (~20–30s) plus a late retry.
+  const backoffMs = [0, 10_000, 25_000, 45_000];
   for (let attempt = 0; attempt < backoffMs.length; attempt++) {
     if (backoffMs[attempt] > 0) await sleep(backoffMs[attempt]);
     try {
-      await claimReward(did, 'welcome');
-      return;
+      const result = await claimReward(did, 'welcome');
+      // Server-side soft failure (e.g. not yet registered, settlement
+      // unavailable) still returns a body — only hard transport/HTTP
+      // errors throw. Treat non-awarded non-idempotent outcomes as
+      // retriable on next launch.
+      if (result?.awarded || result?.reason === 'welcome_already_claimed') {
+        return;
+      }
     } catch {
-      // Keep retrying; the last failure falls through and is dropped.
+      // Keep retrying within this launch.
     }
   }
+  // Re-arm so the next identity activation / app launch retries.
+  welcomeFired = false;
 }
 
 /**
