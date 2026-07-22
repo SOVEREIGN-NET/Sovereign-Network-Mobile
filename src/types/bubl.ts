@@ -72,8 +72,12 @@ export interface RewardAwardedResponse {
 export interface RewardSkippedResponse {
   awarded: false;
   amount: '0';
-  /** e.g. `welcome_already_claimed`, `weekly_partner_cap_reached`. */
+  /** e.g. `welcome_already_claimed`, `weekly_partner_cap_reached`,
+   *  `InsufficientRewardLiquidity` (post-80k underfunded spend delegate). */
   reason: string;
+  /** Present when reason is InsufficientRewardLiquidity (atom strings). */
+  have?: string;
+  need?: string;
   next_eligible_at?: number;
   partners_this_week?: number;
 }

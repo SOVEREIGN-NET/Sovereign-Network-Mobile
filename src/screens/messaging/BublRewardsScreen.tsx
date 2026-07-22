@@ -26,6 +26,7 @@ import { BublTokenGlyph } from '../../components/organisms';
 import { borderRadius, colors, spacing, typography } from '../../theme';
 import {
   claimReward,
+  claimSkipMessage,
   formatBublDisplay,
   getRewardsBalance,
   getRewardsHistory,
@@ -133,7 +134,11 @@ const BublRewardsScreen: React.FC<Props> = ({ navigation }) => {
       if (!did || claiming) return;
       setClaiming(event);
       try {
-        await claimReward(did, event);
+        const result = await claimReward(did, event);
+        const skipMsg = claimSkipMessage(result);
+        if (skipMsg) {
+          console.info('[BublRewardsScreen] claim skipped:', event, result.reason);
+        }
         // Re-pull balance + status so the panel reflects the new state.
         const [b, s] = await Promise.all([
           getRewardsBalance(did),
@@ -142,6 +147,11 @@ const BublRewardsScreen: React.FC<Props> = ({ navigation }) => {
         setBalance(b);
         setStatus(s);
       } catch (e) {
+        // 503 / transport → calm unavailable on next load; do not treat
+        // InsufficientRewardLiquidity as an exception (HTTP 200 body).
+        if (isRewardsUnavailable(e)) {
+          setPhase('unavailable');
+        }
         console.warn('[BublRewardsScreen] claim failed:', event, e);
       } finally {
         setClaiming(null);

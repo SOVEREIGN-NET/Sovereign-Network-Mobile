@@ -8,10 +8,12 @@
 
 export interface DomainRegisterRequest {
   domain: string;
-  // Hex (64 chars) wallet_id of the owner's Primary wallet. The 10 SOV
+  // Hex (64 chars) wallet_id of the owner's Primary wallet. The 100 SOV
   // registration fee is debited from this wallet; lib-client signs the
-  // TokenTransfer to the DAO treasury and attaches it as fee_payment_tx.
+  // TokenTransfer to the protocol treasury and attaches it as fee_payment_tx.
   primary_wallet_id: string;
+  /** Optional 64-char hex sovereign asset id (DomainRegistration V3 / M4). */
+  asset_id?: string;
   content_mappings?: Record<
     string,
     {

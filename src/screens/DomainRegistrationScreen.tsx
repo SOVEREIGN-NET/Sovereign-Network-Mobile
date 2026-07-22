@@ -16,7 +16,9 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Button, Card, FormField, Text, LoadingView } from '../components';
 import { colors, spacing, typography, borderRadius } from '../theme';
-import domainService from '../services/DomainService';
+import domainService, {
+  DOMAIN_REGISTRATION_FEE_SOV,
+} from '../services/DomainService';
 import { useAuth } from '../hooks/useAuth';
 import { useWalletList } from '../hooks/useWalletList';
 import { DOMAIN_REGISTRATION_DURATION_SECS } from '../types/domain';
@@ -25,8 +27,6 @@ import {
   validateDomainDuration,
   yearsToDays,
 } from '../utils/domainValidation';
-
-const DOMAIN_REGISTRATION_FEE_SOV = 10;
 
 // Storage keys
 const REGISTERED_DOMAINS_KEY = 'sov:registered_domains';

@@ -21,9 +21,11 @@ import type {
   DomainRollbackResponse,
 } from '../types/domain';
 
-// 10 SOV at 18 decimals — minimum the web4 domain registration handler enforces.
-const DOMAIN_REGISTRATION_FEE_ATOMS = '10000000000000000000';
-const DOMAIN_CHAIN_ID = 0x03;
+// 100 SOV at 18 decimals — DEFAULT_DOMAIN_REGISTRATION_FEE (Q10 / #2810).
+export const DOMAIN_REGISTRATION_FEE_ATOMS = '100000000000000000000';
+export const DOMAIN_REGISTRATION_FEE_SOV = 100;
+/** Genesis-3 testnet chain id (matches AssetLaunch / TokenService). */
+export const DOMAIN_CHAIN_ID = 2;
 
 class DomainService {
   /**
@@ -63,11 +65,12 @@ class DomainService {
    * the whole signed JSON shape):
    *   1. Resolve SOV token id via the registry (no hardcoding).
    *   2. Fetch the sender wallet's current SOV nonce.
-   *   3. Ask lib-client to sign the 10 SOV fee TokenTransfer (Primary →
-   *      DAO treasury). Treasury wallet id defaults to lib-client's
+   *   3. Ask lib-client to sign the 100 SOV fee TokenTransfer (Primary →
+   *      protocol treasury). Treasury wallet id defaults to lib-client's
    *      deterministic `blake3("SOV_DAO_TREASURY_V1")` constant.
    *   4. Ask lib-client to assemble + sign the full register request JSON,
    *      attaching the fee_payment_tx hex and domain_tx_signature_hex.
+   *      Optional `asset_id` binds the domain to a sovereign asset (V3 / M4).
    *   5. POST the request_json.
    */
   async registerDomain(
@@ -82,6 +85,13 @@ class DomainService {
       );
     }
 
+    const assetIdHex = request.asset_id?.replace(/^0x/i, '').trim() || undefined;
+    if (assetIdHex !== undefined && !/^[0-9a-fA-F]{64}$/.test(assetIdHex)) {
+      throw new Error(
+        'asset_id must be a 64-char hex sovereign asset id (no 0x required)',
+      );
+    }
+
     // 1. Resolve SOV token id from the registry — never hardcode (see useTokenRegistry).
     const sovToken = await resolveTokenBySymbol('SOV');
     if (!sovToken?.token_id) {
@@ -91,7 +101,7 @@ class DomainService {
     // 2. Fetch the wallet's SOV nonce (same endpoint TokenService uses for transfers).
     const nonce = await tokenService.getTokenNonce(sovToken.token_id, primaryWalletIdHex);
 
-    // 3. Sign the 10 SOV fee payment. Treasury id omitted → lib-client uses
+    // 3. Sign the 100 SOV fee payment. Treasury id omitted → lib-client uses
     //    the deterministic blake3("SOV_DAO_TREASURY_V1") constant; no extra
     //    /api/v1/dao/treasury/status round-trip required.
     const feeTx = await nativeIdentityProvisioning.signDomainFeePaymentTx({
@@ -112,6 +122,7 @@ class DomainService {
         contentMappingsJson,
         metadataJson: null,
         chainId: DOMAIN_CHAIN_ID,
+        assetIdHex: assetIdHex ?? null,
       });
 
     const requestBody = JSON.parse(signingResult.request_json) as Record<
