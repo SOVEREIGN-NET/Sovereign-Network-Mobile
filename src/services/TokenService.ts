@@ -6,6 +6,10 @@
 import { quicRequest, publicQuicRequest } from './quic';
 import { nativeIdentityProvisioning } from './NativeIdentityProvisioning';
 import { validateAtomsString } from '../utils/tokenUnits';
+import assetService, {
+  type AssetLaunchRequest,
+  type AssetLaunchResponse,
+} from './AssetService';
 import type {
   TokenCreateRequest,
   TokenCreateResponse,
@@ -117,45 +121,44 @@ class TokenService {
     return data.nonce;
   }
 
-  /** POST /api/v1/token/create — Dilithium-signed */
+  /**
+   * Create New path (DAO M1): real on-chain AssetLaunch via /api/v1/assets/launch.
+   * Legacy TokenCreation is rejected by the node; do not call /api/v1/token/create.
+   */
   async createToken(request: TokenCreateRequest): Promise<TokenCreateResponse> {
-    console.log('[TokenService] Creating token:', request.name);
-
-    // Step 1: fetch fee config and push to Rust before signing (spec requirement).
-    // token_creation_fee must be current so the builder uses the right atomic.
-    // Default is 1000 if the call fails.
-    try {
-      const feeConfig = await publicQuicRequest<Record<string, unknown>>('/api/v1/blockchain/fee-config');
-      const configStr = JSON.stringify(feeConfig);
-      await nativeIdentityProvisioning.setFeeConfig(configStr);
-      console.log('[TokenService] Fee config updated, token_creation_fee:', feeConfig.token_creation_fee);
-    } catch (err) {
-      console.warn('[TokenService] Fee config refresh failed, using cached/default:', err);
-    }
-
-    const signingResult =
-      await nativeIdentityProvisioning.signTokenCreateTransaction({
-        name: request.name,
-        symbol: request.symbol,
-        initialSupply: String(request.initial_supply),
-        decimals: request.decimals,
-        maxSupply:
-          request.max_supply != null ? String(request.max_supply) : null,
-      });
     console.log(
-      '[TokenService] Transaction signed, hex length:',
-      signingResult.signed_tx.length,
+      '[TokenService] Launching sovereign asset (AssetLaunch):',
+      request.name,
     );
-
-    const data = await quicRequest<TokenCreateResponse>(
-      '/api/v1/token/create',
-      {
-        method: 'POST',
-        body: JSON.stringify({ signed_tx: signingResult.signed_tx }),
-      },
+    const launch: AssetLaunchRequest = {
+      name: request.name,
+      symbol: request.symbol,
+      initialSupplyWhole: request.initial_supply,
+      decimals: request.decimals ?? 18,
+      daoClass: 0,
+      chainId: 2,
+      enforceDaoLaunchConstraints: true,
+    };
+    const data: AssetLaunchResponse = await assetService.launchAsset(launch);
+    const response: TokenCreateResponse = {
+      success: data.success !== false,
+      token_id: data.asset_id || data.token_id || '',
+      name: data.name || request.name,
+      symbol: data.symbol || request.symbol,
+      initial_supply: String(request.initial_supply),
+      decimals: request.decimals ?? 18,
+      treasury_allocation_bps: 2000,
+      treasury_recipient: '',
+      creator_allocation: String(data.creator_allocation || '0'),
+      treasury_allocation: String(data.treasury_allocation || '0'),
+      tx_status: data.tx_status || 'submitted_to_mempool',
+    };
+    console.log(
+      '[TokenService] Asset launched:',
+      response.token_id,
+      data.share_link || '',
     );
-    console.log('[TokenService] Token created:', data.token_id);
-    return data;
+    return response;
   }
 
   /** POST /api/v1/token/mint — creator only, Dilithium-signed */

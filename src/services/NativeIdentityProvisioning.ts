@@ -495,6 +495,8 @@ class NativeIdentityProvisioningBridge {
     contentMappingsJson?: string | null;
     metadataJson?: string | null;
     chainId?: number;
+    /** Optional 64-char hex sovereign asset id (DAO M4 V3 binding) */
+    assetIdHex?: string | null;
   }): Promise<{ request_json: string }> {
     if (!this.nativeModule) {
       throw new Error(
@@ -511,6 +513,39 @@ class NativeIdentityProvisioningBridge {
     return await this.nativeModule.signDomainRegisterRequestWithFeePayment(
       params,
     );
+  }
+
+  /**
+   * Build signed sovereign AssetLaunch tx (hex for POST /api/v1/assets/launch).
+   * Supply is a u128 split into two u64 halves (same ABI as lib-client C FFI).
+   */
+  async signAssetLaunchTransaction(params: {
+    name: string;
+    symbol: string;
+    initialSupplyAtomsLo: number | string;
+    initialSupplyAtomsHi?: number | string;
+    decimals?: number;
+    treasuryKeyIdHex: string;
+    /** 0 = Fp (for-profit), 1 = Np (non-profit) */
+    daoClass?: number;
+    burnBps?: number;
+    chainId?: number;
+    manifestCidHex?: string | null;
+    manifestHashHex?: string | null;
+  }): Promise<{ signed_tx: string }> {
+    if (!this.nativeModule) {
+      throw new Error(
+        'NativeIdentityProvisioning not available on this platform',
+      );
+    }
+
+    if (!this.nativeModule.signAssetLaunchTransaction) {
+      throw new Error(
+        'NativeIdentityProvisioning.signAssetLaunchTransaction not available — rebuild quic-jni / lib-client (M1 AssetLaunch bridge)',
+      );
+    }
+
+    return await this.nativeModule.signAssetLaunchTransaction(params);
   }
 
   async signDomainRegisterRequest(params: {

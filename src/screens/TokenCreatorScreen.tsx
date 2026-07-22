@@ -17,7 +17,7 @@ import {
 } from '../components';
 import { colors, spacing, typography, borderRadius } from '../theme';
 import tokenService from '../services/TokenService';
-import { publicQuicRequest } from '../services/quic';
+import assetService from '../services/AssetService';
 import { useAuth } from '../hooks/useAuth';
 import { TokenCreateRequest } from '../types/token';
 
@@ -59,7 +59,7 @@ const TokenCreatorScreen: React.FC<TokenCreatorScreenProps> = ({ onClose }) => {
   const [name, setName] = useState('');
   const [symbol, setSymbol] = useState('');
   const [initialSupply, setInitialSupply] = useState('');
-  const [decimals, setDecimals] = useState('8');
+  const [decimals, setDecimals] = useState('18');
   const [maxSupply, setMaxSupply] = useState('');
   const [errors, setErrors] = useState<CreateFormErrors>({});
   const [loading, setLoading] = useState(false);
@@ -81,18 +81,18 @@ const TokenCreatorScreen: React.FC<TokenCreatorScreenProps> = ({ onClose }) => {
 
     if (!symbol.trim()) {
       newErrors.symbol = 'Token symbol is required';
-    } else if (!/^[A-Z0-9]+$/.test(symbol.toUpperCase())) {
-      newErrors.symbol = 'Symbol must contain only letters and numbers';
-    } else if (symbol.trim().length < 1 || symbol.trim().length > 10) {
-      newErrors.symbol = 'Symbol must be 1-10 characters';
+    } else if (!/^[A-Z]+$/.test(symbol.toUpperCase())) {
+      newErrors.symbol = 'Symbol must be A–Z only (DAO launch)';
+    } else if (symbol.trim().length < 1 || symbol.trim().length > 6) {
+      newErrors.symbol = 'Symbol must be 1–6 characters';
     }
 
     if (!initialSupply.trim()) {
       newErrors.initial_supply = 'Initial supply is required';
     } else {
       const supply = Number.parseFloat(initialSupply);
-      if (Number.isNaN(supply) || supply <= 0) {
-        newErrors.initial_supply = 'Initial supply must be a positive number';
+      if (Number.isNaN(supply) || supply < 1000) {
+        newErrors.initial_supply = 'Initial supply must be at least 1000';
       }
     }
 
@@ -128,16 +128,16 @@ const TokenCreatorScreen: React.FC<TokenCreatorScreenProps> = ({ onClose }) => {
 
     try {
       const symbolUpper = sym.trim().toUpperCase();
-      const response = await publicQuicRequest<{ symbol: string; available: boolean }>(
-        `/api/v1/token/symbol/available/${symbolUpper}`,
-      );
+      const available = await assetService.checkSymbolAvailable(symbolUpper);
 
       setSymbolStatus({
-        available: response.available,
+        available,
         checking: false,
       });
 
-      console.log(`[TokenCreatorScreen] Symbol "${symbolUpper}" is ${response.available ? 'available' : 'taken'}`);
+      console.log(
+        `[TokenCreatorScreen] Symbol "${symbolUpper}" is ${available ? 'available' : 'taken'}`,
+      );
     } catch (error) {
       console.warn('[TokenCreatorScreen] Failed to check symbol availability:', error);
       setSymbolStatus({ available: null, checking: false });
@@ -168,13 +168,15 @@ const TokenCreatorScreen: React.FC<TokenCreatorScreenProps> = ({ onClose }) => {
         name: name.trim(),
         symbol: symbol.trim().toUpperCase(),
         initial_supply: initialSupply.trim(),
-        decimals: Number.parseInt(decimals, 10) || 8,
+        decimals: Number.parseInt(decimals, 10) || 18,
         max_supply: maxSupply.trim() ? maxSupply.trim() : null,
       };
 
       const response = await tokenService.createToken(createRequest);
+      const assetId = response.token_id;
+      const shareLink = `zhtp://asset/${assetId}`;
 
-      // Save token ID to tracked storage (with legacy-key migration)
+      // Save asset_id to tracked storage (with legacy-key migration)
       try {
         const trackedTokensJson = await AsyncStorage.getItem(TRACKED_TOKENS_KEY);
         let trackedTokens: string[] = trackedTokensJson
@@ -190,17 +192,17 @@ const TokenCreatorScreen: React.FC<TokenCreatorScreenProps> = ({ onClose }) => {
           }
         }
 
-        if (!trackedTokens.includes(response.token_id)) {
-          trackedTokens.push(response.token_id);
+        if (assetId && !trackedTokens.includes(assetId)) {
+          trackedTokens.push(assetId);
           await AsyncStorage.setItem(
             TRACKED_TOKENS_KEY,
             JSON.stringify(trackedTokens),
           );
           await AsyncStorage.removeItem(LEGACY_CREATED_TOKENS_KEY);
-          console.log('[TokenCreatorScreen] Saved tracked token ID:', response.token_id);
+          console.log('[TokenCreatorScreen] Saved tracked asset_id:', assetId);
         }
       } catch (storageError) {
-        console.warn('[TokenCreatorScreen] Failed to save token ID to storage:', storageError);
+        console.warn('[TokenCreatorScreen] Failed to save asset_id to storage:', storageError);
       }
 
       setStatus({
@@ -208,8 +210,7 @@ const TokenCreatorScreen: React.FC<TokenCreatorScreenProps> = ({ onClose }) => {
         message: `Submitted to mempool. Confirming...`,
       });
 
-      // Step 5: Poll until token is confirmed on chain
-      const tokenId = response.token_id;
+      // Poll until asset is visible on chain (sovereign assets API)
       const MAX_POLLS = 30;
       const POLL_INTERVAL_MS = 2000;
       let confirmed = false;
@@ -217,31 +218,33 @@ const TokenCreatorScreen: React.FC<TokenCreatorScreenProps> = ({ onClose }) => {
       for (let i = 0; i < MAX_POLLS; i++) {
         await new Promise(resolve => setTimeout(resolve, POLL_INTERVAL_MS));
         try {
-          const info = await publicQuicRequest<{ created_at_block?: number | null }>(
-            `/api/v1/token/${tokenId}`,
-          );
-          if (info && info.created_at_block != null) {
+          const info = await assetService.getAsset(assetId);
+          if (info && info.asset_id) {
             confirmed = true;
-            console.log('[TokenCreatorScreen] Token confirmed at block:', info.created_at_block);
+            console.log(
+              '[TokenCreatorScreen] Asset confirmed:',
+              info.asset_id,
+              info.dao_class,
+            );
             break;
           }
         } catch {
-          // token not yet on chain — keep polling
+          // not yet on chain — keep polling
         }
       }
 
       setStatus({
         type: 'success',
         message: confirmed
-          ? `Token confirmed on chain. ID: ${tokenId}`
-          : `Token submitted. ID: ${tokenId}`,
+          ? `DAO launched. asset_id: ${assetId}\n${shareLink}`
+          : `Submitted. asset_id: ${assetId}\n${shareLink}`,
       });
 
       setTimeout(() => {
         setName('');
         setSymbol('');
         setInitialSupply('');
-        setDecimals('8');
+        setDecimals('18');
         setMaxSupply('');
         setStatus({ type: null, message: '' });
 
