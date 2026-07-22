@@ -180,6 +180,27 @@ private func cBuildTokenMint(
 ) -> UnsafeMutablePointer<CChar>?
 
 /// Build signed token create transaction
+/// Build signed sovereign AssetLaunch transaction (hex for /api/v1/assets/launch).
+/// Supply is two little-endian u64 halves of a u128. Pass NULL for both manifest
+/// pointers to locally derive; mixed null → fail closed.
+@_silgen_name("zhtp_client_build_asset_launch")
+private func cBuildAssetLaunch(
+    _ handle: UnsafeMutableRawPointer,
+    _ name: UnsafePointer<CChar>?,
+    _ symbol: UnsafePointer<CChar>?,
+    _ initialSupplyAtomsLo: UInt64,
+    _ initialSupplyAtomsHi: UInt64,
+    _ decimals: UInt8,
+    _ treasuryKeyId: UnsafePointer<UInt8>?,
+    _ daoClass: UInt8,
+    _ burnBps: UInt16,
+    _ chainId: UInt8,
+    _ manifestCid: UnsafePointer<UInt8>?,
+    _ manifestHash: UnsafePointer<UInt8>?
+) -> UnsafeMutablePointer<CChar>?
+
+/// Build signed domain registration transaction
+
 @_silgen_name("zhtp_client_build_token_create")
 private func cBuildTokenCreate(
     _ handle: UnsafeMutableRawPointer,
@@ -913,6 +934,90 @@ public class ZhtpClient {
         defer { cStringFree(hexPtr) }
         return String(cString: hexPtr)
     }
+
+    /// Build signed AssetLaunch transaction (hex for POST /api/v1/assets/launch).
+    /// - Parameters:
+    ///   - initialSupplyAtomsLo/Hi: u128 supply as two little-endian u64 halves
+    ///   - daoClass: 0 = Fp, 1 = Np
+    ///   - burnBps: transfer burn in basis points (max 1000)
+    ///   - manifestCid/Hash: both nil → local derive; both set → copy; mixed → error
+    public static func buildAssetLaunch(
+        name: String,
+        symbol: String,
+        initialSupplyAtomsLo: UInt64,
+        initialSupplyAtomsHi: UInt64 = 0,
+        decimals: UInt8,
+        treasuryKeyId: Data,
+        daoClass: UInt8 = 0,
+        burnBps: UInt16 = 0,
+        chainId: UInt8 = 0x03,
+        manifestCid: Data? = nil,
+        manifestHash: Data? = nil,
+        using identity: Identity
+    ) throws -> String {
+        guard treasuryKeyId.count == 32 else {
+            throw ClientError.signingError("treasuryKeyId must be 32 bytes")
+        }
+        switch (manifestCid, manifestHash) {
+        case (nil, nil):
+            break
+        case (let c?, let h?) where c.count == 32 && h.count == 32:
+            break
+        default:
+            throw ClientError.signingError(
+                "manifestCid and manifestHash must both be 32 bytes or both nil"
+            )
+        }
+
+        let hexPtr: UnsafeMutablePointer<CChar>? = name.withCString { namePtr in
+            symbol.withCString { symbolPtr in
+                treasuryKeyId.withUnsafeBytes { treasuryBuf in
+                    let treasuryBase = treasuryBuf.baseAddress?.assumingMemoryBound(to: UInt8.self)
+                    if let cid = manifestCid, let hash = manifestHash {
+                        return cid.withUnsafeBytes { cBuf in
+                            hash.withUnsafeBytes { hBuf in
+                                cBuildAssetLaunch(
+                                    identity.getHandle(),
+                                    namePtr,
+                                    symbolPtr,
+                                    initialSupplyAtomsLo,
+                                    initialSupplyAtomsHi,
+                                    decimals,
+                                    treasuryBase,
+                                    daoClass,
+                                    burnBps,
+                                    chainId,
+                                    cBuf.baseAddress?.assumingMemoryBound(to: UInt8.self),
+                                    hBuf.baseAddress?.assumingMemoryBound(to: UInt8.self)
+                                )
+                            }
+                        }
+                    }
+                    return cBuildAssetLaunch(
+                        identity.getHandle(),
+                        namePtr,
+                        symbolPtr,
+                        initialSupplyAtomsLo,
+                        initialSupplyAtomsHi,
+                        decimals,
+                        treasuryBase,
+                        daoClass,
+                        burnBps,
+                        chainId,
+                        nil,
+                        nil
+                    )
+                }
+            }
+        }
+
+        guard let ptr = hexPtr else {
+            throw ClientError.signingError("Failed to build AssetLaunch transaction")
+        }
+        defer { cStringFree(ptr) }
+        return String(cString: ptr)
+    }
+
 
     /// Build signed SOV wallet-to-wallet transfer transaction (returns hex-encoded string ready for API).
     /// fromWalletId and toWalletId must each be exactly 32 bytes.
