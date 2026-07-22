@@ -1743,6 +1743,107 @@ class NativeIdentityProvisioning: NSObject, UIDocumentPickerDelegate {
         self.signDomainRequest("domain_register", params: params, resolve: resolve, reject: reject)
     }
 
+    /// Build signed sovereign AssetLaunch tx (hex for POST /api/v1/assets/launch).
+    @objc
+    func signAssetLaunchTransaction(
+        _ params: NSDictionary,
+        resolve: @escaping RCTPromiseResolveBlock,
+        reject: @escaping RCTPromiseRejectBlock
+    ) {
+        queue.async { [weak self] in
+            do {
+                guard self != nil else { return }
+                guard let name = params["name"] as? String,
+                      let symbol = params["symbol"] as? String,
+                      let treasuryKeyIdHex = params["treasuryKeyIdHex"] as? String else {
+                    reject("INVALID_PARAMS", "name, symbol, and treasuryKeyIdHex are required", nil)
+                    return
+                }
+
+                let decimals = UInt8(truncatingIfNeeded: (params["decimals"] as? NSNumber)?.intValue ?? 18)
+                let daoClass = UInt8(truncatingIfNeeded: (params["daoClass"] as? NSNumber)?.intValue ?? 0)
+                let burnBps = UInt16(truncatingIfNeeded: (params["burnBps"] as? NSNumber)?.intValue ?? 0)
+                let chainId = UInt8(truncatingIfNeeded: (params["chainId"] as? NSNumber)?.intValue ?? 3)
+
+                let supplyLo: UInt64
+                if let s = params["initialSupplyAtomsLo"] as? String, let v = UInt64(s) {
+                    supplyLo = v
+                } else if let n = params["initialSupplyAtomsLo"] as? NSNumber {
+                    supplyLo = n.uint64Value
+                } else {
+                    reject("INVALID_PARAMS", "initialSupplyAtomsLo is required", nil)
+                    return
+                }
+                let supplyHi: UInt64
+                if let s = params["initialSupplyAtomsHi"] as? String, let v = UInt64(s) {
+                    supplyHi = v
+                } else if let n = params["initialSupplyAtomsHi"] as? NSNumber {
+                    supplyHi = n.uint64Value
+                } else {
+                    supplyHi = 0
+                }
+
+                guard let identityAny = IdentityHandleStore.shared.getLatestIdentity(),
+                      let identity = identityAny as? Identity else {
+                    reject("NO_IDENTITY", "No active identity for signing", nil)
+                    return
+                }
+
+                guard let treasuryKeyId = Data(fromHexString: treasuryKeyIdHex),
+                      treasuryKeyId.count == 32 else {
+                    reject("INVALID_PARAMS", "treasuryKeyIdHex must be 32-byte hex", nil)
+                    return
+                }
+
+                let manifestCidHex = params["manifestCidHex"] as? String
+                let manifestHashHex = params["manifestHashHex"] as? String
+                let hasCid = !(manifestCidHex ?? "").isEmpty
+                let hasHash = !(manifestHashHex ?? "").isEmpty
+                let manifestCid: Data?
+                let manifestHash: Data?
+                switch (hasCid, hasHash) {
+                case (false, false):
+                    manifestCid = nil
+                    manifestHash = nil
+                case (true, true):
+                    guard let c = Data(fromHexString: manifestCidHex!),
+                          let h = Data(fromHexString: manifestHashHex!),
+                          c.count == 32, h.count == 32 else {
+                        reject("INVALID_PARAMS", "manifestCidHex/manifestHashHex must be 32-byte hex", nil)
+                        return
+                    }
+                    manifestCid = c
+                    manifestHash = h
+                default:
+                    reject(
+                        "INVALID_PARAMS",
+                        "manifestCidHex and manifestHashHex must both be set or both omitted",
+                        nil
+                    )
+                    return
+                }
+
+                let hexSignedTx = try ZhtpClient.buildAssetLaunch(
+                    name: name,
+                    symbol: symbol,
+                    initialSupplyAtomsLo: supplyLo,
+                    initialSupplyAtomsHi: supplyHi,
+                    decimals: decimals,
+                    treasuryKeyId: treasuryKeyId,
+                    daoClass: daoClass,
+                    burnBps: burnBps,
+                    chainId: chainId,
+                    manifestCid: manifestCid,
+                    manifestHash: manifestHash,
+                    using: identity
+                )
+                resolve(["signed_tx": hexSignedTx])
+            } catch {
+                reject("SIGNING_ERROR", "Failed to build AssetLaunch: \(error)", nil)
+            }
+        }
+    }
+
     /// Build domain register request with fee_payment_tx + domain_tx_signature_hex (RN)
     @objc
     func signDomainRegisterRequestWithFeePayment(
@@ -1766,6 +1867,8 @@ class NativeIdentityProvisioning: NSObject, UIDocumentPickerDelegate {
                 let contentMappingsJson = params["contentMappingsJson"] as? String
                 let metadataJson = params["metadataJson"] as? String
                 let chainId = UInt8(truncatingIfNeeded: (params["chainId"] as? NSNumber)?.intValue ?? 3)
+                // Optional M4 asset binding (nil/omit = unbound domain).
+                let assetIdHex = params["assetIdHex"] as? String
 
                 let requestJson = try ZhtpClient.buildDomainRegisterRequestWithFeePayment(
                     domain: domain,
@@ -1773,6 +1876,7 @@ class NativeIdentityProvisioning: NSObject, UIDocumentPickerDelegate {
                     contentMappingsJson: contentMappingsJson,
                     metadataJson: metadataJson,
                     chainId: chainId,
+                    assetIdHex: assetIdHex,
                     using: identity
                 )
 

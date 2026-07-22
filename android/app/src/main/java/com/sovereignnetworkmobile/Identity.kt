@@ -168,7 +168,30 @@ class Identity private constructor(
             contentMappingsJson: String?,
             feePaymentTxHex: String,
             metadataJson: String?,
-            chainId: Int
+            chainId: Int,
+            /** Optional 64-char hex sovereign asset id (M4 V3 binding); null = unbound. */
+            assetIdHex: String?
+        ): String?
+
+        /**
+         * Build signed AssetLaunch hex for POST /api/v1/assets/launch.
+         * Supply is two little-endian u64 halves of a u128 (same as C FFI).
+         * Pass null for both manifestCid and manifestHash to locally derive.
+         */
+        @JvmStatic private external fun nativeBuildAssetLaunch(
+            handle: Long,
+            name: String,
+            symbol: String,
+            initialSupplyAtomsLo: Long,
+            initialSupplyAtomsHi: Long,
+            decimals: Int,
+            treasuryKeyId: ByteArray,
+            daoClass: Int,
+            burnBps: Int,
+            chainId: Int,
+            /** Empty = locally derive (must pair with empty manifestHash). */
+            manifestCid: ByteArray,
+            manifestHash: ByteArray
         ): String?
 
         @JvmStatic private external fun nativeBuildDomainUpdateRequest(
@@ -373,20 +396,57 @@ class Identity private constructor(
         chainId,
     )
 
-    /** Build domain register request with fee_payment_tx + domain_tx_signature_hex. */
+    /**
+     * Build domain register request with fee_payment_tx + domain_tx_signature_hex.
+     * @param assetIdHex optional 64-char hex sovereign asset id (DAO M4 V3 binding); null for unbound.
+     */
     fun buildDomainRegisterRequestWithFeePayment(
         domain: String,
         feePaymentTxHex: String,
         contentMappingsJson: String? = null,
         metadataJson: String? = null,
-        chainId: Int = 0x03
+        chainId: Int = 0x03,
+        assetIdHex: String? = null
     ): String? = nativeBuildDomainRegisterRequestWithFeePayment(
         handle,
         domain,
         contentMappingsJson,
         feePaymentTxHex,
         metadataJson,
-        chainId
+        chainId,
+        assetIdHex
+    )
+
+    /**
+     * Build signed AssetLaunch transaction (hex for /api/v1/assets/launch).
+     * @param daoClass 0 = for-profit (Fp), 1 = non-profit (Np)
+     * @param burnBps transfer burn in basis points (max 1000)
+     */
+    fun buildAssetLaunch(
+        name: String,
+        symbol: String,
+        initialSupplyAtomsLo: Long,
+        initialSupplyAtomsHi: Long = 0L,
+        decimals: Int,
+        treasuryKeyId: ByteArray,
+        daoClass: Int = 0,
+        burnBps: Int = 0,
+        chainId: Int = 0x03,
+        manifestCid: ByteArray? = null,
+        manifestHash: ByteArray? = null
+    ): String? = nativeBuildAssetLaunch(
+        handle,
+        name,
+        symbol,
+        initialSupplyAtomsLo,
+        initialSupplyAtomsHi,
+        decimals,
+        treasuryKeyId,
+        daoClass,
+        burnBps,
+        chainId,
+        manifestCid ?: ByteArray(0),
+        manifestHash ?: ByteArray(0)
     )
 
     /** Build domain update request with manifest CID versioning. */

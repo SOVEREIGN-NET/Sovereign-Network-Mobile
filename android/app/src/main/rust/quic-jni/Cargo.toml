@@ -42,12 +42,14 @@ once_cell = "1.19"
 hex = "0.4"
 base64 = "0.22"
 
-# UHP handshake dependencies - use The-Sovereign-Network versions for consistency with lib-client
-lib-network = { path = "../../../../../../../The-Sovereign-Network/lib-network" }
-lib-identity = { path = "../../../../../../../The-Sovereign-Network/lib-identity" }
-lib-crypto = { path = "../../../../../../../The-Sovereign-Network/lib-crypto" }
-lib-blockchain = { path = "../../../../../../../The-Sovereign-Network/lib-blockchain" }
-zhtp_client = { package = "lib-client", path = "../../../../../../../The-Sovereign-Network/lib-client" }
+# UHP handshake dependencies — sibling monorepo checkout named SOVN or
+# The-Sovereign-Network (must include lib-client M1/M4: asset_id arg + AssetLaunch FFI).
+# Default path matches this machine's active monorepo (SOVN). Rename if needed.
+lib-network = { path = "../../../../../../../SOVN/lib-network" }
+lib-identity = { path = "../../../../../../../SOVN/lib-identity" }
+lib-crypto = { path = "../../../../../../../SOVN/lib-crypto" }
+lib-blockchain = { path = "../../../../../../../SOVN/lib-blockchain" }
+zhtp_client = { package = "lib-client", path = "../../../../../../../SOVN/lib-client" }
 
 [profile.release]
 # Thin LTO instead of fat: tolerant of rlibs without fully-embedded bitcode,

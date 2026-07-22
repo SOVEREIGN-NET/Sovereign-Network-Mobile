@@ -975,6 +975,8 @@ class NativeIdentityProvisioning(reactContext: ReactApplicationContext) :
                 val contentMappingsJson = params.getString("contentMappingsJson")
                 val metadataJson = params.getString("metadataJson")
                 val chainId = if (params.hasKey("chainId")) params.getInt("chainId") else 0x03
+                // Optional M4 asset binding (null/omit = unbound domain).
+                val assetIdHex = params.getString("assetIdHex")
 
                 if (domain.isEmpty() || feePaymentTxHex.isEmpty()) {
                     promise.reject("INVALID_PARAMS", "domain and feePaymentTxHex are required")
@@ -994,7 +996,8 @@ class NativeIdentityProvisioning(reactContext: ReactApplicationContext) :
                     feePaymentTxHex,
                     contentMappingsJson,
                     metadataJson,
-                    chainId
+                    chainId,
+                    assetIdHex
                 )
                 if (requestJson == null) {
                     promise.reject(
@@ -1014,6 +1017,130 @@ class NativeIdentityProvisioning(reactContext: ReactApplicationContext) :
                     "Failed to build domain registration request: ${e.message}",
                     e
                 )
+            }
+        }
+    }
+
+    /**
+     * Build signed sovereign AssetLaunch tx (hex for POST /api/v1/assets/launch).
+     *
+     * Params:
+     * - name, symbol (string)
+     * - initialSupplyAtomsLo / initialSupplyAtomsHi (u128 as two u64 halves; hi defaults 0)
+     * - decimals (int)
+     * - treasuryKeyIdHex (64-char hex, 32 bytes; must be non-zero and ≠ creator)
+     * - daoClass (0 = Fp, 1 = Np; default 0)
+     * - burnBps (0–1000; default 0)
+     * - chainId (default 0x03)
+     * - manifestCidHex / manifestHashHex (optional 64-char hex; both omit → local derive)
+     */
+    @ReactMethod
+    fun signAssetLaunchTransaction(params: ReadableMap, promise: Promise) {
+        executor.execute {
+            try {
+                val name = params.getString("name") ?: ""
+                val symbol = params.getString("symbol") ?: ""
+                val treasuryKeyIdHex = params.getString("treasuryKeyIdHex") ?: ""
+                val decimals = if (params.hasKey("decimals")) params.getInt("decimals") else 18
+                val daoClass = if (params.hasKey("daoClass")) params.getInt("daoClass") else 0
+                val burnBps = if (params.hasKey("burnBps")) params.getInt("burnBps") else 0
+                val chainId = if (params.hasKey("chainId")) params.getInt("chainId") else 0x03
+                val supplyLo = parseAmount(params, "initialSupplyAtomsLo")
+                    ?: run {
+                        promise.reject(
+                            "INVALID_PARAMS",
+                            "initialSupplyAtomsLo must be a valid integer string or number"
+                        )
+                        return@execute
+                    }
+                val supplyHi = if (params.hasKey("initialSupplyAtomsHi")) {
+                    parseAmount(params, "initialSupplyAtomsHi") ?: 0L
+                } else {
+                    0L
+                }
+
+                if (name.isEmpty() || symbol.isEmpty()) {
+                    promise.reject("INVALID_PARAMS", "name and symbol are required")
+                    return@execute
+                }
+                if (treasuryKeyIdHex.isEmpty()) {
+                    promise.reject("INVALID_PARAMS", "treasuryKeyIdHex is required (32-byte hex)")
+                    return@execute
+                }
+
+                val treasuryKeyId = try {
+                    hexToBytes(treasuryKeyIdHex.removePrefix("0x"))
+                } catch (e: Exception) {
+                    promise.reject("INVALID_PARAMS", "treasuryKeyIdHex is not valid hex", e)
+                    return@execute
+                }
+                if (treasuryKeyId.size != 32) {
+                    promise.reject("INVALID_PARAMS", "treasuryKeyIdHex must decode to 32 bytes")
+                    return@execute
+                }
+
+                val manifestCidHex = params.getString("manifestCidHex")
+                val manifestHashHex = params.getString("manifestHashHex")
+                val manifestCid = if (!manifestCidHex.isNullOrBlank()) {
+                    try {
+                        hexToBytes(manifestCidHex.removePrefix("0x"))
+                    } catch (e: Exception) {
+                        promise.reject("INVALID_PARAMS", "manifestCidHex is not valid hex", e)
+                        return@execute
+                    }
+                } else {
+                    null
+                }
+                val manifestHash = if (!manifestHashHex.isNullOrBlank()) {
+                    try {
+                        hexToBytes(manifestHashHex.removePrefix("0x"))
+                    } catch (e: Exception) {
+                        promise.reject("INVALID_PARAMS", "manifestHashHex is not valid hex", e)
+                        return@execute
+                    }
+                } else {
+                    null
+                }
+                if ((manifestCid == null) != (manifestHash == null)) {
+                    promise.reject(
+                        "INVALID_PARAMS",
+                        "manifestCidHex and manifestHashHex must both be set or both omitted"
+                    )
+                    return@execute
+                }
+
+                val identity = getLatestIdentity()
+                if (identity == null) {
+                    promise.reject("IDENTITY_ERROR", "No identity available for signing")
+                    return@execute
+                }
+
+                Log.d(TAG, "Building AssetLaunch: $name/$symbol supply_lo=$supplyLo hi=$supplyHi")
+
+                val hexSignedTx = identity.buildAssetLaunch(
+                    name = name,
+                    symbol = symbol,
+                    initialSupplyAtomsLo = supplyLo,
+                    initialSupplyAtomsHi = supplyHi,
+                    decimals = decimals,
+                    treasuryKeyId = treasuryKeyId,
+                    daoClass = daoClass,
+                    burnBps = burnBps,
+                    chainId = chainId,
+                    manifestCid = manifestCid,
+                    manifestHash = manifestHash
+                )
+                if (hexSignedTx.isNullOrEmpty()) {
+                    promise.reject("SIGNING_ERROR", "Failed to build AssetLaunch transaction")
+                    return@execute
+                }
+
+                promise.resolve(WritableNativeMap().apply {
+                    putString("signed_tx", hexSignedTx)
+                })
+            } catch (e: Exception) {
+                Log.e(TAG, "AssetLaunch signing failed", e)
+                promise.reject("IDENTITY_ERROR", "Failed to sign AssetLaunch: ${e.message}", e)
             }
         }
     }
