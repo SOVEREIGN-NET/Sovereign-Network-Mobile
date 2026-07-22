@@ -1,9 +1,9 @@
 /**
- * RewardsService — binding for the BUBL Rewards API.
+ * RewardsService — binding for the chain-native rewards API
+ * (`/api/v1/rewards/*`, Path C / N2–N3).
  *
  * Two halves:
- *  1. A typed client for `/api/v1/rewards/*` (claim, conversation,
- *     balance, status, history).
+ *  1. A typed client for claim, conversation, balance, status, history.
  *  2. Auto-fire triggers (`fire*`) wired into the app lifecycle —
  *     welcome on identity activation, daily check-in on launch /
  *     foreground, active session on the messages tab, conversation on
@@ -11,11 +11,15 @@
  *     the authority on every cap, so a missed call is simply retried by
  *     the next trigger.
  *
- * g1 pinning: the rewards endpoints live on g1 only — every other
- * validator answers 503 by design. `quicRequest` happens to target g1
- * today, but routing rewards through `rewardsRequest` (which pins the
- * host explicitly) keeps them correct even if general API traffic is
- * later moved onto failover routing.
+ * g1 pinning: claim POSTs need a hot delegate keystore (g1 today).
+ * Reads work on any node with `rewards_activation.toml`. Routing through
+ * `rewardsGet` / `rewardsPost` keeps the pin even if general API traffic
+ * later moves onto failover routing.
+ *
+ * Errors (do not conflate):
+ *  - HTTP **503** → activation missing / claim on read-only replica
+ *  - body `reason: InsufficientRewardLiquidity` → funded activation but
+ *    underfunded spend delegate (have/need atoms); not a 503
  */
 
 import { quicRequest } from './quic';
@@ -54,6 +58,16 @@ function rewardsPost<T>(path: string, body: unknown): Promise<T> {
   });
 }
 
+/** True when the claim body says the spend delegate lacks liquidity
+ *  (post-80k). This is a successful HTTP response with awarded:false —
+ *  not a transport error and not a 503. */
+export function isInsufficientRewardLiquidity(
+  response: RewardClaimResponse | null | undefined,
+): boolean {
+  if (!response || response.awarded) return false;
+  return response.reason === 'InsufficientRewardLiquidity';
+}
+
 /** Claim a fixed-shape event. Idempotent server-side — a repeat call
  *  returns `awarded: false` rather than erroring. */
 export function claimReward(
@@ -75,7 +89,7 @@ export function reportConversation(
   });
 }
 
-/** Lifetime BUBL stats for a DID. */
+/** Lifetime earned stats for a DID (chain-backed rewards module). */
 export function getRewardsBalance(did: string): Promise<RewardsBalance> {
   return rewardsGet<RewardsBalance>(
     `${BASE}/balance/${encodeURIComponent(did)}`,
@@ -108,9 +122,13 @@ export function getRewardsHistory(
 
 /**
  * True when a failure means "rewards aren't available here" rather than
- * a transient blip — the documented 503 from a non-rewards node, or any
- * transport failure that left us without a response. The rewards screen
- * uses this to show a calm "not live yet" state instead of an error.
+ * a transient blip — the documented 503 from a node without
+ * `rewards_activation.toml` / no hot keystore on claim path, or any
+ * transport failure that left us without a response.
+ *
+ * Do **not** use this for `InsufficientRewardLiquidity` (that is a
+ * successful claim body with awarded:false — see
+ * `isInsufficientRewardLiquidity`).
  */
 export function isRewardsUnavailable(e: unknown): boolean {
   const status = (e as { status?: number })?.status;
@@ -118,6 +136,20 @@ export function isRewardsUnavailable(e: unknown): boolean {
   // No HTTP status at all → the request never reached a responding
   // node (endpoint not deployed, connection refused, timeout).
   return status === undefined;
+}
+
+/**
+ * Human-readable note for a claim response that did not award.
+ * Returns null when the response was successful or is a routine skip.
+ */
+export function claimSkipMessage(
+  response: RewardClaimResponse,
+): string | null {
+  if (response.awarded) return null;
+  if (isInsufficientRewardLiquidity(response)) {
+    return 'Rewards pool is temporarily underfunded. Try again later.';
+  }
+  return null;
 }
 
 /** Group the integer part of a `*_display` amount with thousands

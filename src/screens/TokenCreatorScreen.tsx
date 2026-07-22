@@ -5,7 +5,14 @@
  */
 
 import React, { useState } from 'react';
-import { View, ScrollView, TouchableOpacity, KeyboardAvoidingView, Platform } from 'react-native';
+import {
+  View,
+  ScrollView,
+  TouchableOpacity,
+  KeyboardAvoidingView,
+  Platform,
+  Alert,
+} from 'react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useNavigation } from '@react-navigation/native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -18,7 +25,11 @@ import {
 import { colors, spacing, typography, borderRadius } from '../theme';
 import tokenService from '../services/TokenService';
 import assetService from '../services/AssetService';
+import domainService, {
+  DOMAIN_REGISTRATION_FEE_SOV,
+} from '../services/DomainService';
 import { useAuth } from '../hooks/useAuth';
+import { useWalletList } from '../hooks/useWalletList';
 import { TokenCreateRequest } from '../types/token';
 
 // Storage keys
@@ -46,6 +57,8 @@ const TokenCreatorScreen: React.FC<TokenCreatorScreenProps> = ({ onClose }) => {
   const insets = useSafeAreaInsets();
   const navigation = useNavigation();
   const { currentIdentity } = useAuth();
+  const { walletByType } = useWalletList();
+  const primaryWallet = walletByType?.primary;
 
   const handleClose = () => {
     if (onClose) {
@@ -240,18 +253,79 @@ const TokenCreatorScreen: React.FC<TokenCreatorScreenProps> = ({ onClose }) => {
           : `Submitted. asset_id: ${assetId}\n${shareLink}`,
       });
 
-      setTimeout(() => {
-        setName('');
-        setSymbol('');
-        setInitialSupply('');
-        setDecimals('18');
-        setMaxSupply('');
-        setStatus({ type: null, message: '' });
+      // M4: optional domain claim is a separate tx. Failure must not undo launch.
+      const offerDomainClaim = (): Promise<void> =>
+        new Promise(resolve => {
+          Alert.alert(
+            'Claim .sov domain?',
+            `Launch succeeded.\nasset_id: ${assetId}\n\nDomain is optional (${DOMAIN_REGISTRATION_FEE_SOV} SOV). Skip anytime — launch stays valid.`,
+            [
+              {
+                text: 'Skip',
+                style: 'cancel',
+                onPress: () => resolve(),
+              },
+              {
+                text: 'Claim domain',
+                onPress: () => {
+                  const label = symbol
+                    .trim()
+                    .toLowerCase()
+                    .replace(/[^a-z0-9-]/g, '');
+                  const fullDomain = `${label || 'dao'}.sov`;
+                  if (
+                    !primaryWallet?.id ||
+                    String(primaryWallet.id).length !== 64
+                  ) {
+                    Alert.alert(
+                      'Wallet required',
+                      'Primary wallet needed for domain fee. Launch is already complete.',
+                      [{ text: 'OK', onPress: () => resolve() }],
+                    );
+                    return;
+                  }
+                  void (async () => {
+                    try {
+                      await domainService.registerDomain({
+                        domain: fullDomain,
+                        primary_wallet_id: String(primaryWallet.id),
+                        asset_id: assetId,
+                      });
+                      Alert.alert(
+                        'Domain claimed',
+                        `${fullDomain} bound to asset_id ${assetId}`,
+                        [{ text: 'OK', onPress: () => resolve() }],
+                      );
+                    } catch (domainErr: unknown) {
+                      const msg =
+                        domainErr instanceof Error
+                          ? domainErr.message
+                          : 'Domain registration failed';
+                      Alert.alert(
+                        'Domain failed — launch kept',
+                        `${msg}\n\nYour DAO (asset_id ${assetId}) remains valid. Retry domain later.`,
+                        [{ text: 'OK', onPress: () => resolve() }],
+                      );
+                    }
+                  })();
+                },
+              },
+            ],
+          );
+        });
 
-        if (onClose) {
-          onClose();
-        }
-      }, 2000);
+      await offerDomainClaim();
+
+      setName('');
+      setSymbol('');
+      setInitialSupply('');
+      setDecimals('18');
+      setMaxSupply('');
+      setStatus({ type: null, message: '' });
+
+      if (onClose) {
+        onClose();
+      }
     } catch (error: any) {
       console.error('[TokenCreatorScreen] Creation failed:', error);
       setStatus({

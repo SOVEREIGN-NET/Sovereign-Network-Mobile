@@ -1,5 +1,6 @@
 import React, { useMemo, useState } from 'react';
 import {
+  ActivityIndicator,
   Alert,
   Pressable,
   ScrollView,
@@ -9,7 +10,10 @@ import {
   View,
 } from 'react-native';
 import { SovSectionHeader } from '../../../components/organisms/SovSwap';
-import { mockDAOs } from '../../../services/SovSwapMockData';
+import domainService, {
+  DOMAIN_REGISTRATION_FEE_SOV,
+} from '../../../services/DomainService';
+import { useWalletList } from '../../../hooks/useWalletList';
 import {
   sovswapAccentFor,
   createSovSwapStyles,
@@ -152,7 +156,6 @@ const NewDaoForm: React.FC<{ onBack: () => void }> = ({ onBack }) => {
   const [type, setType] = useState<SovOrgType>('for-profit');
   const [registerOfficial, setRegisterOfficial] = useState(false);
   const [sector, setSector] = useState<WelfareSector | null>(null);
-  const [grantSeed, setGrantSeed] = useState('');
   const [domain, setDomain] = useState('');
   const [tokenName, setTokenName] = useState('');
   const [tokenSymbol, setTokenSymbol] = useState('');
@@ -281,13 +284,9 @@ const NewDaoForm: React.FC<{ onBack: () => void }> = ({ onBack }) => {
                   );
                 })}
               </View>
-              <Text style={styles.smallNote}>OFFICIAL SOV GRANT SEEDPHRASE</Text>
-              <UnderlineField
-                value={grantSeed}
-                onChangeText={setGrantSeed}
-                placeholder="••••• ••••• •••••"
-                secureTextEntry
-              />
+              <Text style={styles.smallNote}>
+                Official sector registration is DID/keystore-signed (no seedphrase).
+              </Text>
             </View>
           ) : null}
         </FormSection>
@@ -438,27 +437,82 @@ const NewDaoForm: React.FC<{ onBack: () => void }> = ({ onBack }) => {
   );
 };
 
-/* ─── Claim domain form ───────────────────────────────────────────── */
+/* ─── Claim domain form (M4: DomainRegistration after AssetLaunch) ── */
 
 const ClaimDomainForm: React.FC<{ onBack: () => void }> = ({ onBack }) => {
-  const [daoId, setDaoId] = useState<number>(mockDAOs[0].id);
-  const [orgName, setOrgName] = useState('');
+  const { walletByType } = useWalletList();
+  const primaryWallet = walletByType?.primary;
+
   const [domain, setDomain] = useState('');
-  const [contract, setContract] = useState('');
-  const [symbol, setSymbol] = useState('');
-  const [supply, setSupply] = useState('');
-  const [description, setDescription] = useState('');
-  const [picker, setPicker] = useState(false);
+  /** Optional 64-char hex sovereign asset_id (V3 bind). Native display — no 0x. */
+  const [assetId, setAssetId] = useState('');
+  const [submitting, setSubmitting] = useState(false);
 
-  const selectedDao = mockDAOs.find(d => d.id === daoId);
-  const fullDomain = `${sanitizeDomain(domain) || 'my-org'}.${selectedDao?.tokenSymbol.toLowerCase()}.sov`;
+  const label = sanitizeDomain(domain);
+  const fullDomain = label ? `${label}.sov` : 'my-org.sov';
+  const assetIdNorm = assetId.replace(/^0x/i, '').trim().toLowerCase();
+  const assetIdOk =
+    assetIdNorm.length === 0 || /^[0-9a-f]{64}$/.test(assetIdNorm);
 
-  const submit = () => {
-    Alert.alert(
-      'Domain claimed',
-      `${fullDomain} now points to ${orgName || 'your organisation'}.`,
-      [{ text: 'OK', onPress: onBack }],
-    );
+  const submit = async () => {
+    if (!label) {
+      Alert.alert('Missing domain', 'Enter a domain label (e.g. my-dao).');
+      return;
+    }
+    if (!assetIdOk) {
+      Alert.alert(
+        'Invalid asset id',
+        'asset_id must be 64 hex characters (native 32-byte id, no 0x required).',
+      );
+      return;
+    }
+    if (!primaryWallet?.id || String(primaryWallet.id).length !== 64) {
+      Alert.alert(
+        'Wallet required',
+        'Primary wallet not found — unlock identity to pay the registration fee.',
+      );
+      return;
+    }
+    if ((primaryWallet.total_balance ?? 0) < DOMAIN_REGISTRATION_FEE_SOV) {
+      Alert.alert(
+        'Insufficient SOV',
+        `Need ${DOMAIN_REGISTRATION_FEE_SOV} SOV to claim a domain.`,
+      );
+      return;
+    }
+
+    setSubmitting(true);
+    try {
+      const response = await domainService.registerDomain({
+        domain: fullDomain,
+        primary_wallet_id: String(primaryWallet.id),
+        asset_id: assetIdNorm.length === 64 ? assetIdNorm : undefined,
+        content_mappings: {
+          '/': {
+            content: `<html><body>${fullDomain}</body></html>`,
+            content_type: 'text/html',
+          },
+        },
+      });
+      const bound =
+        assetIdNorm.length === 64
+          ? `\nBound asset_id: ${assetIdNorm}`
+          : '';
+      Alert.alert(
+        'Domain claimed',
+        `${response.domain} registered.${bound}\nFee: ${DOMAIN_REGISTRATION_FEE_SOV} SOV.`,
+        [{ text: 'OK', onPress: onBack }],
+      );
+    } catch (e: unknown) {
+      // Domain fail must not imply launch rollback — launch is a separate tx.
+      const msg = e instanceof Error ? e.message : 'Domain registration failed';
+      Alert.alert(
+        'Domain claim failed',
+        `${msg}\n\nIf you already launched a DAO, that launch remains valid. You can retry with the same or a different name.`,
+      );
+    } finally {
+      setSubmitting(false);
+    }
   };
 
   return (
@@ -469,122 +523,74 @@ const ClaimDomainForm: React.FC<{ onBack: () => void }> = ({ onBack }) => {
       <View style={styles.headerWrap}>
         <SovSectionHeader
           title="Claim a .sov domain"
-          subtitle="Attach an existing token to a Sovereign domain."
+          subtitle="Separate DomainRegistration after AssetLaunch. Launch stays valid if this fails."
           onBack={onBack}
         />
       </View>
 
-      <FormSection no="§1" title="Existing DAO">
-        <Pressable style={styles.daoPicker} onPress={() => setPicker(true)}>
-          <Text style={styles.daoPickerLabel}>SELECT</Text>
-          <Text style={styles.daoPickerValue}>
-            {selectedDao
-              ? `${selectedDao.name} · $${selectedDao.tokenSymbol}`
-              : 'pick a DAO'}
-          </Text>
-          <Text style={styles.daoPickerArrow}>▾</Text>
-        </Pressable>
-      </FormSection>
-
-      <FormSection no="§2" title="Organisation / Website Name">
-        <UnderlineField
-          value={orgName}
-          onChangeText={setOrgName}
-          placeholder="Acme Coffee Roasters"
-        />
-      </FormSection>
-
-      <FormSection no="§3" title="Your Domain Name">
+      <FormSection title="Domain label">
         <View style={styles.domainRow}>
           <UnderlineField
             value={domain}
             onChangeText={t => setDomain(sanitizeDomain(t))}
             placeholder="my-org"
             style={styles.domainInput}
+            autoCapitalize="none"
+            autoCorrect={false}
           />
-          <Text style={styles.domainSuffix}>
-            .{selectedDao?.tokenSymbol.toLowerCase()}.sov
-          </Text>
+          <Text style={styles.domainSuffix}>.sov</Text>
         </View>
         <Text style={styles.preview}>
           Full domain: <Text style={styles.previewMono}>{fullDomain}</Text>
         </Text>
       </FormSection>
 
-      <FormSection no="§4" title="Existing Token Contract Address">
+      <FormSection title="Sovereign asset_id (optional)">
+        <Text style={styles.smallNote}>
+          64-CHAR HEX · NATIVE 32-BYTE ID · NO 0x PREFIX
+        </Text>
         <TextInput
-          value={contract}
-          onChangeText={setContract}
-          placeholder="0x…"
+          value={assetId}
+          onChangeText={setAssetId}
+          placeholder="e7f56a6e… (from DAO launch)"
           placeholderTextColor={sovswapColors.paperInkFaint}
           style={[styles.textarea, styles.mono]}
           autoCapitalize="none"
           autoCorrect={false}
         />
-      </FormSection>
-
-      <FormSection no="§5" title="Token Symbol · max 6">
-        <UnderlineField
-          value={symbol}
-          onChangeText={t => setSymbol(t.toUpperCase().slice(0, 6))}
-          placeholder="COFFEE"
-        />
-      </FormSection>
-
-      <FormSection no="§6" title="Current Token Supply">
-        <UnderlineField
-          value={supply}
-          onChangeText={setSupply}
-          placeholder="1000000"
-          keyboardType="numeric"
-        />
-      </FormSection>
-
-      <FormSection no="§7" title="Organisation Description">
-        <TextInput
-          value={description}
-          onChangeText={setDescription}
-          multiline
-          numberOfLines={4}
-          placeholder="Describe your organisation."
-          placeholderTextColor={sovswapColors.paperInkFaint}
-          style={styles.textarea}
-        />
+        {assetIdNorm.length > 0 && !assetIdOk ? (
+          <Text style={[styles.smallNote, { color: '#B00020' }]}>
+            Must be exactly 64 hex characters
+          </Text>
+        ) : null}
+        {assetIdOk && assetIdNorm.length === 64 ? (
+          <Text style={styles.preview}>
+            Binding: <Text style={styles.previewMono}>{assetIdNorm}</Text>
+          </Text>
+        ) : null}
       </FormSection>
 
       <View style={styles.feeCard}>
         <Text style={styles.feeKicker}>REGISTRATION FEE</Text>
-        <Text style={styles.feeValue}>100 $SOV</Text>
-        <Text style={styles.feeNote}>One-time, non-refundable.</Text>
+        <Text style={styles.feeValue}>{DOMAIN_REGISTRATION_FEE_SOV} $SOV</Text>
+        <Text style={styles.feeNote}>
+          One-time, non-refundable. Paid from Primary wallet.
+        </Text>
       </View>
 
-      <Pressable onPress={submit} style={styles.submitBtn}>
-        <Text style={styles.submitText}>CLAIM DOMAIN →</Text>
+      <Pressable
+        onPress={() => {
+          void submit();
+        }}
+        style={[styles.submitBtn, submitting ? { opacity: 0.6 } : null]}
+        disabled={submitting}
+      >
+        {submitting ? (
+          <ActivityIndicator color="#fff" />
+        ) : (
+          <Text style={styles.submitText}>CLAIM DOMAIN →</Text>
+        )}
       </Pressable>
-
-      {/* Tiny dropdown impl: scrim with list */}
-      {picker ? (
-        <Pressable style={styles.pickerScrim} onPress={() => setPicker(false)}>
-          <Pressable style={styles.pickerSheet} onPress={() => {}}>
-            {mockDAOs.map(d => (
-              <Pressable
-                key={d.id}
-                onPress={() => {
-                  setDaoId(d.id);
-                  setPicker(false);
-                }}
-                style={[
-                  styles.pickerItem,
-                  d.id === daoId ? styles.pickerItemActive : null,
-                ]}
-              >
-                <Text style={styles.pickerItemSymbol}>${d.tokenSymbol}</Text>
-                <Text style={styles.pickerItemName}>{d.name}</Text>
-              </Pressable>
-            ))}
-          </Pressable>
-        </Pressable>
-      ) : null}
     </ScrollView>
   );
 };
