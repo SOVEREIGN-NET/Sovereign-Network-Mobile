@@ -24,6 +24,7 @@ import { useNodeConnectionStatus } from '../../../hooks/useNodeConnectionStatus'
 import { useRewardCounter } from '../../../hooks/useRewardCounter';
 
 export interface HeaderBarProps {
+  title?: string;
   onMenuPress?: () => void;
   onBackPress?: () => void;
   sovAddress?: string;
@@ -41,6 +42,7 @@ export interface HeaderBarProps {
 }
 
 const HeaderBar: React.FC<HeaderBarProps> = ({
+  title,
   onMenuPress,
   onBackPress,
   sovAddress,
@@ -190,6 +192,12 @@ const HeaderBar: React.FC<HeaderBarProps> = ({
       fontWeight: typography.weight.medium,
       color: colors.text_primary,
     },
+    titleText: {
+      fontSize: typography.size.lg,
+      fontWeight: typography.weight.bold,
+      color: colors.primary,
+      letterSpacing: 0.5,
+    },
     statusIndicator: {
       width: 8,
       height: 8,
@@ -327,7 +335,7 @@ const HeaderBar: React.FC<HeaderBarProps> = ({
               <Svg width={24} height={24} viewBox="0 0 24 24" fill="none">
                 <Path
                   d="M19 12H5M5 12L12 19M5 12L12 5"
-                  stroke={colors.text_primary}
+                  stroke={colors.primary}
                   strokeWidth={2}
                   strokeLinecap="round"
                   strokeLinejoin="round"
@@ -352,14 +360,20 @@ const HeaderBar: React.FC<HeaderBarProps> = ({
 
         {/* Center: SOV Balance Counter — display only by default; parent
             can pass onBalancePress for custom behavior (default: no-op) */}
-        <Pressable
-          onPress={onBalancePress}
-          style={styles.centerSection}
-          pointerEvents="box-none"
-          hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
-        >
-          <Text style={styles.sovLabel}>{sovLabel}</Text>
-        </Pressable>
+        {title ? (
+          <View style={styles.centerSection} pointerEvents="none">
+            <Text style={styles.titleText}>{title}</Text>
+          </View>
+        ) : (
+          <Pressable
+            onPress={onBalancePress}
+            style={styles.centerSection}
+            pointerEvents="box-none"
+            hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+          >
+            <Text style={styles.sovLabel}>{sovLabel}</Text>
+          </Pressable>
+        )}
 
         {/* Right: Connection Status */}
         <View style={[styles.sideSlot, styles.rightSlot]}>

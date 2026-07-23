@@ -287,7 +287,7 @@ const TokenCreatorScreen: React.FC<TokenCreatorScreenProps> = ({ onClose, hideHe
               style={{
                 fontSize: typography.size.lg,
                 fontWeight: typography.weight.semibold,
-                color: colors.text_primary,
+                color: colors.primary,
               }}
             >
               Create Token
