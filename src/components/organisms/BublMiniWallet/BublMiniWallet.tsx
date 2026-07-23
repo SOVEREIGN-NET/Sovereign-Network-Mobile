@@ -85,11 +85,14 @@ export interface BublMiniWalletProps {
   did?: string;
   /** Opens the full BUBL rewards ledger. */
   onPress: () => void;
+  /** Compact header variant — renders as a small tappable chip. */
+  compact?: boolean;
 }
 
 export const BublMiniWallet: React.FC<BublMiniWalletProps> = ({
   did,
   onPress,
+  compact,
 }) => {
   const [phase, setPhase] = useState<Phase>('loading');
   const [balance, setBalance] = useState<RewardsBalance | null>(null);
@@ -123,6 +126,27 @@ export const BublMiniWallet: React.FC<BublMiniWalletProps> = ({
       ? `${streak}-day streak · Tap to see rewards`
       : 'Tap to see rewards';
 
+  // ── Compact header variant ─────────────────────────────────────────
+  if (compact) {
+    return (
+      <Pressable
+        onPress={onPress}
+        accessibilityRole="button"
+        accessibilityLabel={
+          phase === 'ready' && balance
+            ? `BUBL earned: ${balance.total_earned_display}. Tap to see rewards.`
+            : 'BUBL rewards. Tap to see rewards.'
+        }
+        hitSlop={8}
+      >
+        <View style={styles.compactChip}>
+          <Text style={styles.compactText}>Rewards</Text>
+        </View>
+      </Pressable>
+    );
+  }
+
+  // ── Full card variant ──────────────────────────────────────────────
   return (
     <Pressable
       onPress={onPress}
@@ -254,5 +278,18 @@ const styles = StyleSheet.create({
     color: colors.primary,
     fontWeight: typography.weight.medium,
     marginLeft: spacing.xs,
+  },
+  compactChip: {
+    paddingHorizontal: spacing.sm,
+    paddingVertical: spacing.xxs,
+    borderRadius: borderRadius.base,
+    backgroundColor: colors.bg_dark,
+    borderWidth: 1,
+    borderColor: colors.primary,
+  },
+  compactText: {
+    fontSize: typography.size.xxs,
+    fontWeight: typography.weight.semibold,
+    color: colors.primary,
   },
 });

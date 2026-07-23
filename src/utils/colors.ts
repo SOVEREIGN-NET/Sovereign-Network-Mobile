@@ -5,7 +5,7 @@
 
 import { colors } from '../theme';
 
-export const getTransactionColor = (type: 'send' | 'receive' | 'stake' | 'ubi'): string => {
+export const getTransactionColor = (type: 'send' | 'receive' | 'stake' | 'ubs'): string => {
   switch (type) {
     case 'send':
       return colors.error;
@@ -13,14 +13,14 @@ export const getTransactionColor = (type: 'send' | 'receive' | 'stake' | 'ubi'):
       return colors.success;
     case 'stake':
       return colors.info;
-    case 'ubi':
+    case 'ubs':
       return colors.warning;
     default:
       return colors.text_secondary;
   }
 };
 
-export const getTransactionIcon = (type: 'send' | 'receive' | 'stake' | 'ubi'): string => {
+export const getTransactionIcon = (type: 'send' | 'receive' | 'stake' | 'ubs'): string => {
   switch (type) {
     case 'send':
       return '📤';
@@ -28,7 +28,7 @@ export const getTransactionIcon = (type: 'send' | 'receive' | 'stake' | 'ubi'): 
       return '📥';
     case 'stake':
       return '🔒';
-    case 'ubi':
+    case 'ubs':
       return '💰';
     default:
       return '💳';
@@ -69,11 +69,11 @@ export const getProposalStatusIcon = (
   }
 };
 
-export const getWalletTypeIcon = (type: 'primary' | 'ubi' | 'savings'): string => {
+export const getWalletTypeIcon = (type: 'primary' | 'ubs' | 'savings'): string => {
   switch (type) {
     case 'primary':
       return '💳';
-    case 'ubi':
+    case 'ubs':
       return '💰';
     case 'savings':
       return '🏦';

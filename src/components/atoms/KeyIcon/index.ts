@@ -1,0 +1,1 @@
+export { KeyIcon, default } from './KeyIcon';

@@ -23,7 +23,6 @@ export const en = {
     notChecked: 'Not checked',
     notCheckedHint: 'Connection has not been checked yet',
     tapToCheck: 'Tap to check connection',
-    back: 'Back',
     errors: {
       nodeUnreachable: 'Node is not reachable',
       connectionCheckFailed: 'Failed to check connection',
@@ -163,7 +162,7 @@ export const en = {
       identityType: 'Identity Type',
       selectType: 'Select Type',
       types: {
-        citizen: 'Citizen (UBI Eligible)',
+        citizen: 'Citizen (UBS Eligible)',
         citizenDescription: 'Individual citizen with voting rights',
         organization: 'Organization',
         organizationDescription: 'Organization or collective',
@@ -356,7 +355,7 @@ export const en = {
     stats: {
       title: 'Stats',
       votingPower: 'Voting Power',
-      ubiEarned: 'UBI Earned',
+      ubiEarned: 'UBS Earned',
       wallets: 'Wallets',
     },
     logout: {
@@ -383,8 +382,8 @@ export const en = {
         show: '🙈 Show',
         hide: '👁️ Hide',
       },
-      updateButton: '🔐 Update Passphrase',
-      updatingButton: '⏳ Updating...',
+      updateButton: 'Update Passphrase',
+      updatingButton: 'Updating...',
       biometric: {
         title: 'Biometric Authentication',
         enabled: 'Enabled',
@@ -393,13 +392,13 @@ export const en = {
         enabledButton: '✓ Enabled',
       },
       security: {
-        title: '🔐 Security Reminder',
+        title: 'Security Reminder',
         message: 'Keep your passphrase secure and never share it with anyone. We cannot recover your identity if you lose access.',
       },
       backup: {
         title: 'Identity Backup',
-        createButton: '💾 Create Backup',
-        viewButton: '📂 View Backups',
+        createButton: 'Create Backup',
+        viewButton: 'View Backups',
       },
       validation: {
         currentPassphraseRequired: 'Current passphrase is required',
@@ -427,8 +426,8 @@ export const en = {
         title: 'ℹ️ Profile Info',
         description: 'Your display name and avatar help other users identify you on the network.',
       },
-      saveButton: '💾 Save Changes',
-      savingButton: '💾 Saving...',
+      saveButton: 'Save Changes',
+      savingButton: 'Saving...',
       cancelButton: 'Cancel',
       validation: {
         displayNameRequired: 'Display name is required',
@@ -564,7 +563,7 @@ export const en = {
       copy: 'Copy',
       sendZhtp: 'SEND SOV',
       receiveZhtp: 'RECEIVE SOV',
-      claimUbi: 'CLAIM UBI',
+      claimUbi: 'CLAIM UBS',
       stakeZhtp: 'STAKE SOV',
     },
     wallets: {

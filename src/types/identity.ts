@@ -30,7 +30,7 @@ export interface Identity {
   deviceId?: string;
   wallets?: {
     primary: WalletInfo;
-    ubi: WalletInfo;
+    ubs: WalletInfo;
     savings: WalletInfo;
   };
   daoMembership?: {

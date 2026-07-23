@@ -16,7 +16,7 @@ import type { CreateIdentityData } from '../services/RealAuthService';
 import { walletKeychainService } from '../services/WalletKeychainService';
 import { nativeIdentityProvisioning } from '../services/NativeIdentityProvisioning';
 import IdentityCleanup from '../services/IdentityCleanup';
-import {
+import RealAuthService, {
   claimUsername as claimUsernameOnChain,
   fetchIdentityRecord,
 } from '../services/RealAuthService';
@@ -51,12 +51,6 @@ import {
 import type { LobbySession } from '../types/lobby';
 import { maskIdentifier } from '../utils/maskIdentifier';
 import { isValidDid } from '../utils/didValidator';
-
-// Always import RealAuthService, use it when node is available
-import RealAuthServiceModule from '../services/RealAuthService';
-
-// Use real auth service instance
-const RealAuthService = RealAuthServiceModule;
 
 // Use native storage on Android, AsyncStorage on iOS
 const storage = Platform.OS === 'android' ? NativeStorage : AsyncStorage;
@@ -98,15 +92,21 @@ export function getUseMockService(): boolean {
 
 /**
  * Set feature flag state (called from Developer Settings)
+ * Only allowed in __DEV__ builds — production always uses real services.
  */
-export function setUseMockService(_value: boolean): void {
-  // Mock mode is disabled across all builds.
-  const enforcedValue = false;
+export function setUseMockService(value: boolean): void {
+  const enforcedValue = __DEV__ ? value : false;
   if (cachedUseMockService !== enforcedValue) {
     cachedUseMockService = enforcedValue;
-    storage.removeItem('zhtp_use_mock_service').catch(err =>
-      console.warn('Failed to clear mock service setting:', err),
-    );
+    if (enforcedValue) {
+      storage.setItem('zhtp_use_mock_service', 'true').catch(err =>
+        console.warn('Failed to persist mock service setting:', err),
+      );
+    } else {
+      storage.removeItem('zhtp_use_mock_service').catch(err =>
+        console.warn('Failed to clear mock service setting:', err),
+      );
+    }
     notifyMockServiceListeners(enforcedValue);
   }
 }
@@ -132,15 +132,22 @@ function notifyMockServiceListeners(value: boolean): void {
 
 /**
  * Initialize the mock service flag from storage
+ * Dev builds: default to true so hot-reloading doesn't require re-login.
+ * Production: always false.
  */
 async function initializeMockServiceFlag(): Promise<void> {
   try {
-    // Clear stale mock flag — mock is now opt-in only via Settings
-    await storage.removeItem('zhtp_use_mock_service');
-    cachedUseMockService = false;
+    if (__DEV__) {
+      // Dev builds: restore persisted choice, default to true (mock).
+      const stored = await storage.getItem('zhtp_use_mock_service');
+      cachedUseMockService = stored === null ? true : stored === 'true';
+    } else {
+      await storage.removeItem('zhtp_use_mock_service');
+      cachedUseMockService = false;
+    }
   } catch (err) {
     console.warn('Failed to initialize mock service setting:', err);
-    cachedUseMockService = false;
+    cachedUseMockService = __DEV__; // fallback to true in dev
   }
 }
 
@@ -310,6 +317,21 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
    *
    * SECURITY: Also restores lib-client Identity to handle store for UHP signing
    */
+  /** Restore OPAQUE session — extracted to reduce cognitive complexity of restoreIdentity. */
+  const restoreLobbySession = async (): Promise<void> => {
+    try {
+      const lobby = await loadLobbySession();
+      if (lobby) {
+        setLobbySession(lobby);
+        if (__DEV__) {
+          console.log('[AuthContext.bootstrap] OPAQUE session restored');
+        }
+      }
+    } catch (e) {
+      console.warn('[AuthContext.bootstrap] session restore failed:', e);
+    }
+  };
+
   useEffect(() => {
     const restoreIdentity = async () => {
       try {
@@ -321,20 +343,7 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
           return;
         }
 
-        // Restore the OPAQUE password session so a signed-in user stays
-        // signed in across launches.
-        try {
-          const lobby = await loadLobbySession();
-          if (lobby) {
-            setLobbySession(lobby);
-            if (__DEV__) {
-              console.log('[AuthContext.bootstrap] OPAQUE session restored');
-            }
-          }
-        } catch (e) {
-          console.warn('[AuthContext.bootstrap] session restore failed:', e);
-        }
-
+        await restoreLobbySession();
         // Try to restore cached identity without biometric prompt on startup
         // This keeps user logged in between app sessions
         const identity = await SecureIdentityStorage.getIdentityIfAvailable(true);
@@ -401,7 +410,7 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
             }
           })();
 
-          // TODO(messaging-chain-stall): remove once the chain
+          // TODO(sov-network/node#1234): remove once the chain
           // reliably commits IdentityUpdate transactions. Right now
           // the chain on g1 is stalled, so a single publish during
           // recovery sits in mempool and never persists to
@@ -496,7 +505,7 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
         identity = hydrated;
       }
 
-      // TODO(messaging-chain-stall): see matching comment in the
+      // TODO(sov-network/node#1234): see matching comment in the
       // bootstrap effect above. Republish kyber_pk on every sign-in
       // to keep messaging working while the chain is stalled at
       // height 898 and the original publish from recovery sits in
@@ -675,6 +684,30 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
     }
   }, [setMigrationRequiredFlag]);
 
+  const restoreIdentityToHandleStore = async (identity: Identity): Promise<void> => {
+    if (!identity.identityId || !NativeModules.NativeIdentityProvisioning) return;
+    try {
+      const result = await NativeModules.NativeIdentityProvisioning.restoreIdentityToHandleStore(
+        identity.identityId
+      );
+      if (result?.status === 'restored') {
+        setRestoreWarning(null);
+        console.log('[AuthContext.setIdentity] ✅ Identity restored to handle store:', result);
+      } else if (result?.status === 'skipped') {
+        const message = `Handle store restore skipped: ${result.reason}${
+          result.error ? ` (${result.error})` : ''
+        }`;
+        setRestoreWarning(message);
+        console.warn('[AuthContext.setIdentity] ⚠️ Handle store restore skipped:', result);
+      } else {
+        console.log('[AuthContext.setIdentity] ℹ️ Handle store restoration result:', result);
+      }
+    } catch (err) {
+      console.error('[AuthContext.setIdentity] ⚠️ Failed to restore Identity to handle store:', err);
+      setRestoreWarning('Handle store restore failed');
+    }
+  };
+
   /**
    * Manually set the current identity
    * Used after saving identity to storage (e.g., after seed phrase confirmation)
@@ -700,26 +733,7 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
       setCurrentIdentity(identity);
 
       // SECURITY: Restore lib-client Identity to handle store for UHP signing
-        if (identity.identityId && NativeModules.NativeIdentityProvisioning) {
-          try {
-            const result = await NativeModules.NativeIdentityProvisioning.restoreIdentityToHandleStore(
-              identity.identityId
-            );
-            if (result?.status === 'restored') {
-              setRestoreWarning(null);
-              console.log('[AuthContext.setIdentity] ✅ Identity restored to handle store:', result);
-            } else if (result?.status === 'skipped') {
-              const message = `Handle store restore skipped: ${result.reason}${
-                result.error ? ` (${result.error})` : ''
-              }`;
-              setRestoreWarning(message);
-              console.warn('[AuthContext.setIdentity] ⚠️ Handle store restore skipped:', result);
-            } else {
-              console.log('[AuthContext.setIdentity] ℹ️ Handle store restoration result:', result);
-            }
-          } catch (err) {
-            console.error('[AuthContext.setIdentity] ⚠️ Failed to restore Identity to handle store:', err);
-            setRestoreWarning('Handle store restore failed');
+      await restoreIdentityToHandleStore(identity);
             // Non-fatal - continue anyway
           }
         }
@@ -1241,9 +1255,9 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
         .catch(() => null);
       if (
         !local ||
-        local.status !== 'found' ||
-        !local.identity_id ||
-        !local.did
+        local?.status !== 'found' ||
+        !local?.identity_id ||
+        !local?.did
       ) {
         return null;
       }
@@ -1251,7 +1265,7 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
         identityId: local.identity_id,
         did: local.did,
         displayName: username,
-        identityType: (local.identity_type ||
+        identityType: (local?.identity_type ||
           'human') as Identity['identityType'],
         deviceId: local.device_id,
         createdAt: local.created_at,
@@ -1381,6 +1395,29 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
       setIsLoading(true);
       try {
         const normalized = username.trim().toLowerCase();
+
+        // DEV / Mock mode: bypass native OPAQUE bridge entirely
+        if (getUseMockService()) {
+          const identity = await MockAuthService.signIn({
+            did: normalized,
+            passphrase: password,
+          });
+          // Best-effort persist — native Keychain may not be set up
+          // in dev, but the in-memory identity is enough for UI testing.
+          try {
+            await SecureIdentityStorage.setIdentity(identity, {
+              requireBiometric: false,
+            });
+          } catch (storeErr) {
+            console.warn(
+              '[AuthContext.passwordSignIn] mock: storage persist failed (non-fatal):',
+              storeErr,
+            );
+          }
+          setCurrentIdentity(identity);
+          return identity;
+        }
+
         const session = await opaqueLogin({
           username: normalized,
           password,

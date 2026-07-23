@@ -84,7 +84,7 @@ export const ERROR_MESSAGES = {
 export const SUCCESS_MESSAGES = {
   TRANSACTION_SENT: 'Transaction sent successfully',
   VOTE_RECORDED: 'Your vote has been recorded',
-  UBI_CLAIMED: 'UBI claimed successfully',
+  UBI_CLAIMED: 'UBS claimed successfully',
   PROPOSAL_CREATED: 'Proposal created successfully',
 } as const;
 
@@ -92,7 +92,7 @@ export const SUCCESS_MESSAGES = {
 export const PATTERNS = {
   WALLET_ADDRESS: /^zhtp1[a-z0-9]{39}$/,
   DID: /^did:zhtp:[a-zA-Z0-9_-]+$/,
-  EMAIL: /^[^\s@]+@[^\s@]+\.[^\s@]+$/,
+  EMAIL: /^[^\s@]+@[^\s@]+\.[a-z]{2,}$/i,
   AMOUNT: /^\d+(\.\d{1,2})?$/,
 } as const;
 
@@ -109,13 +109,13 @@ export const TRANSACTION_TYPES = {
   SEND: 'send',
   RECEIVE: 'receive',
   STAKE: 'stake',
-  UBI: 'ubi',
+  UBS: 'ubs',
 } as const;
 
 // Wallet Types
 export const WALLET_TYPES = {
   PRIMARY: 'primary',
-  UBI: 'ubi',
+  UBS: 'ubs',
   SAVINGS: 'savings',
 } as const;
 

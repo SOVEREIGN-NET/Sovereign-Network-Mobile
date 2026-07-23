@@ -1,25 +1,78 @@
 /**
  * HeaderBar Component
- * Top navigation bar with hamburger menu, balance text, and connection status
- * Used in Dashboard/Browser screens
+ * Top navigation bar with:
+ *  - Left: hamburger (☰) icon → opens a utility dropdown menu
+ *          (Block Explorer, PoUW Rewards, Domains)
+ *  - Center: SOV reward counter (display only — navigation removed;
+ *            PoUW is now accessible from the dropdown)
+ *  - Right: connection status indicator
+ *
+ * The hamburger dropdown replaces the previous SideDrawer "Menu" button
+ * in screens that use it as a utility nav. Screens that still want a
+ * full side drawer should continue passing onMenuPress separately.
  */
 
 import React, { useEffect, useState, useRef } from 'react';
-import { View, Pressable, StyleSheet } from 'react-native';
+import { View, Pressable, StyleSheet, Modal, TouchableOpacity } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import Svg, { Circle, Path, Rect } from 'react-native-svg';
 import { Text, Row } from '../../atoms';
 import { colors, spacing, typography, shadows } from '../../../theme';
 import { useTranslation } from '../../../i18n';
 import { useNodeConnectionStatus } from '../../../hooks/useNodeConnectionStatus';
 import { useRewardCounter } from '../../../hooks/useRewardCounter';
 
+// Simple SVG icons for the dropdown menu — defined outside the component
+// to avoid re-creating them on every render.
+const ExplorerIcon = () => (
+  <Svg width={20} height={20} viewBox="0 0 24 24" fill="none">
+    <Circle cx="12" cy="12" r="9" stroke={colors.text_primary} strokeWidth={1.5} />
+    <Path d="M12 3a9 9 0 0 1 9 9" stroke={colors.text_primary} strokeWidth={1.5} />
+    <Path d="M12 21a9 9 0 0 0 9-9" stroke={colors.text_primary} strokeWidth={1.5} />
+    <Path d="M3 12h18" stroke={colors.text_primary} strokeWidth={1.5} />
+    <Path d="M12 3v18" stroke={colors.text_primary} strokeWidth={1.5} />
+  </Svg>
+);
+
+const DappsIcon = () => (
+  <Svg width={20} height={20} viewBox="0 0 24 24" fill="none">
+    <Rect x="3" y="3" width="7" height="7" rx="1" stroke={colors.text_primary} strokeWidth={1.5} />
+    <Rect x="14" y="3" width="7" height="7" rx="1" stroke={colors.text_primary} strokeWidth={1.5} />
+    <Rect x="3" y="14" width="7" height="7" rx="1" stroke={colors.text_primary} strokeWidth={1.5} />
+    <Rect x="14" y="14" width="7" height="7" rx="1" stroke={colors.text_primary} strokeWidth={1.5} />
+  </Svg>
+);
+
+const PouwIcon = () => (
+  <Svg width={20} height={20} viewBox="0 0 24 24" fill="none">
+    <Path d="M13 2L3 14h9l-1 8 10-12h-9l1-8z" stroke={colors.text_primary} strokeWidth={1.5} strokeLinejoin="round" />
+  </Svg>
+);
+
+const DomainsIcon = () => (
+  <Svg width={20} height={20} viewBox="0 0 24 24" fill="none">
+    <Path d="M4 4h6v16H4z" stroke={colors.text_primary} strokeWidth={1.5} />
+    <Path d="M14 4h6v16h-6z" stroke={colors.text_primary} strokeWidth={1.5} />
+    <Path d="M4 12h16" stroke={colors.text_primary} strokeWidth={1.5} />
+    <Path d="M8 4V2" stroke={colors.text_primary} strokeWidth={1.5} strokeLinecap="round" />
+    <Path d="M16 4V2" stroke={colors.text_primary} strokeWidth={1.5} strokeLinecap="round" />
+  </Svg>
+);
+
 export interface HeaderBarProps {
-  onMenuPress: () => void;
+  onMenuPress?: () => void;
   sovAddress?: string;
   isConnected?: boolean;
   onConnectionStatusChange?: (connected: boolean, latencyMs?: number) => void;
+  /** Still fired on SOV counter tap, but by default the parent no longer
+   *  navigates to PoUW — that's now in the dropdown. */
   onBalancePress?: () => void;
   showHamburger?: boolean;
+  /** Callbacks for the hamburger dropdown menu */
+  onNavigateExplorer?: () => void;
+  onNavigatePouw?: () => void;
+  onNavigateDomains?: () => void;
+  onNavigateDapps?: () => void;
 }
 
 const HeaderBar: React.FC<HeaderBarProps> = ({
@@ -29,12 +82,19 @@ const HeaderBar: React.FC<HeaderBarProps> = ({
   onConnectionStatusChange,
   onBalancePress,
   showHamburger = true,
+  onNavigateExplorer,
+  onNavigatePouw,
+  onNavigateDomains,
+  onNavigateDapps,
 }) => {
   const insets = useSafeAreaInsets();
   const { t } = useTranslation();
 
   // SOV reward counter
   const { displayBalance, maturesAt } = useRewardCounter();
+
+  // Dropdown state
+  const [dropdownVisible, setDropdownVisible] = useState(false);
 
   // Maturation banner — dismiss on tap or after 10s; reappears if maturesAt changes
   const [bannerDismissed, setBannerDismissed] = useState(false);
@@ -70,6 +130,14 @@ const HeaderBar: React.FC<HeaderBarProps> = ({
     onConnectionStatusChange?.(isConnected, latencyMs ?? undefined);
   }, [isConnected, latencyMs, onConnectionStatusChange]);
 
+  // Get status indicator style (extracted to avoid nested ternary)
+  const getStatusStyle = () => {
+    if (connectionStatus === 'checking') return styles.statusChecking;
+    if (connectionStatus === 'idle') return styles.statusIdle;
+    if (isConnected) return styles.statusConnected;
+    return styles.statusDisconnected;
+  };
+
   // Get status text
   const getStatusText = () => {
     if (connectionStatus === 'checking') {
@@ -84,6 +152,24 @@ const HeaderBar: React.FC<HeaderBarProps> = ({
     return isConnected ? t.headerbar.connected : t.headerbar.offline;
   };
 
+  const handleDropdownItem = (action: string) => {
+    setDropdownVisible(false);
+    switch (action) {
+      case 'explorer':
+        onNavigateExplorer?.();
+        break;
+      case 'pouw':
+        onNavigatePouw?.();
+        break;
+      case 'dapps':
+        onNavigateDapps?.();
+        break;
+      case 'domains':
+        onNavigateDomains?.();
+        break;
+    }
+  };
+
   const styles = StyleSheet.create({
     container: {
       backgroundColor: colors.bg_dark,
@@ -93,6 +179,7 @@ const HeaderBar: React.FC<HeaderBarProps> = ({
       borderBottomWidth: 1,
       borderBottomColor: colors.border,
       ...shadows.sm,
+      zIndex: 100,
     },
     contentRow: {
       flexDirection: 'row',
@@ -113,8 +200,8 @@ const HeaderBar: React.FC<HeaderBarProps> = ({
       justifyContent: 'flex-end',
     },
     hamburger: {
-      padding: spacing.sm,
-      marginLeft: -spacing.sm,
+      paddingHorizontal: spacing.md,
+      paddingVertical: spacing.sm,
     },
     hamburgerIcon: {
       width: 24,
@@ -122,9 +209,9 @@ const HeaderBar: React.FC<HeaderBarProps> = ({
       justifyContent: 'space-between',
     },
     hamburgerLine: {
-      height: 2,
+      height: 2.5,
       backgroundColor: colors.text_primary,
-      borderRadius: 1,
+      borderRadius: 2,
     },
     centerSection: {
       position: 'absolute',
@@ -134,10 +221,8 @@ const HeaderBar: React.FC<HeaderBarProps> = ({
       bottom: 0,
       alignItems: 'center',
       flexDirection: 'row',
-      gap: spacing.md,
-    },
-    centerJustify: {
       justifyContent: 'center',
+      gap: spacing.md,
     },
     addressText: {
       fontSize: typography.size.md,
@@ -193,18 +278,53 @@ const HeaderBar: React.FC<HeaderBarProps> = ({
       paddingLeft: spacing.sm,
       opacity: 0.7,
     },
+    dropdownOverlay: {
+      flex: 1,
+    },
+    dropdownMenu: {
+      position: 'absolute',
+      top: insets.top + 44,
+      left: spacing.sm,
+      backgroundColor: colors.bg_darker,
+      borderRadius: 12,
+      borderWidth: 1,
+      borderColor: colors.border,
+      minWidth: 220,
+      paddingVertical: spacing.xs,
+      ...shadows.md,
+    },
+    dropdownItem: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      paddingVertical: spacing.md,
+      paddingHorizontal: spacing.md,
+    },
+    dropdownItemText: {
+      fontSize: typography.size.md,
+      color: colors.text_primary,
+      fontWeight: '500',
+    },
   });
+
+  const dropdownItems = [
+    { id: 'explorer', label: 'Block Explorer', icon: ExplorerIcon },
+    { id: 'dapps', label: 'Trending dApps', icon: DappsIcon },
+    { id: 'pouw', label: 'PoUW Rewards', icon: PouwIcon },
+    { id: 'domains', label: 'My Domains', icon: DomainsIcon },
+  ];
 
   return (
     <View style={styles.container}>
       <Row style={styles.contentRow}>
-        {/* Hamburger Menu */}
+        {/* Left slot: renders hamburger when enabled, otherwise empty
+            placeholder to keep the right slot pinned to the right */}
         <View style={[styles.sideSlot, styles.leftSlot]}>
           {showHamburger && (
             <Pressable
-              onPress={onMenuPress}
+              onPress={() => setDropdownVisible(true)}
               style={styles.hamburger}
               hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+              accessibilityLabel="Open navigation menu"
             >
               <View style={styles.hamburgerIcon}>
                 <View style={styles.hamburgerLine} />
@@ -215,11 +335,12 @@ const HeaderBar: React.FC<HeaderBarProps> = ({
           )}
         </View>
 
-        {/* Center: SOV Balance Counter - Tappable */}
+        {/* Center: SOV Balance Counter — display only by default; parent
+            can pass onBalancePress for custom behavior (default: no-op) */}
         <Pressable
           onPress={onBalancePress}
-          style={[styles.centerSection, styles.centerJustify]}
-          pointerEvents="box-only"
+          style={styles.centerSection}
+          pointerEvents="box-none"
           hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
         >
           <Text style={styles.sovLabel}>{sovLabel}</Text>
@@ -231,13 +352,7 @@ const HeaderBar: React.FC<HeaderBarProps> = ({
             <View
               style={[
                 styles.statusIndicator,
-                connectionStatus === 'checking'
-                  ? styles.statusChecking
-                  : connectionStatus === 'idle'
-                  ? styles.statusIdle
-                  : isConnected
-                  ? styles.statusConnected
-                  : styles.statusDisconnected,
+                getStatusStyle(),
               ]}
             />
             <Text style={{ color: colors.text_secondary }}>
@@ -248,7 +363,7 @@ const HeaderBar: React.FC<HeaderBarProps> = ({
       </Row>
 
       {/* Maturation banner — shown when identity is too new for rewards */}
-      {maturesAt && !bannerDismissed && (() => {
+      {!!maturesAt && !bannerDismissed && (() => {
         const remaining = maturesAt - Math.floor(Date.now() / 1000);
         if (remaining <= 0) return null;
         const hours = Math.ceil(remaining / 3600);
@@ -261,6 +376,41 @@ const HeaderBar: React.FC<HeaderBarProps> = ({
           </Pressable>
         );
       })()}
+
+      {/* Utility Dropdown — triggered by hamburger icon */}
+      <Modal
+        visible={dropdownVisible}
+        transparent
+        animationType="fade"
+        onRequestClose={() => setDropdownVisible(false)}
+      >
+        <TouchableOpacity
+          style={styles.dropdownOverlay}
+          activeOpacity={1}
+          onPress={() => setDropdownVisible(false)}
+        >
+          <View style={styles.dropdownMenu}>
+            {dropdownItems.map((item, idx) => (
+              <TouchableOpacity
+                key={item.id}
+                style={[
+                  styles.dropdownItem,
+                  idx < dropdownItems.length - 1 && {
+                    borderBottomWidth: 1,
+                    borderBottomColor: colors.border + '40',
+                  },
+                ]}
+                onPress={() => handleDropdownItem(item.id)}
+              >
+                <View style={{ marginRight: spacing.sm, width: 20, alignItems: 'center' }}>
+                  <item.icon />
+                </View>
+                <Text style={styles.dropdownItemText}>{item.label}</Text>
+              </TouchableOpacity>
+            ))}
+          </View>
+        </TouchableOpacity>
+      </Modal>
     </View>
   );
 };

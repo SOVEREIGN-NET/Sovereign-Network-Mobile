@@ -4,6 +4,7 @@
  */
 
 import React, { useState } from 'react';
+import Svg, { Path } from 'react-native-svg';
 import {
   View,
   ScrollView,
@@ -12,6 +13,7 @@ import {
   Clipboard,
 } from 'react-native';
 import {
+  ArrowIcon,
   Card,
   Text,
   Button,
@@ -60,6 +62,38 @@ const formatCreatedDate = (raw: unknown): string | null => {
   return d.toLocaleDateString();
 };
 
+const truncateId = (id: any) => {
+  if (!id) return 'unknown';
+  if (Array.isArray(id)) {
+    const hexString = id
+      .map(byte => byte.toString(16).padStart(2, '0'))
+      .join('');
+    return `${hexString.substring(0, 12)}...${hexString.substring(hexString.length - 12)}`;
+  }
+  if (typeof id === 'string' && id !== '') {
+    return `${id.substring(0, 12)}...${id.substring(id.length - 12)}`;
+  }
+  return 'unknown';
+};
+
+const copyToClipboard = async (id: any) => {
+  let textToCopy = '';
+  if (Array.isArray(id)) {
+    textToCopy = id.map(byte => byte.toString(16).padStart(2, '0')).join('');
+  } else if (typeof id === 'string') {
+    textToCopy = id;
+  }
+  if (textToCopy) {
+    try {
+      await Clipboard.setString(textToCopy);
+      Alert.alert('Copied', `DID copied to clipboard:\n\n${textToCopy}`);
+    } catch (error) {
+      console.error('Failed to copy DID:', error);
+      Alert.alert('Error', 'Failed to copy DID to clipboard');
+    }
+  }
+};
+
 const ProfileScreen = ({ navigation }: any) => {
   const { t } = useTranslation();
   const { currentIdentity, signOut, isLoading } = useAuth();
@@ -68,7 +102,7 @@ const ProfileScreen = ({ navigation }: any) => {
   // Keep hook order stable without triggering any network requests.
   useAsyncData(async () => null, [currentIdentity?.did]);
 
-  // Fetch UBI data for stats
+  // Fetch UBS data for stats
   const { data: ubiData } = useAsyncData(async () => {
     if (!currentIdentity?.did) {
       return null;
@@ -217,44 +251,6 @@ const ProfileScreen = ({ navigation }: any) => {
     );
   }
 
-  const truncateId = (id: any) => {
-    if (!id) return 'unknown';
-
-    if (Array.isArray(id)) {
-      const hexString = id
-        .map(byte => byte.toString(16).padStart(2, '0'))
-        .join('');
-      return `${hexString.substring(0, 12)}...${hexString.substring(
-        hexString.length - 12,
-      )}`;
-    }
-
-    if (typeof id === 'string' && id !== '') {
-      return `${id.substring(0, 12)}...${id.substring(id.length - 12)}`;
-    }
-
-    return 'unknown';
-  };
-
-  const copyToClipboard = async (id: any) => {
-    let textToCopy = '';
-    if (Array.isArray(id)) {
-      textToCopy = id.map(byte => byte.toString(16).padStart(2, '0')).join('');
-    } else if (typeof id === 'string') {
-      textToCopy = id;
-    }
-
-    if (textToCopy) {
-      try {
-        await Clipboard.setString(textToCopy);
-        Alert.alert('Copied', `DID copied to clipboard:\n\n${textToCopy}`);
-      } catch (error) {
-        console.error('Failed to copy DID:', error);
-        Alert.alert('Error', 'Failed to copy DID to clipboard');
-      }
-    }
-  };
-
   // Stats values
   const votingPower = 0;
   const votingPowerFormatted = votingPower.toLocaleString();
@@ -374,7 +370,7 @@ const ProfileScreen = ({ navigation }: any) => {
                       : t.identity.details.notVerified
                   }
                 />
-                {createdDate && (
+                {!!createdDate && (
                   <DetailRow
                     label={t.identity.details.created}
                     value={createdDate}
@@ -430,7 +426,13 @@ const ProfileScreen = ({ navigation }: any) => {
                       gap: spacing.md,
                     }}
                   >
-                    <Text style={{ fontSize: typography.size.lg }}>🌐</Text>
+                    <Svg width={22} height={22} viewBox="0 0 24 24" fill="none">
+                      <Path d="M4 4h6v16H4z" stroke={colors.text_primary} strokeWidth={1.5} />
+                      <Path d="M14 4h6v16h-6z" stroke={colors.text_primary} strokeWidth={1.5} />
+                      <Path d="M4 12h16" stroke={colors.text_primary} strokeWidth={1.5} />
+                      <Path d="M8 4V2" stroke={colors.text_primary} strokeWidth={1.5} strokeLinecap="round" />
+                      <Path d="M16 4V2" stroke={colors.text_primary} strokeWidth={1.5} strokeLinecap="round" />
+                    </Svg>
                     <View>
                       <Text
                         style={{
@@ -452,14 +454,7 @@ const ProfileScreen = ({ navigation }: any) => {
                       </Text>
                     </View>
                   </View>
-                  <Text
-                    style={{
-                      fontSize: typography.size.lg,
-                      color: colors.text_secondary,
-                    }}
-                  >
-                    ›
-                  </Text>
+                  <ArrowIcon direction="right" size={18} color={colors.text_secondary} />
                 </TouchableOpacity>
               </Column>
             </Card>

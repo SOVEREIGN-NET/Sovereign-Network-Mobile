@@ -25,6 +25,7 @@ import {
 } from 'react-native';
 import { SafeAreaView, SafeAreaViewProps } from 'react-native-safe-area-context';
 import { colors, spacing, typography } from '../../../theme';
+import { ArrowIcon } from '../../atoms/ArrowIcon/ArrowIcon';
 
 export interface ScreenLayoutProps extends Omit<ScrollViewProps, 'children' | 'scrollIndicatorInsets'> {
   children: React.ReactNode;
@@ -163,10 +164,17 @@ export const ScreenLayout = React.forwardRef<ScrollView, ScreenLayoutProps>(
             <Pressable
               onPress={onBack}
               hitSlop={12}
-              style={{ alignSelf: 'flex-start', paddingVertical: spacing.xs }}
+              style={{
+                alignSelf: 'flex-start',
+                flexDirection: 'row',
+                alignItems: 'center',
+                gap: spacing.xs,
+                paddingVertical: spacing.xs,
+              }}
               accessibilityRole="button"
               accessibilityLabel={backLabel}
             >
+              <ArrowIcon direction="left" size={18} color={colors.primary} />
               <Text
                 style={{
                   color: colors.primary,
@@ -174,7 +182,7 @@ export const ScreenLayout = React.forwardRef<ScrollView, ScreenLayoutProps>(
                   fontWeight: typography.weight.medium,
                 }}
               >
-                {`← ${backLabel}`}
+                {backLabel}
               </Text>
             </Pressable>
           </View>

@@ -4,8 +4,8 @@
  * TODO: Replace with real SOV API calls when backend is ready
  */
 
-import type { Identity, WalletInfo } from '../types/identity';
-export type { Identity, WalletInfo } from '../types/identity';
+import type { Identity } from '../types/identity';
+export type { Identity } from '../types/identity';
 
 // Keep old Wallet interface for backwards compatibility
 export interface Wallet {
@@ -55,10 +55,10 @@ const MOCK_IDENTITIES: Record<string, Identity> = {
         staked_balance: 0,
         pending_rewards: 0,
       },
-      ubi: {
+      ubs: {
         id: 'wallet_ubi_001',
-        wallet_type: 'UBI',
-        name: 'UBI Wallet',
+        wallet_type: 'UBS',
+        name: 'UBS Wallet',
         balance: 150.5,
         staked_balance: 0,
         pending_rewards: 0,
@@ -97,10 +97,10 @@ const MOCK_IDENTITIES: Record<string, Identity> = {
         staked_balance: 0,
         pending_rewards: 0,
       },
-      ubi: {
+      ubs: {
         id: 'wallet_ubi_002',
-        wallet_type: 'UBI',
-        name: 'UBI Wallet',
+        wallet_type: 'UBS',
+        name: 'UBS Wallet',
         balance: 0,
         staked_balance: 0,
         pending_rewards: 0,
@@ -127,7 +127,7 @@ const MOCK_IDENTITIES: Record<string, Identity> = {
  * All operations are simulated with delays to mimic network latency
  */
 class MockAuthService {
-  private delay: number = 800; // Simulate network delay
+  private readonly delay: number = 800; // Simulate network delay
 
   /**
    * Get demo credentials for testing
@@ -202,10 +202,10 @@ class MockAuthService {
     }
 
     // Mock username availability check
-    const existingUsername = Object.values(MOCK_IDENTITIES).find(
+    const usernameTaken = Object.values(MOCK_IDENTITIES).some(
       (id) => id.username === data.username
     );
-    if (existingUsername) {
+    if (usernameTaken) {
       throw new Error('Username already taken');
     }
 
@@ -230,10 +230,10 @@ class MockAuthService {
           staked_balance: 0,
           pending_rewards: 0,
         },
-        ubi: {
+        ubs: {
           id: 'wallet_ubi_' + this.generateMockId(),
-          wallet_type: 'UBI',
-          name: 'UBI Wallet',
+          wallet_type: 'UBS',
+          name: 'UBS Wallet',
           balance: 0,
           staked_balance: 0,
           pending_rewards: 0,

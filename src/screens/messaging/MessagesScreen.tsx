@@ -32,7 +32,6 @@ import {
   subscribe,
   type WireProbeResult,
 } from '../../services/MessagingService';
-import { publishKyberKey } from '../../services/KyberKeyService';
 import { fireActiveSession } from '../../services/RewardsService';
 import { useAuth } from '../../hooks/useAuth';
 import type { Conversation } from '../../types/messaging';
@@ -180,6 +179,8 @@ const MessagesScreen: React.FC<Props> = ({ navigation }) => {
     : conversations;
 
   const totalUnread = conversations.reduce((n, c) => n + c.unread_count, 0);
+const emptyPreviewText = privacyOn ? '' : 'No messages yet';
+
 
   return (
     <ScreenLayout
@@ -198,14 +199,19 @@ const MessagesScreen: React.FC<Props> = ({ navigation }) => {
         <View style={styles.headerTitleBlock}>
           <Text style={styles.title}>Bubl Social</Text>
           <Text style={styles.subtitle}>
-            {privacyOn
-              ? 'Privacy on · messages hidden'
-              : totalUnread > 0
-                ? `${totalUnread} unread`
-                : 'Post-quantum encrypted'}
+            {(() => {
+              if (privacyOn) return 'Privacy on · messages hidden';
+              if (totalUnread > 0) return `${totalUnread} unread`;
+              return 'Post-quantum encrypted';
+            })()}
           </Text>
         </View>
         <View style={styles.headerActions}>
+          <BublMiniWallet
+            compact
+            did={currentIdentity?.did}
+            onPress={() => navigation.navigate('BublRewards')}
+          />
           <TouchableOpacity
             style={styles.iconButton}
             onPress={() => setPrivacyPref(!privacyPref)}
@@ -227,12 +233,6 @@ const MessagesScreen: React.FC<Props> = ({ navigation }) => {
           </TouchableOpacity>
         </View>
       </View>
-
-      {/* BUBL mini-wallet — balance-only; opens the full rewards ledger. */}
-      <BublMiniWallet
-        did={currentIdentity?.did}
-        onPress={() => navigation.navigate('BublRewards')}
-      />
 
       {/* Release-announcement opt-in. */}
       <ReleaseNotifyCard did={currentIdentity?.did} />
@@ -408,7 +408,7 @@ const ConversationRow: React.FC<RowProps> = ({
             )
           ) : (
             <Text style={styles.rowPreviewEmpty} numberOfLines={1}>
-              {privacyOn ? '' : 'No messages yet'}
+              {emptyPreviewText}
             </Text>
           )}
           {unread && (

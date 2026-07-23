@@ -4,20 +4,22 @@
  */
 
 import React, { useState } from 'react';
-import { View, ScrollView, TouchableOpacity, Alert } from 'react-native';
+import { View, ScrollView, TouchableOpacity, Alert, Modal } from 'react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useFocusEffect } from '@react-navigation/native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import {
+  Button,
   Card,
   Text,
   LoadingView,
   Column,
   ScreenLayout,
 } from '../components';
-import { colors, spacing, typography, borderRadius } from '../theme';
+import { colors, spacing, typography } from '../theme';
 import domainService from '../services/DomainService';
 import { DOMAIN_REGISTRATION_DURATION_SECS } from '../types/domain';
+import DomainRegistrationScreen from './DomainRegistrationScreen';
 
 // Storage keys
 const REGISTERED_DOMAINS_KEY = 'sov:registered_domains';
@@ -53,13 +55,13 @@ function migrateStoredDomains(
       return null;
     }
     const e = entry as Partial<StoredDomain> & Record<string, unknown>;
-    const expiryMs = e.expires_at ? new Date(e.expires_at).getTime() : NaN;
+    const expiryMs = e.expires_at ? new Date(e.expires_at).getTime() : Number.NaN;
     if (Number.isFinite(expiryMs)) return e as StoredDomain;
 
     // expires_at is missing / unparseable — try to recompute from registered_at.
     const registeredMs = e.registered_at
       ? new Date(e.registered_at).getTime()
-      : NaN;
+      : Number.NaN;
     if (!Number.isFinite(registeredMs)) {
       // Can't recover this entry — but keep it (the loader marks it as
       // status: 'unknown' so the user can still see + delete it).
@@ -104,6 +106,7 @@ const MyDomainsScreen = ({ navigation }: any) => {
   const insets = useSafeAreaInsets();
   const [domains, setDomains] = useState<DomainWithStatus[]>([]);
   const [loading, setLoading] = useState(false);
+  const [domainRegistrationVisible, setDomainRegistrationVisible] = useState(false);
 
   // Load domains from AsyncStorage
   const loadDomains = async () => {
@@ -151,12 +154,15 @@ const MyDomainsScreen = ({ navigation }: any) => {
           try {
             const status = await domainService.getDomainStatus(domain.domain).catch(() => null);
             const expiresAt = status?.expires_at ?? domain.expires_at;
-            const expiryDate = typeof expiresAt === 'number'
-              ? new Date(expiresAt * 1000)
-              : expiresAt
-              ? new Date(expiresAt)
-              : null;
-            const expiryTime = expiryDate ? expiryDate.getTime() : NaN;
+            let expiryDate: Date | null;
+            if (typeof expiresAt === 'number') {
+              expiryDate = new Date(expiresAt * 1000);
+            } else if (expiresAt) {
+              expiryDate = new Date(expiresAt);
+            } else {
+              expiryDate = null;
+            }
+            const expiryTime = expiryDate ? expiryDate.getTime() : Number.NaN;
             if (!Number.isFinite(expiryTime)) {
               return {
                 ...domain,
@@ -173,7 +179,7 @@ const MyDomainsScreen = ({ navigation }: any) => {
               status: isExpired ? 'expired' : 'active',
               daysUntilExpiry: Math.max(0, daysUntilExpiry),
             };
-          } catch (error) {
+          } catch {
             return {
               ...domain,
               status: 'unknown',
@@ -233,20 +239,29 @@ const MyDomainsScreen = ({ navigation }: any) => {
         >
           My Domains
         </Text>
-        <TouchableOpacity
-          onPress={() => navigation?.goBack()}
-          hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
-        >
-          <Text
-            style={{
-              fontSize: typography.size.lg,
-              color: colors.text_secondary,
-              fontWeight: typography.weight.light,
-            }}
+        <View style={{ flexDirection: 'row', gap: spacing.sm }}>
+          <Button
+            onPress={() => setDomainRegistrationVisible(true)}
+            size="sm"
+            variant="primary"
           >
-            ✕
-          </Text>
-        </TouchableOpacity>
+            + Register
+          </Button>
+          <TouchableOpacity
+            onPress={() => navigation?.goBack()}
+            hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
+          >
+            <Text
+              style={{
+                fontSize: typography.size.lg,
+                color: colors.text_secondary,
+                fontWeight: typography.weight.normal,
+              }}
+            >
+              ✕
+            </Text>
+          </TouchableOpacity>
+        </View>
       </View>
 
       <ScreenLayout paddingTop={spacing.md}>
@@ -349,7 +364,7 @@ const MyDomainsScreen = ({ navigation }: any) => {
                                 color: colors.success,
                               }}
                             >
-                              {Number.isFinite(domain.daysUntilExpiry ?? NaN)
+                              {Number.isFinite(domain.daysUntilExpiry ?? Number.NaN)
                                 ? `${domain.daysUntilExpiry} days left`
                                 : 'Days left: —'}
                             </Text>
@@ -458,14 +473,39 @@ const MyDomainsScreen = ({ navigation }: any) => {
                       textAlign: 'center',
                     }}
                   >
-                    Register your first .sov domain in the SID tab
+                    Register your first .sov domain
                   </Text>
+                  <Button
+                    onPress={() => setDomainRegistrationVisible(true)}
+                    variant="primary"
+                    size="sm"
+                    style={{ marginTop: spacing.lg }}
+                  >
+                    Register Domain
+                  </Button>
                 </View>
               </Card>
             )}
           </Column>
         </ScrollView>
       </ScreenLayout>
+
+      {/* Domain Registration Modal */}
+      <Modal
+        visible={domainRegistrationVisible}
+        animationType="slide"
+        presentationStyle="formSheet"
+        onRequestClose={() => setDomainRegistrationVisible(false)}
+      >
+        <View style={{ flex: 1, backgroundColor: colors.bg_darkest }}>
+          <DomainRegistrationScreen
+            onClose={() => {
+              setDomainRegistrationVisible(false);
+              loadDomains();
+            }}
+          />
+        </View>
+      </Modal>
     </View>
   );
 };
